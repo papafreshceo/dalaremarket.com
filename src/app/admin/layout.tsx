@@ -13,7 +13,7 @@ export default function AdminLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
 
   const menuItems = [
-    { name: '대시보드', href: '/admin/dashboard', icon: '📊' },
+    { name: '대시222보드', href: '/admin/dashboard', icon: '📊' },
     { name: '상품조회', href: '/admin/products', icon: '📦' },
     { name: '주문통합관리', href: '/admin/orders', icon: '📋' },
     { name: '구매관리', href: '/admin/purchase', icon: '🛒' },
