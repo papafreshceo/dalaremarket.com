@@ -10,22 +10,24 @@ interface CardProps {
   children: React.ReactNode
   footer?: React.ReactNode
   actions?: React.ReactNode
-  variant?: 'default' | 'elevated' | 'outlined' | 'ghost'
+  variant?: 'default' | 'elevated' | 'outlined' | 'ghost' | 'glass' | 'gradient'
   padding?: 'none' | 'sm' | 'md' | 'lg'
   className?: string
   onClick?: () => void
+  hover?: boolean
 }
 
-export function Card({ 
-  title, 
-  description, 
-  children, 
+export function Card({
+  title,
+  description,
+  children,
   footer,
-  actions, 
+  actions,
   variant = 'default',
   padding = 'md',
   className,
-  onClick
+  onClick,
+  hover = false
 }: CardProps) {
   const paddingStyles = {
     none: '',
@@ -38,16 +40,19 @@ export function Card({
     default: 'bg-white border border-gray-200 shadow-sm',
     elevated: 'bg-white shadow-md hover:shadow-lg transition-shadow',
     outlined: 'bg-white border-2 border-gray-300',
-    ghost: 'bg-gray-50'
+    ghost: 'bg-gray-50',
+    glass: 'bg-white/80 backdrop-blur-md border border-gray-200/50 shadow-sm',
+    gradient: 'bg-gradient-to-br from-blue-50 via-white to-purple-50 border border-gray-200/50 shadow-sm'
   }
 
   return (
-    <div 
+    <div
       onClick={onClick}
       className={cn(
-        'rounded-xl overflow-hidden',
+        'rounded-2xl overflow-hidden transition-all duration-300',
         variantStyles[variant],
-        onClick && 'cursor-pointer hover:shadow-md transition-all',
+        onClick && 'cursor-pointer',
+        hover && 'hover:shadow-xl hover:-translate-y-1',
         className
       )}
     >

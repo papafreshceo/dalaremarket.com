@@ -317,3 +317,73 @@ ul, ol {
 .animate-slideUp { animation: slideUp var(--duration-normal) var(--easing-out); }
 .animate-scaleIn { animation: scaleIn var(--duration-fast) var(--easing-spring); }
 .animate-spin { animation: spin 1s linear infinite; }
+
+/* 글래스모피즘 카드 */
+.glass-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(222, 226, 230, 0.5);
+}
+
+/* 그라데이션 버튼 */
+.btn-gradient-blue {
+  background: linear-gradient(135deg, #2563eb 0%, #60a5fa 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-gradient-blue:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+}
+
+.btn-gradient-green {
+  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-gradient-green:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+/* 통계 카드 */
+.stat-card {
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.stat-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* 상태 뱃지 */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}

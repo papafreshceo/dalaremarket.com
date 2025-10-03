@@ -1,4 +1,4 @@
-// app/(admin)/settings/page.tsx
+// app/admin/settings/page.tsx
 'use client'
 
 import { useRouter } from 'next/navigation'

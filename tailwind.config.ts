@@ -1,6 +1,7 @@
 // tailwind.config.ts
 import type { Config } from "tailwindcss";
 import { tailwindExtend } from "./src/styles/design-tokens";
+import defaultTheme from "tailwindcss/defaultTheme";
 
 const config: Config = {
   content: [
@@ -10,8 +11,20 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      ...tailwindExtend,
-      
+      // 기본 Tailwind 색상 유지하면서 커스텀 색상 추가
+      colors: {
+        ...defaultTheme.colors,
+        ...tailwindExtend.colors,
+      },
+      spacing: tailwindExtend.spacing,
+      fontSize: tailwindExtend.fontSize,
+      fontWeight: tailwindExtend.fontWeight,
+      fontFamily: tailwindExtend.fontFamily,
+      borderRadius: tailwindExtend.borderRadius,
+      boxShadow: tailwindExtend.boxShadow,
+      maxWidth: tailwindExtend.maxWidth,
+      screens: tailwindExtend.screens,
+
       // 커스텀 애니메이션
       keyframes: {
         fadeIn: {
@@ -31,13 +44,16 @@ const config: Config = {
           '100%': { transform: 'scale(1)', opacity: '1' },
         },
       },
-      
+
       animation: {
         fadeIn: 'fadeIn 250ms ease-in-out',
         slideUp: 'slideUp 250ms ease-out',
         slideDown: 'slideDown 250ms ease-out',
         scaleIn: 'scaleIn 200ms ease-out',
       },
+
+      // 백드롭 블러 활성화
+      backdropBlur: defaultTheme.backdropBlur,
     },
   },
   plugins: [],

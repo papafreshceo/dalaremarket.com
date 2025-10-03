@@ -6,15 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, Button, Modal, Badge } from '@/components/ui'
 
 // ===== 타입 =====
-interface Category {
-  id: string
-  code: string
-  name: string
-  level: number
-  parent_id: string | null
-  display_order?: number
-  is_active: boolean
-}
 interface Supplier {
   id: string
   code: string
@@ -30,14 +21,11 @@ interface RawMaterial {
   id: string
   material_code: string
   material_name: string
-  category_level_1_id: string | null
-  category_level_2_id: string | null
-  category_level_3_id: string | null
-  category_level_4_id: string | null
-  category_level_5_id: string | null
-  category_level_6_id: string | null
-  item_type?: string
-  variety?: string
+  category_1: string | null  // 대분류
+  category_2: string | null  // 중분류
+  category_3: string | null  // 소분류
+  category_4: string | null  // 품목
+  category_5: string | null  // 품종
   standard_unit: string
   supply_status: string
   main_supplier_id: string | null
@@ -45,12 +33,6 @@ interface RawMaterial {
   unit_quantity?: number
   last_trade_date?: string
   supplier_name?: string
-  category_level_1?: string
-  category_level_2?: string
-  category_level_3?: string
-  category_level_4?: string
-  category_level_5?: string
-  category_level_6?: string
   season?: string
   season_start_date?: string
   season_peak_date?: string
@@ -58,22 +40,6 @@ interface RawMaterial {
   color_code?: string
   created_at?: string
   [key: string]: any
-}
-interface Product {
-  id: string
-  sku: string
-  name: string
-  description?: string
-  category?: string
-  supplier_price: number
-  selling_price: number
-  margin_rate?: number
-  commission_rate?: number
-  stock_quantity: number
-  unit: string
-  thumbnail_url?: string
-  is_active: boolean
-  created_at?: string
 }
 interface SupplyStatus {
   id?: string
@@ -100,8 +66,6 @@ export default function RawMaterialsManagementPage() {
 
   const [materials, setMaterials] = useState<RawMaterial[]>([])
   const [filteredMaterials, setFilteredMaterials] = useState<RawMaterial[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [supplyStatuses, setSupplyStatuses] = useState<SupplyStatus[]>([])
 
@@ -124,8 +88,7 @@ export default function RawMaterialsManagementPage() {
   const originalValues = useRef<Map<string, any>>(new Map())
   const [modifiedMaterials, setModifiedMaterials] = useState<Set<string>>(new Set())
 
-  // 🔸 편집 버퍼 & IME 조합 상태
-  const [editingBuffer, setEditingBuffer] = useState<{ key: string; value: string } | null>(null)
+  // IME 조합 상태
   const [isComposing, setIsComposing] = useState(false)
 
   // 되돌리기 스택
@@ -146,10 +109,11 @@ export default function RawMaterialsManagementPage() {
   const FIELD_LABELS: Record<string,string> = {
     material_code: '원물코드',
     material_name: '원물명',
-    category_level_1: '대분류',
-    category_level_2: '중분류',
-    item_type: '품목',
-    category_level_6_id: '품종',
+    category_1: '대분류',
+    category_2: '중분류',
+    category_3: '소분류',
+    category_4: '품목',
+    category_5: '품종',
     standard_unit: '단위',
     latest_price: '현재시세',
     unit_quantity: '단위수량',
@@ -164,7 +128,7 @@ export default function RawMaterialsManagementPage() {
   }
 
   const FIELD_ORDER = [
-    'material_code','material_name','category_level_1','category_level_2','item_type','category_level_6_id',
+    'material_code','material_name','category_1','category_2','category_3','category_4','category_5',
     'standard_unit','latest_price','unit_quantity','last_trade_date','main_supplier_id','season',
     'season_start_date','season_peak_date','season_end_date','supply_status','color_code'
   ]
@@ -190,15 +154,6 @@ export default function RawMaterialsManagementPage() {
     const part = suppliers.filter(s => s.name.includes(t)).sort((a,b)=>a.name.length-b.name.length)[0]
     return part?.id || null
   }
-  const resolveCategory6IdByName = (name?: string | null) => {
-    if (!name) return null
-    const t = name.trim()
-    const level6 = categories.filter(c => c.level === 6)
-    const exact = level6.find(c => c.name === t)
-    if (exact) return exact.id
-    const part = level6.filter(c => c.name.includes(t)).sort((a,b)=>a.name.length-b.name.length)[0]
-    return part?.id || null
-  }
 
   // 표시용
   const displayValue = (field: string, m: RawMaterial) => {
@@ -210,7 +165,6 @@ export default function RawMaterialsManagementPage() {
       case 'season_peak_date':
       case 'season_end_date': return m[field] ? fmtMD.format(new Date(m[field]!)) : '-'
       case 'main_supplier_id': return m.supplier_name || '-'
-      case 'category_level_6_id': return m.variety || m.category_level_6 || '-'
       default: return (m as any)[field] ?? ((m as any)[field] === 0 ? '0' : '-')
     }
   }
@@ -225,7 +179,6 @@ export default function RawMaterialsManagementPage() {
       case 'season_peak_date':
       case 'season_end_date': return m[field] || ''
       case 'main_supplier_id': return m.supplier_name || ''
-      case 'category_level_6_id': return m.variety || m.category_level_6 || ''
       default: return (m as any)[field] != null ? String((m as any)[field]) : ''
     }
   }
@@ -267,30 +220,6 @@ export default function RawMaterialsManagementPage() {
       m.supplier_name = t || (id ? suppliers.find(s => s.id === id)?.name : null) || null
       return m
     }
-    if (field === 'category_level_6_id') {
-      const id = resolveCategory6IdByName(t)
-      if (id) {
-        const selected = categories.find(c => c.id === id)!
-        let cur = selected
-        ;(m as any)[`category_level_${cur.level}_id`] = cur.id
-        ;(m as any)[`category_level_${cur.level}`] = cur.name
-        while (cur.parent_id) {
-          const p = categories.find(c => c.id === cur.parent_id)
-          if (!p) break
-          ;(m as any)[`category_level_${p.level}_id`] = p.id
-          ;(m as any)[`category_level_${p.level}`] = p.name
-          cur = p
-        }
-        for (let lvl=1; lvl<=6; lvl++) {
-          if (lvl > selected.level) {
-            ;(m as any)[`category_level_${lvl}_id`] = null
-            ;(m as any)[`category_level_${lvl}`] = null
-          }
-        }
-        m.variety = selected.name
-      }
-      return m
-    }
     if (field === 'color_code') {
       const ok = /^#([0-9A-Fa-f]{6})$/.test(t)
       m.color_code = t === '' ? null : (ok ? t : src.color_code || null)
@@ -305,7 +234,7 @@ export default function RawMaterialsManagementPage() {
   const fetchAll = async () => {
     setLoading(true)
     try {
-      await Promise.all([fetchMaterials(), fetchProducts(), fetchCategories(), fetchSuppliers(), fetchSupplyStatuses()])
+      await Promise.all([fetchMaterials(), fetchSuppliers(), fetchSupplyStatuses()])
     } finally { setLoading(false) }
   }
 
@@ -317,23 +246,28 @@ export default function RawMaterialsManagementPage() {
   }
 
   const fetchMaterials = async () => {
-    const { data } = await supabase.from('v_raw_materials_full').select('*').order('created_at', { ascending: false })
+    // raw_materials 테이블에서 직접 조회하고 supplier name은 JOIN으로 가져오기
+    const { data } = await supabase
+      .from('raw_materials')
+      .select(`
+        *,
+        supplier:suppliers!main_supplier_id(name)
+      `)
+      .order('created_at', { ascending: false })
+
     if (data) {
-      setMaterials(data)
-      setFilteredMaterials(data)
-      captureSnapshot(data) // 스냅샷 갱신
+      // supplier name을 supplier_name 필드로 매핑
+      const mapped = data.map(row => ({
+        ...row,
+        supplier_name: row.supplier?.name || null
+      }))
+      setMaterials(mapped)
+      setFilteredMaterials(mapped)
+      captureSnapshot(mapped) // 스냅샷 갱신
       setModifiedMaterials(new Set())
       originalValues.current.clear()
       setUndoStack([]) // 저장/로드 시 되돌리기 초기화
     }
-  }
-  const fetchProducts = async () => {
-    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false })
-    if (data) setProducts(data)
-  }
-  const fetchCategories = async () => {
-    const { data } = await supabase.from('material_categories').select('*').eq('is_active', true).order('level').order('display_order')
-    if (data) setCategories(data)
   }
   const fetchSuppliers = async () => {
     const { data } = await supabase.from('suppliers').select('*').eq('is_active', true).order('name')
@@ -380,8 +314,8 @@ export default function RawMaterialsManagementPage() {
       f = f.filter(m => {
         const arr = [
           m.material_code, m.material_name,
-          m.category_level_1, m.category_level_2, m.category_level_3, m.category_level_4, m.category_level_5, m.category_level_6,
-          m.item_type, m.variety, m.standard_unit, m.supply_status, m.supplier_name, m.season, m.color_code,
+          m.category_1, m.category_2, m.category_3, m.category_4, m.category_5,
+          m.standard_unit, m.supply_status, m.supplier_name, m.season, m.color_code,
           m.latest_price?.toString(), m.unit_quantity?.toString(),
           m.last_trade_date, m.season_start_date, m.season_peak_date, m.season_end_date
         ]
@@ -405,12 +339,22 @@ export default function RawMaterialsManagementPage() {
     setSelectedRows(next); setSelectAll(next.size === filteredMaterials.length)
   }
   const handleDeleteSelected = async () => {
-    if (selectedRows.size === 0) return alert('선택된 항목이 없습니다.')
-    if (!confirm(`${selectedRows.size}개 항목을 삭제하시겠습니까?`)) return
+    if (selectedRows.size === 0) {
+      alert('선택된 항목이 없습니다.')
+      setModalType(null)
+      return
+    }
     const ids = Array.from(selectedRows)
     const { error } = await supabase.from('raw_materials').delete().in('id', ids)
-    if (error) { alert('삭제 중 오류'); return }
-    setSelectedRows(new Set()); setSelectAll(false); await fetchMaterials(); alert('삭제되었습니다.')
+    if (error) {
+      alert('삭제 중 오류가 발생했습니다.')
+      return
+    }
+    setSelectedRows(new Set())
+    setSelectAll(false)
+    setModalType(null)
+    await fetchMaterials()
+    alert('삭제되었습니다.')
   }
 
   // ===== 엑셀식 편집: td contentEditable =====
@@ -419,14 +363,12 @@ export default function RawMaterialsManagementPage() {
     if (!m) return
     const isSame = selectedCell && selectedCell.row === rowIndex && selectedCell.col === colIndex && selectedCell.field === field
     if (isSame) {
-      setEditingCell({ row: rowIndex, col: colIndex, field })
       const key = getKey(m.id, field)
-      setEditingBuffer({ key, value: rawValue(field, m) || '' }) // 편집 버퍼 초기화
       if (!originalValues.current.has(key)) originalValues.current.set(key, rawValue(field, m))
+      setEditingCell({ row: rowIndex, col: colIndex, field })
     } else {
       setSelectedCell({ row: rowIndex, col: colIndex, field })
       setEditingCell(null)
-      setEditingBuffer(null)
     }
   }
 
@@ -446,9 +388,13 @@ export default function RawMaterialsManagementPage() {
 
   const commitEdit = (rowIndex: number, field: string, text: string) => {
     const m = filteredMaterials[rowIndex]
+    if (!m) return
+
     const key = getKey(m.id, field)
     const orig = originalValues.current.get(key) ?? rawValueFromSnapshot(field, m.id)
-    const nextText = (text ?? '')
+    const nextText = (text ?? '').trim()
+
+    setEditingCell(null)
 
     if (nextText === (orig ?? '')) {
       // 동일 → 변경 플래그 정리
@@ -462,8 +408,6 @@ export default function RawMaterialsManagementPage() {
       if (!hasOther) {
         setModifiedMaterials(prev => { const s=new Set(prev); s.delete(m.id); return s })
       }
-      setEditingCell(null)
-      setEditingBuffer(null)
       return
     }
 
@@ -471,29 +415,31 @@ export default function RawMaterialsManagementPage() {
     setUndoStack(prev => [...prev, { id: m.id, field, before: orig ?? '', after: nextText }])
 
     const updated = parseAndAssign(field, nextText, m)
-    const next = [...filteredMaterials]
-    next[rowIndex] = updated
-    setFilteredMaterials(next)
+
+    // filteredMaterials와 materials 둘 다 업데이트
+    setFilteredMaterials(prev => {
+      const next = [...prev]
+      next[rowIndex] = updated
+      return next
+    })
+
+    setMaterials(prev => prev.map(item => item.id === updated.id ? updated : item))
+
     recomputeRowModifiedFlag(updated)
-    setEditingCell(null)
-    setEditingBuffer(null)
   }
 
   const handleTdKeyDown = (e: React.KeyboardEvent<HTMLTableCellElement>, rowIndex: number, field: string) => {
     if (e.key === 'Enter' && !isComposing) {
       e.preventDefault()
-      const domKey = getKey(filteredMaterials[rowIndex].id, field)
-      const txt = (editingBuffer && editingBuffer.key === domKey) ? editingBuffer.value : (e.currentTarget.textContent ?? '')
+      const txt = e.currentTarget.textContent ?? ''
       commitEdit(rowIndex, field, txt)
     } else if (e.key === 'Escape') {
       e.preventDefault()
       setEditingCell(null)
-      setEditingBuffer(null)
     }
   }
   const handleTdBlur = (e: React.FocusEvent<HTMLTableCellElement>, rowIndex: number, field: string) => {
-    const domKey = getKey(filteredMaterials[rowIndex].id, field)
-    const txt = (editingBuffer && editingBuffer.key === domKey) ? editingBuffer.value : (e.currentTarget.textContent ?? '')
+    const txt = e.currentTarget.textContent ?? ''
     commitEdit(rowIndex, field, txt)
   }
 
@@ -599,12 +545,11 @@ export default function RawMaterialsManagementPage() {
         id: m.id,
         material_code: m.material_code || null,
         material_name: m.material_name || null,
-        category_level_1_id: m.category_level_1_id || null,
-        category_level_2_id: m.category_level_2_id || null,
-        category_level_3_id: m.category_level_3_id || null,
-        category_level_4_id: m.category_level_4_id || null,
-        category_level_5_id: m.category_level_5_id || null,
-        category_level_6_id: m.category_level_6_id || null,
+        category_1: m.category_1 || null,
+        category_2: m.category_2 || null,
+        category_3: m.category_3 || null,
+        category_4: m.category_4 || null,
+        category_5: m.category_5 || null,
         standard_unit: m.standard_unit || 'kg',
         supply_status: resolveStatusName(m.supply_status) || m.supply_status || '출하중',
         main_supplier_id: m.main_supplier_id || null,
@@ -673,30 +618,102 @@ export default function RawMaterialsManagementPage() {
 
       {/* 통계 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card padding="sm"><div className="flex items-center justify-between"><div className="text-center"><p className="text-sm text-gray-600">전체 원물</p><p className="text-2xl font-bold">{stats.totalMaterials.toLocaleString()}</p></div><div className="text-3xl">🌾</div></div></Card>
-        <Card padding="sm"><div className="flex items-center justify-between"><div className="text-center"><p className="text-sm text-gray-600">출하중</p><p className="text-2xl font-bold text-green-600">{stats.shippingMaterials.toLocaleString()}</p></div><div className="text-3xl">🚚</div></div></Card>
-        <Card padding="sm"><div className="flex items-center justify-between"><div className="text-center"><p className="text-sm text-gray-600">시즌종료</p><p className="text-2xl font-bold text-orange-600">{stats.seasonEndMaterials.toLocaleString()}</p></div><div className="text-3xl">📅</div></div></Card>
-        <Card padding="sm"><div className="flex items-center justify-between"><div className="text-center"><p className="text-sm text-gray-600">오늘 시세 등록</p><p className="text-2xl font-bold text-blue-600">{stats.todayPriceUpdates.toLocaleString()}</p></div><div className="text-3xl">💱</div></div></Card>
+        <Card padding="sm">
+          <div className="flex items-center justify-between">
+            <div className="text-center">
+              <p className="text-sm text-gray-600">전체 원물</p>
+              <p className="text-2xl font-bold">{stats.totalMaterials.toLocaleString()}</p>
+            </div>
+            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            </div>
+          </div>
+        </Card>
+        <Card padding="sm">
+          <div className="flex items-center justify-between">
+            <div className="text-center">
+              <p className="text-sm text-gray-600">출하중</p>
+              <p className="text-2xl font-bold text-green-600">{stats.shippingMaterials.toLocaleString()}</p>
+            </div>
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+            </div>
+          </div>
+        </Card>
+        <Card padding="sm">
+          <div className="flex items-center justify-between">
+            <div className="text-center">
+              <p className="text-sm text-gray-600">시즌종료</p>
+              <p className="text-2xl font-bold text-orange-600">{stats.seasonEndMaterials.toLocaleString()}</p>
+            </div>
+            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+        </Card>
+        <Card padding="sm">
+          <div className="flex items-center justify-between">
+            <div className="text-center">
+              <p className="text-sm text-gray-600">오늘 시세 등록</p>
+              <p className="text-2xl font-bold text-blue-600">{stats.todayPriceUpdates.toLocaleString()}</p>
+            </div>
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+        </Card>
       </div>
 
       {/* 메뉴 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <button onClick={() => openModal('material-register')} className="text-left">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center justify-between mb-3"><div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center"><span className="text-2xl text-white">📝</span></div><span className="text-xs text-gray-500">모달</span></div>
-            <h3 className="font-semibold text-lg mb-1">원물등록관리</h3><p className="text-sm text-gray-600">새로운 원물을 등록하고 정보를 수정합니다</p>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </div>
+              <span className="text-xs text-gray-500">모달</span>
+            </div>
+            <h3 className="font-semibold text-lg mb-1">원물등록관리</h3>
+            <p className="text-sm text-gray-600">새로운 원물을 등록하고 정보를 수정합니다</p>
           </Card>
         </button>
         <button onClick={() => openModal('price-record')} className="text-left">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center justify-between mb-3"><div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center"><span className="text-2xl text-white">💰</span></div><span className="text-xs text-gray-500">모달</span></div>
-            <h3 className="font-semibold text-lg mb-1">시세기록</h3><p className="text-sm text-gray-600">원물별 시세를 기록하고 이력을 관리합니다</p>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <span className="text-xs text-gray-500">모달</span>
+            </div>
+            <h3 className="font-semibold text-lg mb-1">시세기록</h3>
+            <p className="text-sm text-gray-600">원물별 시세를 기록하고 이력을 관리합니다</p>
           </Card>
         </button>
         <button onClick={() => openModal('price-analysis')} className="text-left">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center justify-between mb-3"><div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center"><span className="text-2xl text-white">📊</span></div><span className="text-xs text-gray-500">모달</span></div>
-            <h3 className="font-semibold text-lg mb-1">시세분석</h3><p className="text-sm text-gray-600">시세 변동 추이를 분석하고 예측합니다</p>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <span className="text-xs text-gray-500">모달</span>
+            </div>
+            <h3 className="font-semibold text-lg mb-1">시세분석</h3>
+            <p className="text-sm text-gray-600">시세 변동 추이를 분석하고 예측합니다</p>
           </Card>
         </button>
       </div>
@@ -714,34 +731,99 @@ export default function RawMaterialsManagementPage() {
       </div>
 
       {/* 테이블 */}
-      <Card
-        title={`원물 목록 (${filteredMaterials.length}건)`}
-        actions={
-          <div className="flex items-center gap-2">
-            {selectedRows.size > 0 && (<><span className="text-sm text-red-600 mr-2">{selectedRows.size}개 선택됨</span><Button variant="danger" size="sm" onClick={handleDeleteSelected}>선택 삭제</Button></>)}
-            {modifiedMaterials.size > 0 && (<span className="text-sm text-orange-600 mr-2">{modifiedMaterials.size}개 항목 수정됨</span>)}
-            <Button variant="primary" onClick={handleOpenConfirm} disabled={modifiedMaterials.size === 0}>변경사항 저장</Button>
-            <Button onClick={() => openModal('material')}>+ 원물 추가</Button>
-          </div>
-        }
-      >
-        {/* 검색 */}
-        <div className="mb-4">
-          <div className="w-full flex justify-end">
-            <div className="relative">
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="w-[220px] pl-3 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
-                placeholder="검색어"
-              />
-              <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+      <Card padding="none">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4 flex-1">
+              <h3 className="text-lg font-semibold text-gray-900">원물 목록</h3>
+              <span className="text-sm text-gray-500">총 {filteredMaterials.length}건</span>
+
+              {/* 검색 - 타이틀 옆 */}
+              <div className="relative ml-4">
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="w-[200px] pl-3 pr-9 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="검색..."
+                  style={{ borderColor: '#d1d5db' }}
+                />
+                <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* 상태 표시 */}
+              {modifiedMaterials.size > 0 && (
+                <span className="text-sm font-semibold px-3 py-1.5 rounded-md" style={{ color: '#c2410c', backgroundColor: '#fed7aa' }}>
+                  {modifiedMaterials.size}개 수정됨
+                </span>
+              )}
+              {selectedRows.size > 0 && (
+                <span className="text-sm font-semibold px-3 py-1.5 rounded-md" style={{ color: '#1d4ed8', backgroundColor: '#bfdbfe' }}>
+                  {selectedRows.size}개 선택됨
+                </span>
+              )}
+
+              {/* 버튼들 */}
+              <button
+                onClick={() => openModal('material')}
+                className="px-5 py-2.5 text-sm font-semibold text-white rounded-lg shadow-sm transition-all duration-200 hover:shadow-md"
+                style={{ backgroundColor: '#2563eb' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#1d4ed8'
+                  e.currentTarget.style.transform = 'translateY(-1px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563eb'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                원물 추가
+              </button>
+
+              {selectedRows.size > 0 && (
+                <button
+                  onClick={() => setModalType('delete-confirm')}
+                  className="px-5 py-2.5 text-sm font-semibold text-white rounded-lg shadow-sm transition-all duration-200 hover:shadow-md"
+                  style={{ backgroundColor: '#dc2626' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#b91c1c'
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#dc2626'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }}
+                >
+                  삭제
+                </button>
+              )}
+
+              <button
+                onClick={handleOpenConfirm}
+                disabled={modifiedMaterials.size === 0}
+                className="px-5 py-2.5 text-sm font-semibold text-white rounded-lg shadow-sm transition-all duration-200 hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ backgroundColor: modifiedMaterials.size === 0 ? '#9ca3af' : '#16a34a' }}
+                onMouseEnter={(e) => {
+                  if (modifiedMaterials.size > 0) {
+                    e.currentTarget.style.backgroundColor = '#15803d'
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (modifiedMaterials.size > 0) {
+                    e.currentTarget.style.backgroundColor = '#16a34a'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }
+                }}
+              >
+                저장
+              </button>
             </div>
           </div>
-          {globalSearchTerm && (<p className="mt-2 text-sm text-gray-600 text-right">검색 결과: {filteredMaterials.length}건</p>)}
         </div>
 
         <div className="overflow-x-auto">
@@ -753,17 +835,19 @@ export default function RawMaterialsManagementPage() {
               <col style={{ width: '100px' }} />
               <col style={{ width: '100px' }} />
               <col style={{ width: '100px' }} />
-              <col style={{ width: '120px' }} />
+              <col style={{ width: '100px' }} />
+              <col style={{ width: '100px' }} />
+              <col style={{ width: '80px' }} />
               <col style={{ width: '110px' }} />
               <col style={{ width: '100px' }} />
               <col style={{ width: '110px' }} />
               <col style={{ width: '130px' }} />
-              <col style={{ width: '120px' }} />
               <col style={{ width: '100px' }} />
               <col style={{ width: '100px' }} />
               <col style={{ width: '100px' }} />
-              <col style={{ width: '110px' }} />
+              <col style={{ width: '100px' }} />
               <col style={{ width: '90px' }} />
+              <col style={{ width: '110px' }} />
               <col style={{ width: '110px' }} />
             </colgroup>
             <thead>
@@ -771,14 +855,24 @@ export default function RawMaterialsManagementPage() {
                 <th className="px-2 py-3">
                   <input type="checkbox" checked={selectAll} onChange={handleSelectAll} className="cursor-pointer" />
                 </th>
-                {['원물코드','원물명','대분류','중분류','품목','품종','단위','현재시세','단위수량','최근거래','주거래처','시즌','시작일','피크시기','종료일','상태','색코드','작업'].map((h, i)=>(
+                {['원물코드','원물명','대분류','중분류','소분류','품목','품종','단위','현재시세','단위수량','최근거래','주거래처','시즌','시작일','피크시기','종료일','상태','색코드','작업'].map((h, i)=>(
                   <th key={i} className="px-2 py-3 text-xs font-medium text-gray-500">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filteredMaterials.map((m, rowIndex) => (
-                <tr key={m.id} className={`border-b hover:bg-gray-50 ${modifiedMaterials.has(m.id) ? 'bg-yellow-50' : ''} ${selectedRows.has(m.id) ? 'bg-blue-50' : ''}`}>
+              {filteredMaterials.map((m, rowIndex) => {
+                // 다음 행과 품목이 다른지 확인 (마지막 행이거나 다음 행의 category_4가 다르면 true)
+                const isLastInGroup =
+                  rowIndex === filteredMaterials.length - 1 ||
+                  filteredMaterials[rowIndex + 1]?.category_4 !== m.category_4
+
+                const borderClass = isLastInGroup
+                  ? 'border-b border-gray-300'
+                  : 'border-b border-gray-100'
+
+                return (
+                <tr key={m.id} className={`hover:bg-gray-50 ${borderClass} ${modifiedMaterials.has(m.id) ? 'bg-yellow-50' : ''} ${selectedRows.has(m.id) ? 'bg-blue-50' : ''}`}>
                   <td className="px-2 py-2">
                     <input type="checkbox" checked={!!selectedRows.has(m.id)} onChange={() => handleSelectRow(m.id)} className="cursor-pointer" />
                   </td>
@@ -786,10 +880,11 @@ export default function RawMaterialsManagementPage() {
                   {[
                     { field: 'material_code' },
                     { field: 'material_name', bold: true },
-                    { field: 'category_level_1' },
-                    { field: 'category_level_2' },
-                    { field: 'item_type' },
-                    { field: 'category_level_6_id' }, // 품종(표시는 이름)
+                    { field: 'category_1' },
+                    { field: 'category_2' },
+                    { field: 'category_3' },
+                    { field: 'category_4' },
+                    { field: 'category_5' },
                     { field: 'standard_unit' },
                     { field: 'latest_price' },
                     { field: 'unit_quantity' },
@@ -818,41 +913,28 @@ export default function RawMaterialsManagementPage() {
                     const textCls = col.bold ? ' font-medium' : ''
                     const modifiedCls = isCellModified(m, col.field) ? ' text-red-600' : ''
 
-                    // 편집 모드: contentEditable + 버퍼
+                    // 편집 모드: contentEditable
                     if (isEditing) {
-                      const domKey = `${m.id}-${col.field}`
-                      const valueForDom =
-                        editingBuffer && editingBuffer.key === domKey
-                          ? editingBuffer.value
-                          : rawValue(col.field, m) || ''
-
                       return (
                         <td
                           key={key}
                           className={`${base}${textCls}${selectedCls}${modifiedCls}`}
                           contentEditable
                           suppressContentEditableWarning
-                          dangerouslySetInnerHTML={{ __html: escapeHtml(valueForDom) }}
                           onClick={(e) => e.stopPropagation()}
-                          onInput={(e) => {
-                            const txt = (e.currentTarget.textContent ?? '')
-                            setEditingBuffer({ key: domKey, value: txt })
-                          }}
                           onPaste={(e) => {
                             e.preventDefault()
                             const t = (e.clipboardData.getData('text/plain') || '').replace(/\r?\n/g, '')
                             document.execCommand('insertText', false, t)
                           }}
                           onCompositionStart={() => setIsComposing(true)}
-                          onCompositionEnd={(e) => {
-                            setIsComposing(false)
-                            const txt = (e.currentTarget.textContent ?? '')
-                            setEditingBuffer({ key: domKey, value: txt })
-                          }}
+                          onCompositionEnd={() => setIsComposing(false)}
                           onKeyDown={(e) => handleTdKeyDown(e, rowIndex, col.field)}
                           onBlur={(e) => handleTdBlur(e, rowIndex, col.field)}
                           title=""
-                        />
+                        >
+                          {rawValue(col.field, m) || ''}
+                        </td>
                       )
                     }
 
@@ -913,7 +995,8 @@ export default function RawMaterialsManagementPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -964,6 +1047,51 @@ export default function RawMaterialsManagementPage() {
                 </tbody>
               </table>
             )}
+          </div>
+        </Modal>
+      )}
+
+      {/* 삭제 컨펌 모달 */}
+      {modalType === 'delete-confirm' && (
+        <Modal
+          isOpen={true}
+          onClose={() => setModalType(null)}
+          title="선택 항목 삭제"
+          size="lg"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setModalType(null)}>취소</Button>
+              <Button variant="danger" onClick={handleDeleteSelected} className="bg-red-600 hover:bg-red-700">삭제</Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              선택한 <strong className="text-red-600">{selectedRows.size}개</strong>의 원물을 삭제하시겠습니까?
+            </p>
+            <div className="max-h-[40vh] overflow-auto bg-gray-50 rounded-lg p-3">
+              <ul className="space-y-2">
+                {Array.from(selectedRows).map(id => {
+                  const item = filteredMaterials.find(m => m.id === id)
+                  if (!item) return null
+                  return (
+                    <li key={id} className="text-sm flex items-center gap-2">
+                      <span className="text-red-500">•</span>
+                      <span className="font-medium">{item.material_name || item.material_code}</span>
+                      <span className="text-gray-500 text-xs">
+                        ({item.category_1} &gt; {item.category_2} &gt; {item.category_4})
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>삭제된 데이터는 복구할 수 없습니다.</span>
+            </div>
           </div>
         </Modal>
       )}

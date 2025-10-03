@@ -58,9 +58,10 @@ export function Modal({
       
       {/* 모달 */}
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div 
+        <div
           className={cn(
-            'relative bg-white rounded-xl shadow-xl w-full max-h-[90vh] overflow-hidden animate-scaleIn',
+            'relative bg-white rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-hidden animate-scaleIn',
+            'border border-gray-100',
             sizeStyles[size]
           )}
           onClick={(e) => e.stopPropagation()}
