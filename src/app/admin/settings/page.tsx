@@ -1,4 +1,4 @@
-// app/admin/settings/page.tsx
+// app/(admin)/settings/page.tsx
 'use client'
 
 import { useRouter } from 'next/navigation'
@@ -14,6 +14,13 @@ export default function SettingsPage() {
       href: '/admin/settings/categories',
       icon: '📂',
       color: 'bg-blue-500'
+    },
+    {
+      title: '공급상태 관리',
+      description: '원물/상품의 공급상태 옵션을 관리합니다.',
+      href: '/admin/settings/supply-status',
+      icon: '🏷️',
+      color: 'bg-emerald-500'
     },
     {
       title: '사용자 관리',
@@ -137,6 +144,12 @@ export default function SettingsPage() {
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
         >
           🎯 카테고리 관리 바로가기
+        </button>
+        <button
+          onClick={() => router.push('/admin/settings/supply-status')}
+          className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
+        >
+          🏷️ 공급상태 관리 바로가기
         </button>
         <button
           onClick={() => alert('캐시를 삭제했습니다.')}
