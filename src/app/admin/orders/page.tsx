@@ -1,7 +1,31 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+
+// 타입 정의
+interface Customer {
+  id: string
+  email: string
+  name: string
+  phone?: string
+  company_name?: string
+  role: string
+  approved: boolean
+}
+
+interface Product {
+  id: string
+  sku: string
+  name: string
+  description?: string
+  category?: string
+  supplier_price: number
+  selling_price: number
+  stock_quantity: number
+  unit: string
+  is_active: boolean
+}
 
 interface Order {
   id: string
@@ -34,18 +58,34 @@ interface OrderItem {
   }
 }
 
+interface OrderForm {
+  customer_id: string
+  items: {
+    product_id: string
+    quantity: number
+    unit_price: number
+  }[]
+  shipping_fee: number
+  notes: string
+}
+
+interface StatusConfig {
+  label: string
+  color: string
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [products, setProducts] = useState<any[]>([])
-  const [customers, setCustomers] = useState<any[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [error, setError] = useState<string | null>(null)
   
   // 새 주문 폼 데이터
-  const [orderForm, setOrderForm] = useState({
+  const [orderForm, setOrderForm] = useState<OrderForm>({
     customer_id: '',
     items: [{ product_id: '', quantity: 1, unit_price: 0 }],
     shipping_fee: 0,
@@ -54,14 +94,8 @@ export default function OrdersPage() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchOrders()
-    fetchProducts()
-    fetchCustomers()
-  }, [])
-
-  // 주문 목록 조회 - 개선된 에러 핸들링
-  const fetchOrders = async () => {
+  // 주문 목록 조회 - useCallback으로 메모이제이션
+  const fetchOrders = useCallback(async () => {
     try {
       setError(null)
       
@@ -75,8 +109,6 @@ export default function OrdersPage() {
       if (basicError) {
         console.error('Basic query error:', basicError)
         setError(`주문 데이터를 불러올 수 없습니다: ${basicError.message}`)
-        
-        // 테이블이 없거나 권한 문제일 수 있으므로 빈 배열로 설정
         setOrders([])
         return
       }
@@ -103,7 +135,6 @@ export default function OrdersPage() {
 
       if (error) {
         console.error('Full query error:', error)
-        // 관계 조회 실패 시 기본 데이터만 사용
         setOrders(basicData || [])
         console.warn('관계 데이터를 불러올 수 없습니다. 기본 데이터만 표시합니다.')
       } else {
@@ -117,10 +148,10 @@ export default function OrdersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
 
-  // 상품 목록 조회 - 개선된 에러 핸들링
-  const fetchProducts = async () => {
+  // 상품 목록 조회 - useCallback으로 메모이제이션
+  const fetchProducts = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('products')
@@ -136,10 +167,10 @@ export default function OrdersPage() {
     } catch (error) {
       console.error('Error in fetchProducts:', error)
     }
-  }
+  }, [supabase])
 
-  // 고객 목록 조회 - 개선된 에러 핸들링
-  const fetchCustomers = async () => {
+  // 고객 목록 조회 - useCallback으로 메모이제이션
+  const fetchCustomers = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('users')
@@ -156,7 +187,18 @@ export default function OrdersPage() {
     } catch (error) {
       console.error('Error in fetchCustomers:', error)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    const loadData = async () => {
+      await Promise.all([
+        fetchOrders(),
+        fetchProducts(),
+        fetchCustomers()
+      ])
+    }
+    loadData()
+  }, [fetchOrders, fetchProducts, fetchCustomers])
 
   // 주문 생성
   const handleCreateOrder = async () => {
@@ -221,7 +263,7 @@ export default function OrdersPage() {
   // 주문 상태 변경
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
-      const updateData: any = { status: newStatus }
+      const updateData: Record<string, string | Date> = { status: newStatus }
       
       // 상태별 추가 정보 업데이트
       if (newStatus === 'confirmed') {
@@ -301,7 +343,7 @@ export default function OrdersPage() {
   }
 
   const getStatusBadge = (status: string) => {
-    const statusConfig: any = {
+    const statusConfig: Record<string, StatusConfig> = {
       pending: { label: '대기중', color: 'bg-gray-100 text-gray-800' },
       confirmed: { label: '확인됨', color: 'bg-blue-100 text-blue-800' },
       processing: { label: '처리중', color: 'bg-yellow-100 text-yellow-800' },
