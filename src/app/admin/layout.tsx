@@ -42,7 +42,7 @@ export default function AdminLayout({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <h1 className="ml-4 text-xl font-semibold">달래아마켓 관리자</h1>
+            <h1 className="ml-4 text-xl font-semibold">달래마켓 관리자</h1>
           </div>
           
           <div className="flex items-center gap-4">
