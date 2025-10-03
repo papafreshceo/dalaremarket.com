@@ -1,36 +1,125 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 달래마켓 B2B 통합 비즈니스 플랫폼
 
-## Getting Started
+B2B 통합 비즈니스 플랫폼 - 내부 관리 시스템과 고객용 발주/분석 도구를 통합한 올인원 솔루션
 
-First, run the development server:
+## 🚀 기술 스택
 
+- **프레임워크**: Next.js 15.5.4 (App Router)
+- **언어**: TypeScript
+- **데이터베이스**: Supabase (PostgreSQL)
+- **인증**: Supabase Auth
+- **스타일링**: Tailwind CSS + shadcn/ui
+- **배포**: Vercel
+
+## 📋 주요 기능
+
+### 관리자 시스템
+- 📦 주문통합관리
+- 📊 상품/재고 관리
+- 👥 고객/거래처 관리
+- 💰 지출/인건비 관리
+- 📈 대시보드 및 분석
+
+### 사용자 플랫폼
+- 🛒 발주 시스템
+- 📱 상품 카탈로그
+- 🔧 업무 도구
+- 🤖 AI 어시스턴트
+
+## 🛠️ 설치 및 실행
+
+### 1. 프로젝트 클론
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/yourusername/dalreamarket.com.git
+cd dalreamarket.com
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. 의존성 설치
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. 환경 변수 설정
+`.env.example` 파일을 `.env.local`로 복사하고 실제 값으로 채우기:
+```bash
+cp .env.example .env.local
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 4. Supabase 데이터베이스 설정
+1. [Supabase](https://supabase.com)에서 프로젝트 생성
+2. SQL Editor에서 `database/schema.sql` 파일 실행
+3. `.env.local`에 Supabase URL과 키 입력
 
-## Learn More
+### 5. 개발 서버 실행
+```bash
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+브라우저에서 [http://localhost:3000](http://localhost:3000) 접속
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 📁 프로젝트 구조
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+dalreamarket.com/
+├── app/
+│   ├── (admin)/          # 관리자 페이지
+│   ├── (platform)/       # 사용자 페이지
+│   ├── (auth)/          # 인증 페이지
+│   └── api/             # API Routes
+├── components/
+│   ├── ui/              # 공통 UI 컴포넌트
+│   ├── admin/           # 관리자 컴포넌트
+│   └── platform/        # 사용자 컴포넌트
+├── lib/
+│   ├── supabase/        # Supabase 클라이언트
+│   └── utils/           # 유틸리티 함수
+├── types/               # TypeScript 타입 정의
+└── public/             # 정적 파일
+```
 
-## Deploy on Vercel
+## 🔐 사용자 역할
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **super_admin**: 시스템 전체 관리
+- **admin**: 일반 관리자
+- **employee**: 직원
+- **customer**: 일반 고객
+- **vip_customer**: VIP 고객
+- **partner**: 파트너사
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📝 테스트 계정
+
+### 관리자
+- Email: admin@dalreamarket.com
+- Password: admin123456
+
+### 고객
+- Email: customer@test.com
+- Password: customer123456
+
+## 🚀 배포
+
+### Vercel 배포
+```bash
+npm run build
+vercel --prod
+```
+
+### 환경 변수 설정
+Vercel 대시보드에서 다음 환경 변수 설정:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+## 📄 라이선스
+
+MIT License
+
+## 👥 팀
+
+- 개발: [Your Name]
+- 디자인: [Designer Name]
+
+## 📞 문의
+
+- Email: contact@dalreamarket.com
+- Website: https://dalreamarket.com
