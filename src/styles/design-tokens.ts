@@ -111,15 +111,15 @@ export const design = {
     },
     
     fontSize: {
-      xs: ['0.75rem', '1rem'],     // 12px
-      sm: ['0.875rem', '1.25rem'],  // 14px
-      base: ['1rem', '1.5rem'],     // 16px
-      lg: ['1.125rem', '1.75rem'],  // 18px
-      xl: ['1.25rem', '1.75rem'],   // 20px
-      '2xl': ['1.5rem', '2rem'],    // 24px
-      '3xl': ['1.875rem', '2.25rem'], // 30px
-      '4xl': ['2.25rem', '2.5rem'],   // 36px
-      '5xl': ['3rem', '1'],          // 48px
+      xs: ['0.75rem', '1rem'],      // 12px
+      sm: ['0.875rem', '1.25rem'],  // 14px - 본문
+      base: ['0.875rem', '1.25rem'], // 14px - 기본 본문
+      lg: ['1rem', '1.5rem'],       // 16px - 타이틀
+      xl: ['1.125rem', '1.75rem'],  // 18px - 페이지 타이틀
+      '2xl': ['1.25rem', '1.75rem'], // 20px
+      '3xl': ['1.5rem', '2rem'],    // 24px
+      '4xl': ['1.875rem', '2.25rem'], // 30px
+      '5xl': ['2.25rem', '1'],      // 36px
     },
     
     fontWeight: {

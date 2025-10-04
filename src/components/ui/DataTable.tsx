@@ -60,19 +60,19 @@ export function DataTable({
 
   return (
     <div className={cn(
-      'overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm',
+      'overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-md hover:shadow-lg transition-shadow duration-300',
       className
     )}>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
             <tr>
               {columns.map((column) => (
                 <th
                   key={column.key}
                   className={cn(
                     rowPadding,
-                    'text-xs font-medium text-gray-500 uppercase tracking-wider',
+                    'text-xs font-semibold text-gray-600 uppercase tracking-wider',
                     column.align === 'center' && 'text-center',
                     column.align === 'right' && 'text-right',
                     !column.align && 'text-left'
@@ -80,9 +80,9 @@ export function DataTable({
                   style={{ width: column.width }}
                 >
                   {column.sortable ? (
-                    <button className="group inline-flex items-center gap-1 hover:text-gray-900">
+                    <button className="group inline-flex items-center gap-1 hover:text-gray-900 transition-colors">
                       {column.label}
-                      <svg className="w-3 h-3 opacity-0 group-hover:opacity-100" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M5 12a1 1 0 102 0V6.414l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L5 6.414V12zM15 8a1 1 0 10-2 0v5.586l-1.293-1.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L15 13.586V8z" />
                       </svg>
                     </button>
@@ -117,12 +117,12 @@ export function DataTable({
               </tr>
             ) : (
               data.map((row, index) => (
-                <tr 
+                <tr
                   key={index}
                   onClick={() => onRowClick?.(row, index)}
                   className={cn(
-                    striped && index % 2 === 1 && 'bg-gray-50',
-                    hoverable && 'hover:bg-gray-50 transition-colors',
+                    striped && index % 2 === 1 && 'bg-gray-50/50',
+                    hoverable && 'hover:bg-blue-50/50 transition-all duration-200',
                     onRowClick && 'cursor-pointer'
                   )}
                 >
@@ -150,7 +150,7 @@ export function DataTable({
                               e.stopPropagation()
                               onEdit(row, index)
                             }}
-                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-all duration-200 hover:shadow-sm"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -163,7 +163,7 @@ export function DataTable({
                               e.stopPropagation()
                               onDelete(row, index)
                             }}
-                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200 hover:shadow-sm"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

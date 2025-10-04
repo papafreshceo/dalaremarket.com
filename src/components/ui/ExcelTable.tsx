@@ -403,26 +403,26 @@ export default function ExcelTable({
   return (
     <div className="excel-table-container" style={{ fontSize: `${fontSize}px` }}>
       {/* 툴바 */}
-      <div className="flex items-center gap-2 mb-2 p-2 bg-gray-50 border rounded">
+      <div className="flex items-center gap-3 mb-3 p-3 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl shadow-sm">
         <button
           onClick={handleSaveClick}
           disabled={modifiedRows.size === 0}
-          className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 hover:shadow-md hover:-translate-y-0.5 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200"
         >
-          저장 ({modifiedRows.size}개 수정됨)
+          💾 저장 {modifiedRows.size > 0 && `(${modifiedRows.size}개 수정됨)`}
         </button>
-        <div className="text-sm text-gray-600">
-          {currentCell && `셀: ${currentCell.row + 1}행 ${currentCell.col + 1}열`}
+        <div className="text-sm font-medium text-gray-700">
+          {currentCell && `📍 ${currentCell.row + 1}행 ${currentCell.col + 1}열`}
         </div>
-        <div className="text-sm text-gray-500 ml-auto">
+        <div className="text-xs text-gray-500 ml-auto bg-gray-100 px-3 py-1.5 rounded-lg">
           Ctrl+C: 복사 | Ctrl+V: 붙여넣기 | Ctrl+Z: 실행취소 | F2/Enter: 편집
         </div>
       </div>
 
       {/* 테이블 컨테이너 */}
-      <div 
+      <div
         ref={containerRef}
-        className="border border-gray-300 overflow-auto bg-white"
+        className="border border-gray-300 overflow-auto bg-white rounded-xl shadow-md"
         style={{ maxHeight: '600px' }}
         onMouseUp={handleMouseUp}
       >
@@ -446,12 +446,13 @@ export default function ExcelTable({
                     width: `${column.width}px`,
                     minWidth: `${column.width}px`,
                     maxWidth: `${column.width}px`,
-                    padding: '0 4px',
-                    backgroundColor: '#f3f4f6',
+                    padding: '0 8px',
+                    background: 'linear-gradient(to bottom, #f9fafb, #f3f4f6)',
                     borderRight: '1px solid #d1d5db',
-                    borderBottom: '2px solid #9ca3af',
+                    borderBottom: '2px solid #2563eb',
                     fontSize: `${fontSize}px`,
                     fontWeight: 600,
+                    color: '#374151',
                     textAlign: column.align || 'left',
                     position: 'sticky',
                     top: 0,
@@ -469,9 +470,9 @@ export default function ExcelTable({
             {tableData.map((row, rowIndex) => (
               <tr 
                 key={rowIndex}
-                style={{ 
+                style={{
                   height: `${rowHeight}px`,
-                  backgroundColor: modifiedRows.has(rowIndex) ? '#fef3c7' : 'white'
+                  backgroundColor: modifiedRows.has(rowIndex) ? '#fef3c7' : rowIndex % 2 === 0 ? 'white' : '#fafbfc'
                 }}
               >
                 {columns.map((column, colIndex) => {
@@ -488,12 +489,13 @@ export default function ExcelTable({
                         width: `${column.width}px`,
                         minWidth: `${column.width}px`,
                         maxWidth: `${column.width}px`,
-                        padding: '0 4px',
+                        padding: '0 8px',
                         borderRight: '1px solid #e5e7eb',
                         borderBottom: '1px solid #e5e7eb',
                         backgroundColor: isSelected ? '#dbeafe' : isCurrent ? '#eff6ff' : 'transparent',
-                        outline: isCurrent ? '2px solid #2563eb' : 'none',
+                        outline: isCurrent ? '2px solid #3b82f6' : 'none',
                         outlineOffset: '-2px',
+                        boxShadow: isCurrent ? '0 0 0 1px #3b82f6 inset' : 'none',
                         textAlign: column.align || 'left',
                         cursor: column.editable ? 'cell' : 'default',
                         position: 'relative',

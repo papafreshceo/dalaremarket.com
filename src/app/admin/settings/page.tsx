@@ -9,6 +9,20 @@ export default function SettingsPage() {
 
   const settingsMenu = [
     {
+      title: '품종 마스터 관리',
+      description: '품종별 대분류/중분류/소분류를 관리합니다.',
+      href: '/admin/settings/itemmaster',
+      icon: '📋',
+      color: 'bg-teal-500'
+    },
+    {
+      title: '거래처 유형 관리',
+      description: '거래처 유형을 추가하거나 수정합니다.',
+      href: '/admin/settings/partner-types',
+      icon: '🏷️',
+      color: 'bg-sky-500'
+    },
+    {
       title: '카테고리 관리',
       description: '원물 분류 체계(대/중/소분류)를 관리합니다.',
       href: '/admin/settings/categories',

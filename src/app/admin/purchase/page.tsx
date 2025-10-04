@@ -1,13 +1,18 @@
-export default function Page() {
+'use client'
+
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+
+export default function PurchasePage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    router.replace('/admin/purchase/saiup')
+  }, [router])
+
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">구매관리</h1>
-        <p className="mt-1 text-sm text-gray-600">구매관리 관리 페이지입니다.</p>
-      </div>
-      <div className="bg-white shadow rounded-lg p-6">
-        <p>구매관리 기능이 들어갈 예정입니다.</p>
-      </div>
+    <div className="flex items-center justify-center py-12">
+      <p className="text-gray-500">로딩 중...</p>
     </div>
   )
 }

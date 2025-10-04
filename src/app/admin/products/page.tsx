@@ -164,7 +164,7 @@ export default function ProductsMainPage() {
             href={item.href}
             className="block group"
           >
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer h-full">
+            <div className="bg-white shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer h-full">
               <div className="flex items-center justify-between mb-4">
                 <div className={`w-12 h-12 rounded-lg ${item.color} flex items-center justify-center text-white text-2xl`}>
                   {item.icon}

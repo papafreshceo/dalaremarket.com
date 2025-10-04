@@ -48,19 +48,19 @@ export function Tabs({
     default: {
       container: 'border-b border-gray-200',
       tab: cn(baseStyles, 'border-b-2 -mb-px'),
-      active: 'border-primary-500 text-primary-600',
+      active: 'border-blue-600 text-blue-600 font-semibold',
       inactive: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
     },
     pills: {
-      container: 'bg-gray-100 p-1 rounded-lg',
-      tab: cn(baseStyles, 'rounded-md'),
-      active: 'bg-white text-primary-600 shadow-sm',
-      inactive: 'text-gray-500 hover:text-gray-700'
+      container: 'bg-gray-100 p-1 rounded-xl inline-flex',
+      tab: cn(baseStyles, 'rounded-lg'),
+      active: 'bg-white text-blue-600 shadow-md font-semibold',
+      inactive: 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
     },
     underline: {
       container: '',
       tab: cn(baseStyles, 'relative'),
-      active: 'text-primary-600 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary-500',
+      active: 'text-blue-600 font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-gradient-to-r after:from-blue-600 after:to-blue-400',
       inactive: 'text-gray-500 hover:text-gray-700'
     }
   }
