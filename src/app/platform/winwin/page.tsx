@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import UserHeader from '@/components/layout/UserHeader';
 
 // Type definitions
 interface LocationData {
@@ -300,7 +299,7 @@ export default function WinWinPage() {
 
   return (
     <>
-      <UserHeader />
+      
       <div style={{
         minHeight: '100vh',
         background: 'linear-gradient(180deg, #eff6ff, #ffffff 25%, #ffffff)',

@@ -1,6 +1,5 @@
 'use client';
 
-import UserHeader from '@/components/layout/UserHeader';
 
 export default function MarketPage() {
   return (

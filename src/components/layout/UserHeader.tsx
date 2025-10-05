@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { AuthModal } from '@/components/auth/AuthModal';
+import { useToast } from '@/components/ui/Toast';
 
 interface NavItem {
   path: string;
@@ -19,18 +21,39 @@ export default function UserHeader() {
   const pathname = usePathname();
   const [showSubmenu, setShowSubmenu] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
   const supabase = createClient();
+  const { showToast } = useToast();
 
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+
+      if (user) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        setUserRole(userData?.role || null);
+      } else {
+        setUserRole(null);
+      }
     };
 
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      if (session?.user) {
+        checkUser();
+      } else {
+        setUser(null);
+        setUserRole(null);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -47,7 +70,7 @@ export default function UserHeader() {
         { path: '/platform/products/images', text: '이미지다운로드' }
       ]
     },
-    { path: '/platform/orders', text: '발주시스템' },
+    { path: '/platform/orders', text: '발주관리' },
     {
       path: '/platform/tools',
       text: '업무도구',
@@ -86,6 +109,7 @@ export default function UserHeader() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    showToast('로그아웃되었습니다.', 'success');
   };
 
   return (
@@ -110,7 +134,7 @@ export default function UserHeader() {
           justifyContent: 'space-between'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '40px' }}>
-            <Link href="/platform">
+            <Link href="/">
               <img
                 src="https://res.cloudinary.com/dde1hpbrp/image/upload/v1753148563/05_etc/dalraemarket_papafarmers.com/DalraeMarket_loge_trans.png"
                 alt="달래마켓"
@@ -131,7 +155,7 @@ export default function UserHeader() {
                     style={{
                       fontSize: '14px',
                       color: isActive(item.path) ? '#2563eb' : '#212529',
-                      fontWeight: isActive(item.path) ? '600' : '400',
+                      fontWeight: '500',
                       textDecoration: 'none',
                       display: 'flex',
                       alignItems: 'center',
@@ -259,6 +283,22 @@ export default function UserHeader() {
                 <span style={{ fontSize: '14px', color: '#495057' }}>
                   {user.email}
                 </span>
+                {(userRole === 'admin' || userRole === 'employee' || userRole === 'super_admin') && (
+                  <button
+                    onClick={() => window.open('/admin/dashboard', '_blank')}
+                    style={{
+                      padding: '8px 20px',
+                      background: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    관리자 화면
+                  </button>
+                )}
                 <button
                   onClick={handleLogout}
                   style={{
@@ -276,8 +316,8 @@ export default function UserHeader() {
               </>
             ) : (
               <>
-                <Link
-                  href="/auth/login"
+                <button
+                  onClick={() => { setAuthModalMode('login'); setAuthModalOpen(true); }}
                   style={{
                     padding: '8px 20px',
                     background: 'white',
@@ -285,16 +325,14 @@ export default function UserHeader() {
                     borderRadius: '6px',
                     fontSize: '14px',
                     color: '#212529',
-                    cursor: 'pointer',
-                    textDecoration: 'none',
-                    display: 'inline-block'
+                    cursor: 'pointer'
                   }}
                 >
                   로그인
-                </Link>
+                </button>
 
-                <Link
-                  href="/auth/register"
+                <button
+                  onClick={() => { setAuthModalMode('register'); setAuthModalOpen(true); }}
                   style={{
                     padding: '8px 20px',
                     background: '#2563eb',
@@ -302,18 +340,21 @@ export default function UserHeader() {
                     border: 'none',
                     borderRadius: '6px',
                     fontSize: '14px',
-                    cursor: 'pointer',
-                    textDecoration: 'none',
-                    display: 'inline-block'
+                    cursor: 'pointer'
                   }}
                 >
                   회원가입
-                </Link>
+                </button>
               </>
             )}
           </div>
         </div>
       </header>
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        initialMode={authModalMode}
+      />
     </>
   );
 }

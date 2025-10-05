@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import UserHeader from '@/components/layout/UserHeader';
 
 interface PlanLimits {
   [featureId: string]: string;
@@ -224,7 +223,7 @@ export default function PricingPage() {
   return (
     <>
       <style>{heroAuraStyle}</style>
-      <UserHeader />
+      
       <div style={{
         minHeight: '100vh',
         background: 'linear-gradient(180deg, #eff6ff, #ffffff 25%, #ffffff)',

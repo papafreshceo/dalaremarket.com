@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import UserHeader from '@/components/layout/UserHeader';
 
 interface Comment {
   id: number;
@@ -255,7 +254,7 @@ export default function SellerFeedPage() {
 
   return (
     <>
-      <UserHeader />
+      
       <div style={{
         position: 'relative',
         width: '100%',

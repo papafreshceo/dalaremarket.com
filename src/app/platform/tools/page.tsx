@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import UserHeader from '@/components/layout/UserHeader';
 import ToolModal from '@/legacy/dalraemarket/src/components/tools/ToolModal';
 
 interface Category {
@@ -364,7 +363,7 @@ export default function ToolsPage() {
 
   return (
     <>
-      <UserHeader />
+      
       <div style={{
         position: 'relative',
         width: '100%',

@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ToastProvider } from '@/components/ui/Toast'
 import { ConfirmProvider } from '@/components/ui/ConfirmModal'
+import { LogoutButton } from '@/components/ui/LogoutButton'
 
 export default function AdminLayout({
   children,
@@ -238,15 +239,15 @@ export default function AdminLayout({
             </button>
 
             <div className="w-px h-6 bg-gray-300" />
-            
-            <form action="/api/auth/logout" method="POST">
-              <button 
-                type="submit"
-                className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                로그아웃
-              </button>
-            </form>
+
+            <button
+              onClick={() => window.open('/', '_blank')}
+              className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              플랫폼 화면
+            </button>
+
+            <LogoutButton />
           </div>
         </div>
       </header>

@@ -1,6 +1,7 @@
 // app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
+import { ToastProvider } from '@/components/ui/Toast';
 
 export const metadata: Metadata = {
   title: "달래마켓",
@@ -26,7 +27,9 @@ export default function RootLayout({
         />
       </head>
       <body className="font-pretendard antialiased">
-        {children}
+        <ToastProvider>
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

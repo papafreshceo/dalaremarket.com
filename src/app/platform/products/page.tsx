@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import UserHeader from '@/components/layout/UserHeader';
 
 // TypeScript Interfaces
 interface Stat {
@@ -73,7 +72,7 @@ export default function ProductsPage() {
 
   return (
     <>
-      <UserHeader />
+      
       <div style={{
         position: 'relative',
         width: '100%',
