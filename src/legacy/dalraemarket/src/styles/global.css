@@ -1,0 +1,644 @@
+/* ==========================================
+   달래마켓 - Global CSS System
+   Based on Home.jsx Design System
+   ========================================== */
+
+/* ======== Font Import ======== */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+
+/* ======== CSS 변수 정의 (모바일 우선) ======== */
+:root {
+  /* ======== Colors ======== */
+  /* Primary */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #60a5fa;
+  --color-primary-bg: #e7f3ff;
+  
+  /* Status Colors */
+  --color-success: #10b981;
+  --color-success-light: #34d399;
+  --color-warning: #f59e0b;
+  --color-warning-light: #fbbf24;
+  --color-danger: #ef4444;
+  --color-danger-light: #f87171;
+  --color-info: #06b6d4;
+  --color-info-light: #22d3ee;
+  --color-special: #8b5cf6;
+  --color-special-light: #a78bfa;
+  
+  /* Grays */
+  --color-text-primary: #212529;
+  --color-text-secondary: #495057;
+  --color-text-muted: #6c757d;
+  --color-border: #dee2e6;
+  --color-border-light: #f1f3f5;
+  --color-bg-secondary: #f8f9fa;
+  --color-bg-muted: #fafafa;
+  --color-white: #ffffff;
+  
+  /* Weekend Colors */
+  --color-sunday: #ef4444;
+  --color-saturday: #2563eb;
+  
+  /* ======== Typography (Mobile) ======== */
+  --font-size-xs: 9px;
+  --font-size-sm: 10px;
+  --font-size-base: 12px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 20px;
+  --font-size-3xl: 24px;
+  --font-size-4xl: 28px;
+  
+  /* Font Weights - Pretendard 기준 */
+  --font-weight-thin: 200;      /* 가장 얇은 텍스트 */
+  --font-weight-light: 300;     /* 일반 본문 */
+  --font-weight-regular: 400;   /* 기본 텍스트 */
+  --font-weight-medium: 500;    /* 중요 헤더 (h2) */
+  --font-weight-semibold: 600;  /* 주요 헤더 (h1) */
+  
+  /* ======== Spacing (Mobile) ======== */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 24px;
+  --space-3xl: 28px;
+  --space-4xl: 32px;
+  --space-5xl: 36px;
+  --space-6xl: 40px;
+  
+  /* Container */
+  --container-padding: 20px;
+  --section-gap: 24px;
+  
+  /* Cards */
+  --card-padding: 20px;
+  --card-radius: 16px;
+  --card-radius-lg: 20px;
+  --card-radius-xl: 24px;
+  --card-gap: 16px;
+  
+  /* Buttons */
+  --btn-padding: 8px 20px;
+  --btn-padding-lg: 12px 32px;
+  --btn-radius: 8px;
+  --btn-radius-full: 30px;
+  
+  /* Grid */
+  --grid-cols-stats: repeat(2, 1fr);
+  --grid-cols-market: 1fr;
+  --grid-cols-tools: repeat(2, 1fr);
+  --grid-cols-order: 1fr;
+  --grid-cols-calendar: repeat(7, 1fr);
+  
+  /* Component Sizes */
+  --stat-icon-size: 48px;
+  --stat-icon-inner: 24px;
+  --tool-icon-size: 48px;
+  --calendar-nav-btn: 28px;
+  --stat-font-size: 24px;
+  
+  /* Shadows */
+  --shadow-xs: 0 2px 4px rgba(0,0,0,0.05);
+  --shadow-sm: 0 4px 6px rgba(0,0,0,0.07);
+  --shadow-base: 0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.06);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,0.08);
+  --shadow-xl: 0 30px 60px rgba(0,0,0,0.12);
+  
+  /* Transitions */
+  --transition-fast: all 0.2s ease;
+  --transition-base: all 0.3s ease;
+  --transition-slow: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* ======== Mobile adjustments ======== */
+@media (max-width: 768px) {
+  :root {
+    /* 모바일에서 통계 카드 크기 대폭 축소 */
+    --stat-font-size: 14px;
+    --stat-icon-size: 28px;
+    --stat-icon-inner: 14px;
+  }
+  
+  .grid-stats {
+    grid-template-columns: repeat(5, 1fr);  /* PC처럼 5열 구조 */
+    gap: 4px;  /* 간격 최소화 */
+    overflow-x: auto;  /* 가로 스크롤 가능 */
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .stat-card {
+    padding: 8px;  /* 패딩 최소화 */
+    min-width: 70px;  /* 최소 너비 보장 */
+    min-height: auto;
+  }
+  
+  /* 레이아웃 세로로 변경 (아이콘 위, 텍스트 아래) */
+  .stat-card .flex {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 4px;
+  }
+  
+  /* 레이블 숨기거나 축소 */
+  .stat-card div[style*="text-transform"] {
+    font-size: 8px !important;
+    display: none;  /* 또는 숨기기 */
+  }
+}
+
+/* ======== Tablet (768px+) ======== */
+@media (min-width: 768px) {
+  :root {
+    /* Typography */
+    --font-size-sm: 11px;
+    --font-size-base: 13px;
+    --font-size-md: 14px;
+    --font-size-lg: 18px;
+    --font-size-xl: 20px;
+    --font-size-2xl: 22px;
+    --font-size-3xl: 28px;
+    --font-size-4xl: 32px;
+    
+    /* Spacing */
+    --space-3xl: 32px;
+    --space-4xl: 36px;
+    --space-5xl: 40px;
+    --space-6xl: 48px;
+    
+    /* Container */
+    --container-padding: 30px;
+    --section-gap: 30px;
+    
+    /* Cards */
+    --card-padding: 28px;
+    --card-gap: 20px;
+    
+    /* Grid */
+    --grid-cols-stats: repeat(3, 1fr);
+    --grid-cols-market: repeat(2, 1fr);
+    --grid-cols-tools: repeat(3, 1fr);
+    --grid-cols-order: repeat(2, 1fr);
+    
+    /* Component Sizes */
+    --stat-icon-size: 56px;
+    --stat-icon-inner: 28px;
+    --tool-icon-size: 56px;
+    --calendar-nav-btn: 32px;
+    --stat-font-size: 28px;
+    
+    /* Buttons */
+    --btn-padding: 10px 24px;
+  }
+}
+
+/* ======== Desktop (1024px+) ======== */
+@media (min-width: 1024px) {
+  :root {
+    /* Typography */
+    --font-size-sm: 11px;
+    --font-size-base: 14px;
+    --font-size-md: 14px;
+    --font-size-lg: 18px;
+    --font-size-xl: 20px;
+    --font-size-2xl: 24px;
+    --font-size-3xl: 32px;
+    --font-size-4xl: 36px;
+    
+    /* Spacing */
+    --container-padding: 40px;
+    --section-gap: 36px;
+    
+    /* Cards */
+    --card-padding: 36px;
+    --card-radius-xl: 24px;
+    --card-gap: 24px;
+    
+    /* Grid */
+    --grid-cols-stats: repeat(5, 1fr);
+    --grid-cols-market: repeat(4, 1fr);
+    --grid-cols-tools: repeat(4, 1fr);
+    --grid-cols-order: repeat(3, 1fr);
+    
+    /* Component Sizes */
+    --stat-icon-size: 60px;
+    --stat-icon-inner: 30px;
+    --tool-icon-size: 60px;
+    --stat-font-size: 32px;
+    
+    /* Buttons */
+    --btn-padding: 12px 32px;
+  }
+}
+
+/* ======== Global Reset ======== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-light);
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  background: var(--color-white);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ======== Typography ======== */
+h1 {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-semibold);  /* 600 */
+  margin-bottom: 10px;
+}
+
+h2 {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-medium);    /* 500 */
+}
+
+h3 {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-regular);   /* 400 */
+}
+
+p {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-light);     /* 300 */
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+/* 캡션, 주석 등 */
+.caption {
+  font-weight: var(--font-weight-thin);      /* 200 */
+  color: var(--color-text-muted);
+}
+
+/* 일반 텍스트 */
+.text-normal {
+  font-weight: var(--font-weight-light);     /* 300 */
+}
+
+/* 강조 텍스트 */
+.text-emphasis {
+  font-weight: var(--font-weight-regular);   /* 400 */
+}
+
+/* ======== Container System ======== */
+.container {
+  padding: var(--container-padding);
+  background: var(--color-white);
+  min-height: 100vh;
+}
+
+.section {
+  background: var(--color-white);
+  border-radius: var(--card-radius-xl);
+  padding: var(--card-padding);
+  margin-bottom: var(--section-gap);
+  box-shadow: var(--shadow-lg);
+  border: 2px solid var(--color-border-light);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 모바일 전체화면 처리 */
+@media (max-width: 768px) {
+  body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+  
+  .container {
+    padding: 10px;
+    padding-top: 20px;  /* 상단 여백 추가 */
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .section {
+    border-radius: 0;
+    margin: 0 0 2px 0;
+    padding: 20px 10px;  /* 상하 20px, 좌우 10px */
+    border-left: none;
+    border-right: none;
+    box-shadow: none;
+    border-top: 1px solid var(--color-border-light);
+    border-bottom: 1px solid var(--color-border-light);
+  }
+  
+  .section:first-of-type {
+    border-top: none;
+    padding-top: 20px;  /* 첫 번째 섹션 상단 패딩 추가 */
+  }
+
+  .grid-stats:first-child {
+    margin-top: 10px;
+  }
+}
+
+/* ======== Grid System ======== */
+.grid-stats {
+  display: grid;
+  grid-template-columns: var(--grid-cols-stats);
+  gap: var(--card-gap);
+}
+
+.grid-market {
+  display: grid;
+  grid-template-columns: var(--grid-cols-market);
+  gap: var(--card-gap);
+}
+
+.grid-tools {
+  display: grid;
+  grid-template-columns: var(--grid-cols-tools);
+  gap: var(--card-gap);
+}
+
+.grid-order {
+  display: grid;
+  grid-template-columns: var(--grid-cols-order);
+  gap: var(--card-gap);
+}
+
+.grid-calendar {
+  display: grid;
+  grid-template-columns: var(--grid-cols-calendar);
+  gap: 8px;
+}
+
+/* ======== Card Components ======== */
+.stat-card {
+  background: var(--color-white);
+  border-radius: var(--card-radius-lg);
+  padding: var(--space-3xl);
+  cursor: pointer;
+  transition: var(--transition-slow);
+  border: 2px solid var(--color-border-light);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 모바일에서 통계 카드 조정 */
+@media (max-width: 768px) {
+  .stat-card {
+    padding: 16px;
+    min-height: auto;
+  }
+  
+  .stat-card .flex {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  /* 통계 카드 내부 아이콘 크기 조정 */
+  .stat-card div[style*="--stat-icon-size"] {
+    width: 40px !important;
+    height: 40px !important;
+  }
+  
+  .stat-card div[style*="--stat-icon-inner"] {
+    width: 20px !important;
+    height: 20px !important;
+  }
+}
+
+.stat-card:hover {
+  transform: translateY(-12px) scale(1.05);
+}
+
+.card {
+  background: var(--color-white);
+  border-radius: var(--card-radius);
+  padding: var(--space-xl);
+  transition: var(--transition-base);
+  cursor: pointer;
+  box-shadow: var(--shadow-base);
+}
+
+.card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* ======== Button System ======== */
+.btn {
+  padding: var(--btn-padding);
+  border-radius: var(--btn-radius);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-regular);  /* 400 */
+  cursor: pointer;
+  transition: var(--transition-fast);
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn:hover {
+  font-weight: var(--font-weight-medium);   /* hover시 살짝 굵게 */
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+  color: white;
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.3);
+}
+
+.btn-secondary {
+  background: var(--color-white);
+  border: 2px solid var(--color-primary);
+  color: var(--color-primary);
+}
+
+.btn-outline {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-light);    /* 300 */
+}
+
+.btn-outline:hover {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-regular);  /* 400 */
+}
+
+.btn-rounded {
+  border-radius: var(--btn-radius-full);
+}
+
+/* ======== Badge System ======== */
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);    /* 500 - 뱃지는 좀 더 굵게 */
+  color: white;
+}
+
+.badge-success {
+  background: linear-gradient(135deg, var(--color-success) 0%, var(--color-success-light) 100%);
+}
+
+.badge-primary {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+}
+
+.badge-special {
+  background: linear-gradient(135deg, var(--color-special) 0%, var(--color-special-light) 100%);
+}
+
+/* ======== Calendar Specific ======== */
+.calendar-container {
+  background: var(--color-bg-secondary);
+  border-radius: var(--card-radius);
+  padding: var(--space-xl);
+  overflow: hidden;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  background: var(--color-white);
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  position: relative;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+}
+
+.calendar-day:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.calendar-day.today {
+  border: 2px solid var(--color-primary);
+}
+
+.calendar-day.selected {
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+}
+
+/* ======== Table System ======== */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  padding: var(--space-md);
+  text-align: left;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);    /* 500 - 테이블 헤더 */
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table td {
+  padding: var(--space-md);
+  font-weight: var(--font-weight-light);     /* 300 - 테이블 데이터 */
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+/* ======== Animations ======== */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ======== Utility Classes ======== */
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+.flex { display: flex; }
+.flex-center { display: flex; align-items: center; justify-content: center; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+
+.gap-xs { gap: var(--space-xs); }
+.gap-sm { gap: var(--space-sm); }
+.gap-md { gap: var(--space-md); }
+.gap-lg { gap: var(--space-lg); }
+
+.mb-xs { margin-bottom: var(--space-xs); }
+.mb-sm { margin-bottom: var(--space-sm); }
+.mb-md { margin-bottom: var(--space-md); }
+.mb-lg { margin-bottom: var(--space-lg); }
+.mb-xl { margin-bottom: var(--space-xl); }
+
+/* ======== Mobile Specific ======== */
+@media (max-width: 767px) {
+  /* Hide table columns on mobile */
+  .hide-mobile {
+    display: none !important;
+  }
+  
+  /* Mobile table responsive */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Stack buttons on mobile */
+  .btn-group-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+  
+  /* Full width cards on mobile */
+  .card-mobile-full {
+    width: 100%;
+    margin: 0;
+  }
+}
+
+/* ======== Tablet & Desktop Specific ======== */
+@media (min-width: 768px) {
+  .hide-desktop {
+    display: none !important;
+  }
+  
+  .container-max {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+}

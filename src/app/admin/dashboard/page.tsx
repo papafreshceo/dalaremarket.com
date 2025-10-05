@@ -18,7 +18,7 @@ export default async function AdminDashboard() {
     .eq('id', user.id)
     .single()
 
-  if (!userData?.approved || (userData.role !== 'admin' && userData.role !== 'employee')) {
+  if (!userData?.approved || (userData.role !== 'admin' && userData.role !== 'employee' && userData.role !== 'super_admin')) {
     redirect('/')
   }
 

@@ -6,397 +6,533 @@ import { Button } from '@/components/ui'
 interface Task {
   id: string
   title: string
-  time: string
+  dueDate?: string
   completed: boolean
-  priority: 'high' | 'medium' | 'low'
+  list: string
+}
+
+interface SubPlan {
+  id: string
+  title: string
+  startDate: string
+  endDate: string
 }
 
 interface Plan {
   id: string
   title: string
-  description: string
-  tasks: Task[]
-  status: 'completed' | 'inProgress' | 'pending'
-}
-
-interface Note {
-  id: string
-  content: string
+  startDate: string
+  endDate: string
+  subPlans: SubPlan[]
+  expanded: boolean
 }
 
 export default function PlanningPage() {
-  const [selectedDate, setSelectedDate] = useState(new Date())
-  const [plans, setPlans] = useState<Plan[]>([
-    {
-      id: '1',
-      title: '거래처 관리',
-      description: '신규 거래처 발굴 및 기존 거래처 관리',
-      status: 'inProgress',
-      tasks: [
-        { id: '1-1', title: '거래처 미팅', time: '09:00', completed: false, priority: 'high' },
-        { id: '1-2', title: '계약서 검토', time: '11:00', completed: true, priority: 'medium' },
-        { id: '1-3', title: '견적서 발송', time: '14:00', completed: false, priority: 'medium' },
-      ]
-    },
-    {
-      id: '2',
-      title: '재고 관리',
-      description: '재고 현황 파악 및 발주 계획',
-      status: 'inProgress',
-      tasks: [
-        { id: '2-1', title: '재고 확인', time: '10:00', completed: true, priority: 'high' },
-        { id: '2-2', title: '발주 요청', time: '15:00', completed: false, priority: 'medium' },
-      ]
-    },
-    {
-      id: '3',
-      title: '시세 분석',
-      description: '주간 시세 동향 분석',
-      status: 'completed',
-      tasks: [
-        { id: '3-1', title: '데이터 수집', time: '09:00', completed: true, priority: 'low' },
-        { id: '3-2', title: '분석 보고서 작성', time: '14:00', completed: true, priority: 'medium' },
-      ]
-    },
-  ])
-  const [notes, setNotes] = useState<Note[]>([
-    { id: '1', content: '다음주 납품 일정 확인 필요' }
-  ])
-  const [expandedPlans, setExpandedPlans] = useState<Set<string>>(new Set(['1', '2']))
-  const [newNote, setNewNote] = useState('')
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [showCompleted, setShowCompleted] = useState(false)
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [showAddPlan, setShowAddPlan] = useState(false)
+  const [newPlanTitle, setNewPlanTitle] = useState('')
+  const [newPlanStartDate, setNewPlanStartDate] = useState('')
+  const [newPlanEndDate, setNewPlanEndDate] = useState('')
+  const [addingSubPlanTo, setAddingSubPlanTo] = useState<string | null>(null)
+  const [newSubPlanTitle, setNewSubPlanTitle] = useState('')
+  const [newSubPlanStartDate, setNewSubPlanStartDate] = useState('')
+  const [newSubPlanEndDate, setNewSubPlanEndDate] = useState('')
 
-  const togglePlan = (planId: string) => {
-    const newExpanded = new Set(expandedPlans)
-    if (newExpanded.has(planId)) {
-      newExpanded.delete(planId)
-    } else {
-      newExpanded.add(planId)
+  // 캘린더 관련 함수
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const daysInMonth = lastDay.getDate()
+    const startDayOfWeek = firstDay.getDay()
+
+    const days = []
+    // 이전 달 날짜
+    for (let i = 0; i < startDayOfWeek; i++) {
+      days.push(null)
     }
-    setExpandedPlans(newExpanded)
+    // 현재 달 날짜
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(new Date(year, month, i))
+    }
+
+    return days
   }
 
-  const toggleTask = (planId: string, taskId: string) => {
-    setPlans(plans.map(p => {
-      if (p.id === planId) {
-        const updatedTasks = p.tasks.map(t =>
-          t.id === taskId ? { ...t, completed: !t.completed } : t
-        )
-        const allCompleted = updatedTasks.every(t => t.completed)
-        const anyCompleted = updatedTasks.some(t => t.completed)
-        return {
-          ...p,
-          tasks: updatedTasks,
-          status: allCompleted ? 'completed' : anyCompleted ? 'inProgress' : 'pending'
-        }
-      }
-      return p
-    }))
+  const isSameDay = (date1: Date | null, date2: Date | null) => {
+    if (!date1 || !date2) return false
+    return date1.getFullYear() === date2.getFullYear() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getDate() === date2.getDate()
   }
 
-  const addNote = () => {
-    if (!newNote.trim()) return
-    setNotes([...notes, { id: Date.now().toString(), content: newNote }])
-    setNewNote('')
+  const isToday = (date: Date) => {
+    const today = new Date()
+    return isSameDay(date, today)
   }
 
-  const deleteNote = (id: string) => {
-    setNotes(notes.filter(n => n.id !== id))
+  const formatDateString = (date: Date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
   }
 
-  const formatDate = (date: Date) => {
-    const days = ['일', '월', '화', '수', '목', '금', '토']
+  const getTasksForDate = (date: Date | null) => {
+    if (!date) return []
+    const dateString = formatDateString(date)
+    return tasks.filter(task => task.dueDate === dateString)
+  }
+
+  const changeMonth = (delta: number) => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + delta))
+  }
+
+  // 태스크 관련 함수
+  const addTask = () => {
+    if (!newTaskTitle.trim()) return
+
+    const newTask: Task = {
+      id: Date.now().toString(),
+      title: newTaskTitle,
+      dueDate: selectedDate ? formatDateString(selectedDate) : undefined,
+      completed: false,
+      list: 'default'
+    }
+
+    setTasks([...tasks, newTask])
+    setNewTaskTitle('')
+  }
+
+  const toggleTask = (taskId: string) => {
+    setTasks(tasks.map(task =>
+      task.id === taskId ? { ...task, completed: !task.completed } : task
+    ))
+  }
+
+  const deleteTask = (taskId: string) => {
+    setTasks(tasks.filter(task => task.id !== taskId))
+  }
+
+  const addPlan = () => {
+    if (!newPlanTitle.trim() || !newPlanStartDate || !newPlanEndDate) return
+
+    const newPlan: Plan = {
+      id: Date.now().toString(),
+      title: newPlanTitle,
+      startDate: newPlanStartDate,
+      endDate: newPlanEndDate,
+      subPlans: [],
+      expanded: false
+    }
+
+    setPlans([...plans, newPlan])
+    setNewPlanTitle('')
+    setNewPlanStartDate('')
+    setNewPlanEndDate('')
+    setShowAddPlan(false)
+  }
+
+  const togglePlanExpanded = (planId: string) => {
+    setPlans(plans.map(plan =>
+      plan.id === planId ? { ...plan, expanded: !plan.expanded } : plan
+    ))
+  }
+
+  const addSubPlan = (planId: string) => {
+    if (!newSubPlanTitle.trim() || !newSubPlanStartDate || !newSubPlanEndDate) return
+
+    const newSubPlan: SubPlan = {
+      id: Date.now().toString(),
+      title: newSubPlanTitle,
+      startDate: newSubPlanStartDate,
+      endDate: newSubPlanEndDate
+    }
+
+    setPlans(plans.map(plan =>
+      plan.id === planId
+        ? { ...plan, subPlans: [...plan.subPlans, newSubPlan] }
+        : plan
+    ))
+
+    setNewSubPlanTitle('')
+    setNewSubPlanStartDate('')
+    setNewSubPlanEndDate('')
+    setAddingSubPlanTo(null)
+  }
+
+  const calculatePosition = (startDate: string, endDate: string) => {
+    const today = new Date()
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+
+    const timelineStart = new Date(today)
+    timelineStart.setDate(today.getDate() - 30)
+
+    const daysSinceStart = Math.floor((start.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24))
+    const duration = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+
+    // 61일을 100%로 계산
+    const leftPercent = (daysSinceStart / 61) * 100
+    const widthPercent = (duration / 61) * 100
+
     return {
-      year: date.getFullYear(),
-      month: date.getMonth() + 1,
-      day: date.getDate(),
-      dayOfWeek: days[date.getDay()]
+      left: `${leftPercent}%`,
+      width: `${widthPercent}%`
     }
   }
 
-  const calculateProgress = (tasks: Task[]) => {
-    if (tasks.length === 0) return 0
-    const completed = tasks.filter(t => t.completed).length
-    return Math.round((completed / tasks.length) * 100)
-  }
-
-  const { year, month, day, dayOfWeek } = formatDate(selectedDate)
-
-  const completedPlans = plans.filter(p => p.status === 'completed')
-  const inProgressPlans = plans.filter(p => p.status === 'inProgress')
-  const pendingPlans = plans.filter(p => p.status === 'pending')
+  const days = getDaysInMonth(currentDate)
+  const incompleteTasks = tasks.filter(task => !task.completed)
+  const completedTasks = tasks.filter(task => task.completed)
+  const displayTasks = showCompleted ? tasks : incompleteTasks
 
   return (
     <div className="space-y-6">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-[16px] font-bold text-gray-900">업무계획</div>
-          <div className="text-sm text-gray-500 mt-1">{year}년 {month}월 {day}일 {dayOfWeek}요일</div>
+      {/* 캘린더 */}
+      <div className="w-[800px] mx-auto">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          {/* 캘린더 헤더 */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월
+            </h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setCurrentDate(new Date())
+                  setSelectedDate(new Date())
+                }}
+                className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                오늘
+              </button>
+              <button
+                onClick={() => changeMonth(-1)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => changeMonth(1)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* 요일 헤더 */}
+          <div className="grid grid-cols-7 gap-2 mb-2">
+            {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
+              <div
+                key={day}
+                className={`text-center text-xs font-semibold py-2 ${
+                  index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-600'
+                }`}
+              >
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* 캘린더 그리드 */}
+          <div className="grid grid-cols-7 gap-2">
+            {days.map((day, index) => {
+              if (!day) {
+                return <div key={`empty-${index}`} className="aspect-square" />
+              }
+
+              const dayTasks = getTasksForDate(day)
+              const isSelected = isSameDay(day, selectedDate)
+              const isTodayDate = isToday(day)
+              const isWeekend = index % 7 === 0 || index % 7 === 6
+
+              return (
+                <button
+                  key={day.toISOString()}
+                  onClick={() => setSelectedDate(day)}
+                  className={`aspect-square rounded-lg transition-all relative group ${
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-md scale-105'
+                      : isTodayDate
+                      ? 'bg-blue-50 text-blue-600 ring-2 ring-blue-600'
+                      : 'hover:bg-gray-100'
+                  }`}
+                >
+                  <div className="flex flex-col items-center justify-center h-full">
+                    <span
+                      className={`text-sm font-medium ${
+                        isSelected
+                          ? 'text-white'
+                          : isTodayDate
+                          ? 'text-blue-600 font-bold'
+                          : isWeekend
+                          ? index % 7 === 0
+                            ? 'text-red-500'
+                            : 'text-blue-500'
+                          : 'text-gray-900'
+                      }`}
+                    >
+                      {day.getDate()}
+                    </span>
+
+                    {/* 이벤트 점 표시 */}
+                    {dayTasks.length > 0 && !isSelected && (
+                      <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-0.5">
+                        {dayTasks.slice(0, 3).map((_, idx) => (
+                          <div
+                            key={idx}
+                            className={`w-1 h-1 rounded-full ${
+                              isTodayDate ? 'bg-blue-600' : 'bg-blue-500'
+                            }`}
+                          ></div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setSelectedDate(new Date())}>
-          오늘
-        </Button>
       </div>
 
-      <div className="flex gap-6">
-        {/* 계획 목록 */}
-        <div className="flex-1 space-y-4">
-          {/* 진행중 계획 */}
-          {inProgressPlans.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-[14px] font-semibold text-gray-900">진행중 계획 ({inProgressPlans.length})</div>
-              {inProgressPlans.map((plan) => {
-                const progress = calculateProgress(plan.tasks)
-                const isExpanded = expandedPlans.has(plan.id)
-
-                return (
-                  <div key={plan.id} className="border border-gray-300 bg-white">
-                    <div
-                      onClick={() => togglePlan(plan.id)}
-                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <div className="text-sm font-medium text-gray-900">{plan.title}</div>
-                          <span className="text-xs text-gray-500">({plan.tasks.length}개 작업)</span>
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">{plan.description}</div>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <div className="text-sm font-bold text-blue-600">{progress}%</div>
-                        <svg
-                          className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="border-t border-gray-200 p-4 space-y-2 bg-gray-50">
-                        {plan.tasks.map((task) => (
-                          <div key={task.id} className="flex items-center p-2 bg-white border border-gray-200">
-                            <input
-                              type="checkbox"
-                              checked={task.completed}
-                              onChange={() => toggleTask(plan.id, task.id)}
-                              className="w-4 h-4 mr-2 border-2 border-gray-300 cursor-pointer"
-                            />
-                            <div className="flex-1 text-sm mr-3">
-                              <div className={task.completed ? 'line-through text-gray-400' : 'text-gray-900'}>
-                                {task.title}
-                              </div>
-                            </div>
-                            <div className="text-xs text-gray-500 mr-2">{task.time}</div>
-                            <span className={`px-2 py-0.5 text-xs ${
-                              task.priority === 'high' ? 'bg-red-100 text-red-600' :
-                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-600' :
-                              'bg-green-100 text-green-600'
-                            }`}>
-                              {task.priority === 'high' ? '높음' : task.priority === 'medium' ? '보통' : '낮음'}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* 대기중 계획 */}
-          {pendingPlans.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-[14px] font-semibold text-gray-900">대기중 계획 ({pendingPlans.length})</div>
-              {pendingPlans.map((plan) => {
-                const progress = calculateProgress(plan.tasks)
-                const isExpanded = expandedPlans.has(plan.id)
-
-                return (
-                  <div key={plan.id} className="border border-gray-300 bg-white">
-                    <div
-                      onClick={() => togglePlan(plan.id)}
-                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <div className="text-sm font-medium text-gray-900">{plan.title}</div>
-                          <span className="text-xs text-gray-500">({plan.tasks.length}개 작업)</span>
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">{plan.description}</div>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <div className="text-sm font-bold text-gray-400">{progress}%</div>
-                        <svg
-                          className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="border-t border-gray-200 p-4 space-y-2 bg-gray-50">
-                        {plan.tasks.map((task) => (
-                          <div key={task.id} className="flex items-center p-2 bg-white border border-gray-200">
-                            <input
-                              type="checkbox"
-                              checked={task.completed}
-                              onChange={() => toggleTask(plan.id, task.id)}
-                              className="w-4 h-4 mr-2 border-2 border-gray-300 cursor-pointer"
-                            />
-                            <div className="flex-1 text-sm mr-3">
-                              <div className={task.completed ? 'line-through text-gray-400' : 'text-gray-900'}>
-                                {task.title}
-                              </div>
-                            </div>
-                            <div className="text-xs text-gray-500 mr-2">{task.time}</div>
-                            <span className={`px-2 py-0.5 text-xs ${
-                              task.priority === 'high' ? 'bg-red-100 text-red-600' :
-                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-600' :
-                              'bg-green-100 text-green-600'
-                            }`}>
-                              {task.priority === 'high' ? '높음' : task.priority === 'medium' ? '보통' : '낮음'}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* 완료된 계획 */}
-          {completedPlans.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-[14px] font-semibold text-gray-900">완료된 계획 ({completedPlans.length})</div>
-              {completedPlans.map((plan) => {
-                const progress = calculateProgress(plan.tasks)
-                const isExpanded = expandedPlans.has(plan.id)
-
-                return (
-                  <div key={plan.id} className="border border-gray-300 bg-gray-50">
-                    <div
-                      onClick={() => togglePlan(plan.id)}
-                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <div className="text-sm font-medium text-gray-500 line-through">{plan.title}</div>
-                          <span className="text-xs text-gray-400">({plan.tasks.length}개 작업)</span>
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">{plan.description}</div>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <div className="text-sm font-bold text-green-600">{progress}%</div>
-                        <svg
-                          className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="border-t border-gray-200 p-4 space-y-2 bg-gray-100">
-                        {plan.tasks.map((task) => (
-                          <div key={task.id} className="flex items-center p-2 bg-white border border-gray-200">
-                            <input
-                              type="checkbox"
-                              checked={task.completed}
-                              onChange={() => toggleTask(plan.id, task.id)}
-                              className="w-4 h-4 mr-2 border-2 border-gray-300 cursor-pointer"
-                            />
-                            <div className="flex-1 text-sm mr-3">
-                              <div className={task.completed ? 'line-through text-gray-400' : 'text-gray-900'}>
-                                {task.title}
-                              </div>
-                            </div>
-                            <div className="text-xs text-gray-500 mr-2">{task.time}</div>
-                            <span className={`px-2 py-0.5 text-xs ${
-                              task.priority === 'high' ? 'bg-red-100 text-red-600' :
-                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-600' :
-                              'bg-green-100 text-green-600'
-                            }`}>
-                              {task.priority === 'high' ? '높음' : task.priority === 'medium' ? '보통' : '낮음'}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
+      {/* 타임라인 */}
+      <div className="w-full bg-white border-t border-gray-200">
+        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">타임라인</h3>
+          <button
+            onClick={() => setShowAddPlan(true)}
+            className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            + 계획 추가
+          </button>
         </div>
 
-        {/* 메모 & 통계 */}
-        <div className="w-64 flex-shrink-0 space-y-6">
-          {/* 메모 */}
-          <div>
-            <div className="text-[14px] font-semibold text-gray-900 mb-4">메모</div>
+        <div className="relative">
+          {/* 날짜 헤더 */}
+          <div className="border-b border-gray-200">
+            <div className="relative w-full h-12">
+              {/* 오늘 세로 바 */}
+              <div className="absolute top-0 h-full border-l-2 border-blue-500 z-10" style={{ left: '50%' }}></div>
 
-            <div className="space-y-2 mb-4">
-              {notes.map((note) => (
-                <div key={note.id} className="group flex items-start gap-2 p-3 bg-gray-50 border border-gray-200">
-                  <div className="flex-1 text-sm text-gray-700">{note.content}</div>
-                  <button
-                    onClick={() => deleteNote(note.id)}
-                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all"
+              {/* 날짜 표시 (10일 간격) */}
+              {Array.from({ length: 7 }, (_, i) => {
+                const today = new Date()
+                const timelineDate = new Date(today)
+                timelineDate.setDate(today.getDate() + ((i - 3) * 10))
+
+                const position = ((i - 3) * 10 + 30) / 61 * 100
+
+                return (
+                  <div
+                    key={timelineDate.toISOString()}
+                    className="absolute top-0 h-full flex flex-col justify-center items-center"
+                    style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="새 메모 추가..."
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && addNote()}
-                className="flex-1 px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <Button onClick={addNote} size="sm" variant="outline">추가</Button>
+                    <div className="text-[10px] text-gray-500">
+                      {timelineDate.getMonth() + 1}/{timelineDate.getDate()}
+                    </div>
+                    <div className="text-[10px] mt-1 text-gray-600">
+                      {['일', '월', '화', '수', '목', '금', '토'][timelineDate.getDay()]}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
 
-          {/* 통계 */}
+          {/* 계획 목록 */}
           <div>
-            <div className="text-[14px] font-semibold text-gray-900 mb-4">이번 주 통계</div>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-600">완료한 작업</div>
-                <div className="text-sm font-bold text-gray-900">24개</div>
-              </div>
-              <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-600">평균 완료율</div>
-                <div className="text-sm font-bold text-gray-900">78%</div>
-              </div>
-              <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-600">이번 주 목표</div>
-                <div className="text-sm font-bold text-gray-900">30개</div>
-              </div>
-            </div>
+            {plans.map((plan) => {
+              const position = calculatePosition(plan.startDate, plan.endDate)
+
+              return (
+                <div key={plan.id} className="border-b border-gray-200">
+                  {/* 상위 계획 */}
+                  <div className="relative h-12 hover:bg-gray-50">
+                    <div className="absolute left-0 top-0 w-48 h-full flex items-center px-4 border-r border-gray-200 bg-white z-10">
+                      <button
+                        onClick={() => togglePlanExpanded(plan.id)}
+                        className="flex items-center gap-2"
+                      >
+                        <svg
+                          className={`w-4 h-4 transition-transform ${plan.expanded ? 'rotate-90' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <span className="text-sm font-medium text-gray-900">{plan.title}</span>
+                      </button>
+                    </div>
+                    <div className="ml-48 relative h-full">
+                      {/* 오늘 세로 바 */}
+                      <div className="absolute top-0 h-full border-l-2 border-blue-500 opacity-20" style={{ left: '50%' }}></div>
+
+                      <div
+                        className="absolute top-2 h-8 bg-blue-500 rounded"
+                        style={{
+                          left: position.left,
+                          width: position.width
+                        }}
+                      >
+                        <div className="text-[10px] text-white px-2 py-1 truncate">
+                          {plan.title}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 세부 계획 */}
+                  {plan.expanded && (
+                    <>
+                      {plan.subPlans.map((subPlan) => {
+                        const subPosition = calculatePosition(subPlan.startDate, subPlan.endDate)
+
+                        return (
+                          <div key={subPlan.id} className="relative h-10 bg-gray-50 hover:bg-gray-100">
+                            <div className="absolute left-0 top-0 w-48 h-full flex items-center px-8 border-r border-gray-200 bg-gray-50">
+                              <span className="text-xs text-gray-700">{subPlan.title}</span>
+                            </div>
+                            <div className="ml-48 relative h-full">
+                              {/* 오늘 세로 바 */}
+                              <div className="absolute top-0 h-full border-l-2 border-blue-500 opacity-20" style={{ left: '50%' }}></div>
+
+                              <div
+                                className="absolute top-2 h-6 bg-blue-400 rounded"
+                                style={{
+                                  left: subPosition.left,
+                                  width: subPosition.width
+                                }}
+                              >
+                                <div className="text-[10px] text-white px-2 py-0.5 truncate">
+                                  {subPlan.title}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+
+                      {/* 세부 계획 추가 버튼 */}
+                      {addingSubPlanTo === plan.id ? (
+                        <div className="relative h-12 bg-gray-50 border-t border-gray-200">
+                          <div className="flex items-center gap-2 px-4 py-2">
+                            <input
+                              type="text"
+                              placeholder="세부 계획명"
+                              value={newSubPlanTitle}
+                              onChange={(e) => setNewSubPlanTitle(e.target.value)}
+                              className="px-2 py-1 border border-gray-300 rounded text-sm w-40"
+                            />
+                            <input
+                              type="date"
+                              value={newSubPlanStartDate}
+                              onChange={(e) => setNewSubPlanStartDate(e.target.value)}
+                              className="px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
+                            <input
+                              type="date"
+                              value={newSubPlanEndDate}
+                              onChange={(e) => setNewSubPlanEndDate(e.target.value)}
+                              className="px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
+                            <button
+                              onClick={() => addSubPlan(plan.id)}
+                              className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                            >
+                              추가
+                            </button>
+                            <button
+                              onClick={() => setAddingSubPlanTo(null)}
+                              className="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                            >
+                              취소
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative h-8 bg-gray-50 border-t border-gray-200">
+                          <button
+                            onClick={() => setAddingSubPlanTo(plan.id)}
+                            className="w-full h-full text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                          >
+                            + 세부 계획 추가
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
+
+        {/* 계획 추가 모달 */}
+        {showAddPlan && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-96">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">새 계획 추가</h3>
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="계획명"
+                  value={newPlanTitle}
+                  onChange={(e) => setNewPlanTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={newPlanStartDate}
+                    onChange={(e) => setNewPlanStartDate(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm"
+                  />
+                  <span className="self-center text-gray-500">~</span>
+                  <input
+                    type="date"
+                    value={newPlanEndDate}
+                    onChange={(e) => setNewPlanEndDate(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={addPlan}
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  추가
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddPlan(false)
+                    setNewPlanTitle('')
+                    setNewPlanStartDate('')
+                    setNewPlanEndDate('')
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

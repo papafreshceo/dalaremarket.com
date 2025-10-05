@@ -78,6 +78,11 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           href: '/admin/settings/users'
         },
         {
+          title: '사용자 초대',
+          description: '관리자/직원 초대',
+          href: '/admin/settings/invite'
+        },
+        {
           title: '권한 설정',
           description: '역할별 접근 권한',
           href: '/admin/settings/permissions'

@@ -1,0 +1,5 @@
+git add .
+git commit -m "설명적인 메시지"
+git push
+
+
