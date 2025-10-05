@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Card, Button } from '@/components/ui'
+import { Button } from '@/components/ui'
+import { useToast } from '@/components/ui/Toast'
+import { useConfirm } from '@/components/ui/ConfirmModal'
 import { HotTable } from '@handsontable/react'
 import { registerAllModules } from 'handsontable/registry'
 import 'handsontable/dist/handsontable.full.css'
@@ -17,6 +19,9 @@ interface PartnerType {
 }
 
 export default function PartnerTypesPage() {
+  const { showToast } = useToast()
+  const { confirm } = useConfirm()
+
   const [types, setTypes] = useState<PartnerType[]>([])
   const [tableData, setTableData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -83,7 +88,7 @@ export default function PartnerTypesPage() {
           }])
 
           if (error) {
-            alert(`거래처 유형 등록 실패 (${row.type_name}): ${error.message}`)
+            showToast(`거래처 유형 등록 실패 (${row.type_name}): ${error.message}`, 'error')
             return
           }
         } else {
@@ -93,22 +98,29 @@ export default function PartnerTypesPage() {
           }).eq('id', row.id)
 
           if (error) {
-            alert(`거래처 유형 수정 실패 (${row.type_name}): ${error.message}`)
+            showToast(`거래처 유형 수정 실패 (${row.type_name}): ${error.message}`, 'error')
             return
           }
         }
       }
 
       await fetchTypes()
-      alert('저장되었습니다.')
+      showToast('저장되었습니다.', 'success')
     } catch (error) {
       console.error(error)
-      alert('저장 중 오류가 발생했습니다.')
+      showToast('저장 중 오류가 발생했습니다.', 'error')
     }
   }
 
   const handleDelete = async (rowIndex: number) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return
+    const confirmed = await confirm({
+      title: '삭제 확인',
+      message: '정말 삭제하시겠습니까?',
+      type: 'danger',
+      confirmText: '삭제',
+      cancelText: '취소'
+    })
+    if (!confirmed) return
 
     const row = tableData[rowIndex]
     if (row.id.startsWith('temp_')) {
@@ -118,7 +130,7 @@ export default function PartnerTypesPage() {
     } else {
       const { error } = await supabase.from('partner_types').delete().eq('id', row.id)
       if (error) {
-        alert('삭제 실패: ' + error.message)
+        showToast('삭제 실패: ' + error.message, 'error')
         return
       }
       await fetchTypes()
@@ -153,18 +165,24 @@ export default function PartnerTypesPage() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">거래처 유형 관리</h1>
-        <div className="flex gap-2">
-          <Button onClick={handleAddRow} variant="ghost">
-            + 행 추가
-          </Button>
-          <Button onClick={handleSave}>
-            저장
-          </Button>
-        </div>
+        <div className="text-[16px] font-bold">거래처 유형 관리</div>
       </div>
 
-      <Card>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            총 {tableData.length}개의 거래처 유형
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleAddRow} variant="ghost">
+              + 행 추가
+            </Button>
+            <Button onClick={handleSave}>
+              저장
+            </Button>
+          </div>
+        </div>
+
         <HotTable
           ref={hotTableRef}
           data={tableData}
@@ -184,10 +202,6 @@ export default function PartnerTypesPage() {
             }
           }}
         />
-      </Card>
-
-      <div className="text-sm text-gray-600">
-        총 {tableData.length}개의 거래처 유형
       </div>
     </div>
   )

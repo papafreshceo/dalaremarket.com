@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { ToastProvider } from '@/components/ui/Toast'
+import { ConfirmProvider } from '@/components/ui/ConfirmModal'
 
 export default function AdminLayout({
   children,
@@ -173,7 +175,9 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <ToastProvider>
+      <ConfirmProvider>
+        <div className="flex flex-col h-screen bg-gray-50">
       {/* 헤더 */}
       <header className="h-16 bg-white border-b border-gray-200 shadow-sm z-50">
         <div className="h-full px-4 lg:px-6 flex items-center justify-between">
@@ -260,7 +264,7 @@ export default function AdminLayout({
         <aside className={`
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           fixed lg:relative lg:translate-x-0
-          w-64 h-full bg-gradient-to-b from-gray-900 to-gray-800
+          w-44 h-full bg-gradient-to-b from-gray-900 to-gray-800
           transition-transform duration-200 ease-in-out z-40 shadow-xl
           text-[14px]                       /* ✅ 사이드바 기본 글자 크기 14px */
           [&_svg]:!w-[14px] [&_svg]:!h-[14px]  /* ✅ 사이드바 내부 아이콘 14px */
@@ -335,5 +339,7 @@ export default function AdminLayout({
         </main>
       </div>
     </div>
+      </ConfirmProvider>
+    </ToastProvider>
   )
 }

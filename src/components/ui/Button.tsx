@@ -29,7 +29,7 @@ export function Button({
     // 기본
     'inline-flex items-center justify-center gap-2',
     'font-medium transition-all duration-[250ms]',
-    'focus:outline-none focus:ring-2 focus:ring-offset-2',
+    'focus:outline-none focus:ring-0',
     'disabled:opacity-50 disabled:cursor-not-allowed',
 
     // 전체 너비

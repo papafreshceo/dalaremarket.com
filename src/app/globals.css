@@ -391,11 +391,28 @@ ul, ol {
   height: 30px !important;
   line-height: 30px !important;
   padding: 0 8px !important;
+  vertical-align: middle !important;
 }
 
 .handsontable tbody th {
   height: 30px !important;
   line-height: 30px !important;
+  vertical-align: middle !important;
+}
+
+/* Handsontable 셀 세로 정렬 */
+.handsontable td {
+  vertical-align: middle !important;
+}
+
+/* Handsontable 읽기 전용 모드 배경색 */
+.handsontable.readonly-mode td {
+  background-color: #fffbf0 !important;
+}
+
+.handsontable.readonly-mode td.bg-blue-50,
+.handsontable.readonly-mode td.bg-pink-50 {
+  background-color: #fffbf0 !important;
 }
 
 

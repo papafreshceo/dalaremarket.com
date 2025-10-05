@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Card, Button, Modal } from '@/components/ui'
+import { Button, Modal } from '@/components/ui'
+import { useToast } from '@/components/ui/Toast'
+import { useConfirm } from '@/components/ui/ConfirmModal'
 import { HotTable } from '@handsontable/react'
 import { registerAllModules } from 'handsontable/registry'
 import 'handsontable/dist/handsontable.full.css'
@@ -17,6 +19,7 @@ interface PurchaseItem {
   purchase_date?: string
   supplier_id?: string
   supplier_name?: string
+  purchase_category?: string
   category_1: string | null
   category_2: string | null
   category_3: string | null
@@ -50,7 +53,19 @@ interface ItemMaster {
   category_4: string | null
 }
 
+// 날짜에 요일 추가 함수
+const formatDateWithDay = (dateStr: string): string => {
+  if (!dateStr) return ''
+  const days = ['일', '월', '화', '수', '목', '금', '토']
+  const date = new Date(dateStr)
+  const dayOfWeek = days[date.getDay()]
+  return `${dateStr} (${dayOfWeek})`
+}
+
 export default function SaiupManagementPage() {
+  const { showToast } = useToast()
+  const { confirm } = useConfirm()
+
   const [loading, setLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
@@ -61,11 +76,14 @@ export default function SaiupManagementPage() {
   const [tableData, setTableData] = useState<any[]>([])
 
   const [searchTerm, setSearchTerm] = useState('')
-  const [startDate, setStartDate] = useState(new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0])
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
+  const [filterCategory, setFilterCategory] = useState<'전체' | '중매인' | '농가' | '기타'>('전체')
 
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false)
   const [isVarietyModalOpen, setIsVarietyModalOpen] = useState(false)
+  const [isStatementModalOpen, setIsStatementModalOpen] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
   const [newSupplier, setNewSupplier] = useState({
     code: '',
     name: '',
@@ -119,6 +137,11 @@ export default function SaiupManagementPage() {
 
       if (!inDateRange) return false
 
+      // 필터 카테고리 체크
+      if (filterCategory !== '전체' && r.purchase_category !== filterCategory) {
+        return false
+      }
+
       if (searchTerm) {
         return (
           r.supplier_name?.includes(searchTerm) ||
@@ -132,7 +155,7 @@ export default function SaiupManagementPage() {
     })
 
     setTableData(filtered)
-  }, [records, startDate, endDate, searchTerm])
+  }, [records, startDate, endDate, searchTerm, filterCategory])
 
   const fetchRecords = async () => {
     setLoading(true)
@@ -143,7 +166,7 @@ export default function SaiupManagementPage() {
         purchase:purchases!purchase_id(
           purchase_date,
           supplier_id,
-          supplier:suppliers!supplier_id(name)
+          supplier:partners!supplier_id(name)
         )
       `)
       .order('created_at', { ascending: false })
@@ -204,6 +227,7 @@ export default function SaiupManagementPage() {
       purchase_id: '',
       purchase_date: new Date().toISOString().split('T')[0],
       supplier_name: '',
+      purchase_category: filterCategory === '전체' ? '중매인' : filterCategory,
       category_1: '',
       category_2: '',
       category_3: '',
@@ -304,15 +328,22 @@ export default function SaiupManagementPage() {
       }
 
       await fetchRecords()
-      alert('저장되었습니다.')
+      showToast('저장되었습니다.', 'success')
     } catch (error) {
       console.error(error)
-      alert('저장 중 오류가 발생했습니다.')
+      showToast('저장 중 오류가 발생했습니다.', 'error')
     }
   }
 
   const handleDelete = async (rowIndex: number) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return
+    const confirmed = await confirm({
+      title: '삭제 확인',
+      message: '정말 삭제하시겠습니까?',
+      type: 'danger',
+      confirmText: '삭제',
+      cancelText: '취소'
+    })
+    if (!confirmed) return
 
     const row = tableData[rowIndex]
     if (row.id.startsWith('temp_')) {
@@ -329,7 +360,7 @@ export default function SaiupManagementPage() {
 
   const handleSupplierSubmit = async () => {
     if (!newSupplier.code || !newSupplier.name) {
-      alert('거래처 코드와 이름은 필수입니다.')
+      showToast('거래처 코드와 이름은 필수입니다.', 'warning')
       return
     }
 
@@ -351,11 +382,11 @@ export default function SaiupManagementPage() {
     }])
 
     if (error) {
-      alert('거래처 등록 실패: ' + error.message)
+      showToast('거래처 등록 실패: ' + error.message, 'error')
       return
     }
 
-    alert('거래처가 등록되었습니다.')
+    showToast('거래처가 등록되었습니다.', 'success')
     setIsSupplierModalOpen(false)
     setNewSupplier({
       code: '',
@@ -376,7 +407,7 @@ export default function SaiupManagementPage() {
 
   const handleVarietySubmit = async () => {
     if (!newVariety.item_name) {
-      alert('품종명은 필수입니다.')
+      showToast('품종명은 필수입니다.', 'warning')
       return
     }
 
@@ -391,11 +422,11 @@ export default function SaiupManagementPage() {
     }])
 
     if (error) {
-      alert('품종 등록 실패: ' + error.message)
+      showToast('품종 등록 실패: ' + error.message, 'error')
       return
     }
 
-    alert('품종이 등록되었습니다.')
+    showToast('품종이 등록되었습니다.', 'success')
     setIsVarietyModalOpen(false)
     setNewVariety({
       item_name: '',
@@ -420,6 +451,19 @@ export default function SaiupManagementPage() {
       }
     },
     {
+      data: 'purchase_category',
+      title: '구분',
+      type: 'dropdown',
+      source: ['중매인', '농가', '기타'],
+      width: 80,
+      className: 'htCenter bg-blue-50',
+      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
+        td.innerHTML = value || ''
+        td.className = 'htCenter bg-blue-50'
+        return td
+      }
+    },
+    {
       data: 'supplier_name',
       title: '거래처',
       type: 'dropdown',
@@ -432,10 +476,54 @@ export default function SaiupManagementPage() {
         return td
       }
     },
-    { data: 'category_1', title: '대분류', width: 80, className: 'htCenter' },
-    { data: 'category_2', title: '중분류', width: 80, className: 'htCenter' },
-    { data: 'category_3', title: '소분류', width: 80, className: 'htCenter' },
-    { data: 'category_4', title: '품목', width: 100, className: 'htCenter' },
+    {
+      data: 'category_1',
+      title: '대분류',
+      width: 80,
+      className: 'htCenter',
+      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
+        td.innerHTML = value || ''
+        td.className = 'htCenter'
+        td.style.backgroundColor = '#fffbf0'
+        return td
+      }
+    },
+    {
+      data: 'category_2',
+      title: '중분류',
+      width: 80,
+      className: 'htCenter',
+      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
+        td.innerHTML = value || ''
+        td.className = 'htCenter'
+        td.style.backgroundColor = '#fffbf0'
+        return td
+      }
+    },
+    {
+      data: 'category_3',
+      title: '소분류',
+      width: 80,
+      className: 'htCenter',
+      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
+        td.innerHTML = value || ''
+        td.className = 'htCenter'
+        td.style.backgroundColor = '#fffbf0'
+        return td
+      }
+    },
+    {
+      data: 'category_4',
+      title: '품목',
+      width: 100,
+      className: 'htCenter',
+      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
+        td.innerHTML = value || ''
+        td.className = 'htCenter'
+        td.style.backgroundColor = '#fffbf0'
+        return td
+      }
+    },
     {
       data: 'category_5',
       title: '품종',
@@ -565,9 +653,40 @@ export default function SaiupManagementPage() {
 
   return (
     <div className="space-y-4">
+      {/* 필터 버튼 */}
+      <div className="flex gap-2">
+        <Button
+          onClick={() => setFilterCategory('전체')}
+          variant={filterCategory === '전체' ? 'default' : 'ghost'}
+          className={filterCategory === '전체' ? 'underline' : ''}
+        >
+          전체
+        </Button>
+        <Button
+          onClick={() => setFilterCategory('중매인')}
+          variant={filterCategory === '중매인' ? 'default' : 'ghost'}
+          className={filterCategory === '중매인' ? 'underline' : ''}
+        >
+          중매인
+        </Button>
+        <Button
+          onClick={() => setFilterCategory('농가')}
+          variant={filterCategory === '농가' ? 'default' : 'ghost'}
+          className={filterCategory === '농가' ? 'underline' : ''}
+        >
+          농가
+        </Button>
+        <Button
+          onClick={() => setFilterCategory('기타')}
+          variant={filterCategory === '기타' ? 'default' : 'ghost'}
+          className={filterCategory === '기타' ? 'underline' : ''}
+        >
+          기타
+        </Button>
+      </div>
+
       {/* 필터 영역 */}
-      <Card>
-        <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-12 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">시작일</label>
             <input
@@ -586,7 +705,7 @@ export default function SaiupManagementPage() {
               className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
             />
           </div>
-          <div>
+          <div className="col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">검색</label>
             <input
               type="text"
@@ -596,32 +715,75 @@ export default function SaiupManagementPage() {
               className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
             />
           </div>
-          <div className="flex items-end gap-2">
-            <Button onClick={handleAddRow} variant="ghost" className="flex-1">
+          <div className="flex items-end">
+            <Button
+              onClick={() => setIsEditMode(!isEditMode)}
+              variant="ghost"
+              className={`w-full h-[38px] border focus:outline-none focus:ring-0 ${isEditMode ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-purple-500 text-purple-700 hover:bg-purple-50'}`}
+            >
+              {isEditMode ? '🔒 조회' : '✏️ 작성/수정'}
+            </Button>
+          </div>
+          <div className="flex items-end">
+            <Button
+              onClick={handleAddRow}
+              variant="ghost"
+              className="w-full border border-blue-500 h-[38px]"
+              disabled={!isEditMode}
+            >
               + 행 추가
             </Button>
-            <Button onClick={handleSave} className="flex-1">
+          </div>
+          <div className="flex items-end">
+            <Button
+              onClick={handleSave}
+              className="w-full h-[38px]"
+              disabled={!isEditMode}
+            >
               저장
             </Button>
           </div>
+          <div className="flex items-end">
+            <Button
+              onClick={() => setIsStatementModalOpen(true)}
+              variant="ghost"
+              className="w-full h-[38px] border border-green-500 text-green-700 hover:bg-green-50"
+            >
+              거래명세서
+            </Button>
+          </div>
         </div>
-      </Card>
 
       {/* 테이블 */}
-      <Card>
+      <div>
         <HotTable
           ref={hotTableRef}
           data={tableData}
           columns={columns}
           colHeaders={true}
           rowHeaders={true}
-          height="600"
+          height="auto"
           width="100%"
           licenseKey="non-commercial-and-evaluation"
           stretchH="all"
           autoColumnSize={false}
           manualColumnResize={true}
-          contextMenu={true}
+          readOnly={!isEditMode}
+          className={!isEditMode ? 'readonly-mode' : ''}
+          contextMenu={{
+            items: {
+              row_above: { name: '위에 행 삽입' },
+              row_below: { name: '아래에 행 삽입' },
+              separator1: '---------',
+              remove_row: { name: '행 삭제' },
+              separator2: '---------',
+              undo: { name: '실행 취소' },
+              redo: { name: '다시 실행' },
+              separator3: '---------',
+              copy: { name: '복사' },
+              cut: { name: '잘라내기' }
+            }
+          }}
           afterChange={(changes, source) => {
             if (source === 'edit' && changes) {
               changes.forEach(([row, prop, oldValue, newValue]) => {
@@ -638,21 +800,52 @@ export default function SaiupManagementPage() {
                       hotTableRef.current?.hotInstance?.render()
                     }
                   }
+                  // 구분 변경 시 수수료 재계산
+                  if (prop === 'purchase_category') {
+                    const category = newValue as string
+                    const qty = Number(data[row].quantity) || 0
+                    const amount = Number(data[row].amount) || 0
+
+                    // 농가, 기타는 수수료 0
+                    if (category === '농가' || category === '기타') {
+                      data[row].commission = 0
+                      data[row].total_amount = amount
+                    } else if (category === '중매인') {
+                      // 중매인은 거래처 수수료 적용
+                      const supplier = suppliers.find(s => s.name === data[row].supplier_name)
+                      if (supplier) {
+                        if (supplier.commission_type === '정액') {
+                          data[row].commission = qty * (supplier.commission_rate || 0)
+                        } else {
+                          data[row].commission = amount * (supplier.commission_rate || 0) / 100
+                        }
+                        data[row].total_amount = amount + data[row].commission
+                      }
+                    }
+                    hotTableRef.current?.hotInstance?.render()
+                  }
+
                   // 거래처 변경 시 수수료 자동 적용
                   if (prop === 'supplier_name') {
                     const supplier = suppliers.find(s => s.name === newValue)
                     if (supplier) {
                       const qty = Number(data[row].quantity) || 0
                       const amount = Number(data[row].amount) || 0
+                      const category = data[row].purchase_category
 
-                      // 수수료 계산: 정액(수량×수수료) vs 정율(금액×수수료%)
-                      if (supplier.commission_type === '정액') {
-                        data[row].commission = qty * (supplier.commission_rate || 0)
-                      } else { // 정율
-                        data[row].commission = amount * (supplier.commission_rate || 0) / 100
+                      // 농가, 기타는 수수료 0
+                      if (category === '농가' || category === '기타') {
+                        data[row].commission = 0
+                        data[row].total_amount = amount
+                      } else {
+                        // 중매인은 수수료 계산
+                        if (supplier.commission_type === '정액') {
+                          data[row].commission = qty * (supplier.commission_rate || 0)
+                        } else {
+                          data[row].commission = amount * (supplier.commission_rate || 0) / 100
+                        }
+                        data[row].total_amount = amount + data[row].commission
                       }
-
-                      data[row].total_amount = amount + data[row].commission
                       hotTableRef.current?.hotInstance?.render()
                     }
                   }
@@ -662,15 +855,20 @@ export default function SaiupManagementPage() {
                     const price = Number(data[row].unit_price) || 0
                     data[row].amount = qty * price
 
-                    // 수수료 자동 계산
-                    const supplier = suppliers.find(s => s.name === data[row].supplier_name)
-                    if (supplier) {
-                      if (supplier.commission_type === '정액') {
-                        // 정액: 수량 × 수수료
-                        data[row].commission = qty * (supplier.commission_rate || 0)
-                      } else {
-                        // 정율: 금액 × 수수료% / 100
-                        data[row].commission = data[row].amount * (supplier.commission_rate || 0) / 100
+                    const category = data[row].purchase_category
+
+                    // 농가, 기타는 수수료 0
+                    if (category === '농가' || category === '기타') {
+                      data[row].commission = 0
+                    } else {
+                      // 중매인은 수수료 자동 계산
+                      const supplier = suppliers.find(s => s.name === data[row].supplier_name)
+                      if (supplier) {
+                        if (supplier.commission_type === '정액') {
+                          data[row].commission = qty * (supplier.commission_rate || 0)
+                        } else {
+                          data[row].commission = data[row].amount * (supplier.commission_rate || 0) / 100
+                        }
                       }
                     }
 
@@ -682,10 +880,22 @@ export default function SaiupManagementPage() {
             }
           }}
         />
-      </Card>
+
+        {/* 행 추가 버튼 - 테이블 하단 */}
+        <div className="mt-2 flex justify-center">
+          <Button
+            onClick={handleAddRow}
+            variant="ghost"
+            className="w-[200px] border border-blue-500 h-[38px]"
+            disabled={!isEditMode}
+          >
+            + 행 추가
+          </Button>
+        </div>
+      </div>
 
       {/* 버튼 영역 */}
-      <div className="flex justify-start gap-2">
+      <div className="flex justify-start gap-2 pt-4 border-t border-gray-200">
         <Button
           onClick={() => setIsSupplierModalOpen(true)}
           variant="ghost"
@@ -941,6 +1151,195 @@ export default function SaiupManagementPage() {
                   placeholder="비고사항을 입력하세요"
                 />
               </div>
+        </div>
+      </Modal>
+
+      {/* 거래명세서 모달 */}
+      <Modal
+        isOpen={isStatementModalOpen}
+        onClose={() => setIsStatementModalOpen(false)}
+        title=""
+        size="xl"
+      >
+        <div className="max-h-[80vh] overflow-y-auto">
+          {/* 캡처 영역 시작 */}
+          <div id="statement-capture-area" className="bg-white p-6">
+            {/* 거래명세서 헤더 */}
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold">거래명세서</h2>
+              <p className="text-sm text-gray-600 mt-2">
+                기간: {startDate === endDate ? formatDateWithDay(startDate) : `${formatDateWithDay(startDate)} ~ ${formatDateWithDay(endDate)}`}
+              </p>
+            </div>
+
+            {/* 거래처별 명세 */}
+            <div className="space-y-6">
+              {(() => {
+                // 거래처별로 그룹화
+                const groupedBySupplier = tableData.reduce((acc, item) => {
+                  const supplierName = item.supplier_name || '미지정'
+                  if (!acc[supplierName]) {
+                    acc[supplierName] = []
+                  }
+                  acc[supplierName].push(item)
+                  return acc
+                }, {} as Record<string, any[]>)
+
+                return Object.entries(groupedBySupplier).map(([supplierName, items]) => {
+                  const totalQuantity = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
+                  const totalAmount = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+                  const totalCommission = items.reduce((sum, item) => sum + (Number(item.commission) || 0), 0)
+                  const totalSum = items.reduce((sum, item) => sum + (Number(item.total_amount) || 0), 0)
+
+                  // 농가인지 확인 (첫 번째 아이템의 구분으로 판단)
+                  const isNongga = items[0]?.purchase_category === '농가'
+
+                  return (
+                    <div key={supplierName} className="border border-gray-200 rounded p-4">
+                      <div className="mb-3 pb-3 border-b">
+                        <h3 className="text-lg font-bold">{supplierName}</h3>
+                      </div>
+
+                      {/* 테이블 */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-100">
+                            <tr>
+                              <th className="border px-2 py-2">날짜</th>
+                              {!isNongga && <th className="border px-2 py-2">출하자</th>}
+                              <th className="border px-2 py-2">품명</th>
+                              <th className="border px-2 py-2">수량</th>
+                              <th className="border px-2 py-2">단가</th>
+                              <th className="border px-2 py-2">금액</th>
+                              {!isNongga && <th className="border px-2 py-2">수수료</th>}
+                              <th className="border px-2 py-2">합계</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {items.map((item, idx) => (
+                              <tr key={idx}>
+                                <td className="border px-2 py-1 text-center">{formatDateWithDay(item.purchase_date)}</td>
+                                {!isNongga && <td className="border px-2 py-1 text-center">{item.shipper_name}</td>}
+                                <td className="border px-2 py-1 text-center">{item.category_5}</td>
+                                <td className="border px-2 py-1 text-right">{Number(item.quantity).toLocaleString()}</td>
+                                <td className="border px-2 py-1 text-right">{Number(item.unit_price).toLocaleString()}</td>
+                                <td className="border px-2 py-1 text-right">{Number(item.amount).toLocaleString()}</td>
+                                {!isNongga && <td className="border px-2 py-1 text-right">{Number(item.commission).toLocaleString()}</td>}
+                                <td className="border px-2 py-1 text-right font-semibold">{Number(item.total_amount).toLocaleString()}</td>
+                              </tr>
+                            ))}
+                            <tr className="bg-gray-100 font-bold">
+                              <td colSpan={isNongga ? 2 : 3} className="border px-2 py-2 text-center">소계</td>
+                              <td className="border px-2 py-2 text-right">{totalQuantity.toLocaleString()}</td>
+                              <td className="border px-2 py-2 text-center">-</td>
+                              <td className="border px-2 py-2 text-right">{totalAmount.toLocaleString()}</td>
+                              {!isNongga && <td className="border px-2 py-2 text-right">{totalCommission.toLocaleString()}</td>}
+                              <td className="border px-2 py-2 text-right">{totalSum.toLocaleString()}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+
+            {/* 총 합계 */}
+            <div className="bg-blue-50 p-4 rounded mt-6">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <div className="text-sm text-gray-600">총 수량</div>
+                  <div className="text-xl font-bold text-purple-700">
+                    {tableData.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-600">총 금액</div>
+                  <div className="text-xl font-bold text-blue-700">
+                    {tableData.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-600">총 합계</div>
+                  <div className="text-xl font-bold text-green-700">
+                    {tableData.reduce((sum, item) => sum + (Number(item.total_amount) || 0), 0).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* 캡처 영역 끝 */}
+        </div>
+
+        {/* 버튼 영역 */}
+        <div className="flex justify-end gap-2 pt-4 border-t bg-gray-50 -mx-6 -mb-6 px-6 py-4 mt-4">
+            <Button variant="ghost" onClick={() => setIsStatementModalOpen(false)}>
+              닫기
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const element = document.getElementById('statement-capture-area')
+                  if (!element) return
+
+                  showToast('캡처 중...', 'info')
+
+                  const { toBlob } = await import('html-to-image')
+                  const blob = await toBlob(element, {
+                    quality: 0.95,
+                    pixelRatio: 2,
+                    backgroundColor: '#ffffff'
+                  })
+
+                  if (blob) {
+                    await navigator.clipboard.write([
+                      new ClipboardItem({ 'image/png': blob })
+                    ])
+                    showToast('클립보드에 복사되었습니다', 'success')
+                  }
+                } catch (error) {
+                  console.error('캡처 실패:', error)
+                  showToast('캡처 중 오류가 발생했습니다.', 'error')
+                }
+              }}
+            >
+              📸 캡처
+            </Button>
+            <Button
+              onClick={async () => {
+                try {
+                  const element = document.getElementById('statement-capture-area')
+                  if (!element) return
+
+                  showToast('저장 중...', 'info')
+
+                  const firstSupplier = tableData[0]?.supplier_name || '거래처'
+                  const dateStr = startDate === endDate ? startDate : `${startDate}~${endDate}`
+                  const filename = `${firstSupplier}-${dateStr}.jpg`
+
+                  const { toJpeg } = await import('html-to-image')
+                  const dataUrl = await toJpeg(element, {
+                    quality: 0.95,
+                    pixelRatio: 2,
+                    backgroundColor: '#ffffff'
+                  })
+
+                  const link = document.createElement('a')
+                  link.download = filename
+                  link.href = dataUrl
+                  link.click()
+
+                  showToast('저장 완료', 'success')
+                } catch (error) {
+                  console.error('저장 실패:', error)
+                  showToast('저장 중 오류가 발생했습니다.', 'error')
+                }
+              }}
+            >
+              💾 저장
+            </Button>
         </div>
       </Modal>
     </div>

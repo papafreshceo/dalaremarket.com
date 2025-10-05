@@ -304,7 +304,7 @@ export default function RawMaterialsManagementPage() {
       .from('raw_materials')
       .select(`
         *,
-        supplier:suppliers!main_supplier_id(name)
+        supplier:partners!main_supplier_id(name)
       `)
       .order('created_at', { ascending: false })
 
@@ -323,7 +323,7 @@ export default function RawMaterialsManagementPage() {
     }
   }
   const fetchSuppliers = async () => {
-    const { data } = await supabase.from('suppliers').select('*').eq('is_active', true).order('name')
+    const { data } = await supabase.from('partners').select('*').eq('is_active', true).order('name')
     if (data) setSuppliers(data)
   }
   const fetchSupplyStatuses = async () => {
@@ -1095,135 +1095,68 @@ export default function RawMaterialsManagementPage() {
         <p className="mt-1 text-sm text-gray-600">원물 정보와 시세를 통합 관리합니다</p>
       </div>
 
-      {/* 통계 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card padding="sm">
-          <div className="flex items-center justify-between">
-            <div className="text-center">
-              <p className="text-sm text-gray-600">전체 원물</p>
-              <p className="text-2xl font-bold">{stats.totalMaterials.toLocaleString()}</p>
-            </div>
-            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-            </div>
+      {/* 통계 및 메뉴 */}
+      <div className="flex justify-between items-center">
+        <div className="flex gap-6 text-sm">
+          <div>
+            <span className="text-gray-600">전체 원물: </span>
+            <span className="font-bold">{stats.totalMaterials.toLocaleString()}</span>
           </div>
-        </Card>
-        <Card padding="sm">
-          <div className="flex items-center justify-between">
-            <div className="text-center">
-              <p className="text-sm text-gray-600">출하중</p>
-              <p className="text-2xl font-bold text-green-600">{stats.shippingMaterials.toLocaleString()}</p>
-            </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-              </svg>
-            </div>
+          <div>
+            <span className="text-gray-600">출하중: </span>
+            <span className="font-bold text-green-600">{stats.shippingMaterials.toLocaleString()}</span>
           </div>
-        </Card>
-        <Card padding="sm">
-          <div className="flex items-center justify-between">
-            <div className="text-center">
-              <p className="text-sm text-gray-600">시즌종료</p>
-              <p className="text-2xl font-bold text-orange-600">{stats.seasonEndMaterials.toLocaleString()}</p>
-            </div>
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
+          <div>
+            <span className="text-gray-600">시즌종료: </span>
+            <span className="font-bold text-orange-600">{stats.seasonEndMaterials.toLocaleString()}</span>
           </div>
-        </Card>
-        <Card padding="sm">
-          <div className="flex items-center justify-between">
-            <div className="text-center">
-              <p className="text-sm text-gray-600">오늘 시세 등록</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.todayPriceUpdates.toLocaleString()}</p>
-            </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
+          <div>
+            <span className="text-gray-600">오늘 시세 등록: </span>
+            <span className="font-bold text-blue-600">{stats.todayPriceUpdates.toLocaleString()}</span>
           </div>
-        </Card>
-      </div>
+        </div>
 
-      {/* 메뉴 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <button onClick={() => openModal('material-register')} className="text-left">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </div>
-              <span className="text-xs text-gray-500">모달</span>
-            </div>
-            <h3 className="font-semibold text-lg mb-1">원물등록관리</h3>
-            <p className="text-sm text-gray-600">새로운 원물을 등록하고 정보를 수정합니다</p>
-          </Card>
-        </button>
-        <button onClick={() => openModal('price-record')} className="text-left">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <span className="text-xs text-gray-500">모달</span>
-            </div>
-            <h3 className="font-semibold text-lg mb-1">시세기록</h3>
-            <p className="text-sm text-gray-600">원물별 시세를 기록하고 이력을 관리합니다</p>
-          </Card>
-        </button>
-        <button onClick={() => openModal('price-analysis')} className="text-left">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <span className="text-xs text-gray-500">모달</span>
-            </div>
-            <h3 className="font-semibold text-lg mb-1">시세분석</h3>
-            <p className="text-sm text-gray-600">시세 변동 추이를 분석하고 예측합니다</p>
-          </Card>
-        </button>
-      </div>
-
-      {/* 상태 필터 */}
-      <div className="space-y-4">
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={() => setSelectedStatus('all')} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${selectedStatus === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>전체 ({materials.length})</button>
-          {supplyStatuses.map(s => (
-            <button key={s.code} onClick={() => setSelectedStatus(s.name)} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${selectedStatus === s.name ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
-              {s.name} ({materials.filter(m => m.supply_status === s.name).length})
-            </button>
-          ))}
+        <div className="flex gap-2">
+          <Button onClick={() => openModal('material-register')} size="sm" variant="ghost">
+            원물등록관리
+          </Button>
+          <Button onClick={() => openModal('price-record')} size="sm" variant="ghost">
+            시세기록
+          </Button>
+          <Button onClick={() => openModal('price-analysis')} size="sm" variant="ghost">
+            시세분석
+          </Button>
+          <Button onClick={() => alert('엑셀 업로드 기능')} size="sm" variant="ghost">
+            엑셀업로드
+          </Button>
         </div>
       </div>
 
       {/* 테이블 */}
-      <Card padding="none">
+      <div>
         <div className="px-6 py-4 border-b border-gray-100">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4 flex-1">
-              <h3 className="text-lg font-semibold text-gray-900">원물 목록</h3>
+              <div className="text-[16px] font-semibold text-gray-900">원물 목록</div>
               <span className="text-sm text-gray-500">총 {filteredMaterials.length}건</span>
 
-              {/* 검색 - 타이틀 옆 */}
+              {/* 상태 필터 배지 */}
+              <div className="flex gap-2 flex-wrap">
+                <button onClick={() => setSelectedStatus('all')} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${selectedStatus === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>전체 ({materials.length})</button>
+                {supplyStatuses.map(s => (
+                  <button key={s.code} onClick={() => setSelectedStatus(s.name)} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${selectedStatus === s.name ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
+                    {s.name} ({materials.filter(m => m.supply_status === s.name).length})
+                  </button>
+                ))}
+              </div>
+
+              {/* 검색 */}
               <div className="relative ml-4">
                 <input
                   type="text"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  className="w-[200px] pl-3 pr-9 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-[200px] h-[32px] pl-3 pr-9 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="검색..."
                   style={{ borderColor: '#d1d5db' }}
                 />
@@ -1312,7 +1245,7 @@ export default function RawMaterialsManagementPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(20*44px+45px)]">
           <table className="w-full border-collapse table-fixed text-center">
             <colgroup>
               <col style={{ width: '40px' }} />
@@ -1335,14 +1268,15 @@ export default function RawMaterialsManagementPage() {
               <col style={{ width: '90px' }} />
               <col style={{ width: '110px' }} />
               <col style={{ width: '110px' }} />
+              <col style={{ width: '110px' }} />
             </colgroup>
-            <thead>
-              <tr className="bg-gray-50 border-b">
-                <th className="px-2 py-3">
+            <thead className="sticky top-0 z-30">
+              <tr className="bg-gray-50">
+                <th className="px-2 py-3 bg-gray-50 border-b border-gray-200 sticky left-0 z-30">
                   <input type="checkbox" checked={selectAll} onChange={handleSelectAll} className="cursor-pointer" />
                 </th>
                 {['원물코드','원물명','대분류','중분류','소분류','품목','품종','규격','단위수량','최근거래','최근시세','현재시세','주거래처','시즌','시작일','피크시기','종료일','상태','색코드','작업'].map((h, i)=>(
-                  <th key={i} className="px-2 py-3 text-xs font-medium text-gray-500">{h}</th>
+                  <th key={i} className={`px-2 py-3 text-xs font-medium bg-gray-50 border-b border-gray-200 ${i === 0 ? 'sticky left-[40px] z-30 text-gray-500' : i === 1 ? 'sticky left-[160px] z-30 text-gray-500' : 'text-gray-500'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -1357,15 +1291,17 @@ export default function RawMaterialsManagementPage() {
                   ? 'border-b border-gray-300'
                   : 'border-b border-gray-100'
 
+                const rowBgClass = modifiedMaterials.has(m.id) ? 'bg-yellow-50' : selectedRows.has(m.id) ? 'bg-blue-50' : 'bg-gray-50'
+
                 return (
                 <tr key={m.id} className={`hover:bg-gray-50 ${borderClass} ${modifiedMaterials.has(m.id) ? 'bg-yellow-50' : ''} ${selectedRows.has(m.id) ? 'bg-blue-50' : ''}`}>
-                  <td className="px-2 py-2">
+                  <td className={`px-2 py-2 sticky left-0 z-20 ${rowBgClass}`}>
                     <input type="checkbox" checked={!!selectedRows.has(m.id)} onChange={() => handleSelectRow(m.id)} className="cursor-pointer" />
                   </td>
 
                   {[
-                    { field: 'material_code' },
-                    { field: 'material_name', bold: true },
+                    { field: 'material_code', sticky: 'left-[40px]' },
+                    { field: 'material_name', bold: true, sticky: 'left-[160px]' },
                     { field: 'category_1' },
                     { field: 'category_2' },
                     { field: 'category_3' },
@@ -1399,13 +1335,14 @@ export default function RawMaterialsManagementPage() {
                     const selectedCls = isSelected ? ' ring-2 ring-emerald-500 ring-inset' : ''
                     const textCls = col.bold ? ' font-medium' : ''
                     const modifiedCls = isCellModified(m, col.field) ? ' text-red-600' : ''
+                    const stickyCls = col.sticky ? ` sticky ${col.sticky} z-20 ${rowBgClass}` : ''
 
                     // 편집 모드: contentEditable
                     if (isEditing) {
                       return (
                         <td
                           key={key}
-                          className={`${base}${textCls}${selectedCls}${modifiedCls}`}
+                          className={`${base}${textCls}${selectedCls}${modifiedCls}${stickyCls}`}
                           contentEditable
                           suppressContentEditableWarning
                           onClick={(e) => e.stopPropagation()}
@@ -1432,7 +1369,7 @@ export default function RawMaterialsManagementPage() {
                       return (
                         <td
                           key={key}
-                          className={`${base}${selectedCls}`}
+                          className={`${base}${selectedCls}${stickyCls}`}
                           onClick={() => handleCellClick(rowIndex, colIndex, col.field)}
                           title="같은 셀을 다시 클릭하면 입력모드"
                         >
@@ -1448,7 +1385,7 @@ export default function RawMaterialsManagementPage() {
                       return (
                         <td
                           key={key}
-                          className={`${base}${selectedCls}`}
+                          className={`${base}${selectedCls}${stickyCls}`}
                           onClick={() => handleCellClick(rowIndex, colIndex, col.field)}
                           title="같은 셀을 다시 클릭하면 입력모드"
                         >
@@ -1466,7 +1403,7 @@ export default function RawMaterialsManagementPage() {
                     return (
                       <td
                         key={key}
-                        className={`${base}${textCls}${selectedCls}${modifiedCls}`}
+                        className={`${base}${textCls}${selectedCls}${modifiedCls}${stickyCls}`}
                         onClick={() => handleCellClick(rowIndex, colIndex, col.field)}
                         title="같은 셀을 다시 클릭하면 입력모드"
                       >
@@ -1475,7 +1412,7 @@ export default function RawMaterialsManagementPage() {
                     )
                   })}
 
-                  <td className="px-2 py-2 text-xs">
+                  <td className={`px-2 py-2 text-xs ${rowBgClass}`}>
                     <div className="flex gap-1 justify-center">
                       <Button variant="primary" size="xs" onClick={() => openModal('material', m)}>수정</Button>
                       <Button variant="danger" size="xs" onClick={() => handleDelete('raw_materials', m.id)}>삭제</Button>
@@ -1488,12 +1425,12 @@ export default function RawMaterialsManagementPage() {
           </table>
         </div>
 
-        <div className="mt-4 text-sm text-gray-500 text-center">
+        <div className="mt-4 text-sm text-gray-500 text-center px-6 pb-4">
           <p>• <b>같은 셀을 두 번 클릭</b>하면 입력모드(커서만 보임)</p>
           <p>• <b>Enter</b> 저장, <b>Esc</b> 취소, <b>포커스 아웃</b> 저장</p>
           <p>• 선택된 셀에서 <b>Ctrl/Cmd + C</b> 복사, <b>Ctrl/Cmd + V</b> 붙여넣기, <b>Ctrl/Cmd + Z</b> 되돌리기</p>
         </div>
-      </Card>
+      </div>
 
       {/* 변경사항 컨펌 모달 */}
       {isConfirmOpen && (

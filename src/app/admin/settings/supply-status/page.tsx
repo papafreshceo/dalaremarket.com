@@ -233,7 +233,7 @@ export default function SupplyStatusSettingsPage() {
     <div className="space-y-6">
       {/* 페이지 헤더 */}
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">공급상태 설정</h1>
+        <div className="text-[16px] font-bold text-gray-900">공급상태 설정</div>
         <p className="mt-1 text-sm text-gray-600">
           원물 및 옵션상품의 공급상태를 관리합니다
         </p>
@@ -265,10 +265,12 @@ export default function SupplyStatusSettingsPage() {
         </nav>
       </div>
 
-      {/* 상태 목록 카드 */}
-      <Card
-        title={activeTab === 'raw_material' ? '원물 상태 목록' : '옵션상품 상태 목록'}
-        actions={
+      {/* 상태 목록 */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="text-[14px] font-medium">
+            {activeTab === 'raw_material' ? '원물 상태 목록' : '옵션상품 상태 목록'}
+          </div>
           <Button onClick={() => {
             setFormData({
               status_type: activeTab,
@@ -283,8 +285,8 @@ export default function SupplyStatusSettingsPage() {
           }}>
             + 상태 추가
           </Button>
-        }
-      >
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -382,7 +384,7 @@ export default function SupplyStatusSettingsPage() {
             </div>
           )}
         </div>
-      </Card>
+      </div>
 
       {/* 상태 추가/수정 모달 */}
       {modalOpen && (
