@@ -1,0 +1,6 @@
+The layout should be restructured to have:
+1. Custom header at top (fixed, z-index: 1100) with user email and logout button
+2. Sidebar starting at top: 60px
+3. Main content with marginLeft and paddingTop: 60px
+
+This will allow the UserHeader from layout (z-index: 1000) to be visible behind the custom header (z-index: 1100).

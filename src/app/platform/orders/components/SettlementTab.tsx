@@ -62,7 +62,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
             background: 'white',
             padding: '20px',
             borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+            border: '1px solid #e5e7eb'
           }}
         >
           <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
@@ -78,7 +78,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
             background: 'white',
             padding: '20px',
             borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+            border: '1px solid #e5e7eb'
           }}
         >
           <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
@@ -95,7 +95,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
             background: 'white',
             padding: '20px',
             borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+            border: '1px solid #e5e7eb'
           }}
         >
           <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
@@ -113,9 +113,9 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
         style={{
           background: 'white',
           borderRadius: '8px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
           marginBottom: '24px',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          border: '1px solid #e5e7eb'
         }}
       >
         <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb' }}>
@@ -224,8 +224,8 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
         style={{
           background: 'white',
           borderRadius: '8px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          border: '1px solid #e5e7eb'
         }}
       >
         <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb' }}>

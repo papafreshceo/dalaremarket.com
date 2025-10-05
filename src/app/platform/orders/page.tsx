@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Order, StatusConfig, StatsData, Tab } from './types';
 import DashboardTab from './components/DashboardTab';
 import OrderRegistrationTab from './components/OrderRegistrationTab';
@@ -10,6 +12,8 @@ import OrderDetailModal from './modals/OrderDetailModal';
 
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<Tab>('대시보드');
+  const router = useRouter();
+  const [userEmail, setUserEmail] = useState<string>('');
   const [orders, setOrders] = useState<Order[]>([
     { id: 1, orderNo: 'ORD-2024-0001', products: '양파 외 3건', amount: 580000, quantity: 120, status: 'registered', date: '2024-01-15', registeredAt: '2024-01-15 09:30' },
     { id: 2, orderNo: 'ORD-2024-0002', products: '토마토 외 5건', amount: 1250000, quantity: 200, status: 'confirmed', date: '2024-01-15', confirmedAt: '2024-01-15 10:15', paymentMethod: '계좌이체' },
@@ -55,6 +59,15 @@ export default function OrdersPage() {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    const supabase = createClientComponentClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) {
+        setUserEmail(user.email);
+      }
+    });
   }, []);
 
   const statusConfig: Record<Order['status'], StatusConfig> = {
@@ -125,111 +138,227 @@ export default function OrdersPage() {
 
   return (
     <>
+      {/* 발주관리 전용 헤더 */}
       <div style={{
-        position: 'relative',
+        position: 'fixed',
+        top: 0,
+        left: 0,
         width: '100%',
-        paddingTop: '70px',
-        paddingLeft: isMobile ? '20px' : '40px',
-        paddingRight: isMobile ? '20px' : '40px',
-        paddingBottom: isMobile ? '20px' : '40px',
-        minHeight: '100vh',
-        overflow: 'hidden'
+        height: '70px',
+        background: '#f5f5f5',
+        borderBottom: '1px solid #e0e0e0',
+        zIndex: 1100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        padding: '0 24px'
       }}>
-        {/* 배경 그라데이션 */}
+        {/* 사용자 정보 */}
         <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'linear-gradient(180deg, #3b82f6 0%, #60a5fa 300px, #93c5fd 600px, #bfdbfe 900px, #dbeafe 1200px, #f0f9ff 1500px, #ffffff 1800px, #ffffff 100%)',
-          zIndex: -3
-        }} />
-
-        <div style={{
-          position: 'absolute',
-          top: '400px',
-          left: 0,
-          width: '600px',
-          height: '400px',
-          background: 'radial-gradient(ellipse at 0% 50%, rgba(187, 247, 208, 0.4) 0%, transparent 60%)',
-          zIndex: -2
-        }} />
-
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          right: 0,
-          width: '1600px',
-          height: '1200px',
-          background: 'radial-gradient(ellipse at 100% 0%, rgba(139, 92, 246, 0.5) 0%, transparent 60%)',
-          zIndex: -1
-        }} />
-
-        <div style={{
-          maxWidth: '1400px',
-          margin: '0 auto'
+          fontSize: '14px',
+          color: '#1f2937',
+          marginRight: '12px',
+          fontWeight: '500'
         }}>
-          {/* 헤더 영역 */}
-          <div style={{
-            marginBottom: '32px'
-          }}>
-            <h1 style={{
-              fontSize: isMobile ? '24px' : '32px',
-              fontWeight: '700',
-              color: '#212529',
-              margin: 0,
-              marginBottom: '8px'
-            }}>
-              발주관리
-            </h1>
-            <p style={{
-              color: '#6c757d',
-              margin: 0,
-              fontSize: '14px'
-            }}>
-              발주 내역을 확인하고 새로운 주문을 등록하세요
-            </p>
-          </div>
+          {userEmail || '로그인 정보 없음'}
+        </div>
 
-          {/* Tab Navigation */}
-          <div style={{
+        {/* 나가기 버튼 */}
+        <button
+          onClick={() => { router.push('/'); }}
+          style={{
             display: 'flex',
+            alignItems: 'center',
             gap: '8px',
-            borderBottom: '2px solid #e0e0e0',
-            marginBottom: '32px'
-          }}>
-            {(['대시보드', '발주서등록', '정산관리'] as Tab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: '12px 24px',
-                  background: 'transparent',
-                  color: activeTab === tab ? '#2563eb' : '#6b7280',
-                  border: 'none',
-                  borderBottom: activeTab === tab ? '2px solid #2563eb' : '2px solid transparent',
-                  marginBottom: '-2px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  fontWeight: activeTab === tab ? '600' : '400',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
+            padding: '8px 16px',
+            background: 'white',
+            border: '1px solid #e0e0e0',
+            borderRadius: '8px',
+            fontSize: '14px',
+            color: '#1f2937',
+            fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'background 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#f9fafb';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'white';
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          나가기
+        </button>
+      </div>
 
-          {/* Tab Content */}
-          {activeTab === '대시보드' && (
+      {/* Sidebar */}
+      <div style={{
+        position: 'fixed',
+        top: '70px',
+        left: 0,
+        width: isMobile ? '42px' : '175px',
+        height: 'calc(100vh - 70px)',
+        background: '#f5f5f5',
+        borderRight: '1px solid #e0e0e0',
+        zIndex: 100
+      }}>
+        <div style={{
+          paddingTop: '16px',
+          paddingLeft: isMobile ? '6px' : '12px',
+          paddingRight: isMobile ? '6px' : '12px'
+        }}>
+          {/* 대시보드 탭 */}
+          <button
+            onClick={() => setActiveTab('대시보드')}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: isMobile ? '10px 8px' : '10px 16px',
+              margin: isMobile ? '4px 6px' : '2px 8px',
+              background: activeTab === '대시보드' ? '#e8e8e8' : 'transparent',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: isMobile ? '12px' : '14px',
+              fontWeight: activeTab === '대시보드' ? '700' : '400',
+              color: '#1f2937',
+              textAlign: 'left',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              if (activeTab !== '대시보드') {
+                e.currentTarget.style.background = '#f3f4f6';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== '대시보드') {
+                e.currentTarget.style.background = 'transparent';
+              }
+            }}
+          >
+            <svg width={isMobile ? '16' : '20'} height={isMobile ? '16' : '20'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            {!isMobile && '대시보드'}
+          </button>
+
+          {/* 발주서등록 탭 */}
+          <button
+            onClick={() => setActiveTab('발주서등록')}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: isMobile ? '10px 8px' : '10px 16px',
+              margin: isMobile ? '4px 6px' : '2px 8px',
+              background: activeTab === '발주서등록' ? '#e8e8e8' : 'transparent',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: isMobile ? '12px' : '14px',
+              fontWeight: activeTab === '발주서등록' ? '700' : '400',
+              color: '#1f2937',
+              textAlign: 'left',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              if (activeTab !== '발주서등록') {
+                e.currentTarget.style.background = '#f3f4f6';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== '발주서등록') {
+                e.currentTarget.style.background = 'transparent';
+              }
+            }}
+          >
+            <svg width={isMobile ? '16' : '20'} height={isMobile ? '16' : '20'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            {!isMobile && '발주서등록'}
+          </button>
+
+          {/* 정산관리 탭 */}
+          <button
+            onClick={() => setActiveTab('정산관리')}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: isMobile ? '10px 8px' : '10px 16px',
+              margin: isMobile ? '4px 6px' : '2px 8px',
+              background: activeTab === '정산관리' ? '#e8e8e8' : 'transparent',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: isMobile ? '12px' : '14px',
+              fontWeight: activeTab === '정산관리' ? '700' : '400',
+              color: '#1f2937',
+              textAlign: 'left',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              if (activeTab !== '정산관리') {
+                e.currentTarget.style.background = '#f3f4f6';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== '정산관리') {
+                e.currentTarget.style.background = 'transparent';
+              }
+            }}
+          >
+            <svg width={isMobile ? '16' : '20'} height={isMobile ? '16' : '20'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+            {!isMobile && '정산관리'}
+          </button>
+        </div>
+      </div>
+
+      {/* Main content area */}
+      <div style={{
+        marginLeft: isMobile ? '42px' : '175px',
+        padding: isMobile ? '16px' : '24px',
+        paddingTop: '90px',
+        background: '#f5f5f5',
+        minHeight: '100vh',
+        overflowY: 'auto'
+      }}>
+        {/* Tab Content */}
+        {activeTab === '대시보드' && (
+          <div style={{
+            maxWidth: '1440px',
+            margin: '0 auto'
+          }}>
             <DashboardTab
               isMobile={isMobile}
               orders={orders}
               statusConfig={statusConfig}
             />
-          )}
-          {activeTab === '발주서등록' && (
+          </div>
+        )}
+        {activeTab === '발주서등록' && (
+          <div style={{
+            width: '100%'
+          }}>
             <OrderRegistrationTab
               isMobile={isMobile}
               orders={orders}
@@ -252,14 +381,19 @@ export default function OrdersPage() {
               endDate={endDate}
               setEndDate={setEndDate}
             />
-          )}
-          {activeTab === '정산관리' && (
+          </div>
+        )}
+        {activeTab === '정산관리' && (
+          <div style={{
+            maxWidth: '1440px',
+            margin: '0 auto'
+          }}>
             <SettlementTab
               isMobile={isMobile}
               orders={orders}
             />
-          )}
-        </div>
+          </div>
+        )}
 
         {/* 모달들 */}
         <UploadModal

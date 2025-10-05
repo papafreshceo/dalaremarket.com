@@ -138,7 +138,7 @@ export default function UserHeader() {
               <img
                 src="https://res.cloudinary.com/dde1hpbrp/image/upload/v1753148563/05_etc/dalraemarket_papafarmers.com/DalraeMarket_loge_trans.png"
                 alt="달래마켓"
-                style={{ height: '30px' }}
+                style={{ height: '24px' }}
               />
             </Link>
 
@@ -167,7 +167,7 @@ export default function UserHeader() {
                         src={item.imageUrl}
                         alt={item.text}
                         style={{
-                          height: '24px',
+                          height: '19px',
                           width: 'auto',
                           objectFit: 'contain',
                           filter: isActive(item.path) ? 'none' : 'grayscale(0)',

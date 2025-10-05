@@ -59,33 +59,28 @@ export default function OrderRegistrationTab({
           marginBottom: '24px'
         }}
       >
-        {statsData.map((stat) => (
-          <div
-            key={stat.status}
-            style={{
-              background: stat.bgGradient,
-              borderRadius: '12px',
-              padding: '20px',
-              color: 'white',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              transition: 'transform 0.2s',
-              cursor: 'pointer'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-4px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '8px' }}>
-              {statusConfig[stat.status].label}
+        {statsData.map((stat) => {
+          const config = statusConfig[stat.status];
+          return (
+            <div
+              key={stat.status}
+              style={{
+                background: 'white',
+                padding: '20px',
+                borderRadius: '8px',
+                border: '1px solid #e5e7eb',
+                transition: 'all 0.2s'
+              }}
+            >
+              <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px' }}>
+                {config.label}
+              </div>
+              <div style={{ fontSize: '32px', fontWeight: '700', color: '#1f2937' }}>
+                {stat.count}
+              </div>
             </div>
-            <div style={{ fontSize: '28px', fontWeight: '600' }}>
-              {stat.count}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* 발주서 관리 섹션 */}
@@ -95,7 +90,7 @@ export default function OrderRegistrationTab({
           padding: '20px',
           borderRadius: '12px',
           marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+          border: '1px solid #e5e7eb'
         }}
       >
         <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600', color: '#1f2937' }}>
@@ -182,7 +177,7 @@ export default function OrderRegistrationTab({
           padding: '16px',
           borderRadius: '8px',
           marginBottom: '16px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+          border: '1px solid #e5e7eb'
         }}
       >
         <div
@@ -259,8 +254,8 @@ export default function OrderRegistrationTab({
         style={{
           background: 'white',
           borderRadius: '8px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          border: '1px solid #e5e7eb'
         }}
       >
         <div style={{ overflowX: 'auto' }}>

@@ -137,6 +137,8 @@ html {
   text-size-adjust: 100%;
   scroll-behavior: smooth;
   height: 100%;
+  overflow-y: scroll;
+  overflow-x: hidden;
 }
 
 body {
@@ -232,10 +234,14 @@ input[type="search"] {
   color: var(--color-primary-contrast);
 }
 
-/* 스크롤바 - 미니멀 */
+/* 스크롤바 - 오버레이 스타일 */
+html {
+  scrollbar-gutter: stable;
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -243,13 +249,22 @@ input[type="search"] {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
+  background: rgba(0, 0, 0, 0.2);
   border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
   transition: background var(--duration-fast);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-border-hover);
+  background: rgba(0, 0, 0, 0.3);
+  background-clip: padding-box;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
 }
 
 /* 이미지 & 미디어 */
