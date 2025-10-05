@@ -2,6 +2,8 @@
 /* 폰트 임포트 - 최상단 */
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
 @import "tailwindcss";
+@import "ag-grid-community/styles/ag-grid.css";
+@import "ag-grid-community/styles/ag-theme-alpine.css";
 
 /* ========================
    모던 디자인 시스템 2024
@@ -105,25 +107,253 @@
 }
 
 /* 다크모드 */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #0a0a0a;
-    --color-background-secondary: #171717;
-    --color-surface: #171717;
-    --color-surface-hover: #262626;
-    
-    --color-text: #fafafa;
-    --color-text-secondary: #a3a3a3;
-    --color-text-tertiary: #737373;
-    --color-text-disabled: #525252;
-    
-    --color-border: #262626;
-    --color-border-hover: #404040;
-    
-    --color-primary: #6366f1;
-    --color-primary-light: #818cf8;
-    --color-primary-dark: #5046e5;
-  }
+.dark {
+  --color-background: #0f172a;
+  --color-background-secondary: #1e293b;
+  --color-surface: #1e293b;
+  --color-surface-hover: #334155;
+
+  --color-text: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-tertiary: #64748b;
+  --color-text-disabled: #475569;
+
+  --color-border: #334155;
+  --color-border-hover: #475569;
+
+  --color-primary: #60a5fa;
+  --color-primary-light: #93c5fd;
+  --color-primary-dark: #3b82f6;
+}
+
+.dark body {
+  background: linear-gradient(180deg, #0f172a, #1e293b 15%) !important;
+}
+
+/* 다크모드 Input */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+  color: #f1f5f9 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: #60a5fa !important;
+}
+
+/* 다크모드 Card */
+.dark [style*="background: #ffffff"],
+.dark [style*="background:#ffffff"] {
+  background: #1e293b !important;
+}
+
+.dark [style*="border: 1px solid #bfdbfe"],
+.dark [style*="border:1px solid #bfdbfe"] {
+  border-color: #475569 !important;
+}
+
+/* 다크모드 텍스트 - 강제 적용 */
+.dark * {
+  border-color: #475569;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6 {
+  color: #f1f5f9 !important;
+  font-weight: 600 !important;
+}
+
+.dark p,
+.dark span,
+.dark div,
+.dark label {
+  color: #f1f5f9 !important;
+  font-weight: 300 !important;
+}
+
+.dark .font-semibold,
+.dark .font-bold,
+.dark [style*="font-weight: 600"],
+.dark [style*="font-weight: 700"],
+.dark [style*="fontWeight: 600"],
+.dark [style*="fontWeight: 700"] {
+  font-weight: 500 !important;
+}
+
+.dark .font-medium {
+  font-weight: 400 !important;
+}
+
+.dark [style*="color: #1d4ed8"],
+.dark [style*="color:#1d4ed8"],
+.dark [style*="color: rgb(29, 78, 216)"] {
+  color: #60a5fa !important;
+}
+
+.dark [style*="color: #64748b"],
+.dark [style*="color:#64748b"],
+.dark [style*="color: rgb(100, 116, 139)"] {
+  color: #94a3b8 !important;
+}
+
+.dark [style*="color: #334155"],
+.dark [style*="color:#334155"],
+.dark [style*="color: rgb(51, 65, 85)"] {
+  color: #cbd5e1 !important;
+}
+
+.dark [style*="color: #111827"],
+.dark [style*="color:#111827"],
+.dark [style*="color: #000000"],
+.dark [style*="color:#000000"],
+.dark [style*="color: rgb(17, 24, 39)"],
+.dark [style*="color: rgb(0, 0, 0)"] {
+  color: #f1f5f9 !important;
+}
+
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700,
+.dark .text-gray-600 {
+  color: #f1f5f9 !important;
+}
+
+.dark .text-gray-500,
+.dark .text-gray-400 {
+  color: #94a3b8 !important;
+}
+
+.dark .bg-white {
+  background-color: #1e293b !important;
+}
+
+.dark .bg-gray-50,
+.dark .bg-gray-100 {
+  background-color: #0f172a !important;
+}
+
+.dark .bg-gray-200 {
+  background-color: #334155 !important;
+}
+
+/* 다크모드 배지 */
+.dark [style*="background-color: #fed7aa"],
+.dark [style*="background-color:#fed7aa"],
+.dark [style*="backgroundColor: #fed7aa"],
+.dark [style*="backgroundColor:#fed7aa"] {
+  background-color: #78350f !important;
+  color: #fef3c7 !important;
+}
+
+.dark [style*="background-color: #bfdbfe"],
+.dark [style*="background-color:#bfdbfe"],
+.dark [style*="backgroundColor: #bfdbfe"],
+.dark [style*="backgroundColor:#bfdbfe"] {
+  background-color: #1e3a8a !important;
+  color: #dbeafe !important;
+}
+
+.dark [style*="background: #bfdbfe"],
+.dark [style*="background:#bfdbfe"] {
+  background: #1e3a8a !important;
+  color: #dbeafe !important;
+}
+
+.dark [style*="color: #c2410c"],
+.dark [style*="color:#c2410c"] {
+  color: #fef3c7 !important;
+}
+
+.dark [style*="color: #1d4ed8"],
+.dark [style*="color:#1d4ed8"] {
+  color: #dbeafe !important;
+}
+
+/* 다크모드 선택된 메뉴 */
+.dark .bg-blue-600,
+.dark [class*="bg-blue-"] {
+  background-color: #1e40af !important;
+}
+
+.dark .text-blue-600 {
+  color: #60a5fa !important;
+}
+
+.dark .border-blue-600,
+.dark .border-blue-300 {
+  border-color: #3b82f6 !important;
+}
+
+/* 다크모드 호버 효과 */
+.dark .hover\:bg-gray-300:hover,
+.dark [class*="hover:bg-gray"]:hover {
+  background-color: #475569 !important;
+}
+
+.dark .hover\:bg-blue-50:hover {
+  background-color: #1e3a8a !important;
+}
+
+/* 다크모드 버튼 */
+.dark button:not([class*="bg-"]):not([style*="background"]) {
+  color: #f1f5f9;
+}
+
+/* 다크모드 테이블 */
+.dark table {
+  background-color: #1e293b;
+  color: #f1f5f9;
+}
+
+.dark table th,
+.dark table td {
+  border-color: #475569 !important;
+  color: #f1f5f9 !important;
+}
+
+/* 다크모드 DatePicker */
+.dark .react-datepicker {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+}
+
+.dark .react-datepicker__header {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+}
+
+.dark .react-datepicker__current-month,
+.dark .react-datepicker__day-name,
+.dark .react-datepicker__day {
+  color: #f1f5f9 !important;
+}
+
+.dark .react-datepicker__day:hover {
+  background-color: #334155 !important;
+}
+
+.dark .react-datepicker__day--selected {
+  background-color: #60a5fa !important;
+}
+
+.dark .react-datepicker__day--today {
+  background-color: #1e40af !important;
+  color: #ffffff !important;
 }
 
 /* 베이스 리셋 - padding/margin 제거 */
@@ -148,15 +378,15 @@ body {
   font-weight: 400;
   line-height: 1.6;
   color: var(--color-text);
-  background-color: var(--color-background);
+  background: linear-gradient(180deg, #eff6ff, #ffffff 15%);
   margin: 0;
-  
+
   /* 렌더링 최적화 */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: "kern", "liga", "clig", "calt";
-  
+
   /* 스크롤 부드럽게 */
   overscroll-behavior: contain;
 }
@@ -169,12 +399,12 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0;
 }
 
-h1 { font-size: var(--text-3xl); }
-h2 { font-size: var(--text-2xl); }
-h3 { font-size: var(--text-xl); }
-h4 { font-size: var(--text-lg); }
-h5 { font-size: var(--text-base); }
-h6 { font-size: var(--text-sm); }
+h1 { font-size: 18px; }
+h2 { font-size: 16px; }
+h3 { font-size: 14px; }
+h4 { font-size: 13px; }
+h5 { font-size: 12px; }
+h6 { font-size: 12px; }
 
 /* 링크 - 심플하게 */
 a {
@@ -198,16 +428,16 @@ input, textarea, select {
 
 /* 셀렉트 박스 옵션 크기 조정 */
 select {
-  font-size: 14px !important;
+  font-size: 13px !important;
 }
 
 select option {
-  font-size: 14px !important;
+  font-size: 13px !important;
   font-family: inherit !important;
 }
 
 label {
-  font-size: 14px !important;
+  font-size: 13px !important;
 }
 
 input[type="date"],
@@ -218,14 +448,12 @@ input[type="number"],
 input[type="email"],
 input[type="password"],
 input[type="search"] {
-  font-size: 14px !important;
+  font-size: 13px !important;
 }
 
 /* 포커스 스타일 - 접근성 */
 :focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
+  outline: none;
 }
 
 /* 선택 영역 */
@@ -279,20 +507,44 @@ table {
   border-collapse: collapse;
   border-spacing: 0;
   width: 100%;
-  font-size: 14px;
+  font-size: 11px;
 }
 
 table th,
 table td {
-  font-size: 14px;
+  font-size: 11px;
   color: #000000;
 }
 
 table input,
 table select,
 table textarea {
-  font-size: 14px;
+  font-size: 11px;
   color: #000000;
+}
+
+/* 원물관리 & 옵션상품관리 테이블 행 높이 조절 */
+.table-fixed th {
+  height: 16px !important;
+  max-height: 16px !important;
+  padding-top: 1px !important;
+  padding-bottom: 1px !important;
+  line-height: 1 !important;
+  font-size: 12px !important;
+}
+
+.table-fixed td {
+  height: 16px !important;
+  max-height: 16px !important;
+  padding-top: 1px !important;
+  padding-bottom: 1px !important;
+  line-height: 1 !important;
+  font-size: 12px !important;
+}
+
+.table-fixed tr {
+  height: 16px !important;
+  max-height: 16px !important;
 }
 
 /* 리스트 - margin/padding 제거 */
@@ -403,21 +655,29 @@ ul, ol {
 
 /* Handsontable 헤더 높이 조정 */
 .handsontable thead th {
-  height: 30px !important;
-  line-height: 30px !important;
-  padding: 0 8px !important;
+  height: 23px !important;
+  line-height: 23px !important;
+  padding: 0 4px !important;
   vertical-align: middle !important;
 }
 
 .handsontable tbody th {
-  height: 30px !important;
-  line-height: 30px !important;
+  height: 23px !important;
+  line-height: 23px !important;
+  padding: 0 4px !important;
   vertical-align: middle !important;
 }
 
-/* Handsontable 셀 세로 정렬 */
+/* Handsontable 셀 세로 정렬 및 높이 */
 .handsontable td {
+  height: 23px !important;
+  line-height: 23px !important;
   vertical-align: middle !important;
+  padding: 0 4px !important;
+}
+
+.handsontable tr {
+  height: 23px !important;
 }
 
 /* Handsontable 읽기 전용 모드 배경색 */
@@ -430,6 +690,62 @@ ul, ol {
   background-color: #fffbf0 !important;
 }
 
+/* Handsontable 다크모드 */
+.dark .handsontable {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+.dark .handsontable thead th,
+.dark .handsontable tbody th,
+.dark .handsontable td {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+}
+
+.dark .handsontable td.bg-blue-50 {
+  background-color: #1e3a8a !important;
+  color: #dbeafe !important;
+}
+
+.dark .handsontable td.bg-pink-50 {
+  background-color: #831843 !important;
+  color: #fce7f3 !important;
+}
+
+.dark .handsontable.readonly-mode td {
+  background-color: #334155 !important;
+}
+
+.dark .handsontable.readonly-mode td.bg-blue-50,
+.dark .handsontable.readonly-mode td.bg-pink-50 {
+  background-color: #334155 !important;
+}
+
+.dark .handsontable .htCore {
+  background-color: #1e293b !important;
+}
+
+.dark .handsontable .ht_clone_top,
+.dark .handsontable .ht_clone_left,
+.dark .handsontable .ht_clone_top_left_corner {
+  background-color: #1e293b !important;
+}
+
+.dark .handsontable .currentRow,
+.dark .handsontable .currentCol {
+  background-color: #334155 !important;
+}
+
+.dark .handsontable .area {
+  background-color: rgba(96, 165, 250, 0.2) !important;
+}
+
+.dark .handsontable .htDimmed {
+  color: #64748b !important;
+}
+
 /* ========================
    React DatePicker 커스텀 스타일 (구글 캘린더 스타일)
    ======================== */
@@ -437,11 +753,11 @@ ul, ol {
 /* DatePicker 컨테이너 */
 .react-datepicker {
   font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-  border: 1px solid #e5e7eb !important;
+  border: 1px solid #bfdbfe !important;
   border-radius: 12px !important;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
-  padding: 8px !important;
-  font-size: 14px !important;
+  box-shadow: 0 8px 24px rgba(2,6,23,0.06) !important;
+  padding: 12px !important;
+  font-size: 13px !important;
   z-index: 9999 !important;
 }
 
@@ -459,15 +775,15 @@ ul, ol {
 .react-datepicker__header {
   background-color: #ffffff !important;
   border-bottom: 1px solid #f3f4f6 !important;
-  padding: 12px 0 !important;
-  border-radius: 12px 12px 0 0 !important;
+  padding: 8px 0 !important;
+  border-radius: 8px 8px 0 0 !important;
 }
 
 .react-datepicker__current-month {
-  font-size: 16px !important;
+  font-size: 12px !important;
   font-weight: 600 !important;
   color: #111827 !important;
-  margin-bottom: 8px !important;
+  margin-bottom: 4px !important;
 }
 
 /* 요일 헤더 */
@@ -479,10 +795,10 @@ ul, ol {
 
 .react-datepicker__day-name {
   color: #6b7280 !important;
-  font-size: 12px !important;
+  font-size: 10px !important;
   font-weight: 600 !important;
-  width: 36px !important;
-  line-height: 36px !important;
+  width: 28px !important;
+  line-height: 28px !important;
   margin: 0 !important;
 }
 
@@ -500,13 +816,13 @@ ul, ol {
 
 /* 날짜 셀 */
 .react-datepicker__day {
-  width: 36px !important;
-  height: 36px !important;
-  line-height: 36px !important;
-  margin: 2px !important;
-  border-radius: 8px !important;
+  width: 28px !important;
+  height: 28px !important;
+  line-height: 28px !important;
+  margin: 1px !important;
+  border-radius: 6px !important;
   color: #374151 !important;
-  font-size: 14px !important;
+  font-size: 11px !important;
   transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
@@ -559,10 +875,10 @@ ul, ol {
 
 /* 네비게이션 버튼 */
 .react-datepicker__navigation {
-  top: 14px !important;
-  width: 32px !important;
-  height: 32px !important;
-  border-radius: 8px !important;
+  top: 10px !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 6px !important;
   transition: background-color 150ms !important;
 }
 
@@ -571,18 +887,18 @@ ul, ol {
 }
 
 .react-datepicker__navigation--previous {
-  left: 12px !important;
+  left: 8px !important;
 }
 
 .react-datepicker__navigation--next {
-  right: 12px !important;
+  right: 8px !important;
 }
 
 .react-datepicker__navigation-icon::before {
   border-color: #6b7280 !important;
-  border-width: 2px 2px 0 0 !important;
-  height: 7px !important;
-  width: 7px !important;
+  border-width: 1.5px 1.5px 0 0 !important;
+  height: 6px !important;
+  width: 6px !important;
 }
 
 /* 삼각형 제거 */

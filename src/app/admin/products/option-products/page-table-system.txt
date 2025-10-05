@@ -1245,7 +1245,7 @@ export default function RawMaterialsManagementPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto overflow-y-auto max-h-[calc(42*30px)]">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(20*44px+45px)]">
           <table className="w-full border-collapse table-fixed text-center">
             <colgroup>
               <col style={{ width: '40px' }} />
@@ -1272,11 +1272,11 @@ export default function RawMaterialsManagementPage() {
             </colgroup>
             <thead className="sticky top-0 z-30">
               <tr className="bg-gray-50">
-                <th className="px-2 py-1 bg-gray-50 border-b border-gray-200 sticky left-0 z-30">
+                <th className="px-2 py-3 bg-gray-50 border-b border-gray-200 sticky left-0 z-30">
                   <input type="checkbox" checked={selectAll} onChange={handleSelectAll} className="cursor-pointer" />
                 </th>
                 {['원물코드','원물명','대분류','중분류','소분류','품목','품종','규격','단위수량','최근거래','최근시세','현재시세','주거래처','시즌','시작일','피크시기','종료일','상태','색코드','작업'].map((h, i)=>(
-                  <th key={i} className={`px-2 py-1 text-xs font-medium bg-gray-50 border-b border-gray-200 ${i === 0 ? 'sticky left-[40px] z-30 text-gray-500' : i === 1 ? 'sticky left-[160px] z-30 text-gray-500' : 'text-gray-500'}`}>{h}</th>
+                  <th key={i} className={`px-2 py-3 text-xs font-medium bg-gray-50 border-b border-gray-200 ${i === 0 ? 'sticky left-[40px] z-30 text-gray-500' : i === 1 ? 'sticky left-[160px] z-30 text-gray-500' : 'text-gray-500'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -1295,7 +1295,7 @@ export default function RawMaterialsManagementPage() {
 
                 return (
                 <tr key={m.id} className={`hover:bg-gray-50 ${borderClass} ${modifiedMaterials.has(m.id) ? 'bg-yellow-50' : ''} ${selectedRows.has(m.id) ? 'bg-blue-50' : ''}`}>
-                  <td className={`px-2 py-1 sticky left-0 z-20 ${rowBgClass}`}>
+                  <td className={`px-2 py-2 sticky left-0 z-20 ${rowBgClass}`}>
                     <input type="checkbox" checked={!!selectedRows.has(m.id)} onChange={() => handleSelectRow(m.id)} className="cursor-pointer" />
                   </td>
 
@@ -1331,7 +1331,7 @@ export default function RawMaterialsManagementPage() {
                       editingCell.field === col.field
 
                     const key = `${m.id}-${col.field}`
-                    const base = 'px-2 py-1 text-xs text-center overflow-hidden text-ellipsis whitespace-nowrap align-middle'
+                    const base = 'px-2 py-2 text-xs text-center overflow-hidden text-ellipsis whitespace-nowrap align-middle'
                     const selectedCls = isSelected ? ' ring-2 ring-emerald-500 ring-inset' : ''
                     const textCls = col.bold ? ' font-medium' : ''
                     const modifiedCls = isCellModified(m, col.field) ? ' text-red-600' : ''
@@ -1412,7 +1412,7 @@ export default function RawMaterialsManagementPage() {
                     )
                   })}
 
-                  <td className={`px-2 py-1.5 text-xs ${rowBgClass}`}>
+                  <td className={`px-2 py-2 text-xs ${rowBgClass}`}>
                     <div className="flex gap-1 justify-center">
                       <Button variant="primary" size="xs" onClick={() => openModal('material', m)}>수정</Button>
                       <Button variant="danger" size="xs" onClick={() => handleDelete('raw_materials', m.id)}>삭제</Button>

@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ToastProvider } from '@/components/ui/Toast'
 import { ConfirmProvider } from '@/components/ui/ConfirmModal'
 import { LogoutButton } from '@/components/ui/LogoutButton'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 export default function AdminLayout({
   children,
@@ -324,8 +325,11 @@ export default function AdminLayout({
           </nav>
 
           {/* 하단 정보 */}
-          <div className="p-4 border-t border-white/10">
-            <div className="text-xs text-gray-400 space-y-1">
+          <div className="p-4 border-t border-white/10 space-y-3">
+            <div className="flex justify-center">
+              <ThemeToggle />
+            </div>
+            <div className="text-xs text-gray-400 space-y-1 text-center">
               <p>© 2025 달래마켓</p>
               <p>Version 2.0</p>
             </div>
