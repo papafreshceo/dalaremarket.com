@@ -16,6 +16,13 @@ const config: Config = {
       colors: {
         ...defaultTheme.colors,
         ...tailwindExtend.colors,
+        vscode: {
+          bg: '#1e1e1e',
+          sidebar: '#252526',
+          header: '#2d2d30',
+          border: '#3e3e42',
+          text: '#cccccc',
+        },
       },
       spacing: tailwindExtend.spacing,
       fontSize: tailwindExtend.fontSize,

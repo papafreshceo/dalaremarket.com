@@ -106,64 +106,64 @@
   --z-tooltip: 700;
 }
 
-/* 다크모드 */
+/* 다크모드 - VSCode 테마 */
 .dark {
-  --color-background: #0f172a;
-  --color-background-secondary: #1e293b;
-  --color-surface: #1e293b;
-  --color-surface-hover: #334155;
+  --color-background: #1e1e1e;
+  --color-background-secondary: #252526;
+  --color-surface: #2d2d30;
+  --color-surface-hover: #3e3e42;
 
-  --color-text: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-text-tertiary: #64748b;
-  --color-text-disabled: #475569;
+  --color-text: #cccccc;
+  --color-text-secondary: #9c9c9c;
+  --color-text-tertiary: #6e6e6e;
+  --color-text-disabled: #5a5a5a;
 
-  --color-border: #334155;
-  --color-border-hover: #475569;
+  --color-border: #3e3e42;
+  --color-border-hover: #505050;
 
-  --color-primary: #60a5fa;
-  --color-primary-light: #93c5fd;
-  --color-primary-dark: #3b82f6;
+  --color-primary: #007acc;
+  --color-primary-light: #1b9bde;
+  --color-primary-dark: #005a9e;
 }
 
 .dark body {
-  background: linear-gradient(180deg, #0f172a, #1e293b 15%) !important;
+  background: #1e1e1e !important;
 }
 
 /* 다크모드 Input */
 .dark input,
 .dark textarea,
 .dark select {
-  background-color: #1e293b !important;
-  border-color: #475569 !important;
-  color: #f1f5f9 !important;
+  background-color: #2d2d30 !important;
+  border-color: #3e3e42 !important;
+  color: #cccccc !important;
 }
 
 .dark input::placeholder,
 .dark textarea::placeholder {
-  color: #64748b !important;
+  color: #6e6e6e !important;
 }
 
 .dark input:focus,
 .dark textarea:focus,
 .dark select:focus {
-  border-color: #60a5fa !important;
+  border-color: #007acc !important;
 }
 
 /* 다크모드 Card */
 .dark [style*="background: #ffffff"],
 .dark [style*="background:#ffffff"] {
-  background: #1e293b !important;
+  background: #252526 !important;
 }
 
 .dark [style*="border: 1px solid #bfdbfe"],
 .dark [style*="border:1px solid #bfdbfe"] {
-  border-color: #475569 !important;
+  border-color: #3e3e42 !important;
 }
 
 /* 다크모드 텍스트 - 강제 적용 */
 .dark * {
-  border-color: #475569;
+  border-color: #3e3e42;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -174,15 +174,15 @@
 .dark h4,
 .dark h5,
 .dark h6 {
-  color: #f1f5f9 !important;
+  color: #cccccc !important;
   font-weight: 600 !important;
 }
 
-.dark p,
-.dark span,
-.dark div,
-.dark label {
-  color: #f1f5f9 !important;
+.dark p:not([style*="color:"]),
+.dark span:not([style*="color:"]),
+.dark div:not([style*="color:"]),
+.dark label:not([style*="color:"]) {
+  color: #cccccc !important;
   font-weight: 300 !important;
 }
 
@@ -202,19 +202,19 @@
 .dark [style*="color: #1d4ed8"],
 .dark [style*="color:#1d4ed8"],
 .dark [style*="color: rgb(29, 78, 216)"] {
-  color: #60a5fa !important;
+  color: #007acc !important;
 }
 
 .dark [style*="color: #64748b"],
 .dark [style*="color:#64748b"],
 .dark [style*="color: rgb(100, 116, 139)"] {
-  color: #94a3b8 !important;
+  color: #9c9c9c !important;
 }
 
 .dark [style*="color: #334155"],
 .dark [style*="color:#334155"],
 .dark [style*="color: rgb(51, 65, 85)"] {
-  color: #cbd5e1 !important;
+  color: #cccccc !important;
 }
 
 .dark [style*="color: #111827"],
@@ -223,32 +223,32 @@
 .dark [style*="color:#000000"],
 .dark [style*="color: rgb(17, 24, 39)"],
 .dark [style*="color: rgb(0, 0, 0)"] {
-  color: #f1f5f9 !important;
+  color: #cccccc !important;
 }
 
 .dark .text-gray-900,
 .dark .text-gray-800,
 .dark .text-gray-700,
 .dark .text-gray-600 {
-  color: #f1f5f9 !important;
+  color: #cccccc !important;
 }
 
 .dark .text-gray-500,
 .dark .text-gray-400 {
-  color: #94a3b8 !important;
+  color: #9c9c9c !important;
 }
 
 .dark .bg-white {
-  background-color: #1e293b !important;
+  background-color: #252526 !important;
 }
 
 .dark .bg-gray-50,
 .dark .bg-gray-100 {
-  background-color: #0f172a !important;
+  background-color: #1e1e1e !important;
 }
 
 .dark .bg-gray-200 {
-  background-color: #334155 !important;
+  background-color: #2d2d30 !important;
 }
 
 /* 다크모드 배지 */
@@ -287,72 +287,290 @@
 /* 다크모드 선택된 메뉴 */
 .dark .bg-blue-600,
 .dark [class*="bg-blue-"] {
-  background-color: #1e40af !important;
+  background-color: #005a9e !important;
 }
 
 .dark .text-blue-600 {
-  color: #60a5fa !important;
+  color: #007acc !important;
 }
 
 .dark .border-blue-600,
 .dark .border-blue-300 {
-  border-color: #3b82f6 !important;
+  border-color: #007acc !important;
 }
 
 /* 다크모드 호버 효과 */
 .dark .hover\:bg-gray-300:hover,
 .dark [class*="hover:bg-gray"]:hover {
-  background-color: #475569 !important;
+  background-color: #3e3e42 !important;
 }
 
 .dark .hover\:bg-blue-50:hover {
-  background-color: #1e3a8a !important;
+  background-color: #005a9e !important;
 }
 
 /* 다크모드 버튼 */
 .dark button:not([class*="bg-"]):not([style*="background"]) {
-  color: #f1f5f9;
+  color: #cccccc;
 }
 
-/* 다크모드 테이블 */
+/* 다크모드 통계 숫자 색상 유지 */
+.dark [style*="color: #2563eb"],
+.dark [style*="color:#2563eb"] {
+  color: #2563eb !important;
+}
+
+.dark [style*="color: #7c3aed"],
+.dark [style*="color:#7c3aed"] {
+  color: #7c3aed !important;
+}
+
+.dark [style*="color: #ef4444"],
+.dark [style*="color:#ef4444"] {
+  color: #ef4444 !important;
+}
+
+.dark [style*="color: #10b981"],
+.dark [style*="color:#10b981"] {
+  color: #10b981 !important;
+}
+
+.dark [style*="color: #f59e0b"],
+.dark [style*="color:#f59e0b"] {
+  color: #f59e0b !important;
+}
+
+.dark [style*="color: #6b7280"],
+.dark [style*="color:#6b7280"] {
+  color: #6b7280 !important;
+}
+
+.dark [style*="color: #8b5cf6"],
+.dark [style*="color:#8b5cf6"] {
+  color: #8b5cf6 !important;
+}
+
+.dark [style*="color: #ec4899"],
+.dark [style*="color:#ec4899"] {
+  color: #ec4899 !important;
+}
+
+.dark [style*="color: #06b6d4"],
+.dark [style*="color:#06b6d4"] {
+  color: #06b6d4 !important;
+}
+
+.dark [style*="color: #f97316"],
+.dark [style*="color:#f97316"] {
+  color: #f97316 !important;
+}
+
+/* 다크모드 사이드바 */
+.dark aside {
+  background: linear-gradient(to bottom, #252526, #1e1e1e) !important;
+}
+
+.dark aside .border-white\/10 {
+  border-color: rgba(62, 62, 66, 0.3) !important;
+}
+
+/* 플랫폼 주문 페이지 다크모드 */
+.dark .platform-orders-page {
+  background-color: #1e1e1e !important;
+  color: #cccccc !important;
+}
+
+.dark .platform-orders-page > div[style*="background"] {
+  background-color: #1e1e1e !important;
+}
+
+/* 플랫폼 주문 페이지 모든 텍스트 기본 색상 */
+.dark .platform-orders-page * {
+  color: #cccccc;
+}
+
+/* 플랫폼 주문 페이지 폰트 굵기 증가 */
+.platform-orders-page {
+  font-weight: 500;
+}
+
+.platform-orders-page * {
+  font-weight: inherit;
+}
+
+.platform-orders-page [style*="font-weight: normal"],
+.platform-orders-page [style*="font-weight:normal"],
+.platform-orders-page [style*="fontWeight: 'normal'"] {
+  font-weight: 500 !important;
+}
+
+.platform-orders-page [style*="font-weight: 500"],
+.platform-orders-page [style*="font-weight:500"],
+.platform-orders-page [style*="fontWeight: '500'"] {
+  font-weight: 600 !important;
+}
+
+.platform-orders-page [style*="font-weight: 600"],
+.platform-orders-page [style*="font-weight:600"],
+.platform-orders-page [style*="fontWeight: '600'"] {
+  font-weight: 700 !important;
+}
+
+.platform-orders-page [style*="font-weight: bold"],
+.platform-orders-page [style*="font-weight:bold"],
+.platform-orders-page [style*="fontWeight: 'bold'"] {
+  font-weight: 800 !important;
+}
+
+.platform-orders-page [style*="font-weight: 700"],
+.platform-orders-page [style*="font-weight:700"],
+.platform-orders-page [style*="fontWeight: '700'"] {
+  font-weight: 800 !important;
+}
+
+/* 플랫폼 주문 페이지 헤더 */
+.dark .platform-orders-page > div:first-child {
+  background-color: #2d2d30 !important;
+  border-color: #3e3e42 !important;
+}
+
+/* 플랫폼 주문 페이지 사이드바 */
+.dark .platform-orders-page > div:nth-child(2) {
+  background-color: #252526 !important;
+  border-color: #3e3e42 !important;
+}
+
+/* 플랫폼 주문 페이지 버튼 */
+.dark .platform-orders-page button {
+  background-color: #3e3e42 !important;
+  color: #cccccc !important;
+  border-color: #3e3e42 !important;
+}
+
+/* 플랫폼 주문 페이지 텍스트 색상 - 회색/검정 텍스트만 변경 */
+.dark .platform-orders-page div[style*="color: #1f2937"]:not([style*="background"]),
+.dark .platform-orders-page div[style*="color:#1f2937"]:not([style*="background"]),
+.dark .platform-orders-page div[style*="color: #6b7280"]:not([style*="background"]),
+.dark .platform-orders-page div[style*="color:#6b7280"]:not([style*="background"]),
+.dark .platform-orders-page div[style*="color: #000000"]:not([style*="background"]),
+.dark .platform-orders-page div[style*="color:#000000"]:not([style*="background"]),
+.dark .platform-orders-page div[style*="color: black"]:not([style*="background"]),
+.dark .platform-orders-page h3[style*="color: #1f2937"]:not([style*="background"]),
+.dark .platform-orders-page h3[style*="color:#1f2937"]:not([style*="background"]) {
+  color: #cccccc !important;
+  font-weight: 500 !important;
+}
+
+/* 색상 유지: 초록색과 빨간색은 그대로 */
+.dark .platform-orders-page div[style*="color: #10b981"],
+.dark .platform-orders-page div[style*="color:#10b981"],
+.dark .platform-orders-page div[style*="color: #ef4444"],
+.dark .platform-orders-page div[style*="color:#ef4444"] {
+  color: inherit !important;
+}
+
+/* 다크모드에서 파란색을 하늘색으로 변경 */
+.dark .platform-orders-page div[style*="color: #2563eb"],
+.dark .platform-orders-page div[style*="color:#2563eb"],
+.dark .platform-orders-page span[style*="color: #2563eb"],
+.dark .platform-orders-page span[style*="color:#2563eb"] {
+  color: #60a5fa !important;
+}
+
+.dark .platform-orders-page div[style*="background: #2563eb"],
+.dark .platform-orders-page div[style*="background:#2563eb"],
+.dark .platform-orders-page button[style*="background: #2563eb"],
+.dark .platform-orders-page button[style*="background:#2563eb"] {
+  background: #60a5fa !important;
+}
+
+.dark .platform-orders-page div[style*="border: 2px solid #2563eb"],
+.dark .platform-orders-page div[style*="border:2px solid #2563eb"] {
+  border-color: #60a5fa !important;
+}
+
+.dark .platform-orders-page circle[stroke="#2563eb"] {
+  stroke: #60a5fa !important;
+}
+
+.dark .platform-orders-page button[style*="background: #2563eb"]:hover {
+  background: #3b82f6 !important;
+}
+
+/* 플랫폼 주문 페이지 흰색/회색 배경만 다크모드로 변경 */
+.dark .platform-orders-page div[style*="background: white"],
+.dark .platform-orders-page div[style*="background:white"],
+.dark .platform-orders-page div[style*="background: #ffffff"],
+.dark .platform-orders-page div[style*="background:#ffffff"],
+.dark .platform-orders-page div[style*="background: #f9fafb"],
+.dark .platform-orders-page div[style*="background:#f9fafb"],
+.dark .platform-orders-page div[style*="background: #f5f5f5"],
+.dark .platform-orders-page div[style*="background:#f5f5f5"],
+.dark .platform-orders-page div[style*="background: #e5e7eb"],
+.dark .platform-orders-page div[style*="background:#e5e7eb"],
+.dark .platform-orders-page div[style*="background: #dee2e6"],
+.dark .platform-orders-page div[style*="background:#dee2e6"],
+.dark .platform-orders-page div[style*="background: rgba(255, 255, 255"],
+.dark .platform-orders-page div[style*="background:rgba(255,255,255"] {
+  background: #252526 !important;
+}
+
+/* 다크모드 달력 발주 있는 날 호버 효과 */
+.dark .platform-orders-page div[style*="background: rgba(219, 234, 254"],
+.dark .platform-orders-page div[style*="background:rgba(219,234,254"] {
+  background: rgba(96, 165, 250, 0.2) !important;
+}
+
+/* 플랫폼 주문 페이지 보더 */
+.dark .platform-orders-page div[style*="border"],
+.dark .platform-orders-page button[style*="border"] {
+  border-color: #3e3e42 !important;
+}
+
+/* 다크모드 테이블 - VSCode 스타일 */
 .dark table {
-  background-color: #1e293b;
-  color: #f1f5f9;
+  background-color: #1e1e1e;
+  color: #cccccc;
 }
 
 .dark table th,
 .dark table td {
-  border-color: #475569 !important;
-  color: #f1f5f9 !important;
+  border-color: #3e3e42 !important;
+  color: #cccccc !important;
+  background-color: #1e1e1e !important;
+}
+
+.dark table th {
+  background-color: #2d2d30 !important;
 }
 
 /* 다크모드 DatePicker */
 .dark .react-datepicker {
-  background-color: #1e293b !important;
-  border-color: #475569 !important;
+  background-color: #252526 !important;
+  border-color: #3e3e42 !important;
 }
 
 .dark .react-datepicker__header {
-  background-color: #1e293b !important;
-  border-color: #475569 !important;
+  background-color: #2d2d30 !important;
+  border-color: #3e3e42 !important;
 }
 
 .dark .react-datepicker__current-month,
 .dark .react-datepicker__day-name,
 .dark .react-datepicker__day {
-  color: #f1f5f9 !important;
+  color: #cccccc !important;
 }
 
 .dark .react-datepicker__day:hover {
-  background-color: #334155 !important;
+  background-color: #3e3e42 !important;
 }
 
 .dark .react-datepicker__day--selected {
-  background-color: #60a5fa !important;
+  background-color: #007acc !important;
 }
 
 .dark .react-datepicker__day--today {
-  background-color: #1e40af !important;
+  background-color: #005a9e !important;
   color: #ffffff !important;
 }
 
@@ -707,23 +925,23 @@ ul, ol {
   background-color: #fffbf0 !important;
 }
 
-/* Handsontable 다크모드 */
+/* Handsontable 다크모드 - VSCode 스타일 */
 .dark .handsontable {
-  background-color: #1e293b !important;
-  color: #f1f5f9 !important;
+  background-color: #1e1e1e !important;
+  color: #cccccc !important;
 }
 
 .dark .handsontable thead th,
 .dark .handsontable tbody th,
 .dark .handsontable td {
-  background-color: #1e293b !important;
-  color: #f1f5f9 !important;
-  border-color: #475569 !important;
+  background-color: #1e1e1e !important;
+  color: #cccccc !important;
+  border-color: #3e3e42 !important;
 }
 
 .dark .handsontable td.bg-blue-50 {
-  background-color: #1e3a8a !important;
-  color: #dbeafe !important;
+  background-color: #005a9e !important;
+  color: #ffffff !important;
 }
 
 .dark .handsontable td.bg-pink-50 {
@@ -732,35 +950,35 @@ ul, ol {
 }
 
 .dark .handsontable.readonly-mode td {
-  background-color: #334155 !important;
+  background-color: #2d2d30 !important;
 }
 
 .dark .handsontable.readonly-mode td.bg-blue-50,
 .dark .handsontable.readonly-mode td.bg-pink-50 {
-  background-color: #334155 !important;
+  background-color: #2d2d30 !important;
 }
 
 .dark .handsontable .htCore {
-  background-color: #1e293b !important;
+  background-color: #1e1e1e !important;
 }
 
 .dark .handsontable .ht_clone_top,
 .dark .handsontable .ht_clone_left,
 .dark .handsontable .ht_clone_top_left_corner {
-  background-color: #1e293b !important;
+  background-color: #1e1e1e !important;
 }
 
 .dark .handsontable .currentRow,
 .dark .handsontable .currentCol {
-  background-color: #334155 !important;
+  background-color: #2d2d30 !important;
 }
 
 .dark .handsontable .area {
-  background-color: rgba(96, 165, 250, 0.2) !important;
+  background-color: rgba(0, 122, 204, 0.2) !important;
 }
 
 .dark .handsontable .htDimmed {
-  color: #64748b !important;
+  color: #6e6e6e !important;
 }
 
 /* ========================

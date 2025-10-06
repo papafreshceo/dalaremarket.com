@@ -9,6 +9,7 @@ import OrderRegistrationTab from './components/OrderRegistrationTab';
 import SettlementTab from './components/SettlementTab';
 import UploadModal from './modals/UploadModal';
 import OrderDetailModal from './modals/OrderDetailModal';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<Tab>('대시보드');
@@ -137,9 +138,9 @@ export default function OrdersPage() {
   });
 
   return (
-    <>
+    <div className="platform-orders-page dark:bg-[#1e1e1e]" style={{ minHeight: '100vh' }}>
       {/* 발주관리 전용 헤더 */}
-      <div style={{
+      <div className="dark:bg-[#2d2d30] dark:border-[#3e3e42]" style={{
         position: 'fixed',
         top: 0,
         left: 0,
@@ -150,54 +151,64 @@ export default function OrdersPage() {
         zIndex: 1100,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'flex-end',
+        justifyContent: 'space-between',
         padding: '0 24px'
       }}>
-        {/* 사용자 정보 */}
-        <div style={{
-          fontSize: '14px',
-          color: '#1f2937',
-          marginRight: '12px',
-          fontWeight: '500'
-        }}>
-          {userEmail || '로그인 정보 없음'}
-        </div>
+        {/* 왼쪽: 나가기 버튼 & 로그인 정보 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* 나가기 버튼 */}
+          <button
+            onClick={() => { router.push('/'); }}
+            className="dark:bg-[#3e3e42] dark:border-[#3e3e42] dark:text-[#cccccc] dark:hover:bg-[#505050]"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              background: 'white',
+              border: '1px solid #e0e0e0',
+              borderRadius: '8px',
+              fontSize: '14px',
+              color: '#1f2937',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              if (!document.documentElement.classList.contains('dark')) {
+                e.currentTarget.style.background = '#f9fafb';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!document.documentElement.classList.contains('dark')) {
+                e.currentTarget.style.background = 'white';
+              }
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            나가기
+          </button>
 
-        {/* 나가기 버튼 */}
-        <button
-          onClick={() => { router.push('/'); }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 16px',
-            background: 'white',
-            border: '1px solid #e0e0e0',
-            borderRadius: '8px',
+          {/* 로그인 정보 */}
+          <div className="dark:text-[#cccccc]" style={{
             fontSize: '14px',
             color: '#1f2937',
-            fontWeight: '500',
-            cursor: 'pointer',
-            transition: 'background 0.2s'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#f9fafb';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'white';
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-            <polyline points="16 17 21 12 16 7"></polyline>
-            <line x1="21" y1="12" x2="9" y2="12"></line>
-          </svg>
-          나가기
-        </button>
+            fontWeight: '500'
+          }}>
+            {userEmail || '로그인 정보 없음'}
+          </div>
+        </div>
+
+        {/* 오른쪽: 다크모드 토글 */}
+        <ThemeToggle />
       </div>
 
       {/* Sidebar */}
-      <div style={{
+      <div className="dark:bg-[#252526] dark:border-[#3e3e42]" style={{
         position: 'fixed',
         top: '70px',
         left: 0,
@@ -215,6 +226,7 @@ export default function OrdersPage() {
           {/* 대시보드 탭 */}
           <button
             onClick={() => setActiveTab('대시보드')}
+            className={`dark:text-[#cccccc] ${activeTab === '대시보드' ? 'dark:bg-[#3e3e42]' : ''}`}
             style={{
               width: '100%',
               display: 'flex',
@@ -234,7 +246,8 @@ export default function OrdersPage() {
             }}
             onMouseEnter={(e) => {
               if (activeTab !== '대시보드') {
-                e.currentTarget.style.background = '#f3f4f6';
+                const isDark = document.documentElement.classList.contains('dark');
+                e.currentTarget.style.background = isDark ? '#3e3e42' : '#f3f4f6';
               }
             }}
             onMouseLeave={(e) => {
@@ -334,7 +347,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Main content area */}
-      <div style={{
+      <div className="dark:bg-[#1e1e1e]" style={{
         marginLeft: isMobile ? '42px' : '175px',
         padding: isMobile ? '16px' : '24px',
         paddingTop: '90px',
@@ -413,6 +426,6 @@ export default function OrdersPage() {
           statusConfig={statusConfig}
         />
       </div>
-    </>
+    </div>
   );
 }

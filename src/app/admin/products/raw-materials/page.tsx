@@ -3,11 +3,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Card, Button, Modal, Badge } from '@/components/ui'
+import { Button, Modal } from '@/components/ui'
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 import { useToast } from '@/components/ui/Toast'
 import * as XLSX from 'xlsx'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts'
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 
 // ===== 타입 =====
 interface Supplier {
@@ -54,21 +54,11 @@ interface SupplyStatus {
   is_active?: boolean
 }
 interface FormData { [key: string]: any }
-interface CellPosition { row: number; col: number; field: string }
 type DiffItem = { id: string; name: string; field: string; fieldLabel: string; before: string | null; after: string | null }
-
-// 되돌리기 스택 액션
-type EditAction = {
-  id: string          // row id
-  field: string
-  before: string      // raw string 값
-  after: string       // raw string 값
-}
 
 export default function RawMaterialsManagementPage() {
   const { showToast } = useToast()
   const [loading, setLoading] = useState(false)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   const [materials, setMaterials] = useState<RawMaterial[]>([])
   const [filteredMaterials, setFilteredMaterials] = useState<RawMaterial[]>([])
@@ -118,17 +108,8 @@ export default function RawMaterialsManagementPage() {
   const [priceHistoryData, setPriceHistoryData] = useState<{materialId: string, materialName: string, data: any[]}[]>([])
   const [showChart, setShowChart] = useState(false)
 
-  // 엑셀식 편집
-  const [selectedCell, setSelectedCell] = useState<CellPosition | null>(null) // 1클릭 = 선택
-  const [editingCell, setEditingCell] = useState<CellPosition | null>(null)   // 같은 셀 2클릭 = 편집(커서만)
-  const originalValues = useRef<Map<string, any>>(new Map())
-  const [modifiedMaterials, setModifiedMaterials] = useState<Set<string>>(new Set())
-
-  // IME 조합 상태
-  const [isComposing, setIsComposing] = useState(false)
-
-  // 되돌리기 스택
-  const [undoStack, setUndoStack] = useState<EditAction[]>([])
+  // EditableAdminGrid에서 관리하는 데이터를 추적하기 위한 state
+  const [gridData, setGridData] = useState<RawMaterial[]>([])
 
   // 원본 스냅샷(변경 표시/디프 기준)
   const originalSnapshot = useRef<Map<string, RawMaterial>>(new Map())
@@ -136,6 +117,12 @@ export default function RawMaterialsManagementPage() {
   // 저장 컨펌 모달
   const [saveDiffs, setSaveDiffs] = useState<DiffItem[]>([])
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
+
+  // 삭제 확인 모달
+  const [deleteConfirm, setDeleteConfirm] = useState<{ rowIndex: number } | null>(null)
+
+  // 시세 기록 확인 모달
+  const [priceRecordConfirm, setPriceRecordConfirm] = useState<{ records: any[], summary: string } | null>(null)
 
   // 엑셀 업로드 프리뷰 모달 (덮어쓰기 전)
   const [uploadPreview, setUploadPreview] = useState<{
@@ -188,13 +175,6 @@ export default function RawMaterialsManagementPage() {
     'season_start_date','season_peak_date','season_end_date','supply_status','color_code'
   ]
 
-  const escapeHtml = (s: string) =>
-    s.replace(/&/g, '&amp;')
-     .replace(/</g, '&lt;')
-     .replace(/>/g, '&gt;')
-     .replace(/"/g, '&quot;')
-     .replace(/'/g, '&#039;')
-
   // ===== 유틸 =====
   const resolveStatusName = (name?: string | null) => {
     if (!name) return null
@@ -246,61 +226,13 @@ export default function RawMaterialsManagementPage() {
     return rawValue(field, snap)
   }
 
-  const isCellModified = (m: RawMaterial, field: string) => {
-    const before = rawValueFromSnapshot(field, m.id)
-    const after = rawValue(field, m)
-    return (before ?? '') !== (after ?? '')
-  }
-
-  const parseAndAssign = (field: string, text: string, src: RawMaterial): RawMaterial => {
-    const m = { ...src }
-    const t = (text ?? '').trim()
-
-    if (['latest_price', 'unit_quantity'].includes(field)) {
-      const n = t === '' ? null : Number(t.replace(/,/g, ''))
-      ;(m as any)[field] = Number.isFinite(n as number) ? n : null
-      return m
-    }
-    if (field === 'last_trade_date') {
-      const ok = /^\d{4}-\d{2}-\d{2}$/.test(t)
-      ;(m as any)[field] = ok ? t : (t === '' ? null : src[field])
-      return m
-    }
-    if (['season_start_date','season_peak_date','season_end_date'].includes(field)) {
-      // MM-DD 형식 검증
-      const ok = /^\d{2}-\d{2}$/.test(t)
-      ;(m as any)[field] = ok ? t : (t === '' ? null : src[field])
-      return m
-    }
-    if (field === 'supply_status') {
-      const v = resolveStatusName(t)
-      if (v) m.supply_status = v
-      return m
-    }
-    if (field === 'main_supplier_id') {
-      const id = resolveSupplierIdByName(t)
-      m.main_supplier_id = id
-      m.supplier_name = t || (id ? suppliers.find(s => s.id === id)?.name : null) || null
-      return m
-    }
-    if (field === 'color_code') {
-      const ok = /^#([0-9A-Fa-f]{6})$/.test(t)
-      m.color_code = t === '' ? null : (ok ? t : src.color_code || null)
-      return m
-    }
-    ;(m as any)[field] = t === '' ? null : t
-    return m
-  }
+  // parseAndAssign 함수는 제거됨 - EditableAdminGrid에서 데이터 변환 처리
 
   // ===== 데이터 로드 =====
   useEffect(() => { void fetchAll() }, [])
   const fetchAll = async () => {
     setLoading(true)
     try {
-      // 현재 사용자 정보 가져오기
-      const { data: { user } } = await supabase.auth.getUser()
-      setCurrentUserId(user?.id || null)
-
       await Promise.all([fetchMaterials(), fetchSuppliers(), fetchSupplyStatuses()])
     } finally { setLoading(false) }
   }
@@ -330,10 +262,8 @@ export default function RawMaterialsManagementPage() {
       }))
       setMaterials(mapped)
       setFilteredMaterials(mapped)
+      setGridData(mapped) // EditableAdminGrid 데이터 초기화
       captureSnapshot(mapped) // 스냅샷 갱신
-      setModifiedMaterials(new Set())
-      originalValues.current.clear()
-      setUndoStack([]) // 저장/로드 시 되돌리기 초기화
     }
   }
   const fetchSuppliers = async () => {
@@ -358,7 +288,7 @@ export default function RawMaterialsManagementPage() {
     })
 
     if (targetMaterials.length === 0) {
-      alert('조회할 원물을 선택하세요.')
+      showToast('조회할 원물을 선택하세요.', 'warning')
       setPriceHistoryData([])
       setShowChart(false)
       return
@@ -393,11 +323,11 @@ export default function RawMaterialsManagementPage() {
       } else {
         setPriceHistoryData([])
         setShowChart(false)
-        alert('선택한 기간에 시세 데이터가 없습니다.')
+        showToast('선택한 기간에 시세 데이터가 없습니다.', 'info')
       }
     } catch (error) {
       console.error('시세 데이터 조회 오류:', error)
-      alert('시세 데이터를 불러오는 중 오류가 발생했습니다.')
+      showToast('시세 데이터를 불러오는 중 오류가 발생했습니다.', 'error')
       setPriceHistoryData([])
       setShowChart(false)
     }
@@ -506,7 +436,7 @@ export default function RawMaterialsManagementPage() {
         })
       } catch (error) {
         console.error('엑셀 파일 읽기 오류:', error)
-        alert('엑셀 파일 처리 중 오류가 발생했습니다.')
+        showToast('엑셀 파일 처리 중 오류가 발생했습니다.', 'error')
       }
     }
     reader.readAsArrayBuffer(file)
@@ -588,7 +518,7 @@ export default function RawMaterialsManagementPage() {
 
       if (dateErrors.length > 0) {
         setUploadPreview(null)
-        alert(`잘못된 날짜 형식이 발견되었습니다:\n\n${dateErrors.slice(0, 10).join('\n')}${dateErrors.length > 10 ? `\n\n...외 ${dateErrors.length - 10}개` : ''}`)
+        showToast(`잘못된 날짜 형식이 발견되었습니다:\n\n${dateErrors.slice(0, 10).join('\n')}${dateErrors.length > 10 ? `\n\n...외 ${dateErrors.length - 10}개` : ''}`, 'error')
         return
       }
 
@@ -628,7 +558,7 @@ export default function RawMaterialsManagementPage() {
 
         if (error) {
           console.error('삽입 오류:', error)
-          alert(`데이터 삽입 중 오류가 발생했습니다.\n${error.message || JSON.stringify(error)}`)
+          showToast(`데이터 삽입 중 오류가 발생했습니다.\n${error.message || JSON.stringify(error)}`, 'error')
         } else {
           // 결과 모달 표시
           setUploadResult({
@@ -640,11 +570,11 @@ export default function RawMaterialsManagementPage() {
           await fetchMaterials()
         }
       } else {
-        alert('업로드할 데이터가 없습니다.')
+        showToast('업로드할 데이터가 없습니다.', 'warning')
       }
     } catch (error) {
       console.error('엑셀 업로드 오류:', error)
-      alert('엑셀 파일 처리 중 오류가 발생했습니다.')
+      showToast('엑셀 파일 처리 중 오류가 발생했습니다.', 'error')
       setUploadPreview(null)
     }
   }
@@ -655,7 +585,7 @@ export default function RawMaterialsManagementPage() {
     return () => clearTimeout(t)
   }, [searchInput])
 
-  // 필터링
+  // 필터링 - materials 변경 시에만 gridData 업데이트
   useEffect(() => {
     let f = [...materials]
 
@@ -690,12 +620,18 @@ export default function RawMaterialsManagementPage() {
       })
     }
 
-    // 상태 필터 (빈 값도 항상 포함)
+    // 상태 필터 (빈 행도 항상 포함)
     if (selectedStatus !== 'all') {
-      f = f.filter(m => m.supply_status === selectedStatus || !m.supply_status || m.supply_status === '')
+      f = f.filter(m => {
+        // supply_status가 없거나 빈 값이면 항상 포함
+        if (!m.supply_status || m.supply_status === '') return true
+        // 선택된 상태와 일치하면 포함
+        return m.supply_status === selectedStatus
+      })
     }
 
     setFilteredMaterials(f)
+    setGridData(f) // EditableAdminGrid에 필터링된 데이터 전달
     setSelectedRows(new Set())
     setSelectAll(false)
   }, [materials, selectedStatus, globalSearchTerm, supplyStatuses])
@@ -732,10 +668,21 @@ export default function RawMaterialsManagementPage() {
       }
     }
 
+    // temp_ ID 행들을 materials와 gridData에서 제거
+    if (tempIds.length > 0) {
+      const idsToRemove = new Set(tempIds)
+      setMaterials(prev => prev.filter(m => !idsToRemove.has(m.id)))
+      setGridData(prev => prev.filter(m => !idsToRemove.has(m.id)))
+    }
+
     setSelectedRows(new Set())
     setSelectAll(false)
     setModalType(null)
-    await fetchMaterials()
+
+    // DB 삭제가 있었으면 다시 fetch
+    if (realIds.length > 0) {
+      await fetchMaterials()
+    }
 
     if (tempIds.length > 0) {
       showToast(`삭제되었습니다. (실제 삭제: ${realIds.length}건, 임시 행 제거: ${tempIds.length}건)`, 'success')
@@ -744,177 +691,66 @@ export default function RawMaterialsManagementPage() {
     }
   }
 
-  // ===== 엑셀식 편집: td contentEditable =====
-  const handleCellClick = (rowIndex: number, colIndex: number, field: string) => {
-    const m = filteredMaterials[rowIndex]
-    if (!m) return
-    const isSame = selectedCell && selectedCell.row === rowIndex && selectedCell.col === colIndex && selectedCell.field === field
-    if (isSame) {
-      const key = getKey(m.id, field)
-      if (!originalValues.current.has(key)) originalValues.current.set(key, rawValue(field, m))
-      setEditingCell({ row: rowIndex, col: colIndex, field })
-    } else {
-      setSelectedCell({ row: rowIndex, col: colIndex, field })
-      setEditingCell(null)
-    }
-  }
-
-  // 한 행의 전체 변경 여부 재평가
-  const recomputeRowModifiedFlag = (row: RawMaterial) => {
-    const anyChanged = FIELD_ORDER.some(f => {
-      const before = rawValueFromSnapshot(f, row.id)
-      const after = rawValue(f, row)
-      return (before ?? '') !== (after ?? '')
-    })
-    setModifiedMaterials(prev => {
-      const s = new Set(prev)
-      if (anyChanged) s.add(row.id); else s.delete(row.id)
-      return s
-    })
-  }
-
-  const commitEdit = (rowIndex: number, field: string, text: string) => {
-    const m = filteredMaterials[rowIndex]
-    if (!m) return
-
-    const key = getKey(m.id, field)
-    const orig = originalValues.current.get(key) ?? rawValueFromSnapshot(field, m.id)
-    const nextText = (text ?? '').trim()
-
-    setEditingCell(null)
-
-    if (nextText === (orig ?? '')) {
-      // 동일 → 변경 플래그 정리
-      let hasOther = false
-      originalValues.current.forEach((o, k) => {
-        if (k.startsWith(m.id) && k !== key) {
-          const f = k.split('-')[1]
-          if ((m as any)[f] !== o) hasOther = true
-        }
-      })
-      if (!hasOther) {
-        setModifiedMaterials(prev => { const s=new Set(prev); s.delete(m.id); return s })
+  // EditableAdminGrid의 데이터 변경을 처리하는 핸들러
+  const handleGridDataChange = (newData: RawMaterial[]) => {
+    // supplier_name 처리: 드롭다운에서 supplier name이 변경되면 supplier_id를 찾아서 업데이트
+    const processedData = newData.map(item => {
+      const updated = { ...item }
+      // main_supplier_id가 supplier name인 경우 (드롭다운에서 선택한 경우)
+      if (typeof updated.main_supplier_id === 'string' && !updated.main_supplier_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        const supplierName = updated.main_supplier_id
+        const supplier = suppliers.find(s => s.name === supplierName)
+        updated.main_supplier_id = supplier?.id || null
+        updated.supplier_name = supplierName
       }
-      return
-    }
-
-    // 되돌리기 스택 push (원시 문자열 기준)
-    setUndoStack(prev => [...prev, { id: m.id, field, before: orig ?? '', after: nextText }])
-
-    const updated = parseAndAssign(field, nextText, m)
-
-    // filteredMaterials와 materials 둘 다 업데이트
-    setFilteredMaterials(prev => {
-      const next = [...prev]
-      next[rowIndex] = updated
-      return next
+      return updated
     })
 
-    setMaterials(prev => prev.map(item => item.id === updated.id ? updated : item))
+    setGridData(processedData)
+    // gridData의 변경사항을 materials에 반영 (새로 추가된 행도 포함)
+    setMaterials(prevMaterials => {
+      const updatedMap = new Map(processedData.map(item => [item.id, item]))
+      const existingIds = new Set(prevMaterials.map(m => m.id))
 
-    recomputeRowModifiedFlag(updated)
+      // 기존 행 업데이트
+      const updated = prevMaterials.map(item => updatedMap.get(item.id) || item)
+
+      // 새로 추가된 행 추가 (temp_로 시작하는 ID)
+      const newItems = processedData.filter(item => !existingIds.has(item.id))
+
+      return [...updated, ...newItems]
+    })
   }
 
-  const handleTdKeyDown = (e: React.KeyboardEvent<HTMLTableCellElement>, rowIndex: number, field: string) => {
-    if (e.key === 'Enter' && !isComposing) {
-      e.preventDefault()
-      const txt = e.currentTarget.textContent ?? ''
-      commitEdit(rowIndex, field, txt)
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      setEditingCell(null)
-    }
-  }
-  const handleTdBlur = (e: React.FocusEvent<HTMLTableCellElement>, rowIndex: number, field: string) => {
-    const txt = e.currentTarget.textContent ?? ''
-    commitEdit(rowIndex, field, txt)
-  }
-
-  // ===== 복사/붙여넣기(Ctrl/Cmd + C / V) & 되돌리기(Ctrl/Cmd+Z) =====
-  useEffect(() => {
-    const onKeyDown = async (ev: KeyboardEvent) => {
-      const isMod = ev.ctrlKey || ev.metaKey
-      if (!isMod) return
-
-      // 편집 중이면 브라우저 기본 동작(undo/clipboard)을 유지
-      const isEditingActive = !!editingCell
-
-      // Undo (그리드 레벨)
-      if (ev.key.toLowerCase() === 'z' && !isEditingActive) {
-        if (undoStack.length === 0) return
-        ev.preventDefault()
-        const last = undoStack[undoStack.length - 1]
-        // 해당 행 찾기
-        const idx = filteredMaterials.findIndex(r => r.id === last.id)
-        if (idx >= 0) {
-          const row = filteredMaterials[idx]
-          // before 값으로 되돌림
-          const reverted = parseAndAssign(last.field, last.before, row)
-          const nextRows = [...filteredMaterials]
-          nextRows[idx] = reverted
-          setFilteredMaterials(nextRows)
-          recomputeRowModifiedFlag(reverted)
-          // pop
-          setUndoStack(prev => prev.slice(0, -1))
-          // 선택 셀 포커스 유지(선택만 갱신)
-          setSelectedCell({ row: idx, col: selectedCell?.col ?? 1, field: last.field })
-        }
-        return
-      }
-
-      // 복사 / 붙여넣기 (선택 셀에 대해서만, 편집 중이 아닐 때)
-      if (!selectedCell || isEditingActive) return
-      const { row, field } = selectedCell
-
-      if (ev.key.toLowerCase() === 'c') {
-        ev.preventDefault()
-        const m = filteredMaterials[row]
-        try { await navigator.clipboard.writeText(rawValue(field, m)) } catch {}
-      } else if (ev.key.toLowerCase() === 'v') {
-        ev.preventDefault()
-        try {
-          const text = await navigator.clipboard.readText()
-          // 붙여넣기는 즉시 커밋(되돌리기 스택에 올라감)
-          commitEdit(row, field, (text || '').replace(/\r?\n/g, ''))
-        } catch {}
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedCell, editingCell, filteredMaterials, undoStack])
+  // EditableAdminGrid가 복사/붙여넣기/되돌리기를 모두 처리하므로 여기서는 제거
 
   // ===== 저장(컨펌 모달) =====
   const buildDiffs = (): DiffItem[] => {
     const diffs: DiffItem[] = []
-    filteredMaterials
-      .filter(m => modifiedMaterials.has(m.id))
-      .forEach(m => {
-        FIELD_ORDER.forEach(field => {
-          const before = rawValueFromSnapshot(field, m.id)
-          const after = rawValue(field, m)
-          if ((before ?? '') !== (after ?? '')) {
-            diffs.push({
-              id: m.id,
-              name: m.material_name || m.material_code || '(이름없음)',
-              field,
-              fieldLabel: FIELD_LABELS[field] || field,
-              before: before ?? '',
-              after: after ?? ''
-            })
-          }
-        })
+    // gridData를 사용하여 원본 스냅샷과 비교
+    gridData.forEach(m => {
+      FIELD_ORDER.forEach(field => {
+        const before = rawValueFromSnapshot(field, m.id)
+        const after = rawValue(field, m)
+        if ((before ?? '') !== (after ?? '')) {
+          diffs.push({
+            id: m.id,
+            name: m.material_name || m.material_code || '(이름없음)',
+            field,
+            fieldLabel: FIELD_LABELS[field] || field,
+            before: before ?? '',
+            after: after ?? ''
+          })
+        }
       })
+    })
     return diffs
   }
 
   const handleOpenConfirm = () => {
-    if (modifiedMaterials.size === 0) {
-      alert('변경사항이 없습니다.')
-      return
-    }
     const diffs = buildDiffs()
     if (diffs.length === 0) {
-      alert('변경사항이 없습니다.')
+      showToast('변경사항이 없습니다.', 'info')
       return
     }
     setSaveDiffs(diffs)
@@ -928,8 +764,16 @@ export default function RawMaterialsManagementPage() {
 
   const handleSaveAllConfirmed = async (skipWarning = false) => {
     try {
-      // 수정된 행 중에서 유효한 행만 필터링 (id가 있고 필수 필드가 있는 행)
-      const modifiedRows = filteredMaterials.filter(m => modifiedMaterials.has(m.id))
+      // gridData에서 변경된 행 찾기 (원본 스냅샷과 비교)
+      const modifiedRows = gridData.filter(m => {
+        return FIELD_ORDER.some(field => {
+          const before = rawValueFromSnapshot(field, m.id)
+          const after = rawValue(field, m)
+          return (before ?? '') !== (after ?? '')
+        })
+      })
+
+      // 유효한 행만 필터링 (id가 있고 필수 필드가 있는 행)
       const validRows = modifiedRows.filter(m => m.id && (m.material_code || m.material_name))
       const emptyRows = modifiedRows.filter(m => !m.id || (!m.material_code && !m.material_name))
 
@@ -968,8 +812,8 @@ export default function RawMaterialsManagementPage() {
       if (upErr) throw upErr
 
       const today = new Date().toISOString().split('T')[0]
-      const priceRows = filteredMaterials
-        .filter(m => modifiedMaterials.has(m.id) && m.latest_price != null && m.latest_price !== '')
+      const priceRows = modifiedRows
+        .filter(m => m.latest_price != null && m.latest_price !== '')
         .map(m => ({
           material_id: m.id,
           price: Number(m.latest_price),
@@ -982,15 +826,11 @@ export default function RawMaterialsManagementPage() {
         if (phErr) throw phErr
       }
 
-      // 저장 성공 → 스냅샷 갱신 & 표시 리셋 & 되돌리기 초기화
-      captureSnapshot(filteredMaterials)
-      setModifiedMaterials(new Set())
-      originalValues.current.clear()
-      setUndoStack([])
-      alert('저장되었습니다.')
+      // 저장 성공 → 스냅샷 갱신
+      showToast('저장되었습니다.', 'success')
       await fetchMaterials()
     } catch (e) {
-      console.error(e); alert('저장 중 오류가 발생했습니다.')
+      console.error(e); showToast('저장 중 오류가 발생했습니다.', 'error')
     }
   }
 
@@ -1046,37 +886,33 @@ export default function RawMaterialsManagementPage() {
     setPriceHistoryData([])
     setShowChart(false)
   }
-  const handleSaveMaterial = async () => {
-    try {
-      if (editingItem) await supabase.from('raw_materials').update(formData).eq('id', editingItem.id)
-      else await supabase.from('raw_materials').insert([formData])
-      await fetchMaterials(); closeModal(); alert('저장되었습니다.')
-    } catch { alert('저장 중 오류가 발생했습니다.') }
-  }
-  const handleDelete = async (table: string, id: string) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return
-    const { error } = await supabase.from(table).delete().eq('id', id)
-    if (error) return alert('삭제 중 오류가 발생했습니다.')
-    if (table === 'raw_materials') await fetchMaterials()
-    alert('삭제되었습니다.')
-  }
 
   const handleDeleteRow = async (rowIndex: number) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return
-    const material = filteredMaterials[rowIndex]
+    setDeleteConfirm({ rowIndex })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return
+    const { rowIndex } = deleteConfirm
+    const material = gridData[rowIndex]
     if (!material) return
 
     if (material.id.startsWith('temp_')) {
-      // 임시 행 삭제
+      // 임시 행 삭제 - gridData에서 제거
+      const newGridData = gridData.filter((_, idx) => idx !== rowIndex)
+      setGridData(newGridData)
+      // materials에서도 제거
       const newMaterials = materials.filter(m => m.id !== material.id)
       setMaterials(newMaterials)
+      showToast('삭제되었습니다.', 'success')
     } else {
       // DB에서 삭제
       const { error } = await supabase.from('raw_materials').delete().eq('id', material.id)
-      if (error) return alert('삭제 중 오류가 발생했습니다.')
+      if (error) return showToast('삭제 중 오류가 발생했습니다.', 'error')
       await fetchMaterials()
-      alert('삭제되었습니다.')
+      showToast('삭제되었습니다.', 'success')
     }
+    setDeleteConfirm(null)
   }
 
   // EditableAdminGrid 컬럼 정의
@@ -1161,7 +997,7 @@ export default function RawMaterialsManagementPage() {
   const applyBulkDate = () => {
     const date = priceRecordForm.bulk_date
     if (!date) {
-      alert('적용할 날짜를 선택하세요.')
+      showToast('적용할 날짜를 선택하세요.', 'warning')
       return
     }
     const filtered = getFilteredMaterialsByCategory()
@@ -1174,19 +1010,7 @@ export default function RawMaterialsManagementPage() {
       }
     })
     setMaterialPrices(newPrices)
-    alert(`${filtered.length}개 원물에 ${date} 날짜가 적용되었습니다.`)
-  }
-
-  // 행 복사
-  const duplicateRow = (materialId: string) => {
-    const existingData = materialPrices[materialId]
-    if (existingData) {
-      const newId = materialId + '_copy_' + Date.now()
-      setMaterialPrices({
-        ...materialPrices,
-        [newId]: { ...existingData }
-      })
-    }
+    showToast(`${filtered.length}개 원물에 ${date} 날짜가 적용되었습니다.`, 'success')
   }
 
   // 시세기록 저장
@@ -1201,11 +1025,11 @@ export default function RawMaterialsManagementPage() {
         effective_date: data.date || priceRecordForm.bulk_date,
         price_type: priceRecordForm.price_type,
         notes: priceRecordForm.notes || null,
-        created_by: currentUserId
+        created_by: null
       }))
 
     if (recordsToInsert.length === 0) {
-      alert('가격이 입력된 원물이 없습니다.')
+      showToast('가격이 입력된 원물이 없습니다.', 'warning')
       return
     }
 
@@ -1217,23 +1041,27 @@ export default function RawMaterialsManagementPage() {
       return `${idx + 1}. ${material?.material_name} (${record.effective_date}) - ${record.price.toLocaleString()}원`
     }).join('\n')
 
-    if (!confirm(`다음 ${recordsToInsert.length}개 원물의 시세를 기록하시겠습니까?\n\n${summary}`)) {
-      return
-    }
+    setPriceRecordConfirm({ records: recordsToInsert, summary })
+  }
 
-    const { data, error } = await supabase.from('material_price_history').insert(recordsToInsert)
+  const confirmPriceRecord = async () => {
+    if (!priceRecordConfirm) return
+    const { records } = priceRecordConfirm
+
+    const { data, error } = await supabase.from('material_price_history').insert(records)
 
     if (error) {
       console.error('시세 기록 오류:', error)
       console.error('에러 코드:', error.code)
       console.error('에러 메시지:', error.message)
       console.error('에러 상세:', error.details)
-      alert(`시세 기록 중 오류가 발생했습니다.\n${error.message || JSON.stringify(error)}`)
+      showToast(`시세 기록 중 오류가 발생했습니다.\n${error.message || JSON.stringify(error)}`, 'error')
       return
     }
 
     console.log('저장 성공:', data)
-    alert(`${recordsToInsert.length}개 원물의 시세가 기록되었습니다.`)
+    showToast(`${records.length}개 원물의 시세가 기록되었습니다.`, 'success')
+    setPriceRecordConfirm(null)
     closeModal()
   }
 
@@ -1331,15 +1159,19 @@ export default function RawMaterialsManagementPage() {
         </div>
 
         <EditableAdminGrid
-          data={filteredMaterials}
+          data={gridData}
           columns={rawMaterialColumns}
-          onDataChange={(newData) => {
-            setMaterials(newData)
+          onDataChange={handleGridDataChange}
+          onCellEdit={(rowIndex, columnKey, newValue) => {
+            // 셀 편집 시 추가 처리 (필요한 경우)
+            // 현재는 onDataChange에서 모두 처리
           }}
           onDelete={handleDeleteRow}
-          onSave={handleSaveAllConfirmed}
+          onSave={handleOpenConfirm}
           onDeleteSelected={(indices) => {
-            indices.forEach(index => handleDeleteRow(index))
+            const ids = indices.map(i => gridData[i]?.id).filter(Boolean)
+            setSelectedRows(new Set(ids))
+            setModalType('delete-confirm')
           }}
           globalSearchPlaceholder="원물코드, 원물명, 대분류, 중분류, 소분류, 품목, 품종 검색"
         />
@@ -2183,6 +2015,57 @@ export default function RawMaterialsManagementPage() {
                 <strong className="text-blue-600 ml-1">{uploadResult.updated.length}개 수정</strong>,
                 <strong className="text-red-600 ml-1">{uploadResult.deleted.length}개 삭제</strong>
               </p>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 단일 행 삭제 확인 모달 */}
+      {deleteConfirm && (
+        <Modal
+          isOpen={true}
+          onClose={() => setDeleteConfirm(null)}
+          title="삭제 확인"
+          size="sm"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setDeleteConfirm(null)}>취소</Button>
+              <Button variant="danger" onClick={confirmDelete}>삭제</Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <p className="text-sm text-gray-700">정말 삭제하시겠습니까?</p>
+            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>삭제된 데이터는 복구할 수 없습니다.</span>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 시세 기록 확인 모달 */}
+      {priceRecordConfirm && (
+        <Modal
+          isOpen={true}
+          onClose={() => setPriceRecordConfirm(null)}
+          title={`시세 기록 확인 (${priceRecordConfirm.records.length}개)`}
+          size="lg"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setPriceRecordConfirm(null)}>취소</Button>
+              <Button variant="primary" onClick={confirmPriceRecord}>기록</Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              다음 <strong className="text-blue-600">{priceRecordConfirm.records.length}개</strong> 원물의 시세를 기록하시겠습니까?
+            </p>
+            <div className="max-h-[40vh] overflow-auto bg-gray-50 rounded-lg p-3">
+              <pre className="text-xs text-gray-700 whitespace-pre-wrap">{priceRecordConfirm.summary}</pre>
             </div>
           </div>
         </Modal>

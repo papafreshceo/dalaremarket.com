@@ -9,9 +9,10 @@ interface Column<T = any> {
   width?: number
   type?: 'text' | 'number' | 'dropdown' | 'checkbox'
   source?: string[]
-  readOnly?: boolean
+  readOnly?: boolean | ((row: T) => boolean)
   className?: string
-  renderer?: (value: any, row: T) => React.ReactNode
+  align?: 'left' | 'center' | 'right'
+  renderer?: (value: any, row: T, rowIndex: number, handleDropdownArrowClick?: (e: React.MouseEvent) => void) => React.ReactNode
 }
 
 interface EditableAdminGridProps<T = any> {
@@ -34,6 +35,7 @@ interface EditableAdminGridProps<T = any> {
   enableDelete?: boolean
   enableCheckbox?: boolean
   globalSearchPlaceholder?: string
+  customActions?: React.ReactNode
 }
 
 interface CellPosition {
@@ -60,11 +62,20 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   enableAddRow = true,
   enableDelete = true,
   enableCheckbox = true,
-  globalSearchPlaceholder = '검색'
+  globalSearchPlaceholder = '검색',
+  customActions
 }: EditableAdminGridProps<T>) {
   const [gridData, setGridData] = useState<T[]>([])
   const [editingCell, setEditingCell] = useState<CellPosition | null>(null)
   const [selectedCell, setSelectedCell] = useState<CellPosition | null>(null)
+
+  // readOnly 체크 헬퍼 함수
+  const isReadOnly = (column: Column<T>, row: T): boolean => {
+    if (typeof column.readOnly === 'function') {
+      return column.readOnly(row)
+    }
+    return column.readOnly ?? false
+  }
   const [editValue, setEditValue] = useState('')
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({ key: '', direction: null })
   const [globalSearchTerm, setGlobalSearchTerm] = useState<string>('')
@@ -113,9 +124,21 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
   useEffect(() => {
     if (editingCell && inputRef.current) {
-      inputRef.current.focus()
-      if (inputRef.current instanceof HTMLInputElement || inputRef.current instanceof HTMLTextAreaElement) {
-        inputRef.current.select()
+      if (inputRef.current instanceof HTMLSelectElement) {
+        // 드롭다운을 자동으로 열기
+        const selectElement = inputRef.current
+        selectElement.focus()
+        // 약간의 지연 후 클릭 이벤트 트리거 (브라우저가 포커스를 처리한 후)
+        setTimeout(() => {
+          if (document.activeElement === selectElement) {
+            selectElement.click()
+          }
+        }, 10)
+      } else {
+        inputRef.current.focus()
+        if (inputRef.current instanceof HTMLInputElement || inputRef.current instanceof HTMLTextAreaElement) {
+          inputRef.current.select()
+        }
       }
     }
   }, [editingCell])
@@ -210,7 +233,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
         if (targetColIndex >= columns.length) return
 
         const column = columns[targetColIndex]
-        if (column.readOnly) return
+        const targetRowData = newData[targetRow]
+        if (isReadOnly(column, targetRowData)) return
 
         let processedValue: any = value.trim()
         if (column.type === 'number') {
@@ -393,13 +417,26 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     setHistoryIndex(newHistory.length - 1)
   }
 
-  const handleCellClick = (rowIndex: number, columnKey: string) => {
+  const handleCellClick = (rowIndex: number, columnKey: string, currentValue: any) => {
     setSelectedCell({ row: rowIndex, col: columnKey })
+  }
+
+  const handleDropdownArrowClick = (rowIndex: number, columnKey: string, currentValue: any, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const column = columns.find(col => col.key === columnKey)
+    const row = gridData[rowIndex]
+
+    if (column?.type === 'dropdown' && !isReadOnly(column, row)) {
+      setEditingCell({ row: rowIndex, col: columnKey })
+      setEditValue(currentValue ?? '')
+      setSelectedCell({ row: rowIndex, col: columnKey })
+    }
   }
 
   const handleCellDoubleClick = (rowIndex: number, columnKey: string, currentValue: any) => {
     const column = columns.find(col => col.key === columnKey)
-    if (column?.readOnly) return
+    const row = gridData[rowIndex]
+    if (isReadOnly(column, row)) return
 
     setEditingCell({ row: rowIndex, col: columnKey })
     setEditValue(currentValue ?? '')
@@ -520,13 +557,6 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
     const searchLower = globalSearchTerm.toLowerCase()
     return gridData.filter(row => {
-      // 모든 셀이 빈 값이면 항상 표시 (새로 추가된 행)
-      const allEmpty = columns.every(col => {
-        const cellValue = row[col.key]
-        return cellValue === '' || cellValue === null || cellValue === undefined
-      })
-      if (allEmpty) return true
-
       // 검색어와 매칭되는 셀이 있으면 표시
       return columns.some(col => {
         const cellValue = row[col.key]
@@ -665,7 +695,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     )
     const isFillPreview = isFillRange && fillPreviewData && rowIndex !== fillStartCell?.row
 
-    let classes = 'border border-gray-300 px-2 py-1 relative overflow-hidden align-middle '
+    let classes = 'border border-gray-200 px-2 py-1 relative overflow-hidden align-middle '
 
     // 폰트 크기
     classes += 'text-[13px] '
@@ -700,13 +730,15 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     }
 
     // 정렬
-    if (isNumberCol) {
+    if (column.align) {
+      classes += `text-${column.align} `
+    } else if (isNumberCol) {
       classes += 'text-right '
     } else {
       classes += 'text-center '
     }
 
-    // readOnly 셀
+    // readOnly 셀 (getCellClassName은 row 정보 없이 호출되므로 함수형은 지원 안함)
     if (!column.readOnly) {
       classes += 'cursor-cell '
     }
@@ -785,10 +817,14 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     }
 
     if (column.renderer) {
+      const dropdownArrowClickHandler = (e: React.MouseEvent) => {
+        handleDropdownArrowClick(rowIndex, column.key, value, e)
+      }
+
       return (
         <>
-          {column.renderer(value, row)}
-          {isSelected && !column.readOnly && (
+          {column.renderer(value, row, rowIndex, dropdownArrowClickHandler)}
+          {isSelected && !isReadOnly(column, row) && (
             <div
               className="absolute bottom-0 right-0 w-3 h-3 bg-blue-600 z-30"
               style={{ margin: '-1px', cursor: 'crosshair' }}
@@ -807,12 +843,42 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       )
     }
 
+    if (column.type === 'dropdown' && column.source) {
+      return (
+        <div className="relative flex items-center justify-center h-full w-full">
+          <span style={{ fontSize: '13px' }}>{value ?? ''}</span>
+          <div
+            className="absolute right-1 w-5 h-full flex items-center justify-center cursor-pointer"
+            onClick={(e) => handleDropdownArrowClick(rowIndex, column.key, value, e)}
+            style={{ zIndex: 10 }}
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              style={{ opacity: 0.5 }}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+          {isSelected && !isReadOnly(column, row) && (
+            <div
+              className="absolute bottom-0 right-0 w-3 h-3 bg-blue-600 z-30"
+              style={{ margin: '-1px', cursor: 'crosshair' }}
+              onMouseDown={(e) => handleFillHandleMouseDown(rowIndex, column.key, e)}
+            />
+          )}
+        </div>
+      )
+    }
+
     const displayValue = isNumberColumn(column.key) ? formatNumberWithComma(value) : (value ?? '')
 
     return (
       <>
         <span style={{ fontSize: '13px' }}>{displayValue}</span>
-        {isSelected && !column.readOnly && (
+        {isSelected && !isReadOnly(column, row) && (
           <div
             className="absolute bottom-0 right-0 w-3 h-3 bg-blue-600 z-30"
             style={{ margin: '-1px', cursor: 'crosshair' }}
@@ -889,109 +955,114 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
   return (
     <div className="space-y-2">
-      <div className="flex gap-2 items-center">
-        {enableFilter && (
-          <div className="relative" style={{ width: '200px' }}>
-            <input
-              type="text"
-              value={globalSearchTerm}
-              onChange={(e) => setGlobalSearchTerm(e.target.value)}
-              placeholder={globalSearchPlaceholder}
-              className="w-full border border-gray-300 rounded px-3 pr-8"
-              style={{ height: '32px' }}
-            />
-            <svg
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+      {(enableFilter || enableCSVExport || enableCSVImport || onSave || onDeleteSelected || onCopy || customActions) && (
+        <div className="flex gap-2 items-center">
+          {enableFilter && (
+            <div className="relative" style={{ width: '200px' }}>
+              <input
+                type="text"
+                value={globalSearchTerm}
+                onChange={(e) => setGlobalSearchTerm(e.target.value)}
+                placeholder={globalSearchPlaceholder}
+                className="w-full border border-gray-200 rounded px-3 pr-8"
+                style={{ height: '32px' }}
               />
-            </svg>
-          </div>
-        )}
-        {enableCSVExport && (
-          <button
-            onClick={exportToCSV}
-            className="p-1 border border-gray-300 rounded hover:bg-gray-50"
-            title="엑셀 다운로드"
-          >
-            <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
-              <path d="M14 2v6h6M9.5 13.5L12 16l2.5-2.5M12 10v6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </button>
-        )}
-        {enableCSVImport && (
-          <label className="cursor-pointer p-1 border border-gray-300 rounded hover:bg-gray-50" title="엑셀 업로드">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={(e) => e.target.files?.[0] && importFromCSV(e.target.files[0])}
-              className="hidden"
-            />
-            <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
-              <path d="M14 2v6h6M12 10v6m-2.5-3.5L12 10l2.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </label>
-        )}
-        <div className="flex-1"></div>
-        {modifiedCount > 0 && (
-          <span className="text-sm text-gray-600">수정 {modifiedCount}건</span>
-        )}
-        {addedRows.size > 0 && (
-          <span className="text-sm text-green-600">추가 {addedRows.size}건</span>
-        )}
-        {copiedRows.size > 0 && (
-          <span className="text-sm text-blue-600">복사 {copiedRows.size}건</span>
-        )}
-        <button
-          onClick={handleSaveClick}
-          disabled={modifiedCount === 0 && addedRows.size === 0 && copiedRows.size === 0}
-          className={`px-2 py-1 rounded text-xs ${
-            modifiedCount > 0 || addedRows.size > 0 || copiedRows.size > 0
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          저장
-        </button>
-        {selectedRows.size > 0 && (
-          <button
-            onClick={handleDeleteSelectedClick}
-            className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
-          >
-            삭제
-          </button>
-        )}
-        {selectedRows.size > 0 && (
-          <button
-            onClick={handleCopyClick}
-            className="px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
-          >
-            복사
-          </button>
-        )}
-      </div>
+              <svg
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+          )}
+          {enableCSVExport && (
+            <button
+              onClick={exportToCSV}
+              className="p-1 border border-gray-200 rounded hover:bg-gray-50"
+              title="엑셀 다운로드"
+            >
+              <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+                <path d="M14 2v6h6M9.5 13.5L12 16l2.5-2.5M12 10v6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </button>
+          )}
+          {enableCSVImport && (
+            <label className="cursor-pointer p-1 border border-gray-200 rounded hover:bg-gray-50" title="엑셀 업로드">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => e.target.files?.[0] && importFromCSV(e.target.files[0])}
+                className="hidden"
+              />
+              <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+                <path d="M14 2v6h6M12 10v6m-2.5-3.5L12 10l2.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </label>
+          )}
+          <div className="flex-1"></div>
+          {customActions}
+          {modifiedCount > 0 && (
+            <span className="text-sm text-gray-600">수정 {modifiedCount}건</span>
+          )}
+          {addedRows.size > 0 && (
+            <span className="text-sm text-green-600">추가 {addedRows.size}건</span>
+          )}
+          {copiedRows.size > 0 && (
+            <span className="text-sm text-blue-600">복사 {copiedRows.size}건</span>
+          )}
+          {onSave && (
+            <button
+              onClick={handleSaveClick}
+              disabled={modifiedCount === 0 && addedRows.size === 0 && copiedRows.size === 0}
+              className={`px-2 py-1 rounded text-xs ${
+                modifiedCount > 0 || addedRows.size > 0 || copiedRows.size > 0
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              저장
+            </button>
+          )}
+          {selectedRows.size > 0 && onDeleteSelected && (
+            <button
+              onClick={handleDeleteSelectedClick}
+              className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+            >
+              삭제
+            </button>
+          )}
+          {selectedRows.size > 0 && onCopy && (
+            <button
+              onClick={handleCopyClick}
+              className="px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
+            >
+              복사
+            </button>
+          )}
+        </div>
+      )}
 
       <div
         ref={containerRef}
-        className="overflow-auto bg-white border-b border-gray-200"
+        className="overflow-auto bg-white dark:bg-[#1e1e1e] border-b border-gray-200 dark:border-[#3e3e42]"
         style={{ maxHeight: height, height: 'auto' }}
         onPaste={handlePaste}
         tabIndex={0}
       >
-        <table ref={tableRef} className="w-full border-collapse" style={{ fontSize: '13px' }}>
-          <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800" style={{ zIndex: 30 }}>
+        <table ref={tableRef} className="w-full border-collapse" style={{ fontSize: '13px', borderSpacing: 0 }}>
+          <thead className="sticky top-0 bg-gray-50 dark:bg-[#2d2d30]" style={{ zIndex: 30 }}>
             <tr>
               {enableCheckbox && (
-                <th className="border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 px-2 py-1 text-center align-middle" style={{ width: 40, fontSize: '13px' }}>
+                <th className="border border-gray-200 dark:border-[#3e3e42] bg-gray-100 dark:bg-[#2d2d30] px-2 py-1 text-center align-middle" style={{ width: 40, fontSize: '13px' }}>
                   <input
                     type="checkbox"
                     checked={selectedRows.size === filteredData.length && filteredData.length > 0}
@@ -1001,7 +1072,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                 </th>
               )}
               {showRowNumbers && (
-                <th className="border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 px-2 py-1 font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap" style={{ width: 50, fontSize: '13px' }}>
+                <th className="border border-gray-200 dark:border-[#3e3e42] bg-gray-100 dark:bg-[#2d2d30] px-2 py-1 font-semibold text-gray-600 dark:text-[#cccccc] whitespace-nowrap" style={{ width: 50, fontSize: '13px' }}>
                   {enableAddRow && (
                     <button
                       onClick={handleAddRow}
@@ -1018,7 +1089,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                 return (
                   <th
                     key={column.key}
-                    className="border border-gray-300 dark:border-gray-600 px-2 py-1 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap bg-gray-50 dark:bg-gray-800"
+                    className="border border-gray-200 dark:border-[#3e3e42] px-2 py-1 font-semibold text-gray-700 dark:text-[#cccccc] whitespace-nowrap bg-gray-50 dark:bg-[#2d2d30]"
                     style={{
                       width: column.width,
                       fontSize: '13px'
@@ -1040,7 +1111,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
               })}
               {enableDelete && (
                 <th
-                  className="border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 px-2 py-1 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap"
+                  className="border border-gray-200 dark:border-[#3e3e42] bg-gray-100 dark:bg-[#2d2d30] px-2 py-1 font-semibold text-gray-700 dark:text-[#cccccc] whitespace-nowrap"
                   style={{ width: 100, fontSize: '13px' }}
                 >
                   삭제
@@ -1052,7 +1123,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
             {filteredData.map((row, rowIndex) => (
               <tr key={rowIndex}>
                 {enableCheckbox && (
-                  <td className="border border-gray-300 px-2 py-1 text-center align-middle">
+                  <td className="border border-gray-200 px-2 py-1 text-center align-middle">
                     <input
                       type="checkbox"
                       checked={selectedRows.has(rowIndex)}
@@ -1062,7 +1133,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   </td>
                 )}
                 {showRowNumbers && (
-                  <td className="border border-gray-300 px-2 py-1 text-xs text-center align-middle text-gray-500">
+                  <td className="border border-gray-200 px-2 py-1 text-xs text-center align-middle text-gray-500">
                     {rowIndex + 1}
                   </td>
                 )}
@@ -1075,7 +1146,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                         height: rowHeight,
                         userSelect: 'text'
                       }}
-                      onClick={() => handleCellClick(rowIndex, column.key)}
+                      onClick={() => handleCellClick(rowIndex, column.key, row[column.key])}
                       onDoubleClick={() => handleCellDoubleClick(rowIndex, column.key, row[column.key])}
                       onMouseEnter={() => setHoverCell({ row: rowIndex, col: column.key })}
                       onMouseLeave={() => !fillStartCell && setHoverCell(null)}
@@ -1085,7 +1156,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   )
                 })}
                 {enableDelete && (
-                  <td className="border border-gray-300 px-2 py-1 text-center align-middle" style={{ height: rowHeight, width: 100 }}>
+                  <td className="border border-gray-200 px-2 py-1 text-center align-middle" style={{ height: rowHeight, width: 100 }}>
                     <button
                       onClick={() => onDelete?.(rowIndex)}
                       className="px-3 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200 whitespace-nowrap"

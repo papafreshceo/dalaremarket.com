@@ -1,6 +1,8 @@
 'use client';
 
 import { Order } from '../types';
+import { useMemo } from 'react';
+import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 
 interface SettlementTabProps {
   isMobile: boolean;
@@ -46,6 +48,30 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
     cash: Math.floor(orders.length * 0.1)
   };
 
+  const columns = useMemo(() => [
+    { key: 'month', title: '월', width: 150 },
+    { key: 'totalOrders', title: '발주 건수', type: 'number' as const, width: 120, renderer: (value: any) => `${value}건` },
+    { key: 'totalAmount', title: '총 금액', type: 'number' as const, width: 150, renderer: (value: any) => `${value?.toLocaleString()}원` },
+    { key: 'paidAmount', title: '완료 금액', type: 'number' as const, width: 150, renderer: (value: any) => `${value?.toLocaleString()}원` },
+    { key: 'unpaidAmount', title: '미완료 금액', type: 'number' as const, width: 150, renderer: (value: any) => `${value?.toLocaleString()}원` },
+    {
+      key: 'completionRate',
+      title: '완료율',
+      width: 200,
+      renderer: (value: any, row: any) => {
+        const rate = row.totalAmount > 0 ? ((row.paidAmount / row.totalAmount) * 100).toFixed(1) : '0.0';
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '60px', height: '8px', background: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: `${rate}%`, height: '100%', background: '#10b981', borderRadius: '4px' }} />
+            </div>
+            <span style={{ fontSize: '14px', fontWeight: '500' }}>{rate}%</span>
+          </div>
+        );
+      }
+    }
+  ], []);
+
   return (
     <div>
       {/* 정산 요약 카드 */}
@@ -58,6 +84,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
         }}
       >
         <div
+          className="dark:bg-[#252526] dark:border-[#3e3e42]"
           style={{
             background: 'white',
             padding: '20px',
@@ -65,15 +92,16 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
             border: '1px solid #e5e7eb'
           }}
         >
-          <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
+          <div style={{ fontSize: '14px', marginBottom: '8px' }}>
             총 정산액
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937' }}>
+          <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
             ₩{orders.reduce((sum, o) => sum + (o.amount || 0), 0).toLocaleString()}
           </div>
         </div>
 
         <div
+          className="dark:bg-[#252526] dark:border-[#3e3e42]"
           style={{
             background: 'white',
             padding: '20px',
@@ -81,7 +109,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
             border: '1px solid #e5e7eb'
           }}
         >
-          <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
+          <div style={{ fontSize: '14px', marginBottom: '8px' }}>
             완료된 정산
           </div>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>
@@ -91,6 +119,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
         </div>
 
         <div
+          className="dark:bg-[#252526] dark:border-[#3e3e42]"
           style={{
             background: 'white',
             padding: '20px',
@@ -98,7 +127,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
             border: '1px solid #e5e7eb'
           }}
         >
-          <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
+          <div style={{ fontSize: '14px', marginBottom: '8px' }}>
             미완료 정산
           </div>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>
@@ -109,118 +138,31 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
       </div>
 
       {/* 월별 정산 테이블 */}
-      <div
-        style={{
-          background: 'white',
-          borderRadius: '8px',
-          marginBottom: '24px',
-          overflow: 'hidden',
-          border: '1px solid #e5e7eb'
-        }}
-      >
-        <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ marginBottom: '16px' }}>
           <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#1f2937' }}>
             월별 정산 내역
           </h3>
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f9fafb' }}>
-                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600' }}>
-                  월
-                </th>
-                <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600' }}>
-                  발주 건수
-                </th>
-                <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600' }}>
-                  총 금액
-                </th>
-                <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600' }}>
-                  완료 금액
-                </th>
-                <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600' }}>
-                  미완료 금액
-                </th>
-                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600' }}>
-                  완료율
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {settlementData.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    style={{
-                      padding: '40px',
-                      textAlign: 'center',
-                      color: '#6b7280',
-                      fontSize: '14px'
-                    }}
-                  >
-                    정산 내역이 없습니다.
-                  </td>
-                </tr>
-              ) : (
-                (settlementData as any[]).map((settlement) => {
-                  const completionRate = settlement.totalAmount > 0
-                    ? ((settlement.paidAmount / settlement.totalAmount) * 100).toFixed(1)
-                    : '0.0';
-
-                  return (
-                    <tr key={settlement.month} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>
-                        {settlement.month}
-                      </td>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#1f2937', textAlign: 'right' }}>
-                        {settlement.totalOrders}건
-                      </td>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#1f2937', textAlign: 'right' }}>
-                        {settlement.totalAmount.toLocaleString()}원
-                      </td>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#10b981', textAlign: 'right' }}>
-                        {settlement.paidAmount.toLocaleString()}원
-                      </td>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#ef4444', textAlign: 'right' }}>
-                        {settlement.unpaidAmount.toLocaleString()}원
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                          <div
-                            style={{
-                              width: '60px',
-                              height: '8px',
-                              background: '#e5e7eb',
-                              borderRadius: '4px',
-                              overflow: 'hidden'
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: `${completionRate}%`,
-                                height: '100%',
-                                background: '#10b981',
-                                borderRadius: '4px'
-                              }}
-                            />
-                          </div>
-                          <span style={{ fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>
-                            {completionRate}%
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        <EditableAdminGrid
+          data={settlementData as any[]}
+          columns={columns}
+          height="400px"
+          rowHeight={40}
+          showRowNumbers={false}
+          enableFilter={false}
+          enableSort={true}
+          enableCSVExport={false}
+          enableCSVImport={false}
+          enableAddRow={false}
+          enableDelete={false}
+          enableCheckbox={false}
+        />
       </div>
 
       {/* 결제 수단별 통계 */}
       <div
+        className="dark:bg-[#252526] dark:border-[#3e3e42]"
         style={{
           background: 'white',
           borderRadius: '8px',
@@ -228,8 +170,8 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
           border: '1px solid #e5e7eb'
         }}
       >
-        <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb' }}>
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#1f2937' }}>
+        <div className="dark:border-[#3e3e42]" style={{ padding: '16px', borderBottom: '1px solid #e5e7eb' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
             결제 수단별 통계
           </h3>
         </div>
@@ -242,6 +184,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
             }}
           >
             <div
+              className="dark:bg-[#2d2d30] dark:border-[#3e3e42]"
               style={{
                 padding: '16px',
                 background: '#f9fafb',
@@ -249,18 +192,19 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                 border: '1px solid #e5e7eb'
               }}
             >
-              <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
+              <div style={{ fontSize: '14px', marginBottom: '8px' }}>
                 카드 결제
               </div>
-              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1f2937' }}>
+              <div style={{ fontSize: '20px', fontWeight: 'bold' }}>
                 {paymentStats.card}건
               </div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              <div style={{ fontSize: '12px', marginTop: '4px' }}>
                 전체의 {orders.length > 0 ? ((paymentStats.card / orders.length) * 100).toFixed(0) : 0}%
               </div>
             </div>
 
             <div
+              className="dark:bg-[#2d2d30] dark:border-[#3e3e42]"
               style={{
                 padding: '16px',
                 background: '#f9fafb',
@@ -268,18 +212,19 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                 border: '1px solid #e5e7eb'
               }}
             >
-              <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
+              <div style={{ fontSize: '14px', marginBottom: '8px' }}>
                 계좌 이체
               </div>
-              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1f2937' }}>
+              <div style={{ fontSize: '20px', fontWeight: 'bold' }}>
                 {paymentStats.transfer}건
               </div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              <div style={{ fontSize: '12px', marginTop: '4px' }}>
                 전체의 {orders.length > 0 ? ((paymentStats.transfer / orders.length) * 100).toFixed(0) : 0}%
               </div>
             </div>
 
             <div
+              className="dark:bg-[#2d2d30] dark:border-[#3e3e42]"
               style={{
                 padding: '16px',
                 background: '#f9fafb',
@@ -287,13 +232,13 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                 border: '1px solid #e5e7eb'
               }}
             >
-              <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
+              <div style={{ fontSize: '14px', marginBottom: '8px' }}>
                 현금 결제
               </div>
-              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1f2937' }}>
+              <div style={{ fontSize: '20px', fontWeight: 'bold' }}>
                 {paymentStats.cash}건
               </div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              <div style={{ fontSize: '12px', marginTop: '4px' }}>
                 전체의 {orders.length > 0 ? ((paymentStats.cash / orders.length) * 100).toFixed(0) : 0}%
               </div>
             </div>

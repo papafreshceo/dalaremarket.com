@@ -8,7 +8,9 @@
       "Bash(npm run dev:*)",
       "Bash(grep:*)",
       "Bash(npx supabase db dump:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx supabase:*)"
     ],
     "deny": [],
     "ask": []

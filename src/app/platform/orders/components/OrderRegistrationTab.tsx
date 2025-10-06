@@ -1,6 +1,8 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Order, StatusConfig, StatsData } from '../types';
+import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 
 interface OrderRegistrationTabProps {
   isMobile: boolean;
@@ -48,6 +50,312 @@ export default function OrderRegistrationTab({
   setEndDate
 }: OrderRegistrationTabProps) {
 
+  // 상태별 칼럼 정의
+  const getColumnsByStatus = useMemo(() => {
+    const baseColumns = [
+      {
+        key: 'orderNo',
+        title: filterStatus === 'registered' ? '등록번호' : '발주번호',
+        width: 100,
+        readOnly: true,
+        align: 'center' as const
+      },
+      {
+        key: 'date',
+        title: filterStatus === 'registered' ? '등록일시' :
+               filterStatus === 'cancelRequested' || filterStatus === 'cancelled' ? '취소요청일시' : '발주일시',
+        width: 150,
+        readOnly: true,
+        align: 'center' as const
+      },
+      {
+        key: 'orderNumber',
+        title: '주문번호',
+        width: 120,
+        readOnly: true,
+        align: 'center' as const
+      },
+      {
+        key: 'orderer',
+        title: '주문자',
+        width: 100,
+        readOnly: true,
+        align: 'center' as const
+      },
+      {
+        key: 'ordererPhone',
+        title: '주문자전화번호',
+        width: 120,
+        readOnly: true,
+        align: 'center' as const
+      },
+      {
+        key: 'recipient',
+        title: '수령인',
+        width: 100,
+        readOnly: true,
+        align: 'center' as const
+      },
+      {
+        key: 'recipientPhone',
+        title: '수령인전화번호',
+        width: 120,
+        readOnly: true,
+        align: 'center' as const
+      },
+      {
+        key: 'address',
+        title: '주소',
+        width: 250,
+        readOnly: true,
+        align: 'left' as const
+      },
+      {
+        key: 'optionName',
+        title: '옵션명',
+        width: 150,
+        readOnly: true,
+        align: 'left' as const
+      },
+      {
+        key: 'quantity',
+        title: '수량',
+        width: 80,
+        type: 'number' as const,
+        readOnly: true,
+        align: 'center' as const
+      },
+      {
+        key: 'unitPrice',
+        title: '공급단가',
+        width: 100,
+        type: 'number' as const,
+        readOnly: true,
+        align: 'right' as const,
+        renderer: (value: any) => (
+          <span style={{ fontSize: '13px' }}>₩{value?.toLocaleString()}</span>
+        )
+      }
+    ];
+
+    // 상태별 추가 칼럼
+    if (filterStatus === 'registered') {
+      return [
+        ...baseColumns,
+        {
+          key: 'supplyPrice',
+          title: '공급가',
+          width: 100,
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>₩{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'delete',
+          title: '삭제',
+          width: 80,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: () => (
+            <button
+              style={{
+                padding: '4px 12px',
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              삭제
+            </button>
+          )
+        }
+      ];
+    } else if (filterStatus === 'confirmed') {
+      return [
+        ...baseColumns,
+        {
+          key: 'supplyPrice',
+          title: '공급가',
+          width: 100,
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>₩{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'cancelRequest',
+          title: '취소요청',
+          width: 80,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: () => (
+            <button
+              style={{
+                padding: '4px 12px',
+                background: '#f59e0b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              요청
+            </button>
+          )
+        }
+      ];
+    } else if (filterStatus === 'preparing') {
+      return [
+        ...baseColumns,
+        {
+          key: 'depositAmount',
+          title: '입금액',
+          width: 100,
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>₩{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'cancelRequest',
+          title: '취소요청',
+          width: 80,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: () => (
+            <button
+              style={{
+                padding: '4px 12px',
+                background: '#f59e0b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              요청
+            </button>
+          )
+        }
+      ];
+    } else if (filterStatus === 'shipped') {
+      return [
+        ...baseColumns,
+        {
+          key: 'supplyPrice',
+          title: '공급가',
+          width: 100,
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>₩{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'shippedDate',
+          title: '발송일',
+          width: 100,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'courier',
+          title: '택배사',
+          width: 100,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'trackingNo',
+          title: '송장번호',
+          width: 120,
+          readOnly: true,
+          align: 'center' as const
+        }
+      ];
+    } else if (filterStatus === 'cancelRequested' || filterStatus === 'cancelled') {
+      const cols = [
+        ...baseColumns,
+        {
+          key: 'depositAmount',
+          title: '입금액',
+          width: 100,
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>₩{value?.toLocaleString()}</span>
+          )
+        }
+      ];
+
+      if (filterStatus === 'cancelled') {
+        cols.push({
+          key: 'cancelledAt',
+          title: '취소완료일시',
+          width: 150,
+          readOnly: true,
+          align: 'center' as const
+        });
+      }
+
+      return cols;
+    }
+
+    // 전체 보기일 때
+    return [
+      ...baseColumns,
+      {
+        key: 'supplyPrice',
+        title: '공급가',
+        width: 100,
+        type: 'number' as const,
+        readOnly: true,
+        align: 'right' as const,
+        renderer: (value: any) => (
+          <span style={{ fontSize: '13px' }}>₩{value?.toLocaleString()}</span>
+        )
+      },
+      {
+        key: 'status',
+        title: '상태',
+        width: 120,
+        readOnly: true,
+        align: 'center' as const,
+        renderer: (value: Order['status']) => {
+          const config = statusConfig[value];
+          return (
+            <span
+              style={{
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: '500',
+                background: config.bg,
+                color: config.color
+              }}
+            >
+              {config.label}
+            </span>
+          );
+        }
+      }
+    ];
+  }, [filterStatus, statusConfig]);
+
   return (
     <div>
       {/* 상태 통계 카드 섹션 */}
@@ -56,26 +364,28 @@ export default function OrderRegistrationTab({
           display: 'grid',
           gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(6, 1fr)',
           gap: '16px',
-          marginBottom: '24px'
+          marginBottom: '32px'
         }}
       >
         {statsData.map((stat) => {
           const config = statusConfig[stat.status];
+          const isSelected = filterStatus === stat.status;
           return (
             <div
               key={stat.status}
+              onClick={() => setFilterStatus(stat.status)}
               style={{
                 background: 'white',
                 padding: '20px',
                 borderRadius: '8px',
-                border: '1px solid #e5e7eb',
-                transition: 'all 0.2s'
+                border: isSelected ? `2px solid ${config.color}` : '1px solid #e5e7eb',
+                cursor: 'pointer'
               }}
             >
-              <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px' }}>
+              <div style={{ fontSize: '13px', color: config.color, marginBottom: '8px', fontWeight: '600' }}>
                 {config.label}
               </div>
-              <div style={{ fontSize: '32px', fontWeight: '700', color: '#1f2937' }}>
+              <div style={{ fontSize: '32px', fontWeight: '700', color: config.color }}>
                 {stat.count}
               </div>
             </div>
@@ -83,37 +393,97 @@ export default function OrderRegistrationTab({
         })}
       </div>
 
-      {/* 발주서 관리 섹션 */}
-      <div
-        style={{
-          background: 'white',
-          padding: '20px',
-          borderRadius: '12px',
-          marginBottom: '24px',
-          border: '1px solid #e5e7eb'
-        }}
-      >
-        <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600', color: '#1f2937' }}>
-          발주서 관리
-        </h3>
-        <div
-          style={{
-            display: 'flex',
-            gap: '12px',
-            flexWrap: 'wrap'
-          }}
-        >
+      {/* 필터 및 버튼 섹션 */}
+      <div style={{
+        background: 'white',
+        padding: '16px',
+        borderRadius: '8px',
+        border: '1px solid #e5e7eb',
+        marginBottom: '16px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        {/* 필터 - 좌측 */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as any)}
+            style={{
+              width: '120px',
+              padding: '4px 8px',
+              border: '1px solid #9ca3af',
+              borderRadius: '6px',
+              fontSize: '12px',
+              height: '28px'
+            }}
+          >
+            <option value="all">전체</option>
+            {Object.entries(statusConfig).map(([key, config]: [string, any]) => (
+              <option key={key} value={key}>
+                {config.label}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            style={{
+              width: '140px',
+              padding: '4px 8px',
+              border: '1px solid #9ca3af',
+              borderRadius: '6px',
+              fontSize: '12px',
+              height: '28px'
+            }}
+          />
+
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            style={{
+              width: '140px',
+              padding: '4px 8px',
+              border: '1px solid #9ca3af',
+              borderRadius: '6px',
+              fontSize: '12px',
+              height: '28px'
+            }}
+          />
+
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="발주번호, 상품명 검색"
+            style={{
+              width: '180px',
+              padding: '4px 8px',
+              border: '1px solid #9ca3af',
+              borderRadius: '6px',
+              fontSize: '12px',
+              height: '28px'
+            }}
+          />
+        </div>
+
+        {/* 발주서 관리 버튼들 - 우측 */}
+        <div style={{ display: 'flex', gap: '8px' }}>
           <button
             style={{
-              padding: '12px 24px',
+              padding: '6px 16px',
               background: '#10b981',
               color: 'white',
               border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
+              borderRadius: '6px',
+              fontSize: '12px',
               fontWeight: '500',
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              height: '28px'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = '#059669';
@@ -127,15 +497,16 @@ export default function OrderRegistrationTab({
           <button
             onClick={() => setShowUploadModal(true)}
             style={{
-              padding: '12px 24px',
+              padding: '6px 16px',
               background: '#2563eb',
               color: 'white',
               border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
+              borderRadius: '6px',
+              fontSize: '12px',
               fontWeight: '500',
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              height: '28px'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = '#1d4ed8';
@@ -148,15 +519,16 @@ export default function OrderRegistrationTab({
           </button>
           <button
             style={{
-              padding: '12px 24px',
+              padding: '6px 16px',
               background: '#8b5cf6',
               color: 'white',
               border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
+              borderRadius: '6px',
+              fontSize: '12px',
               fontWeight: '500',
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              height: '28px'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = '#7c3aed';
@@ -170,211 +542,21 @@ export default function OrderRegistrationTab({
         </div>
       </div>
 
-      {/* 필터 */}
-      <div
-        style={{
-          background: 'white',
-          padding: '16px',
-          borderRadius: '8px',
-          marginBottom: '16px',
-          border: '1px solid #e5e7eb'
-        }}
-      >
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-            gap: '12px'
-          }}
-        >
-          <div>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', color: '#374151' }}>
-              상태
-            </label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as any)}
-              style={{
-                width: '100%',
-                padding: '8px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '14px'
-              }}
-            >
-              <option value="all">전체</option>
-              {Object.entries(statusConfig).map(([key, config]: [string, any]) => (
-                <option key={key} value={key}>
-                  {config.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', color: '#374151' }}>
-              시작일
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '14px'
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', color: '#374151' }}>
-              종료일
-            </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '14px'
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
       {/* 발주 테이블 */}
-      <div
-        style={{
-          background: 'white',
-          borderRadius: '8px',
-          overflow: 'hidden',
-          border: '1px solid #e5e7eb'
-        }}
-      >
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f9fafb' }}>
-                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-                  <input
-                    type="checkbox"
-                    onChange={handleSelectAll}
-                    checked={filteredOrders.length > 0 && selectedOrders.length === filteredOrders.length}
-                  />
-                </th>
-                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600' }}>
-                  발주번호
-                </th>
-                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600' }}>
-                  발주일
-                </th>
-                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600' }}>
-                  상품
-                </th>
-                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600' }}>
-                  수량
-                </th>
-                <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600' }}>
-                  금액
-                </th>
-                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600' }}>
-                  상태
-                </th>
-                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600' }}>
-                  작업
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    style={{
-                      padding: '40px',
-                      textAlign: 'center',
-                      color: '#6b7280',
-                      fontSize: '14px'
-                    }}
-                  >
-                    발주 내역이 없습니다.
-                  </td>
-                </tr>
-              ) : (
-                filteredOrders.map((order) => {
-                  const config = statusConfig[order.status];
-                  return (
-                    <tr key={order.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ padding: '12px' }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedOrders.includes(order.id)}
-                          onChange={() => handleSelectOrder(order.id)}
-                        />
-                      </td>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#1f2937' }}>
-                        {order.orderNo}
-                      </td>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#1f2937' }}>
-                        {order.date}
-                      </td>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#1f2937' }}>
-                        {order.products}
-                      </td>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#1f2937' }}>
-                        {order.quantity}개
-                      </td>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#1f2937', textAlign: 'right' }}>
-                        ₩{order.amount.toLocaleString()}
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <span
-                          style={{
-                            padding: '4px 12px',
-                            borderRadius: '12px',
-                            fontSize: '12px',
-                            fontWeight: '500',
-                            background: config.bg,
-                            color: config.color
-                          }}
-                        >
-                          {config.label}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <button
-                          onClick={() => {
-                            setSelectedOrder(order);
-                            setShowDetailModal(true);
-                          }}
-                          style={{
-                            padding: '4px 12px',
-                            background: '#2563eb',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '12px'
-                          }}
-                        >
-                          상세
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <EditableAdminGrid
+        data={filteredOrders}
+        columns={getColumnsByStatus}
+        height="600px"
+        rowHeight={32}
+        showRowNumbers={true}
+        enableFilter={false}
+        enableSort={true}
+        enableCSVExport={false}
+        enableCSVImport={false}
+        enableAddRow={false}
+        enableDelete={false}
+        enableCheckbox={false}
+      />
     </div>
   );
 }

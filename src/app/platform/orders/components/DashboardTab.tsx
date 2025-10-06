@@ -36,7 +36,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             <h3 style={{
               fontSize: '14px',
               fontWeight: '600',
-              color: '#212529',
               margin: 0
             }}>
               월간 발주 일정
@@ -63,7 +62,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               <span style={{
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#212529',
                 minWidth: '100px',
                 textAlign: 'center'
               }}>
@@ -96,9 +94,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
               <div key={idx} style={{
                 textAlign: 'center',
-                fontSize: '11px',
+                fontSize: '12px',
                 fontWeight: '600',
-                color: idx === 0 ? '#ef4444' : idx === 6 ? '#2563eb' : '#6c757d',
+                color: idx === 0 ? '#ef4444' : idx === 6 ? '#2563eb' : undefined,
                 padding: '4px 0'
               }}>
                 {day}
@@ -117,7 +115,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               <div key={`prev-${day}`} style={{
                 padding: '8px 4px',
                 textAlign: 'center',
-                color: '#cbd5e1',
                 fontSize: '13px'
               }}>
                 {day}
@@ -161,7 +158,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   <span style={{
                     fontSize: '13px',
                     fontWeight: isToday ? '600' : '500',
-                    color: dayOfWeek === 0 ? '#ef4444' : dayOfWeek === 6 ? '#2563eb' : isToday ? '#2563eb' : '#212529'
+                    color: dayOfWeek === 0 ? '#ef4444' : dayOfWeek === 6 ? '#2563eb' : isToday ? '#2563eb' : undefined
                   }}>
                     {day}
                   </span>
@@ -172,13 +169,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         color: '#ffffff',
                         borderRadius: '10px',
                         padding: '2px 6px',
-                        fontSize: '10px',
+                        fontSize: '12px',
                         fontWeight: '500'
                       }}>
                         {orderCount}건
                       </div>
                       <div style={{
-                        fontSize: '9px',
+                        fontSize: '12px',
                         color: '#10b981',
                         fontWeight: '500'
                       }}>
@@ -195,7 +192,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       color: '#ffffff',
                       borderRadius: '3px',
                       padding: '1px 4px',
-                      fontSize: '8px',
+                      fontSize: '12px',
                       fontWeight: '600'
                     }}>
                       오늘
@@ -209,7 +206,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               <div key={`next-${day}`} style={{
                 padding: '8px 4px',
                 textAlign: 'center',
-                color: '#cbd5e1',
                 fontSize: '13px'
               }}>
                 {day}
@@ -234,7 +230,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 border: '2px solid #2563eb',
                 borderRadius: '3px'
               }} />
-              <span style={{ color: '#6c757d' }}>오늘</span>
+              <span>오늘</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
@@ -244,7 +240,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 border: '1px solid #dee2e6',
                 borderRadius: '3px'
               }} />
-              <span style={{ color: '#6c757d' }}>발주일</span>
+              <span>발주일</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
@@ -257,7 +253,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               }}>
                 N건
               </div>
-              <span style={{ color: '#6c757d' }}>발주 건수</span>
+              <span>발주 건수</span>
             </div>
           </div>
         </div>
@@ -278,7 +274,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           }}>
             <div style={{
               fontSize: '12px',
-              color: '#6b7280',
               marginBottom: '8px'
             }}>
               이번달 발주액
@@ -287,7 +282,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               fontSize: '24px',
               fontWeight: '600',
               marginBottom: '8px',
-              color: '#1f2937'
             }}>
               ₩8,450,000
             </div>
@@ -312,7 +306,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           }}>
             <div style={{
               fontSize: '12px',
-              color: '#6b7280',
               marginBottom: '8px'
             }}>
               어제 발주액
@@ -321,7 +314,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               fontSize: '24px',
               fontWeight: '600',
               marginBottom: '8px',
-              color: '#1f2937'
             }}>
               ₩520,000
             </div>
@@ -346,7 +338,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           }}>
             <div style={{
               fontSize: '12px',
-              color: '#6b7280',
               marginBottom: '8px'
             }}>
               평균 주문액
@@ -355,7 +346,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               fontSize: '24px',
               fontWeight: '600',
               marginBottom: '8px',
-              color: '#1f2937'
             }}>
               ₩680,000
             </div>
@@ -380,7 +370,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           }}>
             <div style={{
               fontSize: '12px',
-              color: '#6b7280',
               marginBottom: '8px'
             }}>
               총 발주 건수
@@ -389,7 +378,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               fontSize: '24px',
               fontWeight: '600',
               marginBottom: '8px',
-              color: '#1f2937'
             }}>
               156건
             </div>
@@ -422,7 +410,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             <h3 style={{
               fontSize: '14px',
               fontWeight: '600',
-              color: '#212529',
               marginBottom: '16px'
             }}>
               월별 발주 추이
@@ -451,7 +438,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   }} />
                   <span style={{
                     fontSize: '10px',
-                    color: '#6c757d'
                   }}>
                     {['7월', '8월', '9월', '10월', '11월', '12월', '1월'][idx]}
                   </span>
@@ -470,7 +456,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             <h3 style={{
               fontSize: '14px',
               fontWeight: '600',
-              color: '#212529',
               marginBottom: '16px'
             }}>
               판매채널별 발주 비율
@@ -506,7 +491,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   <div style={{
                     fontSize: '18px',
                     fontWeight: '600',
-                    color: '#212529'
                   }}>
                     100%
                   </div>
@@ -539,7 +523,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       }} />
                       <span style={{
                         fontSize: '12px',
-                        color: '#495057'
                       }}>
                         {item.label}
                       </span>
@@ -547,8 +530,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     <span style={{
                       fontSize: '12px',
                       fontWeight: '500',
-                      color: '#212529'
-                    }}>
+                      }}>
                       {item.value}
                     </span>
                   </div>
@@ -567,7 +549,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             <h3 style={{
               fontSize: '14px',
               fontWeight: '600',
-              color: '#212529',
               marginBottom: '16px'
             }}>
               품목별 발주 TOP 5
@@ -588,15 +569,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   }}>
                     <span style={{
                       fontSize: '12px',
-                      color: '#495057'
                     }}>
                       {idx + 1}. {item.name}
                     </span>
                     <span style={{
                       fontSize: '12px',
                       fontWeight: '500',
-                      color: '#212529'
-                    }}>
+                      }}>
                       {item.amount}
                     </span>
                   </div>
@@ -628,7 +607,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             <h3 style={{
               fontSize: '14px',
               fontWeight: '600',
-              color: '#212529',
               marginBottom: '16px'
             }}>
               최근 7일 발주 현황
@@ -671,7 +649,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   }} />
                   <span style={{
                     fontSize: '10px',
-                    color: '#6c757d'
                   }}>
                     {item.day}
                   </span>

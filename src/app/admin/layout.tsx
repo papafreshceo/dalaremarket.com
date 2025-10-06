@@ -179,62 +179,62 @@ export default function AdminLayout({
   return (
     <ToastProvider>
       <ConfirmProvider>
-        <div className="flex flex-col h-screen bg-gray-50">
+        <div className="flex flex-col h-screen bg-gray-50 dark:bg-[#1e1e1e]">
       {/* 헤더 */}
-      <header className="h-16 bg-white border-b border-gray-200 shadow-sm z-50">
+      <header className="h-16 bg-white dark:bg-[#2d2d30] border-b border-gray-200 dark:border-[#3e3e42] shadow-sm z-50">
         <div className="h-full px-4 lg:px-6 flex items-center justify-between">
           <div className="flex items-center gap-4 flex-1">
             {/* 햄버거 + 로고 */}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3e3e42] transition-colors"
               >
-                <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-gray-700 dark:text-[#cccccc]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
-              
+
               <Link href="/admin/dashboard" className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-blue-500 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-lg">D</span>
                 </div>
-                <h2 className="text-lg font-bold text-gray-900">달래마켓 관리자</h2>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-[#cccccc]">달래마켓 관리자</h2>
               </Link>
             </div>
             
             {/* Breadcrumb */}
-            <nav className="hidden lg:flex items-center text-sm text-gray-500 ml-4">
+            <nav className="hidden lg:flex items-center text-sm text-gray-500 dark:text-[#9c9c9c] ml-4">
               {pathname && pathname !== '/admin' && pathname !== '/admin/dashboard' && (
-                <span className="text-gray-700 font-medium">
+                <span className="text-gray-700 dark:text-[#cccccc] font-medium">
                   {menuItems.find(item => pathname.startsWith(item.href))?.name || ''}
                 </span>
               )}
             </nav>
           </div>
-          
+
           {/* 헤더 우측 */}
           <div className="flex items-center gap-2">
-            <div className="hidden md:flex items-center bg-gray-100 rounded-lg px-3 py-2">
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="hidden md:flex items-center bg-gray-100 dark:bg-[#3e3e42] rounded-lg px-3 py-2">
+              <svg className="w-4 h-4 text-gray-400 dark:text-[#9c9c9c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <input 
-                type="text" 
-                placeholder="검색..." 
-                className="ml-2 bg-transparent outline-none text-sm text-gray-700 placeholder-gray-400 w-40"
+              <input
+                type="text"
+                placeholder="검색..."
+                className="ml-2 bg-transparent outline-none text-sm text-gray-700 dark:text-[#cccccc] placeholder-gray-400 dark:placeholder-[#6e6e6e] w-40"
               />
             </div>
 
-            <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3e3e42] transition-colors">
+              <svg className="w-5 h-5 text-gray-600 dark:text-[#cccccc]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
             </button>
-            
-            <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
+            <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3e3e42] transition-colors">
+              <svg className="w-5 h-5 text-gray-600 dark:text-[#cccccc]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1 1 0 01.293.707V19a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
               </svg>
             </button>
@@ -266,7 +266,7 @@ export default function AdminLayout({
         <aside className={`
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           fixed lg:relative lg:translate-x-0
-          w-44 h-full bg-gradient-to-b from-gray-900 to-gray-800
+          w-44 h-full bg-gradient-to-b from-gray-900 to-gray-800 dark:from-[#252526] dark:to-[#1e1e1e]
           transition-transform duration-200 ease-in-out z-40 shadow-xl
           text-[14px]                       /* ✅ 사이드바 기본 글자 크기 14px */
           [&_svg]:!w-[14px] [&_svg]:!h-[14px]  /* ✅ 사이드바 내부 아이콘 14px */
@@ -337,7 +337,7 @@ export default function AdminLayout({
         </aside>
 
         {/* 메인 */}
-        <main className="flex-1 overflow-y-auto bg-gray-50">
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-[#1e1e1e]">
           <div className="p-4 lg:p-6">
             {children}
           </div>
