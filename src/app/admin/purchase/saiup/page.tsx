@@ -1,16 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button, Modal } from '@/components/ui'
 import { useToast } from '@/components/ui/Toast'
 import { useConfirm } from '@/components/ui/ConfirmModal'
-import { HotTable } from '@handsontable/react'
-import { registerAllModules } from 'handsontable/registry'
-import 'handsontable/dist/handsontable.full.css'
-
-// 모든 Handsontable 모듈 등록
-registerAllModules()
+import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 
 // ===== 타입 =====
 interface PurchaseItem {
@@ -107,7 +102,6 @@ export default function SaiupManagementPage() {
     notes: ''
   })
 
-  const hotTableRef = useRef<any>(null)
   const supabase = createClient()
 
   // 사용자 정보
@@ -248,15 +242,9 @@ export default function SaiupManagementPage() {
   }
 
   const handleSave = async () => {
-    if (!hotTableRef.current) return
-
-    const hotInstance = hotTableRef.current.hotInstance
-    const data = hotInstance.getData()
-    const sourceData = hotInstance.getSourceData()
-
     try {
-      for (let i = 0; i < sourceData.length; i++) {
-        const row = sourceData[i]
+      for (let i = 0; i < tableData.length; i++) {
+        const row = tableData[i]
 
         if (row.id.startsWith('temp_')) {
           // 신규 데이터
@@ -438,217 +426,118 @@ export default function SaiupManagementPage() {
     await fetchItems()
   }
 
-  const columns: any[] = [
-    {
-      data: 'purchase_date',
-      title: '날짜',
-      width: 100,
-      className: 'htCenter bg-blue-50',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        td.innerHTML = value || ''
-        td.className = 'htCenter bg-blue-50'
-        return td
+  const handleCellEdit = (rowIndex: number, columnKey: string, newValue: any) => {
+    const newData = [...tableData]
+    const row = newData[rowIndex]
+
+    row[columnKey] = newValue
+
+    // 품종(category_5) 입력 시 대분류/중분류/소분류/품목 자동 입력
+    if (columnKey === 'category_5') {
+      const item = items.find(i => i.item_name === newValue)
+      if (item) {
+        row.category_1 = item.category_1 || ''
+        row.category_2 = item.category_2 || ''
+        row.category_3 = item.category_3 || ''
+        row.category_4 = item.category_4 || ''
       }
-    },
-    {
-      data: 'purchase_category',
-      title: '구분',
-      type: 'dropdown',
-      source: ['중매인', '농가', '기타'],
-      width: 80,
-      className: 'htCenter bg-blue-50',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        td.innerHTML = value || ''
-        td.className = 'htCenter bg-blue-50'
-        return td
+    }
+
+    // 구분 변경 시 수수료 재계산
+    if (columnKey === 'purchase_category') {
+      const category = newValue as string
+      const qty = Number(row.quantity) || 0
+      const amount = Number(row.amount) || 0
+
+      // 농가, 기타는 수수료 0
+      if (category === '농가' || category === '기타') {
+        row.commission = 0
+        row.total_amount = amount
+      } else if (category === '중매인') {
+        // 중매인은 거래처 수수료 적용
+        const supplier = suppliers.find(s => s.name === row.supplier_name)
+        if (supplier) {
+          if (supplier.commission_type === '정액') {
+            row.commission = qty * (supplier.commission_rate || 0)
+          } else {
+            row.commission = amount * (supplier.commission_rate || 0) / 100
+          }
+          row.total_amount = amount + row.commission
+        }
       }
-    },
-    {
-      data: 'supplier_name',
-      title: '거래처',
-      type: 'dropdown',
-      source: suppliers.map(s => s.name),
-      width: 120,
-      className: 'htCenter bg-blue-50',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        td.innerHTML = value || ''
-        td.className = 'htCenter bg-blue-50'
-        return td
+    }
+
+    // 거래처 변경 시 수수료 자동 적용
+    if (columnKey === 'supplier_name') {
+      const supplier = suppliers.find(s => s.name === newValue)
+      if (supplier) {
+        const qty = Number(row.quantity) || 0
+        const amount = Number(row.amount) || 0
+        const category = row.purchase_category
+
+        // 농가, 기타는 수수료 0
+        if (category === '농가' || category === '기타') {
+          row.commission = 0
+          row.total_amount = amount
+        } else {
+          // 중매인은 수수료 계산
+          if (supplier.commission_type === '정액') {
+            row.commission = qty * (supplier.commission_rate || 0)
+          } else {
+            row.commission = amount * (supplier.commission_rate || 0) / 100
+          }
+          row.total_amount = amount + row.commission
+        }
       }
-    },
-    {
-      data: 'category_1',
-      title: '대분류',
-      width: 80,
-      className: 'htCenter',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        td.innerHTML = value || ''
-        td.className = 'htCenter'
-        td.style.backgroundColor = '#fffbf0'
-        return td
+    }
+
+    // 수량 또는 단가 변경 시 금액/수수료/합계 자동 계산
+    if (columnKey === 'quantity' || columnKey === 'unit_price') {
+      const qty = Number(row.quantity) || 0
+      const price = Number(row.unit_price) || 0
+      row.amount = qty * price
+
+      const category = row.purchase_category
+
+      // 농가, 기타는 수수료 0
+      if (category === '농가' || category === '기타') {
+        row.commission = 0
+      } else {
+        // 중매인은 수수료 자동 계산
+        const supplier = suppliers.find(s => s.name === row.supplier_name)
+        if (supplier) {
+          if (supplier.commission_type === '정액') {
+            row.commission = qty * (supplier.commission_rate || 0)
+          } else {
+            row.commission = row.amount * (supplier.commission_rate || 0) / 100
+          }
+        }
       }
-    },
-    {
-      data: 'category_2',
-      title: '중분류',
-      width: 80,
-      className: 'htCenter',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        td.innerHTML = value || ''
-        td.className = 'htCenter'
-        td.style.backgroundColor = '#fffbf0'
-        return td
-      }
-    },
-    {
-      data: 'category_3',
-      title: '소분류',
-      width: 80,
-      className: 'htCenter',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        td.innerHTML = value || ''
-        td.className = 'htCenter'
-        td.style.backgroundColor = '#fffbf0'
-        return td
-      }
-    },
-    {
-      data: 'category_4',
-      title: '품목',
-      width: 100,
-      className: 'htCenter',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        td.innerHTML = value || ''
-        td.className = 'htCenter'
-        td.style.backgroundColor = '#fffbf0'
-        return td
-      }
-    },
-    {
-      data: 'category_5',
-      title: '품종',
-      width: 100,
-      className: 'htCenter bg-blue-50',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        td.innerHTML = value || ''
-        td.className = 'htCenter bg-blue-50'
-        return td
-      }
-    },
-    {
-      data: 'classification',
-      title: '구분',
-      width: 80,
-      className: 'htCenter bg-blue-50',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        td.innerHTML = value || ''
-        td.className = 'htCenter bg-blue-50'
-        return td
-      }
-    },
-    {
-      data: 'shipper_name',
-      title: '출하자',
-      width: 100,
-      className: 'htCenter bg-blue-50',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        td.innerHTML = value || ''
-        td.className = 'htCenter bg-blue-50'
-        return td
-      }
-    },
-    {
-      data: 'quantity',
-      title: '수량',
-      type: 'numeric',
-      numericFormat: { pattern: '0,0.00' },
-      width: 80,
-      className: 'htCenter bg-blue-50',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        td.innerHTML = value || ''
-        td.className = 'htCenter bg-blue-50'
-        return td
-      }
-    },
-    {
-      data: 'unit_price',
-      title: '단가',
-      type: 'numeric',
-      numericFormat: { pattern: '0,0' },
-      width: 100,
-      className: 'htRight bg-blue-50',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        const formatted = value ? Number(value).toLocaleString('ko-KR') : ''
-        td.innerHTML = formatted
-        td.className = 'htRight bg-blue-50'
-        return td
-      }
-    },
-    {
-      data: 'amount',
-      title: '금액',
-      type: 'numeric',
-      numericFormat: { pattern: '0,0' },
-      width: 100,
-      className: 'htRight bg-pink-50',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        const formatted = value ? Number(value).toLocaleString('ko-KR') : ''
-        td.innerHTML = formatted
-        td.className = 'htRight bg-pink-50'
-        return td
-      }
-    },
-    {
-      data: 'commission',
-      title: '수수료',
-      type: 'numeric',
-      numericFormat: { pattern: '0,0' },
-      width: 80,
-      className: 'htRight bg-pink-50',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        const formatted = value ? Number(value).toLocaleString('ko-KR') : ''
-        td.innerHTML = formatted
-        td.className = 'htRight bg-pink-50'
-        return td
-      }
-    },
-    {
-      data: 'total_amount',
-      title: '합계',
-      type: 'numeric',
-      numericFormat: { pattern: '0,0' },
-      readOnly: true,
-      width: 100,
-      className: 'htRight bg-pink-50 font-semibold',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        const formatted = value ? Number(value).toLocaleString('ko-KR') : ''
-        td.innerHTML = formatted
-        td.className = 'htRight bg-pink-50 font-semibold'
-        return td
-      }
-    },
-    {
-      data: 'task',
-      title: '작업',
-      width: 100,
-      className: 'htCenter bg-blue-50',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        td.innerHTML = value || ''
-        td.className = 'htCenter bg-blue-50'
-        return td
-      }
-    },
-    {
-      data: 'taste',
-      title: '맛',
-      width: 100,
-      className: 'htCenter bg-blue-50',
-      renderer: function(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-        td.innerHTML = value || ''
-        td.className = 'htCenter bg-blue-50'
-        return td
-      }
-    },
+
+      row.total_amount = row.amount + (Number(row.commission) || 0)
+    }
+
+    setTableData(newData)
+  }
+
+  const columns = [
+    { key: 'purchase_date', title: '날짜', width: 100, className: 'text-center bg-blue-50', readOnly: !isEditMode },
+    { key: 'purchase_category', title: '구분', type: 'dropdown' as const, source: ['중매인', '농가', '기타'], width: 80, className: 'text-center bg-blue-50', readOnly: !isEditMode },
+    { key: 'supplier_name', title: '거래처', type: 'dropdown' as const, source: suppliers.map(s => s.name), width: 120, className: 'text-center bg-blue-50', readOnly: !isEditMode },
+    { key: 'category_1', title: '대분류', width: 80, className: 'text-center bg-amber-50', readOnly: true },
+    { key: 'category_2', title: '중분류', width: 80, className: 'text-center bg-amber-50', readOnly: true },
+    { key: 'category_3', title: '소분류', width: 80, className: 'text-center bg-amber-50', readOnly: true },
+    { key: 'category_4', title: '품목', width: 100, className: 'text-center bg-amber-50', readOnly: true },
+    { key: 'category_5', title: '품종', width: 100, className: 'text-center bg-blue-50', readOnly: !isEditMode },
+    { key: 'classification', title: '구분', width: 80, className: 'text-center bg-blue-50', readOnly: !isEditMode },
+    { key: 'shipper_name', title: '출하자', width: 100, className: 'text-center bg-blue-50', readOnly: !isEditMode },
+    { key: 'quantity', title: '수량', type: 'number' as const, width: 80, className: 'text-center bg-blue-50', readOnly: !isEditMode },
+    { key: 'unit_price', title: '단가', type: 'number' as const, width: 100, className: 'text-right bg-blue-50', readOnly: !isEditMode, renderer: (value: any) => <span>{value ? Number(value).toLocaleString('ko-KR') : ''}</span> },
+    { key: 'amount', title: '금액', type: 'number' as const, width: 100, className: 'text-right bg-pink-50', readOnly: true, renderer: (value: any) => <span>{value ? Number(value).toLocaleString('ko-KR') : ''}</span> },
+    { key: 'commission', title: '수수료', type: 'number' as const, width: 80, className: 'text-right bg-pink-50', readOnly: true, renderer: (value: any) => <span>{value ? Number(value).toLocaleString('ko-KR') : ''}</span> },
+    { key: 'total_amount', title: '합계', type: 'number' as const, width: 100, className: 'text-right bg-pink-50 font-semibold', readOnly: true, renderer: (value: any) => <span className="font-semibold">{value ? Number(value).toLocaleString('ko-KR') : ''}</span> },
+    { key: 'task', title: '작업', width: 100, className: 'text-center bg-blue-50', readOnly: !isEditMode },
+    { key: 'taste', title: '맛', width: 100, className: 'text-center bg-blue-50', readOnly: !isEditMode },
   ]
 
   return (
@@ -756,142 +645,13 @@ export default function SaiupManagementPage() {
 
       {/* 테이블 */}
       <div>
-        <HotTable
-          ref={hotTableRef}
+        <EditableAdminGrid
           data={tableData}
           columns={columns}
-          colHeaders={true}
-          rowHeaders={true}
-          height="auto"
-          width="100%"
-          licenseKey="non-commercial-and-evaluation"
-          stretchH="all"
-          autoColumnSize={false}
-          manualColumnResize={true}
-          readOnly={!isEditMode}
-          className={!isEditMode ? 'readonly-mode' : ''}
-          contextMenu={{
-            items: {
-              row_above: { name: '위에 행 삽입' },
-              row_below: { name: '아래에 행 삽입' },
-              separator1: '---------',
-              remove_row: { name: '행 삭제' },
-              separator2: '---------',
-              undo: { name: '실행 취소' },
-              redo: { name: '다시 실행' },
-              separator3: '---------',
-              copy: { name: '복사' },
-              cut: { name: '잘라내기' }
-            }
-          }}
-          afterChange={(changes, source) => {
-            if (source === 'edit' && changes) {
-              changes.forEach(([row, prop, oldValue, newValue]) => {
-                const data = hotTableRef.current?.hotInstance?.getSourceData()
-                if (data && data[row]) {
-                  // 품종(category_5) 입력 시 대분류/중분류/소분류/품목 자동 입력
-                  if (prop === 'category_5') {
-                    const item = items.find(i => i.item_name === newValue)
-                    if (item) {
-                      data[row].category_1 = item.category_1 || ''
-                      data[row].category_2 = item.category_2 || ''
-                      data[row].category_3 = item.category_3 || ''
-                      data[row].category_4 = item.category_4 || ''
-                      hotTableRef.current?.hotInstance?.render()
-                    }
-                  }
-                  // 구분 변경 시 수수료 재계산
-                  if (prop === 'purchase_category') {
-                    const category = newValue as string
-                    const qty = Number(data[row].quantity) || 0
-                    const amount = Number(data[row].amount) || 0
-
-                    // 농가, 기타는 수수료 0
-                    if (category === '농가' || category === '기타') {
-                      data[row].commission = 0
-                      data[row].total_amount = amount
-                    } else if (category === '중매인') {
-                      // 중매인은 거래처 수수료 적용
-                      const supplier = suppliers.find(s => s.name === data[row].supplier_name)
-                      if (supplier) {
-                        if (supplier.commission_type === '정액') {
-                          data[row].commission = qty * (supplier.commission_rate || 0)
-                        } else {
-                          data[row].commission = amount * (supplier.commission_rate || 0) / 100
-                        }
-                        data[row].total_amount = amount + data[row].commission
-                      }
-                    }
-                    hotTableRef.current?.hotInstance?.render()
-                  }
-
-                  // 거래처 변경 시 수수료 자동 적용
-                  if (prop === 'supplier_name') {
-                    const supplier = suppliers.find(s => s.name === newValue)
-                    if (supplier) {
-                      const qty = Number(data[row].quantity) || 0
-                      const amount = Number(data[row].amount) || 0
-                      const category = data[row].purchase_category
-
-                      // 농가, 기타는 수수료 0
-                      if (category === '농가' || category === '기타') {
-                        data[row].commission = 0
-                        data[row].total_amount = amount
-                      } else {
-                        // 중매인은 수수료 계산
-                        if (supplier.commission_type === '정액') {
-                          data[row].commission = qty * (supplier.commission_rate || 0)
-                        } else {
-                          data[row].commission = amount * (supplier.commission_rate || 0) / 100
-                        }
-                        data[row].total_amount = amount + data[row].commission
-                      }
-                      hotTableRef.current?.hotInstance?.render()
-                    }
-                  }
-                  // 수량 또는 단가 변경 시 금액/수수료/합계 자동 계산
-                  if (prop === 'quantity' || prop === 'unit_price') {
-                    const qty = Number(data[row].quantity) || 0
-                    const price = Number(data[row].unit_price) || 0
-                    data[row].amount = qty * price
-
-                    const category = data[row].purchase_category
-
-                    // 농가, 기타는 수수료 0
-                    if (category === '농가' || category === '기타') {
-                      data[row].commission = 0
-                    } else {
-                      // 중매인은 수수료 자동 계산
-                      const supplier = suppliers.find(s => s.name === data[row].supplier_name)
-                      if (supplier) {
-                        if (supplier.commission_type === '정액') {
-                          data[row].commission = qty * (supplier.commission_rate || 0)
-                        } else {
-                          data[row].commission = data[row].amount * (supplier.commission_rate || 0) / 100
-                        }
-                      }
-                    }
-
-                    data[row].total_amount = data[row].amount + (Number(data[row].commission) || 0)
-                    hotTableRef.current?.hotInstance?.render()
-                  }
-                }
-              })
-            }
-          }}
+          onDataChange={setTableData}
+          onCellEdit={handleCellEdit}
+          height="600px"
         />
-
-        {/* 행 추가 버튼 - 테이블 하단 */}
-        <div className="mt-2 flex justify-center">
-          <Button
-            onClick={handleAddRow}
-            variant="ghost"
-            className="w-[200px] border border-blue-500 h-[38px]"
-            disabled={!isEditMode}
-          >
-            + 행 추가
-          </Button>
-        </div>
       </div>
 
       {/* 버튼 영역 */}

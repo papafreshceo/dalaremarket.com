@@ -1,15 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui'
 import { useToast } from '@/components/ui/Toast'
 import { useConfirm } from '@/components/ui/ConfirmModal'
-import { HotTable } from '@handsontable/react'
-import { registerAllModules } from 'handsontable/registry'
-import 'handsontable/dist/handsontable.full.css'
-
-registerAllModules()
+import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 
 interface PartnerType {
   id: string
@@ -23,10 +19,9 @@ export default function PartnerTypesPage() {
   const { confirm } = useConfirm()
 
   const [types, setTypes] = useState<PartnerType[]>([])
-  const [tableData, setTableData] = useState<any[]>([])
+  const [tableData, setTableData] = useState<PartnerType[]>([])
   const [loading, setLoading] = useState(false)
 
-  const hotTableRef = useRef<any>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -67,14 +62,9 @@ export default function PartnerTypesPage() {
   }
 
   const handleSave = async () => {
-    if (!hotTableRef.current) return
-
-    const hotInstance = hotTableRef.current.hotInstance
-    const sourceData = hotInstance.getSourceData()
-
     try {
-      for (let i = 0; i < sourceData.length; i++) {
-        const row = sourceData[i]
+      for (let i = 0; i < tableData.length; i++) {
+        const row = tableData[i]
 
         if (!row.type_name) {
           continue
@@ -137,72 +127,32 @@ export default function PartnerTypesPage() {
     }
   }
 
-  const columns: any[] = [
-    {
-      data: 'type_name',
-      title: '유형명',
-      width: 200,
-      className: 'htCenter'
-    },
-    {
-      data: 'description',
-      title: '설명',
-      width: 400,
-      className: 'htLeft'
-    },
-    {
-      title: '삭제',
-      width: 80,
-      readOnly: true,
-      renderer: function(instance: any, td: any, row: any) {
-        td.innerHTML = '<button class="text-red-600 hover:text-red-800">삭제</button>'
-        td.className = 'htCenter'
-        return td
-      }
-    }
+  const columns = [
+    { key: 'type_name', title: '유형명', width: 200, className: 'text-center' },
+    { key: 'description', title: '설명', width: 400, className: 'text-left' }
   ]
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div className="text-[16px] font-bold">거래처 유형 관리</div>
-      </div>
-
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-600">
-            총 {tableData.length}개의 거래처 유형
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={handleAddRow} variant="ghost">
-              + 행 추가
-            </Button>
-            <Button onClick={handleSave}>
-              저장
-            </Button>
-          </div>
+        <div className="text-sm text-gray-600">
+          총 {tableData.length}개의 거래처 유형
         </div>
-
-        <HotTable
-          ref={hotTableRef}
-          data={tableData}
-          columns={columns}
-          colHeaders={true}
-          rowHeaders={true}
-          height="600"
-          width="100%"
-          licenseKey="non-commercial-and-evaluation"
-          stretchH="all"
-          autoColumnSize={false}
-          manualColumnResize={true}
-          contextMenu={true}
-          afterOnCellMouseDown={(event, coords) => {
-            if (coords.col === 2) { // 삭제 컬럼
-              handleDelete(coords.row)
-            }
-          }}
-        />
       </div>
+
+      <EditableAdminGrid
+        data={tableData}
+        columns={columns}
+        onDataChange={setTableData}
+        onDelete={handleDelete}
+        onSave={handleSave}
+        onDeleteSelected={(indices) => {
+          indices.forEach(index => handleDelete(index))
+        }}
+        height="600px"
+        globalSearchPlaceholder="유형명, 설명 검색"
+      />
     </div>
   )
 }

@@ -495,6 +495,23 @@ html {
   scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
 }
 
+/* 다크모드에서 글자 굵기 감소 */
+.dark body,
+.dark * {
+  font-weight: 200 !important;
+}
+
+/* Tailwind 폰트 클래스별 다크모드 조정 */
+.dark .font-thin,
+.dark .font-extralight { font-weight: 100 !important; }
+.dark .font-light { font-weight: 100 !important; }
+.dark .font-normal { font-weight: 200 !important; }
+.dark .font-medium { font-weight: 300 !important; }
+.dark .font-semibold { font-weight: 400 !important; }
+.dark .font-bold { font-weight: 500 !important; }
+.dark .font-extrabold { font-weight: 600 !important; }
+.dark .font-black { font-weight: 700 !important; }
+
 /* 이미지 & 미디어 */
 img, picture, video, canvas, svg {
   display: block;
@@ -542,10 +559,10 @@ table textarea {
   font-size: 12px !important;
 }
 
-.table-fixed tr {
+/* .table-fixed tr {
   height: 16px !important;
   max-height: 16px !important;
-}
+} */
 
 /* 리스트 - margin/padding 제거 */
 ul, ol {

@@ -1,0 +1,717 @@
+{
+  "generated_at": "2025-10-06T00:06:29.828Z",
+  "tables": {
+    "raw_materials": [
+      {
+        "column_name": "id",
+        "data_type": "string",
+        "sample_value": "ab13cdde-cfe5-4173-9226-68a664666364"
+      },
+      {
+        "column_name": "material_code",
+        "data_type": "string",
+        "sample_value": "bansi030"
+      },
+      {
+        "column_name": "material_name",
+        "data_type": "string",
+        "sample_value": "반시(30내)"
+      },
+      {
+        "column_name": "standard_unit",
+        "data_type": "string",
+        "sample_value": "kg"
+      },
+      {
+        "column_name": "supply_status",
+        "data_type": "string",
+        "sample_value": "출하중"
+      },
+      {
+        "column_name": "season",
+        "data_type": "string",
+        "sample_value": "가을"
+      },
+      {
+        "column_name": "season_start_date",
+        "data_type": "string",
+        "sample_value": "2025-09-15"
+      },
+      {
+        "column_name": "season_peak_date",
+        "data_type": "string",
+        "sample_value": "2025-10-20"
+      },
+      {
+        "column_name": "season_end_date",
+        "data_type": "string",
+        "sample_value": "2025-11-20"
+      },
+      {
+        "column_name": "main_supplier_id",
+        "data_type": "string",
+        "sample_value": "1c7fd55d-580f-4142-8b9a-859565d049ce"
+      },
+      {
+        "column_name": "notes",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "metadata",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "is_active",
+        "data_type": "boolean",
+        "sample_value": true
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "string",
+        "sample_value": "2025-10-04T04:51:31.380823+00:00"
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "string",
+        "sample_value": "2025-10-05T11:05:53.15323+00:00"
+      },
+      {
+        "column_name": "created_by",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "updated_by",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "category_1",
+        "data_type": "string",
+        "sample_value": "농산물"
+      },
+      {
+        "column_name": "category_2",
+        "data_type": "string",
+        "sample_value": "과일"
+      },
+      {
+        "column_name": "category_3",
+        "data_type": "string",
+        "sample_value": "감"
+      },
+      {
+        "column_name": "category_4",
+        "data_type": "string",
+        "sample_value": "청도반시"
+      },
+      {
+        "column_name": "category_5",
+        "data_type": "string",
+        "sample_value": "청도반시"
+      },
+      {
+        "column_name": "color_code",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "last_trade_date",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "unit_quantity",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "latest_price",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "standard_quantity",
+        "data_type": "number",
+        "sample_value": 5
+      }
+    ],
+    "option_products": [
+      {
+        "column_name": "id",
+        "data_type": "string",
+        "sample_value": "0d592e20-88a8-462a-b36b-a5e09fad8805"
+      },
+      {
+        "column_name": "option_code",
+        "data_type": "string",
+        "sample_value": "hp4k22-013"
+      },
+      {
+        "column_name": "option_name",
+        "data_type": "string",
+        "sample_value": "딱딱이1.3kg (8과)"
+      },
+      {
+        "column_name": "item_type",
+        "data_type": "string",
+        "sample_value": "복숭아"
+      },
+      {
+        "column_name": "variety",
+        "data_type": "string",
+        "sample_value": "딱딱이"
+      },
+      {
+        "column_name": "specification_1",
+        "data_type": "string",
+        "sample_value": "1.3kg"
+      },
+      {
+        "column_name": "specification_2",
+        "data_type": "string",
+        "sample_value": "소과"
+      },
+      {
+        "column_name": "specification_3",
+        "data_type": "string",
+        "sample_value": "8과"
+      },
+      {
+        "column_name": "weight",
+        "data_type": "number",
+        "sample_value": 1.3
+      },
+      {
+        "column_name": "weight_unit",
+        "data_type": "string",
+        "sample_value": "kg"
+      },
+      {
+        "column_name": "packaging_box_price",
+        "data_type": "number",
+        "sample_value": 800
+      },
+      {
+        "column_name": "pack_price",
+        "data_type": "number",
+        "sample_value": 0
+      },
+      {
+        "column_name": "bag_vinyl_price",
+        "data_type": "number",
+        "sample_value": 0
+      },
+      {
+        "column_name": "cushioning_price",
+        "data_type": "number",
+        "sample_value": 100
+      },
+      {
+        "column_name": "sticker_price",
+        "data_type": "number",
+        "sample_value": 0
+      },
+      {
+        "column_name": "ice_pack_price",
+        "data_type": "number",
+        "sample_value": 0
+      },
+      {
+        "column_name": "other_material_price",
+        "data_type": "number",
+        "sample_value": 0
+      },
+      {
+        "column_name": "total_material_cost",
+        "data_type": "number",
+        "sample_value": 900
+      },
+      {
+        "column_name": "raw_material_cost",
+        "data_type": "number",
+        "sample_value": 4225
+      },
+      {
+        "column_name": "total_cost",
+        "data_type": "number",
+        "sample_value": 5125
+      },
+      {
+        "column_name": "vendor_id",
+        "data_type": "string",
+        "sample_value": "8fc82758-f052-4c70-95f4-123d6e9e502d"
+      },
+      {
+        "column_name": "shipping_type",
+        "data_type": "string",
+        "sample_value": "직접발송"
+      },
+      {
+        "column_name": "shipping_address",
+        "data_type": "string",
+        "sample_value": "경상북도 청도군 청도읍 구미길 22"
+      },
+      {
+        "column_name": "shipping_contact",
+        "data_type": "string",
+        "sample_value": "010-1111-2222"
+      },
+      {
+        "column_name": "shipping_deadline",
+        "data_type": "number",
+        "sample_value": 1
+      },
+      {
+        "column_name": "shipping_fee",
+        "data_type": "number",
+        "sample_value": 3000
+      },
+      {
+        "column_name": "additional_quantity",
+        "data_type": "number",
+        "sample_value": 0
+      },
+      {
+        "column_name": "status",
+        "data_type": "string",
+        "sample_value": "시즌종료"
+      },
+      {
+        "column_name": "season",
+        "data_type": "string",
+        "sample_value": "여름"
+      },
+      {
+        "column_name": "season_start_date",
+        "data_type": "string",
+        "sample_value": "2025-06-20"
+      },
+      {
+        "column_name": "season_peak_date",
+        "data_type": "string",
+        "sample_value": "2025-07-15"
+      },
+      {
+        "column_name": "season_end_date",
+        "data_type": "string",
+        "sample_value": "2025-08-25"
+      },
+      {
+        "column_name": "labor_cost",
+        "data_type": "number",
+        "sample_value": 1000
+      },
+      {
+        "column_name": "target_margin_rate",
+        "data_type": "number",
+        "sample_value": 20
+      },
+      {
+        "column_name": "seller_margin_rate",
+        "data_type": "number",
+        "sample_value": 10
+      },
+      {
+        "column_name": "seller_supply_price_mode",
+        "data_type": "string",
+        "sample_value": "수동"
+      },
+      {
+        "column_name": "seller_supply_auto_price",
+        "data_type": "number",
+        "sample_value": 10140
+      },
+      {
+        "column_name": "seller_supply_manual_price",
+        "data_type": "number",
+        "sample_value": 13500
+      },
+      {
+        "column_name": "seller_supply_price",
+        "data_type": "number",
+        "sample_value": 13500
+      },
+      {
+        "column_name": "naver_price_mode",
+        "data_type": "string",
+        "sample_value": "자동"
+      },
+      {
+        "column_name": "naver_paid_shipping_auto",
+        "data_type": "number",
+        "sample_value": 7300
+      },
+      {
+        "column_name": "naver_free_shipping_auto",
+        "data_type": "number",
+        "sample_value": 10500
+      },
+      {
+        "column_name": "naver_paid_shipping_manual",
+        "data_type": "number",
+        "sample_value": 12000
+      },
+      {
+        "column_name": "naver_free_shipping_manual",
+        "data_type": "number",
+        "sample_value": 15200
+      },
+      {
+        "column_name": "naver_paid_shipping_price",
+        "data_type": "number",
+        "sample_value": 12000
+      },
+      {
+        "column_name": "naver_free_shipping_price",
+        "data_type": "number",
+        "sample_value": 15200
+      },
+      {
+        "column_name": "coupang_price_mode",
+        "data_type": "string",
+        "sample_value": "자동"
+      },
+      {
+        "column_name": "coupang_paid_shipping_auto",
+        "data_type": "number",
+        "sample_value": 7800
+      },
+      {
+        "column_name": "coupang_free_shipping_auto",
+        "data_type": "number",
+        "sample_value": 14400
+      },
+      {
+        "column_name": "coupang_paid_shipping_manual",
+        "data_type": "number",
+        "sample_value": 20000
+      },
+      {
+        "column_name": "coupang_free_shipping_manual",
+        "data_type": "number",
+        "sample_value": 23400
+      },
+      {
+        "column_name": "coupang_paid_shipping_price",
+        "data_type": "number",
+        "sample_value": 20000
+      },
+      {
+        "column_name": "coupang_free_shipping_price",
+        "data_type": "number",
+        "sample_value": 23400
+      },
+      {
+        "column_name": "thumbnail_url",
+        "data_type": "string",
+        "sample_value": "https://res.cloudinary.com/dde1hpbrp/image/upload/01_detail_pages/peach004_hard/thumbnail_hardpeach/08.jpg"
+      },
+      {
+        "column_name": "detail_page_url",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "has_detail_page",
+        "data_type": "boolean",
+        "sample_value": true
+      },
+      {
+        "column_name": "has_images",
+        "data_type": "boolean",
+        "sample_value": true
+      },
+      {
+        "column_name": "is_best",
+        "data_type": "boolean",
+        "sample_value": false
+      },
+      {
+        "column_name": "is_recommended",
+        "data_type": "boolean",
+        "sample_value": false
+      },
+      {
+        "column_name": "description",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "notes",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "is_active",
+        "data_type": "boolean",
+        "sample_value": true
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "string",
+        "sample_value": "2025-10-05T09:36:12.924611+00:00"
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "string",
+        "sample_value": "2025-10-05T10:48:06.651156+00:00"
+      }
+    ],
+    "option_product_materials": [
+      {
+        "column_name": "id",
+        "data_type": "string",
+        "sample_value": "fb4866d5-945f-4b65-a501-32d6f95e4818"
+      },
+      {
+        "column_name": "option_id",
+        "data_type": "string",
+        "sample_value": "0d592e20-88a8-462a-b36b-a5e09fad8805"
+      },
+      {
+        "column_name": "material_id",
+        "data_type": "string",
+        "sample_value": "6d78b6e9-2d74-4ce6-900d-4c2ac59d2107"
+      },
+      {
+        "column_name": "material_order",
+        "data_type": "number",
+        "sample_value": 1
+      },
+      {
+        "column_name": "quantity",
+        "data_type": "number",
+        "sample_value": 1.3
+      },
+      {
+        "column_name": "unit",
+        "data_type": "string",
+        "sample_value": "kg"
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "string",
+        "sample_value": "2025-10-05T09:36:12.924611+00:00"
+      },
+      {
+        "column_name": "unit_price",
+        "data_type": "object",
+        "sample_value": null
+      }
+    ],
+    "material_price_history": [
+      {
+        "column_name": "id",
+        "data_type": "string",
+        "sample_value": "21ab2c48-fe4d-481d-ab3d-9bb8ed36da00"
+      },
+      {
+        "column_name": "material_id",
+        "data_type": "string",
+        "sample_value": "ab13cdde-cfe5-4173-9226-68a664666364"
+      },
+      {
+        "column_name": "supplier_id",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "price",
+        "data_type": "number",
+        "sample_value": 12500
+      },
+      {
+        "column_name": "currency",
+        "data_type": "string",
+        "sample_value": "KRW"
+      },
+      {
+        "column_name": "price_per_unit",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "unit_quantity",
+        "data_type": "number",
+        "sample_value": 1
+      },
+      {
+        "column_name": "effective_date",
+        "data_type": "string",
+        "sample_value": "2025-10-02"
+      },
+      {
+        "column_name": "expiry_date",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "price_type",
+        "data_type": "string",
+        "sample_value": "MARKET"
+      },
+      {
+        "column_name": "is_negotiable",
+        "data_type": "boolean",
+        "sample_value": false
+      },
+      {
+        "column_name": "notes",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "string",
+        "sample_value": "2025-10-04T06:06:45.573043+00:00"
+      },
+      {
+        "column_name": "created_by",
+        "data_type": "string",
+        "sample_value": "40861fd6-7faf-4b40-9cbc-c3f54a144f2e"
+      }
+    ],
+    "partners": [
+      {
+        "column_name": "id",
+        "data_type": "string",
+        "sample_value": "1c7fd55d-580f-4142-8b9a-859565d049ce"
+      },
+      {
+        "column_name": "code",
+        "data_type": "string",
+        "sample_value": "SUP001"
+      },
+      {
+        "column_name": "name",
+        "data_type": "string",
+        "sample_value": "청도농협"
+      },
+      {
+        "column_name": "business_number",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "contact_person",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "phone",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "email",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "address",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "bank_account",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "notes",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "is_active",
+        "data_type": "boolean",
+        "sample_value": true
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "string",
+        "sample_value": "2025-10-03T02:41:34.964491+00:00"
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "string",
+        "sample_value": "2025-10-03T02:41:34.964491+00:00"
+      },
+      {
+        "column_name": "created_by",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "updated_by",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "representative_phone",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "bank_name",
+        "data_type": "object",
+        "sample_value": null
+      },
+      {
+        "column_name": "account_holder",
+        "data_type": "object",
+        "sample_value": null
+      }
+    ],
+    "supply_status_settings": [
+      {
+        "column_name": "id",
+        "data_type": "string",
+        "sample_value": "eb526c54-822e-47a8-9d02-22e8784ac325"
+      },
+      {
+        "column_name": "status_type",
+        "data_type": "string",
+        "sample_value": "raw_material"
+      },
+      {
+        "column_name": "code",
+        "data_type": "string",
+        "sample_value": "SHIPPING"
+      },
+      {
+        "column_name": "name",
+        "data_type": "string",
+        "sample_value": "출하중"
+      },
+      {
+        "column_name": "color",
+        "data_type": "string",
+        "sample_value": "#10B981"
+      },
+      {
+        "column_name": "display_order",
+        "data_type": "number",
+        "sample_value": 1
+      },
+      {
+        "column_name": "is_active",
+        "data_type": "boolean",
+        "sample_value": true
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "string",
+        "sample_value": "2025-10-03T15:14:22.14897+00:00"
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "string",
+        "sample_value": "2025-10-03T15:14:22.14897+00:00"
+      }
+    ]
+  }
+}

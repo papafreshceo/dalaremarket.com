@@ -1,13 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui'
-import { HotTable } from '@handsontable/react'
-import { registerAllModules } from 'handsontable/registry'
-import 'handsontable/dist/handsontable.full.min.css'
-
-registerAllModules()
+import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 
 interface OptionProductRow {
   id: string
@@ -38,7 +34,6 @@ export default function OptionProductsEditPage() {
   const [data, setData] = useState<OptionProductRow[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const hotTableRef = useRef<any>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -90,47 +85,8 @@ export default function OptionProductsEditPage() {
     setSaving(true)
 
     try {
-      const hotInstance = hotTableRef.current?.hotInstance
-      if (!hotInstance) return
-
-      const tableData = hotInstance.getData()
-      const updates = []
-
-      for (let i = 0; i < tableData.length; i++) {
-        const row = tableData[i]
-        const originalRow = data[i]
-
-        if (!originalRow) continue
-
-        const update = {
-          id: originalRow.id,
-          option_name: row[1],
-          item_type: row[2],
-          variety: row[3],
-          specification_1: row[4],
-          specification_2: row[5],
-          specification_3: row[6],
-          weight: parseFloat(row[7]) || 0,
-          weight_unit: row[8],
-          packaging_box_price: parseFloat(row[9]) || 0,
-          cushioning_price: parseFloat(row[10]) || 0,
-          raw_material_cost: parseFloat(row[11]) || 0,
-          labor_cost: parseFloat(row[12]) || 0,
-          shipping_fee: parseFloat(row[13]) || 0,
-          seller_supply_price: parseFloat(row[14]) || 0,
-          naver_paid_shipping_price: parseFloat(row[15]) || 0,
-          naver_free_shipping_price: parseFloat(row[16]) || 0,
-          coupang_paid_shipping_price: parseFloat(row[17]) || 0,
-          coupang_free_shipping_price: parseFloat(row[18]) || 0,
-          supply_status: row[19]
-        }
-
-        updates.push(update)
-      }
-
-      // Batch update
-      for (const update of updates) {
-        const { id, ...updateData } = update
+      for (const row of data) {
+        const { id, vendor_name, ...updateData } = row
         const { error } = await supabase
           .from('option_products')
           .update(updateData)
@@ -138,7 +94,7 @@ export default function OptionProductsEditPage() {
 
         if (error) {
           console.error('Error updating row:', error)
-          alert(`Failed to update ${update.id}`)
+          alert(`Failed to update ${id}`)
           setSaving(false)
           return
         }
@@ -155,33 +111,33 @@ export default function OptionProductsEditPage() {
   }
 
   const columns = [
-    { data: 'option_code', title: 'Option Code', readOnly: true, width: 120 },
-    { data: 'option_name', title: 'Name', width: 200 },
-    { data: 'item_type', title: 'Item Type', width: 100 },
-    { data: 'variety', title: 'Variety', width: 100 },
-    { data: 'specification_1', title: 'Spec 1', width: 80 },
-    { data: 'specification_2', title: 'Spec 2', width: 80 },
-    { data: 'specification_3', title: 'Spec 3', width: 80 },
-    { data: 'weight', title: 'Weight', type: 'numeric', width: 80 },
-    { data: 'weight_unit', title: 'Unit', width: 60 },
-    { data: 'packaging_box_price', title: 'Box Price', type: 'numeric', width: 100 },
-    { data: 'cushioning_price', title: 'Cushion', type: 'numeric', width: 100 },
-    { data: 'raw_material_cost', title: 'Material Cost', type: 'numeric', width: 120 },
-    { data: 'labor_cost', title: 'Labor Cost', type: 'numeric', width: 100 },
-    { data: 'shipping_fee', title: 'Shipping Fee', type: 'numeric', width: 100 },
-    { data: 'seller_supply_price', title: 'Seller Price', type: 'numeric', width: 120, className: 'htCenter htMiddle bg-blue-50' },
-    { data: 'naver_paid_shipping_price', title: 'Naver Paid', type: 'numeric', width: 100, className: 'htCenter htMiddle bg-green-50' },
-    { data: 'naver_free_shipping_price', title: 'Naver Free', type: 'numeric', width: 100, className: 'htCenter htMiddle bg-green-50' },
-    { data: 'coupang_paid_shipping_price', title: 'Coupang Paid', type: 'numeric', width: 100, className: 'htCenter htMiddle bg-purple-50' },
-    { data: 'coupang_free_shipping_price', title: 'Coupang Free', type: 'numeric', width: 100, className: 'htCenter htMiddle bg-purple-50' },
+    { key: 'option_code', title: 'Option Code', readOnly: true, width: 120 },
+    { key: 'option_name', title: 'Name', width: 200 },
+    { key: 'item_type', title: 'Item Type', width: 100 },
+    { key: 'variety', title: 'Variety', width: 100 },
+    { key: 'specification_1', title: 'Spec 1', width: 80 },
+    { key: 'specification_2', title: 'Spec 2', width: 80 },
+    { key: 'specification_3', title: 'Spec 3', width: 80 },
+    { key: 'weight', title: 'Weight', type: 'number' as const, width: 80 },
+    { key: 'weight_unit', title: 'Unit', width: 60 },
+    { key: 'packaging_box_price', title: 'Box Price', type: 'number' as const, width: 100 },
+    { key: 'cushioning_price', title: 'Cushion', type: 'number' as const, width: 100 },
+    { key: 'raw_material_cost', title: 'Material Cost', type: 'number' as const, width: 120 },
+    { key: 'labor_cost', title: 'Labor Cost', type: 'number' as const, width: 100 },
+    { key: 'shipping_fee', title: 'Shipping Fee', type: 'number' as const, width: 100 },
+    { key: 'seller_supply_price', title: 'Seller Price', type: 'number' as const, width: 120, className: 'text-center bg-blue-50' },
+    { key: 'naver_paid_shipping_price', title: 'Naver Paid', type: 'number' as const, width: 100, className: 'text-center bg-green-50' },
+    { key: 'naver_free_shipping_price', title: 'Naver Free', type: 'number' as const, width: 100, className: 'text-center bg-green-50' },
+    { key: 'coupang_paid_shipping_price', title: 'Coupang Paid', type: 'number' as const, width: 100, className: 'text-center bg-purple-50' },
+    { key: 'coupang_free_shipping_price', title: 'Coupang Free', type: 'number' as const, width: 100, className: 'text-center bg-purple-50' },
     {
-      data: 'supply_status',
+      key: 'supply_status',
       title: 'Status',
-      type: 'dropdown',
+      type: 'dropdown' as const,
       source: ['PREPARING', 'SUPPLYING', 'PAUSED', 'STOPPED', 'SEASON_END'],
       width: 120
     },
-    { data: 'vendor_name', title: 'Vendor', readOnly: true, width: 150 }
+    { key: 'vendor_name', title: 'Vendor', readOnly: true, width: 150 }
   ]
 
   if (loading) {
@@ -210,28 +166,13 @@ export default function OptionProductsEditPage() {
       </div>
 
       <div className="border rounded-lg overflow-hidden bg-white">
-        <HotTable
-          ref={hotTableRef}
+        <EditableAdminGrid
           data={data}
           columns={columns}
-          colHeaders={true}
-          rowHeaders={true}
-          width="100%"
-          height={600}
-          licenseKey="non-commercial-and-evaluation"
-          stretchH="all"
-          autoWrapRow={true}
-          autoWrapCol={true}
-          manualColumnResize={true}
-          manualRowResize={true}
-          contextMenu={true}
-          filters={true}
-          dropdownMenu={true}
-          columnSorting={true}
-          afterChange={(changes, source) => {
-            if (source === 'loadData') return
-            console.log('Data changed:', changes)
-          }}
+          onDataChange={setData}
+          height="600px"
+          enableFilter={true}
+          enableSort={true}
         />
       </div>
 

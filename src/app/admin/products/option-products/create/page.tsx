@@ -27,6 +27,9 @@ export default function CreateOptionProductPage() {
 
   const [rawMaterials, setRawMaterials] = useState<any[]>([])
   const [vendors, setVendors] = useState<any[]>([])
+  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [shippingVendors, setShippingVendors] = useState<any[]>([])
+  const [invoiceEntities, setInvoiceEntities] = useState<any[]>([])
   const [supplyStatuses, setSupplyStatuses] = useState<any[]>([])
   const [selectedItemType, setSelectedItemType] = useState('')
   const [selectedVariety, setSelectedVariety] = useState('')
@@ -35,11 +38,49 @@ export default function CreateOptionProductPage() {
   const [filteredMaterials, setFilteredMaterials] = useState<any[]>([])
   const [materialPlans, setMaterialPlans] = useState<{[key: string]: any}>({})
   const [commonCosts, setCommonCosts] = useState({
+    // 자재비
     packaging_box_price: '0',
+    pack_price: '0',
+    bag_vinyl_price: '0',
     cushioning_price: '0',
+    sticker_price: '0',
+    ice_pack_price: '0',
+    other_material_price: '0',
     labor_cost: '1000',
+    // 거래처 및 출고 정보
+    supplier_id: '',
+    shipping_vendor_id: '',
+    invoice_entity: '',
+    vendor_id: '',
+    shipping_location_name: '',
+    shipping_location_address: '',
+    shipping_location_contact: '',
+    shipping_deadline: '',
+    // 택배비 및 부가
+    shipping_fee: '3000',
+    shipping_additional_quantity: '0',
+    misc_cost: '0',
+    // 셀러공급
+    is_seller_supply: false,
+    // 상태
     status: '',
-    vendor_id: ''
+    // 썸네일 및 설명
+    thumbnail_url: '',
+    description: '',
+    notes: '',
+    // Y/N 옵션
+    is_best: false,
+    is_recommended: false,
+    has_detail_page: false,
+    has_images: false,
+    // 가격 정책
+    material_cost_policy: 'auto',
+    seller_supply_price_mode: '자동',
+    naver_price_mode: '자동',
+    coupang_price_mode: '자동',
+    // 마진율
+    seller_margin_rate: '10',
+    target_margin_rate: '20'
   })
 
   useEffect(() => {
@@ -48,7 +89,10 @@ export default function CreateOptionProductPage() {
 
   const fetchData = async () => {
     const { data: materials } = await supabase.from('raw_materials').select('*').eq('is_active', true)
-    const { data: vendorData } = await supabase.from('partners').select('*').eq('is_active', true)
+    const { data: vendorData } = await supabase.from('partners').select('*').eq('partner_category', 'eq', '벤더사').eq('is_active', true)
+    const { data: supplierData } = await supabase.from('partners').select('*').eq('partner_category', 'eq', '공급자').eq('is_active', true)
+    const { data: shippingVendorData } = await supabase.from('shipping_vendors').select('*').eq('is_active', true).order('display_order')
+    const { data: invoiceEntityData } = await supabase.from('invoice_entities').select('*').eq('is_active', true).order('display_order')
     const { data: statuses } = await supabase
       .from('supply_status_settings')
       .select('*')
@@ -56,8 +100,30 @@ export default function CreateOptionProductPage() {
       .eq('is_active', true)
       .order('display_order')
 
-    if (materials) setRawMaterials(materials)
+    // 각 원물의 최신 시세 가져오기
+    if (materials) {
+      const materialsWithPrice = await Promise.all(
+        materials.map(async (material) => {
+          const { data: priceHistory } = await supabase
+            .from('material_price_history')
+            .select('price')
+            .eq('material_id', material.id)
+            .order('effective_date', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          return {
+            ...material,
+            latest_price: priceHistory?.price || material.latest_price || 0
+          }
+        })
+      )
+      setRawMaterials(materialsWithPrice)
+    }
     if (vendorData) setVendors(vendorData)
+    if (supplierData) setSuppliers(supplierData)
+    if (shippingVendorData) setShippingVendors(shippingVendorData)
+    if (invoiceEntityData) setInvoiceEntities(invoiceEntityData)
     if (statuses) setSupplyStatuses(statuses)
   }
 
@@ -117,6 +183,19 @@ export default function CreateOptionProductPage() {
           ? ((subdivisionQty / material.standard_quantity) * material.latest_price)
           : 0
 
+        // 총 원가 계산
+        const totalCost = rawMaterialCost +
+          Number(plan.packaging_box_price) +
+          Number(plan.cushioning_price) +
+          Number(plan.labor_cost)
+
+        // 자동 가격 계산
+        const sellerMarginRate = Number(commonCosts.seller_margin_rate) || 10
+        const targetMarginRate = Number(commonCosts.target_margin_rate) || 20
+        const sellerAutoPrice = Math.round(totalCost / (1 - sellerMarginRate / 100))
+        const naverPaidAuto = Math.round(totalCost / (1 - targetMarginRate / 100))
+        const naverFreeAuto = Math.round((totalCost + Number(plan.shipping_fee)) / (1 - targetMarginRate / 100))
+
         const productData = {
           ...plan,
           option_code: `OPT${Date.now()}_${materialId}`,
@@ -125,7 +204,31 @@ export default function CreateOptionProductPage() {
           cushioning_price: Number(plan.cushioning_price),
           labor_cost: Number(plan.labor_cost),
           shipping_fee: Number(plan.shipping_fee),
-          raw_material_cost: rawMaterialCost
+          // 원가
+          raw_material_cost: rawMaterialCost,
+          total_cost: totalCost,
+          // 가격 정책
+          material_cost_policy: commonCosts.material_cost_policy,
+          fixed_material_cost: commonCosts.material_cost_policy === 'fixed' ? rawMaterialCost : 0,
+          // 마진율
+          seller_margin_rate: sellerMarginRate,
+          target_margin_rate: targetMarginRate,
+          // 셀러공급가
+          seller_supply_price_mode: commonCosts.seller_supply_price_mode,
+          seller_supply_auto_price: sellerAutoPrice,
+          seller_supply_price: sellerAutoPrice,
+          // 네이버 가격
+          naver_price_mode: commonCosts.naver_price_mode,
+          naver_paid_shipping_auto: naverPaidAuto,
+          naver_free_shipping_auto: naverFreeAuto,
+          naver_paid_shipping_price: naverPaidAuto,
+          naver_free_shipping_price: naverFreeAuto,
+          // 쿠팡 가격
+          coupang_price_mode: commonCosts.coupang_price_mode,
+          coupang_paid_shipping_auto: naverPaidAuto,
+          coupang_free_shipping_auto: naverFreeAuto,
+          coupang_paid_shipping_price: naverPaidAuto,
+          coupang_free_shipping_price: naverFreeAuto
         }
 
         const { data: newProduct, error: productError } = await supabase
@@ -168,398 +271,560 @@ export default function CreateOptionProductPage() {
         <Button size="xs" onClick={handleSave}>저장</Button>
       </>}
     >
-      <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <h2 className="text-sm font-semibold mb-3" style={{ color: '#1d4ed8' }}>공통 비용 설정</h2>
-        <div className="grid grid-cols-5 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">박스비</label>
-            <input
-              type="number"
-              value={commonCosts.packaging_box_price}
-              onChange={(e) => setCommonCosts({ ...commonCosts, packaging_box_price: e.target.value })}
-              className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">완충재</label>
-            <input
-              type="number"
-              value={commonCosts.cushioning_price}
-              onChange={(e) => setCommonCosts({ ...commonCosts, cushioning_price: e.target.value })}
-              className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">인건비</label>
-            <input
-              type="number"
-              value={commonCosts.labor_cost}
-              onChange={(e) => setCommonCosts({ ...commonCosts, labor_cost: e.target.value })}
-              className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">상태</label>
+      {/* 가격 정책 설정 */}
+      <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
+        <h2 className="text-sm font-semibold mb-3" style={{ color: '#1d4ed8' }}>💰 가격 정책 설정</h2>
+        <div className="grid grid-cols-6 gap-3 mb-3">
+          <div className="col-span-2">
+            <label className="block text-xs font-semibold text-gray-700 mb-1">원물가 정책</label>
             <select
-              value={commonCosts.status}
-              onChange={(e) => setCommonCosts({ ...commonCosts, status: e.target.value })}
+              value={commonCosts.material_cost_policy}
+              onChange={(e) => setCommonCosts({ ...commonCosts, material_cost_policy: e.target.value })}
               className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
             >
-              <option value="">선택</option>
-              {supplyStatuses.map(s => (
-                <option key={s.id} value={s.name}>{s.name}</option>
-              ))}
+              <option value="auto">자동 (최신시세 반영)</option>
+              <option value="fixed">고정 (시세 무시)</option>
+            </select>
+            <div className="text-xs text-gray-500 mt-1">
+              {commonCosts.material_cost_policy === 'auto'
+                ? '시세 변경 시 반영 가능'
+                : '시세가 변경되어도 고정가 유지'}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">셀러공급가</label>
+            <select
+              value={commonCosts.seller_supply_price_mode}
+              onChange={(e) => setCommonCosts({ ...commonCosts, seller_supply_price_mode: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+            >
+              <option value="자동">자동</option>
+              <option value="수동">수동</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">벤더</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">네이버</label>
             <select
-              value={commonCosts.vendor_id}
-              onChange={(e) => setCommonCosts({ ...commonCosts, vendor_id: e.target.value })}
+              value={commonCosts.naver_price_mode}
+              onChange={(e) => setCommonCosts({ ...commonCosts, naver_price_mode: e.target.value })}
               className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
             >
-              <option value="">선택</option>
-              {vendors.map(v => (
-                <option key={v.id} value={v.id}>{v.name}</option>
-              ))}
+              <option value="자동">자동</option>
+              <option value="수동">수동</option>
             </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">쿠팡</label>
+            <select
+              value={commonCosts.coupang_price_mode}
+              onChange={(e) => setCommonCosts({ ...commonCosts, coupang_price_mode: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+            >
+              <option value="자동">자동</option>
+              <option value="수동">수동</option>
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-6 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">셀러 마진율 (%)</label>
+            <input
+              type="number"
+              value={commonCosts.seller_margin_rate}
+              onChange={(e) => setCommonCosts({ ...commonCosts, seller_margin_rate: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">목표 마진율 (%)</label>
+            <input
+              type="number"
+              value={commonCosts.target_margin_rate}
+              onChange={(e) => setCommonCosts({ ...commonCosts, target_margin_rate: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+            />
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-9 gap-4">
-        {/* Column 1: 품목/품종 선택 */}
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold" style={{ color: '#1d4ed8' }}>1. 품목/품종</h2>
+      <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800/30 rounded-lg border border-gray-200 dark:border-gray-700">
+        <h2 className="text-sm font-semibold mb-3" style={{ color: '#1d4ed8' }}>공통 비용 설정</h2>
 
-          <div className="space-y-3">
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setSelectionType('item')
-                  setSelectedItemType('')
-                  setSelectedVariety('')
-                }}
-                className={`flex-1 px-2 py-1 rounded-lg text-xs font-semibold ${
-                  selectionType === 'item' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
-                }`}
-              >
-                품목
-              </button>
-              <button
-                onClick={() => {
-                  setSelectionType('variety')
-                  setSelectedItemType('')
-                  setSelectedVariety('')
-                }}
-                className={`flex-1 px-2 py-1 rounded-lg text-xs font-semibold ${
-                  selectionType === 'variety' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
-                }`}
-              >
-                품종
-              </button>
-            </div>
-
+        {/* 자재비 */}
+        <div className="mb-3">
+          <label className="block text-xs font-semibold text-gray-600 mb-2">자재비</label>
+          <div className="grid grid-cols-7 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">품목</label>
-              <select
-                value={selectedItemType}
-                onChange={(e) => {
-                  setSelectedItemType(e.target.value)
-                  setSelectedVariety('')
-                }}
-                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
-              >
-                <option value="">선택하세요</option>
-                {uniqueItems.map(item => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </select>
+              <label className="block text-xs text-gray-700 mb-1">박스비</label>
+              <input
+                type="number"
+                value={commonCosts.packaging_box_price}
+                onChange={(e) => setCommonCosts({ ...commonCosts, packaging_box_price: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              />
             </div>
-
-            {(selectionType === 'variety' || selectedItemType) && (
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">품종</label>
-                <select
-                  value={selectedVariety}
-                  onChange={(e) => setSelectedVariety(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
-                >
-                  <option value="">선택하세요</option>
-                  {filteredVarieties.map(variety => (
-                    <option key={variety} value={variety}>{variety}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">팩</label>
+              <input
+                type="number"
+                value={commonCosts.pack_price}
+                onChange={(e) => setCommonCosts({ ...commonCosts, pack_price: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">봉지/비닐</label>
+              <input
+                type="number"
+                value={commonCosts.bag_vinyl_price}
+                onChange={(e) => setCommonCosts({ ...commonCosts, bag_vinyl_price: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">완충재</label>
+              <input
+                type="number"
+                value={commonCosts.cushioning_price}
+                onChange={(e) => setCommonCosts({ ...commonCosts, cushioning_price: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">스티커</label>
+              <input
+                type="number"
+                value={commonCosts.sticker_price}
+                onChange={(e) => setCommonCosts({ ...commonCosts, sticker_price: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">아이스팩</label>
+              <input
+                type="number"
+                value={commonCosts.ice_pack_price}
+                onChange={(e) => setCommonCosts({ ...commonCosts, ice_pack_price: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">기타자재</label>
+              <input
+                type="number"
+                value={commonCosts.other_material_price}
+                onChange={(e) => setCommonCosts({ ...commonCosts, other_material_price: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Column 2: 소분 단위 */}
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold" style={{ color: '#1d4ed8' }}>2. 소분 단위</h2>
-
-          {(selectedItemType || selectedVariety) ? (
+        {/* 거래처 및 출고 정보 */}
+        <div className="mb-3">
+          <label className="block text-xs font-semibold text-gray-600 mb-2">거래처 및 출고 정보</label>
+          <div className="grid grid-cols-4 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">소분 단위</label>
+              <label className="block text-xs text-gray-700 mb-1">원물거래처</label>
+              <select
+                value={commonCosts.supplier_id}
+                onChange={(e) => setCommonCosts({ ...commonCosts, supplier_id: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              >
+                <option value="">선택</option>
+                {suppliers.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">출고처</label>
+              <select
+                value={commonCosts.shipping_vendor_id}
+                onChange={(e) => setCommonCosts({ ...commonCosts, shipping_vendor_id: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              >
+                <option value="">선택</option>
+                {shippingVendors.map(sv => (
+                  <option key={sv.id} value={sv.id}>{sv.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">송장주체</label>
+              <select
+                value={commonCosts.invoice_entity}
+                onChange={(e) => setCommonCosts({ ...commonCosts, invoice_entity: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              >
+                <option value="">선택</option>
+                {invoiceEntities.map(ie => (
+                  <option key={ie.id} value={ie.name}>{ie.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">벤더사</label>
+              <select
+                value={commonCosts.vendor_id}
+                onChange={(e) => setCommonCosts({ ...commonCosts, vendor_id: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              >
+                <option value="">선택</option>
+                {vendors.map(v => (
+                  <option key={v.id} value={v.id}>{v.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* 기타 비용 */}
+        <div className="mb-3">
+          <label className="block text-xs font-semibold text-gray-600 mb-2">기타</label>
+          <div className="grid grid-cols-5 gap-3">
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">인건비</label>
               <input
                 type="number"
-                step="0.1"
-                value={subdivisionUnit}
-                onChange={(e) => setSubdivisionUnit(e.target.value)}
-                placeholder="예: 1.5"
-                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+                value={commonCosts.labor_cost}
+                onChange={(e) => setCommonCosts({ ...commonCosts, labor_cost: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
               />
-              <div className="text-xs text-gray-500 mt-1">
-                원물의 기준 단위를 상속받습니다
-              </div>
             </div>
-          ) : (
-            <div className="text-xs text-gray-500 py-4">
-              먼저 품목/품종을 선택하세요
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">택배비</label>
+              <input
+                type="number"
+                value={commonCosts.shipping_fee}
+                onChange={(e) => setCommonCosts({ ...commonCosts, shipping_fee: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">택배비부가수량</label>
+              <input
+                type="number"
+                value={commonCosts.shipping_additional_quantity}
+                onChange={(e) => setCommonCosts({ ...commonCosts, shipping_additional_quantity: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">기타비용</label>
+              <input
+                type="number"
+                value={commonCosts.misc_cost}
+                onChange={(e) => setCommonCosts({ ...commonCosts, misc_cost: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-700 mb-1">상태</label>
+              <select
+                value={commonCosts.status}
+                onChange={(e) => setCommonCosts({ ...commonCosts, status: e.target.value })}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+              >
+                <option value="">선택</option>
+                {supplyStatuses.map(s => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Y/N 옵션 */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-2">옵션</label>
+          <div className="grid grid-cols-5 gap-3">
+            <div>
+              <label className="flex items-center text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={commonCosts.is_seller_supply}
+                  onChange={(e) => setCommonCosts({ ...commonCosts, is_seller_supply: e.target.checked })}
+                  className="mr-2"
+                />
+                셀러공급Y/N
+              </label>
+            </div>
+            <div>
+              <label className="flex items-center text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={commonCosts.is_best}
+                  onChange={(e) => setCommonCosts({ ...commonCosts, is_best: e.target.checked })}
+                  className="mr-2"
+                />
+                베스트Y/N
+              </label>
+            </div>
+            <div>
+              <label className="flex items-center text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={commonCosts.is_recommended}
+                  onChange={(e) => setCommonCosts({ ...commonCosts, is_recommended: e.target.checked })}
+                  className="mr-2"
+                />
+                추천상품Y/N
+              </label>
+            </div>
+            <div>
+              <label className="flex items-center text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={commonCosts.has_detail_page}
+                  onChange={(e) => setCommonCosts({ ...commonCosts, has_detail_page: e.target.checked })}
+                  className="mr-2"
+                />
+                상세페이지제공
+              </label>
+            </div>
+            <div>
+              <label className="flex items-center text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={commonCosts.has_images}
+                  onChange={(e) => setCommonCosts({ ...commonCosts, has_images: e.target.checked })}
+                  className="mr-2"
+                />
+                이미지제공
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 품목/품종 선택 */}
+      <div className="mb-4 space-y-3">
+        <h2 className="text-sm font-semibold" style={{ color: '#1d4ed8' }}>1. 품목/품종 선택</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setSelectionType('item')
+              setSelectedItemType('')
+              setSelectedVariety('')
+            }}
+            className={`flex-1 px-2 py-1 rounded-lg text-xs font-semibold ${
+              selectionType === 'item' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
+            }`}
+          >
+            품목
+          </button>
+          <button
+            onClick={() => {
+              setSelectionType('variety')
+              setSelectedItemType('')
+              setSelectedVariety('')
+            }}
+            className={`flex-1 px-2 py-1 rounded-lg text-xs font-semibold ${
+              selectionType === 'variety' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
+            }`}
+          >
+            품종
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">품목</label>
+            <select
+              value={selectedItemType}
+              onChange={(e) => {
+                setSelectedItemType(e.target.value)
+                setSelectedVariety('')
+              }}
+              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+            >
+              <option value="">선택하세요</option>
+              {uniqueItems.map(item => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+          </div>
+
+          {(selectionType === 'variety' || selectedItemType) && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">품종</label>
+              <select
+                value={selectedVariety}
+                onChange={(e) => setSelectedVariety(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+              >
+                <option value="">선택하세요</option>
+                {filteredVarieties.map(variety => (
+                  <option key={variety} value={variety}>{variety}</option>
+                ))}
+              </select>
             </div>
           )}
         </div>
+      </div>
 
-        {/* Column 2: 원물 리스트 */}
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold" style={{ color: '#1d4ed8' }}>3. 원물명</h2>
+      {/* 소분 단위 */}
+      <div className="mb-4">
+        <h2 className="text-sm font-semibold mb-2" style={{ color: '#1d4ed8' }}>2. 소분 단위</h2>
+        {(selectedItemType || selectedVariety) ? (
+          <div>
+            <input
+              type="number"
+              step="0.1"
+              value={subdivisionUnit}
+              onChange={(e) => setSubdivisionUnit(e.target.value)}
+              placeholder="예: 1.5"
+              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              원물의 기준 단위를 상속받습니다
+            </div>
+          </div>
+        ) : (
+          <div className="text-xs text-gray-500 py-4">
+            먼저 품목/품종을 선택하세요
+          </div>
+        )}
+      </div>
 
-          {filteredMaterials.length > 0 ? (
-            <div className="space-y-1.5">
-              {filteredMaterials.map(material => (
-                <div key={material.id} className="bg-gray-50 px-2 py-1.5 rounded border border-gray-200 flex items-center justify-between">
+      {/* 헤더 행 */}
+      <div className="grid gap-2 mb-2 px-2" style={{ gridTemplateColumns: '200px 150px 100px 100px 100px 200px 120px' }}>
+        <h2 className="text-xs font-semibold" style={{ color: '#1d4ed8' }}>3. 원물명</h2>
+        <h2 className="text-xs font-semibold" style={{ color: '#1d4ed8' }}>4. 옵션명</h2>
+        <h2 className="text-xs font-semibold" style={{ color: '#1d4ed8' }}>5. 규격1</h2>
+        <h2 className="text-xs font-semibold" style={{ color: '#1d4ed8' }}>6. 규격2</h2>
+        <h2 className="text-xs font-semibold" style={{ color: '#1d4ed8' }}>7. 규격3</h2>
+        <h2 className="text-xs font-semibold" style={{ color: '#1d4ed8' }}>최종 옵션명</h2>
+        <h2 className="text-xs font-semibold" style={{ color: '#1d4ed8' }}>옵션가격</h2>
+      </div>
+
+      {/* 데이터 행들 */}
+      <div className="space-y-2">
+        {filteredMaterials.length > 0 ? (
+          filteredMaterials.map(material => {
+            const plan = materialPlans[material.id] || {}
+            const subdivisionQty = subdivisionUnit ? parseFloat(subdivisionUnit) : material.standard_quantity
+            const rawMaterialCost = subdivisionQty
+              ? ((subdivisionQty / material.standard_quantity) * material.latest_price)
+              : 0
+            const boxPrice = parseFloat(commonCosts.packaging_box_price) || 0
+            const cushionPrice = parseFloat(commonCosts.cushioning_price) || 0
+            const laborCost = parseFloat(commonCosts.labor_cost) || 0
+            const totalPrice = rawMaterialCost + boxPrice + cushionPrice + laborCost
+
+            const updateSpec1 = (value: string) => {
+              const updatedPlan = { ...plan, spec1: value }
+              const finalName = [
+                updatedPlan.base_name,
+                updatedPlan.spec1,
+                updatedPlan.spec2,
+                updatedPlan.spec3
+              ].filter(Boolean).join(' ')
+
+              setMaterialPlans({
+                ...materialPlans,
+                [material.id]: { ...updatedPlan, option_name: finalName }
+              })
+            }
+
+            const updateSpec2 = (value: string) => {
+              const updatedPlan = { ...plan, spec2: value }
+              const finalName = [
+                updatedPlan.base_name,
+                updatedPlan.spec1,
+                updatedPlan.spec2,
+                updatedPlan.spec3
+              ].filter(Boolean).join(' ')
+
+              setMaterialPlans({
+                ...materialPlans,
+                [material.id]: { ...updatedPlan, option_name: finalName }
+              })
+            }
+
+            const updateSpec3 = (value: string) => {
+              const updatedPlan = { ...plan, spec3: value }
+              const finalName = [
+                updatedPlan.base_name,
+                updatedPlan.spec1,
+                updatedPlan.spec2,
+                updatedPlan.spec3
+              ].filter(Boolean).join(' ')
+
+              setMaterialPlans({
+                ...materialPlans,
+                [material.id]: { ...updatedPlan, option_name: finalName }
+              })
+            }
+
+            return (
+              <div key={material.id} className="grid gap-2 px-2" style={{ gridTemplateColumns: '200px 150px 100px 100px 100px 200px 120px' }}>
+                {/* 원물명 */}
+                <div className="bg-gray-50 dark:bg-gray-800/30 px-2 py-1.5 rounded border border-gray-200 dark:border-gray-700">
                   <div className="text-xs font-semibold">{material.material_name}</div>
                   <div className="text-xs text-gray-600">
                     {material.latest_price?.toLocaleString()}원/{material.standard_quantity}{material.standard_unit}
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-xs text-gray-500 py-4">
-              {(selectedItemType || selectedVariety) ? '해당하는 원물이 없습니다' : '품목/품종을 선택하세요'}
-            </div>
-          )}
-        </div>
 
-        {/* Column 3: 옵션상품명 (기본) */}
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold" style={{ color: '#1d4ed8' }}>4. 옵션상품명</h2>
+                {/* 옵션명 (기본) */}
+                <div className="bg-gray-50 dark:bg-gray-800/30 px-2 py-1.5 rounded border border-gray-200 dark:border-gray-700 flex items-center">
+                  <div className="text-xs font-semibold">{plan.base_name || ''}</div>
+                </div>
 
-          {filteredMaterials.length > 0 ? (
-            <div className="space-y-1.5">
-              {filteredMaterials.map(material => {
-                const plan = materialPlans[material.id] || {}
+                {/* 규격1 */}
+                <div className="bg-gray-50 dark:bg-gray-800/30 px-2 py-1.5 rounded border border-gray-200 dark:border-gray-700">
+                  <input
+                    type="text"
+                    value={plan.spec1 || ''}
+                    onChange={(e) => updateSpec1(e.target.value)}
+                    placeholder="규격1"
+                    className="w-full bg-transparent border-none outline-none p-0 m-0 text-xs font-semibold"
+                  />
+                </div>
 
-                return (
-                  <div key={material.id} className="bg-gray-50 px-2 py-1.5 rounded border border-gray-200">
-                    <div className="text-xs font-semibold">{plan.base_name || ''}</div>
+                {/* 규격2 */}
+                <div className="bg-gray-50 dark:bg-gray-800/30 px-2 py-1.5 rounded border border-gray-200 dark:border-gray-700">
+                  <input
+                    type="text"
+                    value={plan.spec2 || ''}
+                    onChange={(e) => updateSpec2(e.target.value)}
+                    placeholder="규격2"
+                    className="w-full bg-transparent border-none outline-none p-0 m-0 text-xs font-semibold"
+                  />
+                </div>
+
+                {/* 규격3 */}
+                <div className="bg-gray-50 dark:bg-gray-800/30 px-2 py-1.5 rounded border border-gray-200 dark:border-gray-700">
+                  <input
+                    type="text"
+                    value={plan.spec3 || ''}
+                    onChange={(e) => updateSpec3(e.target.value)}
+                    placeholder="규격3"
+                    className="w-full bg-transparent border-none outline-none p-0 m-0 text-xs font-semibold"
+                  />
+                </div>
+
+                {/* 최종 옵션명 */}
+                <div className="bg-blue-50 dark:bg-blue-900/30 px-2 py-1.5 rounded border border-blue-200 dark:border-blue-800 flex items-center">
+                  <div className="text-xs font-semibold text-blue-900">{plan.option_name || ''}</div>
+                </div>
+
+                {/* 옵션가격 */}
+                <div className="bg-gray-50 dark:bg-gray-800/30 px-2 py-1.5 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-end">
+                  <div className="text-xs text-gray-600">
+                    {totalPrice.toLocaleString()}원/{subdivisionQty}{material.standard_unit}
                   </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="text-xs text-gray-500 py-4">
-              원물을 먼저 선택하세요
-            </div>
-          )}
-        </div>
-
-        {/* Column 4: 규격1 입력 */}
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold" style={{ color: '#1d4ed8' }}>규격1</h2>
-
-          {filteredMaterials.length > 0 ? (
-            <div className="space-y-1.5">
-              {filteredMaterials.map(material => {
-                const plan = materialPlans[material.id] || {}
-
-                const updateSpec = (value: string) => {
-                  const updatedPlan = { ...plan, spec1: value }
-                  const finalName = [
-                    updatedPlan.base_name,
-                    updatedPlan.spec1
-                  ].filter(Boolean).join(' ')
-
-                  setMaterialPlans({
-                    ...materialPlans,
-                    [material.id]: { ...updatedPlan, option_name: finalName }
-                  })
-                }
-
-                return (
-                  <div key={material.id} className="bg-gray-50 px-2 py-1.5 rounded border border-gray-200">
-                    <div className="text-xs font-semibold">
-                      <input
-                        type="text"
-                        value={plan.spec1 || ''}
-                        onChange={(e) => updateSpec(e.target.value)}
-                        placeholder="규격 입력"
-                        className="w-full bg-transparent border-none outline-none p-0 m-0"
-                        style={{ font: 'inherit' }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="text-xs text-gray-500 py-4">
-              원물을 먼저 선택하세요
-            </div>
-          )}
-        </div>
-
-        {/* Column 5: 규격2 입력 */}
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold" style={{ color: '#1d4ed8' }}>규격2</h2>
-
-          {filteredMaterials.length > 0 ? (
-            <div className="space-y-1.5">
-              {filteredMaterials.map(material => {
-                const plan = materialPlans[material.id] || {}
-
-                const updateSpec2 = (value: string) => {
-                  const updatedPlan = { ...plan, spec2: value }
-                  const finalName = [
-                    updatedPlan.base_name,
-                    updatedPlan.spec1,
-                    updatedPlan.spec2,
-                    updatedPlan.spec3
-                  ].filter(Boolean).join(' ')
-
-                  setMaterialPlans({
-                    ...materialPlans,
-                    [material.id]: { ...updatedPlan, option_name: finalName }
-                  })
-                }
-
-                return (
-                  <div key={material.id} className="bg-gray-50 px-2 py-1.5 rounded border border-gray-200">
-                    <div className="text-xs font-semibold">
-                      <input
-                        type="text"
-                        value={plan.spec2 || ''}
-                        onChange={(e) => updateSpec2(e.target.value)}
-                        placeholder="규격2 입력"
-                        className="w-full bg-transparent border-none outline-none p-0 m-0"
-                        style={{ font: 'inherit' }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="text-xs text-gray-500 py-4">
-              원물을 먼저 선택하세요
-            </div>
-          )}
-        </div>
-
-        {/* Column 6: 규격3 입력 */}
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold" style={{ color: '#1d4ed8' }}>규격3</h2>
-
-          {filteredMaterials.length > 0 ? (
-            <div className="space-y-1.5">
-              {filteredMaterials.map(material => {
-                const plan = materialPlans[material.id] || {}
-
-                const updateSpec3 = (value: string) => {
-                  const updatedPlan = { ...plan, spec3: value }
-                  const finalName = [
-                    updatedPlan.base_name,
-                    updatedPlan.spec1,
-                    updatedPlan.spec2,
-                    updatedPlan.spec3
-                  ].filter(Boolean).join(' ')
-
-                  setMaterialPlans({
-                    ...materialPlans,
-                    [material.id]: { ...updatedPlan, option_name: finalName }
-                  })
-                }
-
-                return (
-                  <div key={material.id} className="bg-gray-50 px-2 py-1.5 rounded border border-gray-200">
-                    <div className="text-xs font-semibold">
-                      <input
-                        type="text"
-                        value={plan.spec3 || ''}
-                        onChange={(e) => updateSpec3(e.target.value)}
-                        placeholder="규격3 입력"
-                        className="w-full bg-transparent border-none outline-none p-0 m-0"
-                        style={{ font: 'inherit' }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="text-xs text-gray-500 py-4">
-              원물을 먼저 선택하세요
-            </div>
-          )}
-        </div>
-
-        {/* Column 7: 최종 옵션명 */}
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold" style={{ color: '#1d4ed8' }}>최종 옵션명</h2>
-
-          {filteredMaterials.length > 0 ? (
-            <div className="space-y-1.5">
-              {filteredMaterials.map(material => {
-                const plan = materialPlans[material.id] || {}
-                const finalName = plan.option_name || ''
-
-                return (
-                  <div key={material.id} className="bg-blue-50 px-2 py-1.5 rounded border border-blue-200">
-                    <div className="text-xs font-semibold text-blue-900">{finalName}</div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="text-xs text-gray-500 py-4">
-              원물을 먼저 선택하세요
-            </div>
-          )}
-        </div>
-
-        {/* Column 8: 옵션가격 */}
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold" style={{ color: '#1d4ed8' }}>옵션가격</h2>
-
-          {filteredMaterials.length > 0 ? (
-            <div className="space-y-1.5">
-              {filteredMaterials.map(material => {
-                const subdivisionQty = subdivisionUnit ? parseFloat(subdivisionUnit) : material.standard_quantity
-                const rawMaterialCost = subdivisionQty
-                  ? ((subdivisionQty / material.standard_quantity) * material.latest_price)
-                  : 0
-                const boxPrice = parseFloat(commonCosts.packaging_box_price) || 0
-                const cushionPrice = parseFloat(commonCosts.cushioning_price) || 0
-                const laborCost = parseFloat(commonCosts.labor_cost) || 0
-                const totalPrice = rawMaterialCost + boxPrice + cushionPrice + laborCost
-
-                return (
-                  <div key={material.id} className="bg-gray-50 px-2 py-1.5 rounded border border-gray-200 text-right">
-                    <div className="text-xs text-gray-600">
-                      {totalPrice.toLocaleString()}원/{subdivisionQty}{material.standard_unit}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="text-xs text-gray-500 py-4">
-              원물을 먼저 선택하세요
-            </div>
-          )}
-        </div>
+                </div>
+              </div>
+            )
+          })
+        ) : (
+          <div className="text-xs text-gray-500 py-4 text-center">
+            {(selectedItemType || selectedVariety) ? '해당하는 원물이 없습니다' : '품목/품종을 선택하세요'}
+          </div>
+        )}
       </div>
     </PageLayout>
   )

@@ -1,15 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, Button } from '@/components/ui'
 import { useToast } from '@/components/ui/Toast'
 import { useConfirm } from '@/components/ui/ConfirmModal'
-import { HotTable } from '@handsontable/react'
-import { registerAllModules } from 'handsontable/registry'
-import 'handsontable/dist/handsontable.full.css'
-
-registerAllModules()
+import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 
 interface Variety {
   id: string
@@ -27,10 +23,9 @@ export default function ItemMasterPage() {
   const { confirm } = useConfirm()
 
   const [varieties, setVarieties] = useState<Variety[]>([])
-  const [tableData, setTableData] = useState<any[]>([])
+  const [tableData, setTableData] = useState<Variety[]>([])
   const [loading, setLoading] = useState(false)
 
-  const hotTableRef = useRef<any>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -75,14 +70,9 @@ export default function ItemMasterPage() {
   }
 
   const handleSave = async () => {
-    if (!hotTableRef.current) return
-
-    const hotInstance = hotTableRef.current.hotInstance
-    const sourceData = hotInstance.getSourceData()
-
     try {
-      for (let i = 0; i < sourceData.length; i++) {
-        const row = sourceData[i]
+      for (let i = 0; i < tableData.length; i++) {
+        const row = tableData[i]
 
         if (!row.item_name) {
           continue // 품종명이 없으면 스킵
@@ -157,84 +147,37 @@ export default function ItemMasterPage() {
     }
   }
 
-  const columns: any[] = [
-    {
-      data: 'item_name',
-      title: '품종명',
-      width: 150,
-      className: 'htCenter'
-    },
-    {
-      data: 'category_1',
-      title: '대분류',
-      width: 120,
-      className: 'htCenter'
-    },
-    {
-      data: 'category_2',
-      title: '중분류',
-      width: 120,
-      className: 'htCenter'
-    },
-    {
-      data: 'category_3',
-      title: '소분류',
-      width: 120,
-      className: 'htCenter'
-    },
-    {
-      data: 'notes',
-      title: '비고',
-      width: 200,
-      className: 'htCenter'
-    },
-    {
-      title: '삭제',
-      width: 80,
-      readOnly: true,
-      renderer: function(instance: any, td: any, row: any) {
-        td.innerHTML = '<button class="text-red-600 hover:text-red-800">삭제</button>'
-        td.className = 'htCenter'
-        return td
-      }
-    }
+  const columns = [
+    { key: 'item_name', title: '품종명', width: 150, className: 'text-center' },
+    { key: 'category_1', title: '대분류', width: 120, className: 'text-center' },
+    { key: 'category_2', title: '중분류', width: 120, className: 'text-center' },
+    { key: 'category_3', title: '소분류', width: 120, className: 'text-center' },
+    { key: 'notes', title: '비고', width: 200, className: 'text-center' }
   ]
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div className="text-[16px] font-bold">품종 마스터 관리</div>
-        <div className="flex items-center gap-2">
-          <div className="text-sm text-gray-600">
-            총 {tableData.length}개의 품종
-          </div>
-          <Button onClick={handleAddRow} variant="ghost">
-            + 행 추가
-          </Button>
-          <Button onClick={handleSave}>
-            저장
-          </Button>
+        <div className="text-sm text-gray-600">
+          총 {tableData.length}개의 품종
         </div>
       </div>
 
-      <HotTable
-        ref={hotTableRef}
+      <EditableAdminGrid
         data={tableData}
         columns={columns}
-        colHeaders={true}
-        rowHeaders={true}
-        height="600"
-        width="100%"
-        licenseKey="non-commercial-and-evaluation"
-        stretchH="all"
-        autoColumnSize={false}
-        manualColumnResize={true}
-        contextMenu={true}
-        afterOnCellMouseDown={(event, coords) => {
-          if (coords.col === 5) { // 삭제 컬럼
-            handleDelete(coords.row)
-          }
+        onDataChange={setTableData}
+        onDelete={handleDelete}
+        onSave={handleSave}
+        onDeleteSelected={(indices) => {
+          indices.forEach(index => handleDelete(index))
         }}
+        onCopy={(indices) => {
+          console.log('복사할 행:', indices)
+        }}
+        height="600px"
+        globalSearchPlaceholder="품종명, 대분류, 중분류, 소분류, 비고 검색"
       />
     </div>
   )

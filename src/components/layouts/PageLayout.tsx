@@ -14,14 +14,15 @@ interface PageLayoutProps {
 
 export function PageLayout({ title, children, actions, showBack = false, description }: PageLayoutProps) {
   const router = useRouter()
+  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
 
   return (
-    <div style={{
+    <div className="dark:bg-gradient-to-b dark:from-gray-900 dark:to-gray-950" style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #eff6ff, #ffffff 15%)',
+      background: isDark ? undefined : 'linear-gradient(180deg, #eff6ff, #ffffff 15%)',
       position: 'relative'
     }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
+      <div style={{ padding: '20px' }}>
         <div style={{
           marginBottom: '20px',
           display: 'flex',

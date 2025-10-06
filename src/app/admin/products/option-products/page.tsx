@@ -5,6 +5,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Card, Button, Modal, Badge } from '@/components/ui'
+import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
+import { useToast } from '@/components/ui/Toast'
 
 // ===== 타입 =====
 interface Vendor {
@@ -34,7 +36,9 @@ interface OptionProduct {
   cushioning_price: number | null
   raw_material_cost: number | null
   labor_cost: number | null
+  misc_cost: number | null
   shipping_fee: number | null
+  total_cost: number | null
   seller_supply_price: number | null
   naver_paid_shipping_price: number | null
   naver_free_shipping_price: number | null
@@ -68,6 +72,7 @@ type EditAction = {
 
 export default function OptionProductsManagementPage() {
   const router = useRouter()
+  const { showToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
@@ -78,19 +83,18 @@ export default function OptionProductsManagementPage() {
   const [rawMaterials, setRawMaterials] = useState<any[]>([])
   const [packagingMaterials, setPackagingMaterials] = useState<any[]>([])
 
-  const [stats, setStats] = useState({
-    totalProducts: 0,
-    supplyingProducts: 0,
-    pausedProducts: 0,
-    seasonEndProducts: 0
-  })
+  const [stats, setStats] = useState<Record<string, number>>({})
 
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
   const [searchInput, setSearchInput] = useState<string>('')
   const [globalSearchTerm, setGlobalSearchTerm] = useState<string>('')
 
+  // 뷰 모드
+  const [viewMode, setViewMode] = useState<'basic' | 'price' | 'policy' | 'cost' | 'full'>('full')
+
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
   const [selectAll, setSelectAll] = useState(false)
+  const [emptyRowsWarning, setEmptyRowsWarning] = useState<{emptyCount: number, validCount: number} | null>(null)
 
   const [modalType, setModalType] = useState<string | null>(null)
   const [editingItem, setEditingItem] = useState<any>(null)
@@ -134,32 +138,129 @@ export default function OptionProductsManagementPage() {
     specification_1: '규격1',
     specification_2: '규격2',
     specification_3: '규격3',
+    used_material_1: '사용원물1',
+    used_material_2: '사용원물2',
+    used_material_3: '사용원물3',
     weight: '중량',
     weight_unit: '단위',
+
+    // 자재비
     packaging_box_price: '박스비',
+    pack_price: '팩',
+    bag_vinyl_price: '봉지/비닐',
     cushioning_price: '완충재',
-    raw_material_cost: '원물비용',
+    sticker_price: '스티커',
+    ice_pack_price: '아이스팩',
+    other_material_price: '기타자재',
     labor_cost: '인건비',
-    shipping_fee: '배송비',
+
+    // 원가
+    raw_material_cost: '원물비용',
+    total_material_cost: '총자재비',
+    total_cost: '총원가',
+    material_cost_policy: '원물가정책',
+    fixed_material_cost: '고정원물가',
+
+    // 거래처 및 출고 정보
+    supplier_id: '원물거래처',
+    shipping_vendor_id: '출고처',
+    invoice_entity: '송장주체',
+    vendor_id: '벤더사',
+    shipping_location_name: '발송지명',
+    shipping_location_address: '발송지주소',
+    shipping_location_contact: '발송지연락처',
+    shipping_deadline: '발송기한',
+
+    // 택배비 및 부가
+    shipping_fee: '택배비',
+    additional_quantity: '부가수량',
+
+    // 셀러공급
+    is_seller_supply: '셀러공급Y/N',
+
+    // 가격 정책
+    seller_margin_rate: '셀러마진%',
+    seller_supply_price_mode: '셀러모드',
     seller_supply_price: '셀러공급가',
+
+    target_margin_rate: '목표마진%',
+    naver_price_mode: '네이버모드',
     naver_paid_shipping_price: '네이버유료',
     naver_free_shipping_price: '네이버무료',
+
+    coupang_price_mode: '쿠팡모드',
     coupang_paid_shipping_price: '쿠팡유료',
     coupang_free_shipping_price: '쿠팡무료',
+
+    // 상태 및 기타
     status: '상태',
-    vendor_id: '벤더사',
+    thumbnail_url: '썸네일',
+    description: '설명',
+    notes: '비고',
+    is_best: '베스트Y/N',
+    is_recommended: '추천상품Y/N',
+    has_detail_page: '상세페이지제공',
+    has_images: '이미지제공',
+    misc_cost: '기타비용',
+
+    // 사용 옵션명
+    option_name_1: '옵션명1',
+    option_name_2: '옵션명2',
+    option_name_3: '옵션명3',
   }
 
   const FIELD_ORDER = [
     'option_code','option_name','item_type','variety',
     'specification_1','specification_2','specification_3',
+    'used_material_1','used_material_2','used_material_3',
     'weight','weight_unit',
-    'packaging_box_price','cushioning_price','raw_material_cost','labor_cost','shipping_fee',
-    'seller_supply_price',
-    'naver_paid_shipping_price','naver_free_shipping_price',
-    'coupang_paid_shipping_price','coupang_free_shipping_price',
-    'status','vendor_id'
+
+    // 자재비
+    'packaging_box_price','pack_price','bag_vinyl_price','cushioning_price','sticker_price','ice_pack_price','other_material_price','labor_cost',
+
+    // 원가
+    'raw_material_cost','total_material_cost','total_cost','material_cost_policy','fixed_material_cost',
+
+    // 거래처 및 출고
+    'supplier_id','shipping_vendor_id','invoice_entity','vendor_id',
+    'shipping_location_name','shipping_location_address','shipping_location_contact','shipping_deadline',
+
+    // 택배비 및 부가
+    'shipping_fee','additional_quantity','misc_cost',
+
+    // 셀러공급
+    'is_seller_supply',
+
+    // 가격 정책
+    'seller_margin_rate','seller_supply_price_mode','seller_supply_price',
+    'target_margin_rate',
+    'naver_price_mode','naver_paid_shipping_price','naver_free_shipping_price',
+    'coupang_price_mode','coupang_paid_shipping_price','coupang_free_shipping_price',
+
+    // 상태 및 기타
+    'status','thumbnail_url','description','notes',
+    'is_best','is_recommended','has_detail_page','has_images',
+
+    // 사용 옵션명
+    'option_name_1','option_name_2','option_name_3'
   ]
+
+  // 뷰 모드별 표시 컬럼
+  const getVisibleFields = (mode: string) => {
+    switch(mode) {
+      case 'basic':
+        return ['option_code','option_name','item_type','variety','specification_1','weight','weight_unit','status','vendor_id']
+      case 'cost':
+        return ['option_code','option_name','raw_material_cost','packaging_box_price','pack_price','bag_vinyl_price','cushioning_price','sticker_price','ice_pack_price','other_material_price','labor_cost','misc_cost','shipping_fee','total_material_cost','total_cost','status']
+      case 'price':
+        return ['option_code','option_name','seller_supply_price','naver_paid_shipping_price','naver_free_shipping_price','coupang_paid_shipping_price','coupang_free_shipping_price','status']
+      case 'policy':
+        return ['option_code','option_name','material_cost_policy','seller_supply_price_mode','seller_margin_rate','target_margin_rate','naver_price_mode','coupang_price_mode','status']
+      case 'full':
+      default:
+        return FIELD_ORDER
+    }
+  }
 
   const escapeHtml = (s: string) =>
     s.replace(/&/g, '&amp;')
@@ -193,11 +294,38 @@ export default function OptionProductsManagementPage() {
   // 표시용
   const displayValue = (field: string, p: OptionProduct) => {
     switch (field) {
+      case 'option_name':
+        // 상품명에 가격 정책 뱃지 표시
+        const policyBadge = p.material_cost_policy === 'fixed'
+          ? ' 🔒'
+          : p.seller_supply_price_mode === '수동'
+            ? ' ⚙️'
+            : ''
+        return (p.option_name || '-') + policyBadge
+      case 'material_cost_policy':
+        return p.material_cost_policy === 'auto' ? '자동' : '고정'
+      case 'seller_supply_price_mode':
+      case 'naver_price_mode':
+      case 'coupang_price_mode':
+        return p[field] === '자동' ? '자동' : '수동'
+      case 'seller_margin_rate':
+      case 'target_margin_rate':
+        return p[field] != null ? String(p[field]) + '%' : '-'
+      case 'total_cost':
       case 'packaging_box_price':
+      case 'pack_price':
+      case 'bag_vinyl_price':
       case 'cushioning_price':
+      case 'sticker_price':
+      case 'ice_pack_price':
+      case 'other_material_price':
       case 'raw_material_cost':
       case 'labor_cost':
+      case 'misc_cost':
       case 'shipping_fee':
+      case 'total_material_cost':
+      case 'fixed_material_cost':
+      case 'additional_quantity':
       case 'seller_supply_price':
       case 'naver_paid_shipping_price':
       case 'naver_free_shipping_price':
@@ -206,6 +334,14 @@ export default function OptionProductsManagementPage() {
         return p[field] != null ? fmtInt.format(Number(p[field])) : '-'
       case 'weight':
         return p.weight != null ? String(p.weight) : '-'
+      case 'is_seller_supply':
+      case 'is_best':
+      case 'is_recommended':
+      case 'has_detail_page':
+      case 'has_images':
+        return p[field] ? 'Y' : 'N'
+      case 'supplier_id':
+      case 'shipping_vendor_id':
       case 'vendor_id':
         return p.vendor_name || '-'
       case 'status':
@@ -216,14 +352,32 @@ export default function OptionProductsManagementPage() {
     }
   }
 
-  // 원시값(복사/편집용)
+  // 원시값(복사/편집용) - 편집 모드에서도 한글로 표시
   const rawValue = (field: string, p: OptionProduct) => {
     switch (field) {
+      case 'material_cost_policy':
+        return p.material_cost_policy === 'fixed' ? '고정' : '자동'
+      case 'seller_supply_price_mode':
+      case 'naver_price_mode':
+      case 'coupang_price_mode':
+        return p[field] === '수동' ? '수동' : '자동'
+      case 'seller_margin_rate':
+      case 'target_margin_rate':
+        return p[field] != null ? String(p[field]) : ''
       case 'packaging_box_price':
+      case 'pack_price':
+      case 'bag_vinyl_price':
       case 'cushioning_price':
+      case 'sticker_price':
+      case 'ice_pack_price':
+      case 'other_material_price':
       case 'raw_material_cost':
       case 'labor_cost':
+      case 'misc_cost':
       case 'shipping_fee':
+      case 'total_material_cost':
+      case 'fixed_material_cost':
+      case 'additional_quantity':
       case 'seller_supply_price':
       case 'naver_paid_shipping_price':
       case 'naver_free_shipping_price':
@@ -231,6 +385,14 @@ export default function OptionProductsManagementPage() {
       case 'coupang_free_shipping_price':
       case 'weight':
         return p[field] != null ? String(p[field]) : ''
+      case 'is_seller_supply':
+      case 'is_best':
+      case 'is_recommended':
+      case 'has_detail_page':
+      case 'has_images':
+        return p[field] ? 'Y' : 'N'
+      case 'supplier_id':
+      case 'shipping_vendor_id':
       case 'vendor_id':
         return p.vendor_name || ''
       case 'status':
@@ -258,12 +420,30 @@ export default function OptionProductsManagementPage() {
     const t = (text ?? '').trim()
 
     if ([
-      'packaging_box_price','cushioning_price','raw_material_cost','labor_cost','shipping_fee',
-      'seller_supply_price','naver_paid_shipping_price','naver_free_shipping_price',
-      'coupang_paid_shipping_price','coupang_free_shipping_price','weight'
+      'packaging_box_price','pack_price','bag_vinyl_price','cushioning_price','sticker_price','ice_pack_price','other_material_price',
+      'raw_material_cost','labor_cost','misc_cost','shipping_fee','total_material_cost','fixed_material_cost','additional_quantity',
+      'seller_supply_price',
+      'naver_paid_shipping_price','naver_free_shipping_price',
+      'coupang_paid_shipping_price','coupang_free_shipping_price','weight',
+      'seller_margin_rate','target_margin_rate'
     ].includes(field)) {
-      const n = t === '' ? null : Number(t.replace(/,/g, ''))
+      const n = t === '' ? null : Number(t.replace(/,/g, '').replace(/%/g, ''))
       ;(p as any)[field] = Number.isFinite(n as number) ? n : null
+      return p
+    }
+
+    if (field === 'material_cost_policy') {
+      p.material_cost_policy = t === '고정' || t === 'fixed' ? 'fixed' : 'auto'
+      return p
+    }
+
+    if (['seller_supply_price_mode', 'naver_price_mode', 'coupang_price_mode'].includes(field)) {
+      ;(p as any)[field] = t === '수동' ? '수동' : '자동'
+      return p
+    }
+
+    if (['is_seller_supply', 'is_best', 'is_recommended', 'has_detail_page', 'has_images'].includes(field)) {
+      ;(p as any)[field] = t.toUpperCase() === 'Y' || t === 'true' || t === '1'
       return p
     }
 
@@ -273,9 +453,9 @@ export default function OptionProductsManagementPage() {
       return p
     }
 
-    if (field === 'vendor_id') {
+    if (['vendor_id', 'supplier_id', 'shipping_vendor_id'].includes(field)) {
       const id = resolveVendorIdByName(t)
-      p.vendor_id = id
+      ;(p as any)[field] = id
       p.vendor_name = t || (id ? vendors.find(v => v.id === id)?.name : null) || null
       return p
     }
@@ -305,7 +485,7 @@ export default function OptionProductsManagementPage() {
   }
 
   const fetchProducts = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('option_products')
       .select(`
         *,
@@ -313,14 +493,75 @@ export default function OptionProductsManagementPage() {
       `)
       .order('created_at', { ascending: false })
 
+    if (error) {
+      console.error('Fetch error:', error)
+    }
+
     if (data) {
-      const mapped = data.map(row => ({
-        ...row,
-        vendor_name: row.vendor?.name || null
-      }))
-      setProducts(mapped)
-      setFilteredProducts(mapped)
-      captureSnapshot(mapped)
+      // 각 상품에 대해 원물 정보를 별도로 가져오기
+      const productsWithMaterials = await Promise.all(
+        data.map(async (product) => {
+          // option_product_materials와 raw_materials를 수동으로 조인
+          const { data: materials, error: materialsError } = await supabase
+            .from('option_product_materials')
+            .select('id, quantity, unit_price, raw_material_id')
+            .eq('option_product_id', product.id)
+
+          if (materialsError) {
+            console.error('Materials fetch error for product', product.id, materialsError)
+          }
+
+          let enrichedMaterials: any[] = []
+          if (materials && materials.length > 0) {
+            // 각 material에 대해 raw_materials 정보를 가져오기
+            enrichedMaterials = await Promise.all(
+              materials.map(async (m) => {
+                const { data: rawMaterial } = await supabase
+                  .from('raw_materials')
+                  .select('*')
+                  .eq('id', m.raw_material_id)
+                  .single()
+
+                return {
+                  material_id: rawMaterial?.id,
+                  material_name: rawMaterial?.material_name,
+                  material_code: rawMaterial?.material_code,
+                  quantity: m.quantity,
+                  unit_price: m.unit_price,
+                  category_1: rawMaterial?.category_1,
+                  category_2: rawMaterial?.category_2,
+                  item_type: rawMaterial?.item_type,
+                  variety: rawMaterial?.variety,
+                  standard_unit: rawMaterial?.standard_unit,
+                  latest_price: rawMaterial?.latest_price,
+                  standard_quantity: rawMaterial?.standard_quantity,
+                  last_trade_date: rawMaterial?.last_trade_date,
+                  season: rawMaterial?.season,
+                  season_start_date: rawMaterial?.season_start_date,
+                  season_peak_date: rawMaterial?.season_peak_date,
+                  season_end_date: rawMaterial?.season_end_date,
+                  supply_status: rawMaterial?.supply_status
+                }
+              })
+            )
+          }
+
+          return {
+            ...product,
+            vendor_name: product.vendor?.name || null,
+            // 사용원물 정보 추가
+            used_materials: enrichedMaterials,
+            // 사용원물1, 2, 3 (표시용)
+            used_material_1: enrichedMaterials[0]?.material_name || '',
+            used_material_2: enrichedMaterials[1]?.material_name || '',
+            used_material_3: enrichedMaterials[2]?.material_name || ''
+          }
+        })
+      )
+
+      setProducts(productsWithMaterials)
+      setFilteredProducts(productsWithMaterials)
+      captureSnapshot(productsWithMaterials)
       setModifiedProducts(new Set())
       originalValues.current.clear()
       setUndoStack([])
@@ -366,30 +607,18 @@ export default function OptionProductsManagementPage() {
   }
 
   // 통계
-  useEffect(() => { void refreshStats(products) }, [products])
+  useEffect(() => { void refreshStats(products) }, [products, supplyStatuses])
 
   const refreshStats = async (snapshot: OptionProduct[]) => {
-    try {
-      const [{ count: total }, { count: supplying }, { count: paused }, { count: seasonEnd }] = await Promise.all([
-        supabase.from('option_products').select('*', { count: 'exact', head: true }),
-        supabase.from('option_products').select('*', { count: 'exact', head: true }).eq('status', 'SUPPLYING'),
-        supabase.from('option_products').select('*', { count: 'exact', head: true }).eq('status', 'PAUSED'),
-        supabase.from('option_products').select('*', { count: 'exact', head: true }).eq('status', 'SEASON_END')
-      ])
-      setStats({
-        totalProducts: total || 0,
-        supplyingProducts: supplying || 0,
-        pausedProducts: paused || 0,
-        seasonEndProducts: seasonEnd || 0
-      })
-    } catch {
-      setStats({
-        totalProducts: snapshot.length,
-        supplyingProducts: snapshot.filter(p => p.status === 'SUPPLYING').length,
-        pausedProducts: snapshot.filter(p => p.status === 'PAUSED').length,
-        seasonEndProducts: snapshot.filter(p => p.status === 'SEASON_END').length
-      })
-    }
+    // 동적으로 모든 상태별 통계 계산
+    const statusCounts: Record<string, number> = { total: snapshot.length }
+
+    supplyStatuses.forEach(status => {
+      const count = snapshot.filter(p => p.status === status.code || p.status === status.name).length
+      statusCounts[status.code] = count
+    })
+
+    setStats(statusCounts)
   }
 
   // 검색 디바운스
@@ -435,9 +664,15 @@ export default function OptionProductsManagementPage() {
       })
     }
 
-    // 상태 필터
+    // 상태 필터 (빈 값도 항상 포함)
     if (selectedStatus !== 'all') {
-      f = f.filter(p => p.status === selectedStatus)
+      const selectedStatusObj = supplyStatuses.find(s => s.code === selectedStatus)
+      f = f.filter(p =>
+        p.status === selectedStatus ||
+        (selectedStatusObj && p.status === selectedStatusObj.name) ||
+        !p.status ||
+        p.status === ''
+      )
     }
 
     setFilteredProducts(f)
@@ -460,21 +695,35 @@ export default function OptionProductsManagementPage() {
 
   const handleDeleteSelected = async () => {
     if (selectedRows.size === 0) {
-      alert('선택된 항목이 없습니다.')
+      showToast('선택된 항목이 없습니다.', 'warning')
       setModalType(null)
       return
     }
     const ids = Array.from(selectedRows)
-    const { error } = await supabase.from('option_products').delete().in('id', ids)
-    if (error) {
-      alert('삭제 중 오류가 발생했습니다.')
-      return
+
+    // temp_ ID와 실제 ID 분리
+    const realIds = ids.filter(id => !String(id).startsWith('temp_'))
+    const tempIds = ids.filter(id => String(id).startsWith('temp_'))
+
+    // 실제 DB에 있는 데이터만 삭제
+    if (realIds.length > 0) {
+      const { error } = await supabase.from('option_products').delete().in('id', realIds)
+      if (error) {
+        showToast('삭제 중 오류가 발생했습니다.', 'error')
+        return
+      }
     }
+
     setSelectedRows(new Set())
     setSelectAll(false)
     setModalType(null)
     await fetchProducts()
-    alert('삭제되었습니다.')
+
+    if (tempIds.length > 0) {
+      showToast(`삭제되었습니다. (실제 삭제: ${realIds.length}건, 임시 행 제거: ${tempIds.length}건)`, 'success')
+    } else {
+      showToast(`${realIds.length}건이 삭제되었습니다.`, 'success')
+    }
   }
 
   // ===== 엑셀식 편집: td contentEditable =====
@@ -664,9 +913,25 @@ export default function OptionProductsManagementPage() {
     await handleSaveAllConfirmed()
   }
 
-  const handleSaveAllConfirmed = async () => {
+  const handleSaveAllConfirmed = async (skipWarning = false) => {
     try {
-      const rows = filteredProducts.filter(p => modifiedProducts.has(p.id)).map(p => ({
+      // 수정된 행 중에서 유효한 행만 필터링 (id가 있고 필수 필드가 있는 행)
+      const modifiedRows = filteredProducts.filter(p => modifiedProducts.has(p.id))
+      const validRows = modifiedRows.filter(p => p.id && (p.option_code || p.option_name))
+      const emptyRows = modifiedRows.filter(p => !p.id || (!p.option_code && !p.option_name))
+
+      // 빈 행이 있으면 경고 모달 표시
+      if (!skipWarning && emptyRows.length > 0) {
+        setEmptyRowsWarning({ emptyCount: emptyRows.length, validCount: validRows.length })
+        return
+      }
+
+      if (validRows.length === 0) {
+        setModalType('no-data-warning')
+        return
+      }
+
+      const rows = validRows.map(p => ({
         id: p.id,
         option_code: p.option_code || null,
         option_name: p.option_name || null,
@@ -681,6 +946,7 @@ export default function OptionProductsManagementPage() {
         cushioning_price: p.cushioning_price != null ? Number(p.cushioning_price) : null,
         raw_material_cost: p.raw_material_cost != null ? Number(p.raw_material_cost) : null,
         labor_cost: p.labor_cost != null ? Number(p.labor_cost) : null,
+        misc_cost: p.misc_cost != null ? Number(p.misc_cost) : null,
         shipping_fee: p.shipping_fee != null ? Number(p.shipping_fee) : null,
         seller_supply_price: p.seller_supply_price != null ? Number(p.seller_supply_price) : null,
         naver_paid_shipping_price: p.naver_paid_shipping_price != null ? Number(p.naver_paid_shipping_price) : null,
@@ -778,49 +1044,77 @@ export default function OptionProductsManagementPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex items-center gap-8">
         <h1 className="text-2xl font-medium text-gray-900">옵션상품 관리</h1>
-        <p className="mt-1 text-sm text-gray-600">옵션상품 정보를 통합 관리합니다</p>
-      </div>
-
-      {/* 통계 */}
-      <div className="flex justify-between items-center">
-        <div className="flex gap-6 text-sm">
+        {/* 통계 */}
+        <div className="flex gap-4 text-sm">
           <div>
-            <span className="text-gray-600">전체 상품: </span>
-            <span className="font-bold">{stats.totalProducts.toLocaleString()}</span>
+            <span className="text-gray-600">전체 </span>
+            <span className="font-bold">{(stats.total || 0).toLocaleString()}</span>
           </div>
-          <div>
-            <span className="text-gray-600">공급중: </span>
-            <span className="font-bold text-green-600">{stats.supplyingProducts.toLocaleString()}</span>
-          </div>
-          <div>
-            <span className="text-gray-600">일시중지: </span>
-            <span className="font-bold text-orange-600">{stats.pausedProducts.toLocaleString()}</span>
-          </div>
-          <div>
-            <span className="text-gray-600">시즌종료: </span>
-            <span className="font-bold text-red-600">{stats.seasonEndProducts.toLocaleString()}</span>
-          </div>
+          {supplyStatuses.map(status => (
+            <div key={status.code}>
+              <span className="text-gray-600">{status.name} </span>
+              <span className="font-bold" style={{ color: status.color }}>
+                {(stats[status.code] || 0).toLocaleString()}
+              </span>
+            </div>
+          ))}
+        </div>
+        {/* 범례 */}
+        <div className="text-xs text-gray-500 ml-4">
+          🔒 원물가 고정 | ⚙️ 수동 가격
         </div>
       </div>
 
       {/* 테이블 */}
       <div>
         <div className="px-6 py-4 border-b border-gray-100">
+          {/* 뷰 모드 선택기 */}
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex gap-2">
+              {[
+                { value: 'basic', label: '간단히' },
+                { value: 'cost', label: '원가' },
+                { value: 'price', label: '가격' },
+                { value: 'policy', label: '정책' },
+                { value: 'full', label: '전체' }
+              ].map(mode => (
+                <button
+                  key={mode.value}
+                  onClick={() => setViewMode(mode.value as any)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    viewMode === mode.value
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4 flex-1">
-              <div className="text-[16px] font-semibold text-gray-900">옵션상품 목록</div>
-              <span className="text-sm text-gray-500">총 {filteredProducts.length}건</span>
-
               {/* 상태 필터 배지 */}
               <div className="flex gap-2 flex-wrap">
                 <button onClick={() => setSelectedStatus('all')} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${selectedStatus === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>전체 ({products.length})</button>
-                {supplyStatuses.map(s => (
-                  <button key={s.code} onClick={() => setSelectedStatus(s.code)} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${selectedStatus === s.code ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
-                    {s.name} ({products.filter(p => p.status === s.code).length})
-                  </button>
-                ))}
+                {supplyStatuses.map(s => {
+                  const isSelected = selectedStatus === s.code
+                  return (
+                    <button
+                      key={s.code}
+                      onClick={() => setSelectedStatus(s.code)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${isSelected ? 'text-white' : 'text-gray-700 hover:opacity-80'}`}
+                      style={{
+                        backgroundColor: isSelected ? s.color : `${s.color}30`,
+                      }}
+                    >
+                      {s.name} ({products.filter(p => p.status === s.code || p.status === s.name).length})
+                    </button>
+                  )
+                })}
               </div>
 
               {/* 검색 */}
@@ -853,215 +1147,102 @@ export default function OptionProductsManagementPage() {
               )}
 
               {/* 버튼들 */}
-              <Button
-                variant="primary"
-                size="sm"
+              <button
                 onClick={() => router.push('/admin/products/option-products/create')}
+                className="bg-blue-600 text-white px-3 rounded hover:bg-blue-700 transition-colors"
+                style={{ fontSize: '14px', height: '32px' }}
               >
                 상품 추가
-              </Button>
+              </button>
 
               {selectedRows.size > 0 && (
-                <Button
-                  variant="danger"
-                  size="sm"
+                <button
                   onClick={() => setModalType('delete-confirm')}
+                  className="bg-red-600 text-white px-3 rounded hover:bg-red-700 transition-colors"
+                  style={{ fontSize: '14px', height: '32px' }}
                 >
                   삭제
-                </Button>
+                </button>
               )}
 
-              <Button
-                variant="gradient-green"
-                size="sm"
+              <button
                 onClick={handleOpenConfirm}
                 disabled={modifiedProducts.size === 0}
+                className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 rounded hover:from-green-600 hover:to-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ fontSize: '14px', height: '32px' }}
               >
                 저장
-              </Button>
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto overflow-y-auto max-h-[calc(42*30px)]">
-          <table className="w-full border-collapse table-fixed text-center">
-            <colgroup>
-              <col style={{ width: '40px' }} />
-              <col style={{ width: '120px' }} />
-              <col style={{ width: '200px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '80px' }} />
-              <col style={{ width: '80px' }} />
-              <col style={{ width: '80px' }} />
-              <col style={{ width: '80px' }} />
-              <col style={{ width: '60px' }} />
-              <col style={{ width: '80px' }} />
-              <col style={{ width: '80px' }} />
-              <col style={{ width: '90px' }} />
-              <col style={{ width: '80px' }} />
-              <col style={{ width: '80px' }} />
-              <col style={{ width: '110px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '90px' }} />
-              <col style={{ width: '120px' }} />
-              <col style={{ width: '110px' }} />
-            </colgroup>
-            <thead className="sticky top-0 z-30">
-              <tr className="bg-gray-50">
-                <th className="px-2 py-1 bg-gray-50 border-b border-gray-200 sticky left-0 z-30">
-                  <input type="checkbox" checked={selectAll} onChange={handleSelectAll} className="cursor-pointer" />
-                </th>
-                <th className="px-2 py-1.5 text-xs font-medium bg-gray-50 border-b border-gray-200 sticky left-[40px] z-30 text-gray-500">옵션코드</th>
-                <th className="px-2 py-1.5 text-xs font-medium bg-gray-50 border-b border-gray-200 sticky left-[160px] z-30 text-gray-500">상품명</th>
-                {['품목','품종','규격1','규격2','규격3','중량','단위','박스비','완충재','원물비용','인건비','배송비','셀러공급가','네이버유료','네이버무료','쿠팡유료','쿠팡무료','상태','벤더사','작업'].map((h, i)=>(
-                  <th key={i} className="px-2 py-1.5 text-xs font-medium bg-gray-50 border-b border-gray-200 text-gray-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map((p, rowIndex) => {
-                const isLastInGroup = rowIndex === filteredProducts.length - 1 || filteredProducts[rowIndex + 1]?.item_type !== p.item_type
-                const borderClass = isLastInGroup ? 'border-b border-gray-300' : 'border-b border-gray-100'
-                const rowBgClass = modifiedProducts.has(p.id) ? 'bg-yellow-50' : selectedRows.has(p.id) ? 'bg-blue-50' : 'bg-gray-50'
-
+        <EditableAdminGrid
+          data={filteredProducts}
+          columns={(() => {
+            const visibleFields = getVisibleFields(viewMode)
+            return visibleFields.map(field => ({
+              key: field,
+              title: FIELD_LABELS[field] || field,
+              width: field === 'option_code' ? 120
+                : field === 'option_name' ? 200
+                : field === 'status' ? 90
+                : field === 'vendor_id' ? 130
+                : 110,
+              type: ['packaging_box_price', 'pack_price', 'bag_vinyl_price', 'cushioning_price', 'sticker_price', 'ice_pack_price', 'other_material_price',
+                     'raw_material_cost', 'labor_cost', 'misc_cost', 'shipping_fee', 'total_material_cost', 'fixed_material_cost', 'additional_quantity',
+                     'seller_supply_price', 'naver_paid_shipping_price', 'naver_free_shipping_price', 'coupang_paid_shipping_price',
+                     'coupang_free_shipping_price', 'weight', 'seller_margin_rate', 'target_margin_rate'].includes(field) ? 'number' as const
+                : ['material_cost_policy', 'seller_supply_price_mode', 'naver_price_mode', 'coupang_price_mode', 'status',
+                   'weight_unit', 'item_type', 'variety'].includes(field) ? 'dropdown' as const
+                : 'text' as const,
+              source: field === 'material_cost_policy' ? ['자동', '고정']
+                : field === 'seller_supply_price_mode' || field === 'naver_price_mode' || field === 'coupang_price_mode' ? ['자동', '수동']
+                : field === 'status' ? supplyStatuses.map(s => s.name)
+                : field === 'weight_unit' ? ['kg', 'g', 'box', '개']
+                : undefined,
+              readOnly: ['option_code', 'vendor_id', 'used_material_1', 'used_material_2', 'used_material_3', 'total_cost'].includes(field),
+              renderer: field === 'status' ? (value: any, row: OptionProduct) => {
+                if (!row.status) return ''
+                const st = supplyStatuses.find(s => s.name === row.status || s.code === row.status)
+                const bg = st?.color || '#6B7280'
                 return (
-                <tr key={p.id} className={`hover:bg-gray-50 ${borderClass} ${modifiedProducts.has(p.id) ? 'bg-yellow-50' : ''} ${selectedRows.has(p.id) ? 'bg-blue-50' : ''}`}>
-                  <td className={`px-2 py-1 sticky left-0 z-20 ${rowBgClass}`}>
-                    <input type="checkbox" checked={!!selectedRows.has(p.id)} onChange={() => handleSelectRow(p.id)} className="cursor-pointer" />
-                  </td>
-
-                  {[
-                    { field: 'option_code', sticky: 'left-[40px]', readonly: true },
-                    { field: 'option_name', bold: true, sticky: 'left-[160px]' },
-                    { field: 'item_type' },
-                    { field: 'variety' },
-                    { field: 'specification_1' },
-                    { field: 'specification_2' },
-                    { field: 'specification_3' },
-                    { field: 'weight' },
-                    { field: 'weight_unit' },
-                    { field: 'packaging_box_price' },
-                    { field: 'cushioning_price' },
-                    { field: 'raw_material_cost' },
-                    { field: 'labor_cost' },
-                    { field: 'shipping_fee' },
-                    { field: 'seller_supply_price', bgColor: 'bg-blue-50' },
-                    { field: 'naver_paid_shipping_price', bgColor: 'bg-green-50' },
-                    { field: 'naver_free_shipping_price', bgColor: 'bg-green-50' },
-                    { field: 'coupang_paid_shipping_price', bgColor: 'bg-purple-50' },
-                    { field: 'coupang_free_shipping_price', bgColor: 'bg-purple-50' },
-                    { field: 'status', isStatus: true },
-                    { field: 'vendor_id', readonly: true },
-                  ].map((col, colOffset) => {
-                    const colIndex = colOffset + 1
-                    const isSelected =
-                      selectedCell?.row === rowIndex &&
-                      selectedCell?.col === colIndex &&
-                      selectedCell.field === col.field
-                    const isEditing =
-                      editingCell?.row === rowIndex &&
-                      editingCell?.col === colIndex &&
-                      editingCell.field === col.field
-
-                    const key = `${p.id}-${col.field}`
-                    const base = `px-2 py-1 text-xs text-center overflow-hidden text-ellipsis whitespace-nowrap align-middle ${col.bgColor || ''}`
-                    const selectedCls = isSelected ? ' ring-2 ring-emerald-500 ring-inset' : ''
-                    const textCls = col.bold ? ' font-medium' : ''
-                    const modifiedCls = isCellModified(p, col.field) ? ' text-red-600' : ''
-                    const stickyCls = col.sticky ? ` sticky ${col.sticky} z-20 ${rowBgClass}` : ''
-                    const readonlyCls = col.readonly ? ' cursor-default' : ''
-
-                    // 읽기전용 필드
-                    if (col.readonly) {
-                      return (
-                        <td
-                          key={key}
-                          className={`${base}${textCls}${stickyCls}${readonlyCls} text-gray-600`}
-                          title="읽기전용"
-                        >
-                          {displayValue(col.field, p)}
-                        </td>
-                      )
-                    }
-
-                    // 편집 모드: contentEditable
-                    if (isEditing) {
-                      return (
-                        <td
-                          key={key}
-                          className={`${base}${textCls}${selectedCls}${modifiedCls}${stickyCls}`}
-                          contentEditable
-                          suppressContentEditableWarning
-                          onClick={(e) => e.stopPropagation()}
-                          onPaste={(e) => {
-                            e.preventDefault()
-                            const t = (e.clipboardData.getData('text/plain') || '').replace(/\r?\n/g, '')
-                            document.execCommand('insertText', false, t)
-                          }}
-                          onCompositionStart={() => setIsComposing(true)}
-                          onCompositionEnd={() => setIsComposing(false)}
-                          onKeyDown={(e) => handleTdKeyDown(e, rowIndex, col.field)}
-                          onBlur={(e) => handleTdBlur(e, rowIndex, col.field)}
-                          title=""
-                        >
-                          {rawValue(col.field, p) || ''}
-                        </td>
-                      )
-                    }
-
-                    // 보기 모드 (상태 커스텀)
-                    if (col.isStatus) {
-                      const st = supplyStatuses.find(s => s.name === p.status)
-                      const bg = st?.color || '#6B7280'
-                      return (
-                        <td
-                          key={key}
-                          className={`${base}${selectedCls}${stickyCls}`}
-                          onClick={() => handleCellClick(rowIndex, colIndex, col.field)}
-                          title="같은 셀을 다시 클릭하면 입력모드"
-                        >
-                          <span className="px-2 py-1 rounded-full text-xs font-medium text-white" style={{ backgroundColor: bg }}>
-                            {st?.name || p.status || '-'}
-                          </span>
-                          {isCellModified(p, col.field) && <span className="ml-1 text-red-600">•</span>}
-                        </td>
-                      )
-                    }
-
-                    return (
-                      <td
-                        key={key}
-                        className={`${base}${textCls}${selectedCls}${modifiedCls}${stickyCls}`}
-                        onClick={() => handleCellClick(rowIndex, colIndex, col.field)}
-                        title="같은 셀을 다시 클릭하면 입력모드"
-                      >
-                        {displayValue(col.field, p)}
-                      </td>
-                    )
-                  })}
-
-                  <td className={`px-2 py-1.5 text-xs ${rowBgClass}`}>
-                    <div className="flex gap-1 justify-center">
-                      <Button variant="primary" size="xs" onClick={() => openModal('product', p)}>수정</Button>
-                      <Button variant="danger" size="xs" onClick={() => handleDelete('option_products', p.id)}>삭제</Button>
-                    </div>
-                  </td>
-                </tr>
+                  <span style={{
+                    backgroundColor: bg,
+                    color: 'white',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontSize: '12px'
+                  }}>
+                    {st?.name || row.status}
+                  </span>
                 )
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mt-4 text-sm text-gray-500 text-center px-6 pb-4">
-          <p>• <b>같은 셀을 두 번 클릭</b>하면 입력모드(커서만 보임)</p>
-          <p>• <b>Enter</b> 저장, <b>Esc</b> 취소, <b>포커스 아웃</b> 저장</p>
-          <p>• 선택된 셀에서 <b>Ctrl/Cmd + C</b> 복사, <b>Ctrl/Cmd + V</b> 붙여넣기, <b>Ctrl/Cmd + Z</b> 되돌리기</p>
-        </div>
+              } : field === 'vendor_id' ? (value: any, row: OptionProduct) => row.vendor_name || ''
+                : field === 'option_name' ? (value: any, row: OptionProduct) => {
+                  const policyBadge = row.material_cost_policy === 'fixed' ? ' 🔒'
+                    : row.seller_supply_price_mode === '수동' ? ' ⚙️' : ''
+                  return (row.option_name || '-') + policyBadge
+                }
+                : undefined
+            }))
+          })()}
+          onDataChange={(newData) => {
+            setProducts(newData)
+          }}
+          onDelete={(index) => {
+            const product = filteredProducts[index]
+            if (product) handleDelete('option_products', product.id)
+          }}
+          onSave={handleSaveAllConfirmed}
+          onDeleteSelected={(indices) => {
+            const ids = indices.map(i => filteredProducts[i]?.id).filter(Boolean)
+            setSelectedRows(new Set(ids))
+            setModalType('delete-confirm')
+          }}
+          globalSearchPlaceholder="옵션코드, 상품명, 품목, 품종 검색"
+          height="900px"
+          rowHeight={26}
+        />
       </div>
 
       {/* 변경사항 컨펌 모달 */}
@@ -1421,16 +1602,53 @@ export default function OptionProductsManagementPage() {
         </Modal>
       )}
 
-      {/* contentEditable 상태 보정: 입력란처럼 보이는 스타일 제거
-          선택 테두리는 className의 ring-* 로만 표시 */}
-      <style jsx global>{`
-        td[contenteditable="true"] {
-          outline: none !important;
-          background: transparent !important;
-          border: none !important;
-          box-shadow: none !important;
-        }
-      `}</style>
+      {/* 빈 행 경고 모달 */}
+      {emptyRowsWarning && (
+        <Modal
+          isOpen={true}
+          onClose={() => setEmptyRowsWarning(null)}
+          title="빈 행 저장 경고"
+          size="md"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setEmptyRowsWarning(null)}>취소</Button>
+              <Button onClick={() => {
+                setEmptyRowsWarning(null)
+                handleSaveAllConfirmed(true)
+              }}>계속 저장</Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              빈 행 <strong className="text-amber-600">{emptyRowsWarning.emptyCount}개</strong>는 저장되지 않습니다.
+            </p>
+            <p className="text-sm text-gray-700">
+              나머지 <strong className="text-blue-600">{emptyRowsWarning.validCount}개</strong> 행을 저장하시겠습니까?
+            </p>
+            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>빈 행은 저장 후 페이지를 새로고침하면 사라집니다.</span>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 저장할 데이터 없음 경고 */}
+      {modalType === 'no-data-warning' && (
+        <Modal
+          isOpen={true}
+          onClose={() => setModalType(null)}
+          title="저장 불가"
+          size="sm"
+          footer={<Button onClick={() => setModalType(null)}>확인</Button>}
+        >
+          <p className="text-sm text-gray-700">저장할 데이터가 없습니다.</p>
+        </Modal>
+      )}
+
     </div>
   )
 }

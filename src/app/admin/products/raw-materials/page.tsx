@@ -4,6 +4,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, Button, Modal, Badge } from '@/components/ui'
+import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
+import { useToast } from '@/components/ui/Toast'
 import * as XLSX from 'xlsx'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts'
 
@@ -64,6 +66,7 @@ type EditAction = {
 }
 
 export default function RawMaterialsManagementPage() {
+  const { showToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
@@ -84,6 +87,7 @@ export default function RawMaterialsManagementPage() {
   const [modalType, setModalType] = useState<string | null>(null)
   const [editingItem, setEditingItem] = useState<any>(null)
   const [formData, setFormData] = useState<FormData>({})
+  const [emptyRowsWarning, setEmptyRowsWarning] = useState<{emptyCount: number, validCount: number} | null>(null)
 
   // 시세기록 폼 데이터
   const [priceRecordForm, setPriceRecordForm] = useState({
@@ -150,7 +154,11 @@ export default function RawMaterialsManagementPage() {
 
   const supabase = createClient()
   const fmtInt = new Intl.NumberFormat('ko-KR')
-  const fmtMD = new Intl.DateTimeFormat('ko-KR', { month: '2-digit', day: '2-digit' })
+  const fmtMD = (date: Date) => {
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${month}/${day}`
+  }
   const getKey = (id: string, field: string) => `${id}-${field}`
 
   const FIELD_LABELS: Record<string,string> = {
@@ -211,7 +219,7 @@ export default function RawMaterialsManagementPage() {
       case 'last_trade_date':
       case 'season_start_date':
       case 'season_peak_date':
-      case 'season_end_date': return m[field] ? fmtMD.format(new Date(m[field]!)) : '-'
+      case 'season_end_date': return m[field] ? fmtMD(new Date(m[field]!)) : '-'
       case 'main_supplier_id': return m.supplier_name || '-'
       default: return (m as any)[field] ?? ((m as any)[field] === 0 ? '0' : '-')
     }
@@ -253,8 +261,14 @@ export default function RawMaterialsManagementPage() {
       ;(m as any)[field] = Number.isFinite(n as number) ? n : null
       return m
     }
-    if (['last_trade_date','season_start_date','season_peak_date','season_end_date'].includes(field)) {
+    if (field === 'last_trade_date') {
       const ok = /^\d{4}-\d{2}-\d{2}$/.test(t)
+      ;(m as any)[field] = ok ? t : (t === '' ? null : src[field])
+      return m
+    }
+    if (['season_start_date','season_peak_date','season_end_date'].includes(field)) {
+      // MM-DD 형식 검증
+      const ok = /^\d{2}-\d{2}$/.test(t)
       ;(m as any)[field] = ok ? t : (t === '' ? null : src[field])
       return m
     }
@@ -526,6 +540,27 @@ export default function RawMaterialsManagementPage() {
         }
       }
 
+      const validateSeasonDate = (dateStr: string | null | undefined): { valid: boolean; formatted: string | null; original: string } => {
+        if (!dateStr || dateStr === '') return { valid: true, formatted: null, original: '' }
+        try {
+          // 이미 MM-DD 형식인 경우
+          if (/^\d{2}-\d{2}$/.test(String(dateStr))) {
+            return { valid: true, formatted: String(dateStr), original: String(dateStr) }
+          }
+          // 날짜로 파싱해서 MM-DD 추출
+          const date = new Date(dateStr)
+          if (isNaN(date.getTime())) {
+            return { valid: false, formatted: null, original: String(dateStr) }
+          }
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          const formatted = `${month}-${day}`
+          return { valid: true, formatted, original: String(dateStr) }
+        } catch {
+          return { valid: false, formatted: null, original: String(dateStr) }
+        }
+      }
+
       // 2. 날짜 유효성 검사
       const dateErrors: string[] = []
       for (let i = 0; i < excelData.length; i++) {
@@ -533,9 +568,9 @@ export default function RawMaterialsManagementPage() {
         const rowNum = i + 2 // 엑셀 행 번호 (헤더 제외)
 
         const lastTrade = validateDate(row['최근거래일'])
-        const seasonStart = validateDate(row['시즌시작일'])
-        const seasonPeak = validateDate(row['시즌성수기'])
-        const seasonEnd = validateDate(row['시즌종료일'])
+        const seasonStart = validateSeasonDate(row['시즌시작일'])
+        const seasonPeak = validateSeasonDate(row['시즌성수기'])
+        const seasonEnd = validateSeasonDate(row['시즌종료일'])
 
         if (!lastTrade.valid) {
           dateErrors.push(`${rowNum}행 [${row['원물코드']}]: 최근거래일 "${lastTrade.original}"`)
@@ -581,9 +616,9 @@ export default function RawMaterialsManagementPage() {
           unit_quantity: row['단위수량'] ? Number(row['단위수량']) : null,
           last_trade_date: validateDate(row['최근거래일']).formatted,
           season: row['시즌'] || null,
-          season_start_date: validateDate(row['시즌시작일']).formatted,
-          season_peak_date: validateDate(row['시즌성수기']).formatted,
-          season_end_date: validateDate(row['시즌종료일']).formatted,
+          season_start_date: validateSeasonDate(row['시즌시작일']).formatted,
+          season_peak_date: validateSeasonDate(row['시즌성수기']).formatted,
+          season_end_date: validateSeasonDate(row['시즌종료일']).formatted,
           color_code: row['컬러코드'] || null
         })
       }
@@ -655,15 +690,15 @@ export default function RawMaterialsManagementPage() {
       })
     }
 
-    // 상태 필터
+    // 상태 필터 (빈 값도 항상 포함)
     if (selectedStatus !== 'all') {
-      f = f.filter(m => m.supply_status === selectedStatus)
+      f = f.filter(m => m.supply_status === selectedStatus || !m.supply_status || m.supply_status === '')
     }
 
     setFilteredMaterials(f)
     setSelectedRows(new Set())
     setSelectAll(false)
-  }, [materials, selectedStatus, globalSearchTerm])
+  }, [materials, selectedStatus, globalSearchTerm, supplyStatuses])
 
   // ===== 선택/삭제 =====
   const handleSelectAll = () => {
@@ -678,21 +713,35 @@ export default function RawMaterialsManagementPage() {
   }
   const handleDeleteSelected = async () => {
     if (selectedRows.size === 0) {
-      alert('선택된 항목이 없습니다.')
+      showToast('선택된 항목이 없습니다.', 'warning')
       setModalType(null)
       return
     }
     const ids = Array.from(selectedRows)
-    const { error } = await supabase.from('raw_materials').delete().in('id', ids)
-    if (error) {
-      alert('삭제 중 오류가 발생했습니다.')
-      return
+
+    // temp_ ID와 실제 ID 분리
+    const realIds = ids.filter(id => !String(id).startsWith('temp_'))
+    const tempIds = ids.filter(id => String(id).startsWith('temp_'))
+
+    // 실제 DB에 있는 데이터만 삭제
+    if (realIds.length > 0) {
+      const { error } = await supabase.from('raw_materials').delete().in('id', realIds)
+      if (error) {
+        showToast('삭제 중 오류가 발생했습니다.', 'error')
+        return
+      }
     }
+
     setSelectedRows(new Set())
     setSelectAll(false)
     setModalType(null)
     await fetchMaterials()
-    alert('삭제되었습니다.')
+
+    if (tempIds.length > 0) {
+      showToast(`삭제되었습니다. (실제 삭제: ${realIds.length}건, 임시 행 제거: ${tempIds.length}건)`, 'success')
+    } else {
+      showToast(`${realIds.length}건이 삭제되었습니다.`, 'success')
+    }
   }
 
   // ===== 엑셀식 편집: td contentEditable =====
@@ -877,9 +926,25 @@ export default function RawMaterialsManagementPage() {
     await handleSaveAllConfirmed()
   }
 
-  const handleSaveAllConfirmed = async () => {
+  const handleSaveAllConfirmed = async (skipWarning = false) => {
     try {
-      const rows = filteredMaterials.filter(m => modifiedMaterials.has(m.id)).map(m => ({
+      // 수정된 행 중에서 유효한 행만 필터링 (id가 있고 필수 필드가 있는 행)
+      const modifiedRows = filteredMaterials.filter(m => modifiedMaterials.has(m.id))
+      const validRows = modifiedRows.filter(m => m.id && (m.material_code || m.material_name))
+      const emptyRows = modifiedRows.filter(m => !m.id || (!m.material_code && !m.material_name))
+
+      // 빈 행이 있으면 경고 모달 표시
+      if (!skipWarning && emptyRows.length > 0) {
+        setEmptyRowsWarning({ emptyCount: emptyRows.length, validCount: validRows.length })
+        return
+      }
+
+      if (validRows.length === 0) {
+        setModalType('no-data-warning')
+        return
+      }
+
+      const rows = validRows.map(m => ({
         id: m.id,
         material_code: m.material_code || null,
         material_name: m.material_name || null,
@@ -996,6 +1061,90 @@ export default function RawMaterialsManagementPage() {
     alert('삭제되었습니다.')
   }
 
+  const handleDeleteRow = async (rowIndex: number) => {
+    if (!confirm('정말 삭제하시겠습니까?')) return
+    const material = filteredMaterials[rowIndex]
+    if (!material) return
+
+    if (material.id.startsWith('temp_')) {
+      // 임시 행 삭제
+      const newMaterials = materials.filter(m => m.id !== material.id)
+      setMaterials(newMaterials)
+    } else {
+      // DB에서 삭제
+      const { error } = await supabase.from('raw_materials').delete().eq('id', material.id)
+      if (error) return alert('삭제 중 오류가 발생했습니다.')
+      await fetchMaterials()
+      alert('삭제되었습니다.')
+    }
+  }
+
+  // EditableAdminGrid 컬럼 정의
+  const rawMaterialColumns = [
+    { key: 'material_code', title: '원물코드', width: 120 },
+    { key: 'material_name', title: '원물명', width: 160 },
+    { key: 'category_1', title: '대분류', width: 100 },
+    { key: 'category_2', title: '중분류', width: 100 },
+    { key: 'category_3', title: '소분류', width: 100 },
+    { key: 'category_4', title: '품목', width: 100 },
+    { key: 'category_5', title: '품종', width: 100 },
+    { key: 'standard_unit', title: '규격', width: 80 },
+    { key: 'unit_quantity', title: '단위수량', width: 110, type: 'number' as const },
+    { key: 'last_trade_date', title: '최근거래', width: 100 },
+    { key: 'latest_price', title: '최근시세', width: 110, type: 'number' as const },
+    { key: 'current_price', title: '현재시세', width: 110, type: 'number' as const },
+    {
+      key: 'main_supplier_id',
+      title: '주거래처',
+      width: 130,
+      type: 'dropdown' as const,
+      source: suppliers.map(s => s.name),
+      renderer: (value: any, row: RawMaterial) => row.supplier_name || ''
+    },
+    { key: 'season', title: '시즌', width: 100 },
+    { key: 'season_start_date', title: '시작일', width: 100 },
+    { key: 'season_peak_date', title: '피크시기', width: 100 },
+    { key: 'season_end_date', title: '종료일', width: 100 },
+    {
+      key: 'supply_status',
+      title: '상태',
+      width: 90,
+      type: 'dropdown' as const,
+      source: supplyStatuses.map(s => s.name),
+      renderer: (value: any, row: RawMaterial) => {
+        if (!row.supply_status) return ''
+        const st = supplyStatuses.find(s => s.name === row.supply_status)
+        const bg = st?.color || '#6B7280'
+        return (
+          <span style={{
+            backgroundColor: bg,
+            color: 'white',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            fontSize: '12px'
+          }}>
+            {row.supply_status}
+          </span>
+        )
+      }
+    },
+    {
+      key: 'color_code',
+      title: '색코드',
+      width: 110,
+      renderer: (value: any, row: RawMaterial) => {
+        if (!row.color_code) return '-'
+        return (
+          <div
+            className="w-6 h-6 mx-auto rounded border"
+            style={{ backgroundColor: row.color_code }}
+            title={row.color_code}
+          />
+        )
+      }
+    }
+  ]
+
   // 카테고리별 원물 필터링
   const getFilteredMaterialsByCategory = () => {
     return materials.filter(m => {
@@ -1090,64 +1239,76 @@ export default function RawMaterialsManagementPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-medium text-gray-900">원물관리</h1>
-        <p className="mt-1 text-sm text-gray-600">원물 정보와 시세를 통합 관리합니다</p>
-      </div>
-
-      {/* 통계 및 메뉴 */}
+      {/* 타이틀과 통계 */}
       <div className="flex justify-between items-center">
-        <div className="flex gap-6 text-sm">
-          <div>
-            <span className="text-gray-600">전체 원물: </span>
-            <span className="font-bold">{stats.totalMaterials.toLocaleString()}</span>
-          </div>
-          <div>
-            <span className="text-gray-600">출하중: </span>
-            <span className="font-bold text-green-600">{stats.shippingMaterials.toLocaleString()}</span>
-          </div>
-          <div>
-            <span className="text-gray-600">시즌종료: </span>
-            <span className="font-bold text-orange-600">{stats.seasonEndMaterials.toLocaleString()}</span>
-          </div>
-          <div>
-            <span className="text-gray-600">오늘 시세 등록: </span>
-            <span className="font-bold text-blue-600">{stats.todayPriceUpdates.toLocaleString()}</span>
+        <div className="flex items-center gap-8">
+          <h1 className="text-2xl font-medium text-gray-900">원물관리</h1>
+          {/* 통계 */}
+          <div className="flex gap-4 text-sm">
+            <div>
+              <span className="text-gray-600">전체 </span>
+              <span className="font-bold">{stats.totalMaterials.toLocaleString()}</span>
+            </div>
+            {supplyStatuses.map(status => (
+              <div key={status.code}>
+                <span className="text-gray-600">{status.name} </span>
+                <span className="font-bold" style={{ color: status.color }}>
+                  {materials.filter(m => m.supply_status === status.name || m.supply_status === status.code).length}
+                </span>
+              </div>
+            ))}
+            <div>
+              <span className="text-gray-600">오늘 시세 </span>
+              <span className="font-bold text-blue-600">{stats.todayPriceUpdates.toLocaleString()}</span>
+            </div>
           </div>
         </div>
 
+        {/* 메뉴 버튼들 - 아웃라인 */}
         <div className="flex gap-2">
-          <Button onClick={() => openModal('material-register')} size="sm" variant="ghost">
+          <button onClick={() => openModal('material-register')} className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors">
             원물등록관리
-          </Button>
-          <Button onClick={() => openModal('price-record')} size="sm" variant="ghost">
+          </button>
+          <button onClick={() => openModal('price-record')} className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors">
             시세기록
-          </Button>
-          <Button onClick={() => openModal('price-analysis')} size="sm" variant="ghost">
+          </button>
+          <button onClick={() => openModal('price-analysis')} className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors">
             시세분석
-          </Button>
-          <Button onClick={() => alert('엑셀 업로드 기능')} size="sm" variant="ghost">
-            엑셀업로드
-          </Button>
+          </button>
         </div>
       </div>
 
       {/* 테이블 */}
       <div>
-        <div className="px-6 py-4 border-b border-gray-100">
+        <div className="px-6 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4 flex-1">
-              <div className="text-[16px] font-semibold text-gray-900">원물 목록</div>
-              <span className="text-sm text-gray-500">총 {filteredMaterials.length}건</span>
-
               {/* 상태 필터 배지 */}
               <div className="flex gap-2 flex-wrap">
-                <button onClick={() => setSelectedStatus('all')} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${selectedStatus === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>전체 ({materials.length})</button>
-                {supplyStatuses.map(s => (
-                  <button key={s.code} onClick={() => setSelectedStatus(s.name)} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${selectedStatus === s.name ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
-                    {s.name} ({materials.filter(m => m.supply_status === s.name).length})
-                  </button>
-                ))}
+                <button
+                  onClick={() => setSelectedStatus('all')}
+                  className="px-3 py-1 rounded-full text-xs font-medium transition-colors text-white cursor-pointer hover:opacity-90"
+                  style={{
+                    backgroundColor: selectedStatus === 'all' ? '#3b82f6' : '#3b82f630'
+                  }}
+                >
+                  전체 ({materials.length})
+                </button>
+                {supplyStatuses.map(s => {
+                  const isSelected = selectedStatus === s.name
+                  return (
+                    <button
+                      key={s.code}
+                      onClick={() => setSelectedStatus(s.name)}
+                      className="px-3 py-1 rounded-full text-xs font-medium transition-colors text-white cursor-pointer hover:opacity-90"
+                      style={{
+                        backgroundColor: isSelected ? s.color : `${s.color}30`
+                      }}
+                    >
+                      {s.name} ({materials.filter(m => m.supply_status === s.name || m.supply_status === s.code).length})
+                    </button>
+                  )
+                })}
               </div>
 
               {/* 검색 */}
@@ -1166,270 +1327,22 @@ export default function RawMaterialsManagementPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              {/* 상태 표시 */}
-              {modifiedMaterials.size > 0 && (
-                <span className="text-sm font-semibold px-3 py-1.5 rounded-md" style={{ color: '#c2410c', backgroundColor: '#fed7aa' }}>
-                  {modifiedMaterials.size}개 수정됨
-                </span>
-              )}
-              {selectedRows.size > 0 && (
-                <span className="text-sm font-semibold px-3 py-1.5 rounded-md" style={{ color: '#1d4ed8', backgroundColor: '#bfdbfe' }}>
-                  {selectedRows.size}개 선택됨
-                </span>
-              )}
-
-              {/* 버튼들 */}
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => openModal('material')}
-              >
-                원물 추가
-              </Button>
-
-              {selectedRows.size > 0 && (
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => setModalType('delete-confirm')}
-                >
-                  삭제
-                </Button>
-              )}
-
-              <Button
-                variant="gradient-green"
-                size="sm"
-                onClick={handleOpenConfirm}
-                disabled={modifiedMaterials.size === 0}
-              >
-                저장
-              </Button>
-
-              {/* 엑셀 다운로드 */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExcelDownload}
-                icon={
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                }
-              >
-                엑셀 다운로드
-              </Button>
-
-              {/* 엑셀 업로드 */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => document.getElementById('excel-upload')?.click()}
-                icon={
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                }
-              >
-                엑셀 업로드
-              </Button>
-              <input
-                id="excel-upload"
-                type="file"
-                accept=".xlsx,.xls"
-                style={{ display: 'none' }}
-                onChange={handleExcelUpload}
-              />
-            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto overflow-y-auto max-h-[calc(42*30px)]">
-          <table className="w-full border-collapse table-fixed text-center">
-            <colgroup>
-              <col style={{ width: '40px' }} />
-              <col style={{ width: '120px' }} />
-              <col style={{ width: '160px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '80px' }} />
-              <col style={{ width: '110px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '110px' }} />
-              <col style={{ width: '130px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '90px' }} />
-              <col style={{ width: '110px' }} />
-              <col style={{ width: '110px' }} />
-              <col style={{ width: '110px' }} />
-            </colgroup>
-            <thead className="sticky top-0 z-30">
-              <tr className="bg-gray-50">
-                <th className="px-2 py-1 bg-gray-50 border-b border-gray-200 sticky left-0 z-30">
-                  <input type="checkbox" checked={selectAll} onChange={handleSelectAll} className="cursor-pointer" />
-                </th>
-                {['원물코드','원물명','대분류','중분류','소분류','품목','품종','규격','단위수량','최근거래','최근시세','현재시세','주거래처','시즌','시작일','피크시기','종료일','상태','색코드','작업'].map((h, i)=>(
-                  <th key={i} className={`px-2 py-1 text-xs font-medium bg-gray-50 border-b border-gray-200 ${i === 0 ? 'sticky left-[40px] z-30 text-gray-500' : i === 1 ? 'sticky left-[160px] z-30 text-gray-500' : 'text-gray-500'}`}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredMaterials.map((m, rowIndex) => {
-                // 다음 행과 품목이 다른지 확인 (마지막 행이거나 다음 행의 category_4가 다르면 true)
-                const isLastInGroup =
-                  rowIndex === filteredMaterials.length - 1 ||
-                  filteredMaterials[rowIndex + 1]?.category_4 !== m.category_4
-
-                const borderClass = isLastInGroup
-                  ? 'border-b border-gray-300'
-                  : 'border-b border-gray-100'
-
-                const rowBgClass = modifiedMaterials.has(m.id) ? 'bg-yellow-50' : selectedRows.has(m.id) ? 'bg-blue-50' : 'bg-gray-50'
-
-                return (
-                <tr key={m.id} className={`hover:bg-gray-50 ${borderClass} ${modifiedMaterials.has(m.id) ? 'bg-yellow-50' : ''} ${selectedRows.has(m.id) ? 'bg-blue-50' : ''}`}>
-                  <td className={`px-2 py-1 sticky left-0 z-20 ${rowBgClass}`}>
-                    <input type="checkbox" checked={!!selectedRows.has(m.id)} onChange={() => handleSelectRow(m.id)} className="cursor-pointer" />
-                  </td>
-
-                  {[
-                    { field: 'material_code', sticky: 'left-[40px]' },
-                    { field: 'material_name', bold: true, sticky: 'left-[160px]' },
-                    { field: 'category_1' },
-                    { field: 'category_2' },
-                    { field: 'category_3' },
-                    { field: 'category_4' },
-                    { field: 'category_5' },
-                    { field: 'standard_unit' },
-                    { field: 'unit_quantity' },
-                    { field: 'last_trade_date' },
-                    { field: 'latest_price' },
-                    { field: 'current_price' },
-                    { field: 'main_supplier_id' },    // 표시: supplier_name
-                    { field: 'season' },
-                    { field: 'season_start_date' },
-                    { field: 'season_peak_date' },
-                    { field: 'season_end_date' },
-                    { field: 'supply_status', isStatus: true },
-                    { field: 'color_code', isColor: true },
-                  ].map((col, colOffset) => {
-                    const colIndex = colOffset + 1
-                    const isSelected =
-                      selectedCell?.row === rowIndex &&
-                      selectedCell?.col === colIndex &&
-                      selectedCell.field === col.field
-                    const isEditing =
-                      editingCell?.row === rowIndex &&
-                      editingCell?.col === colIndex &&
-                      editingCell.field === col.field
-
-                    const key = `${m.id}-${col.field}`
-                    const base = 'px-2 py-1 text-xs text-center overflow-hidden text-ellipsis whitespace-nowrap align-middle'
-                    const selectedCls = isSelected ? ' ring-2 ring-emerald-500 ring-inset' : ''
-                    const textCls = col.bold ? ' font-medium' : ''
-                    const modifiedCls = isCellModified(m, col.field) ? ' text-red-600' : ''
-                    const stickyCls = col.sticky ? ` sticky ${col.sticky} z-20 ${rowBgClass}` : ''
-
-                    // 편집 모드: contentEditable
-                    if (isEditing) {
-                      return (
-                        <td
-                          key={key}
-                          className={`${base}${textCls}${selectedCls}${modifiedCls}${stickyCls}`}
-                          contentEditable
-                          suppressContentEditableWarning
-                          onClick={(e) => e.stopPropagation()}
-                          onPaste={(e) => {
-                            e.preventDefault()
-                            const t = (e.clipboardData.getData('text/plain') || '').replace(/\r?\n/g, '')
-                            document.execCommand('insertText', false, t)
-                          }}
-                          onCompositionStart={() => setIsComposing(true)}
-                          onCompositionEnd={() => setIsComposing(false)}
-                          onKeyDown={(e) => handleTdKeyDown(e, rowIndex, col.field)}
-                          onBlur={(e) => handleTdBlur(e, rowIndex, col.field)}
-                          title=""
-                        >
-                          {rawValue(col.field, m) || ''}
-                        </td>
-                      )
-                    }
-
-                    // 보기 모드 (상태/색상 커스텀)
-                    if (col.isStatus) {
-                      const st = supplyStatuses.find(s => s.name === m.supply_status)
-                      const bg = st?.color || '#6B7280'
-                      return (
-                        <td
-                          key={key}
-                          className={`${base}${selectedCls}${stickyCls}`}
-                          onClick={() => handleCellClick(rowIndex, colIndex, col.field)}
-                          title="같은 셀을 다시 클릭하면 입력모드"
-                        >
-                          <span className="px-2 py-1 rounded-full text-xs font-medium text-white" style={{ backgroundColor: bg }}>
-                            {m.supply_status || '-'}
-                          </span>
-                          {isCellModified(m, col.field) && <span className="ml-1 text-red-600">•</span>}
-                        </td>
-                      )
-                    }
-                    if (col.isColor) {
-                      const isMod = isCellModified(m, col.field)
-                      return (
-                        <td
-                          key={key}
-                          className={`${base}${selectedCls}${stickyCls}`}
-                          onClick={() => handleCellClick(rowIndex, colIndex, col.field)}
-                          title="같은 셀을 다시 클릭하면 입력모드"
-                        >
-                          {m.color_code ? (
-                            <div
-                              className={`w-6 h-6 mx-auto rounded border ${isMod ? 'ring-2 ring-red-500' : ''}`}
-                              style={{ backgroundColor: m.color_code }}
-                              title={m.color_code}
-                            />
-                          ) : '-'}
-                        </td>
-                      )
-                    }
-
-                    return (
-                      <td
-                        key={key}
-                        className={`${base}${textCls}${selectedCls}${modifiedCls}${stickyCls}`}
-                        onClick={() => handleCellClick(rowIndex, colIndex, col.field)}
-                        title="같은 셀을 다시 클릭하면 입력모드"
-                      >
-                        {displayValue(col.field, m)}
-                      </td>
-                    )
-                  })}
-
-                  <td className={`px-2 py-1.5 text-xs ${rowBgClass}`}>
-                    <div className="flex gap-1 justify-center">
-                      <Button variant="primary" size="xs" onClick={() => openModal('material', m)}>수정</Button>
-                      <Button variant="danger" size="xs" onClick={() => handleDelete('raw_materials', m.id)}>삭제</Button>
-                    </div>
-                  </td>
-                </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mt-4 text-sm text-gray-500 text-center px-6 pb-4">
-          <p>• <b>같은 셀을 두 번 클릭</b>하면 입력모드(커서만 보임)</p>
-          <p>• <b>Enter</b> 저장, <b>Esc</b> 취소, <b>포커스 아웃</b> 저장</p>
-          <p>• 선택된 셀에서 <b>Ctrl/Cmd + C</b> 복사, <b>Ctrl/Cmd + V</b> 붙여넣기, <b>Ctrl/Cmd + Z</b> 되돌리기</p>
-        </div>
+        <EditableAdminGrid
+          data={filteredMaterials}
+          columns={rawMaterialColumns}
+          onDataChange={(newData) => {
+            setMaterials(newData)
+          }}
+          onDelete={handleDeleteRow}
+          onSave={handleSaveAllConfirmed}
+          onDeleteSelected={(indices) => {
+            indices.forEach(index => handleDeleteRow(index))
+          }}
+          globalSearchPlaceholder="원물코드, 원물명, 대분류, 중분류, 소분류, 품목, 품종 검색"
+        />
       </div>
 
       {/* 변경사항 컨펌 모달 */}
@@ -1517,6 +1430,53 @@ export default function RawMaterialsManagementPage() {
               <span>삭제된 데이터는 복구할 수 없습니다.</span>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* 빈 행 경고 모달 */}
+      {emptyRowsWarning && (
+        <Modal
+          isOpen={true}
+          onClose={() => setEmptyRowsWarning(null)}
+          title="빈 행 저장 경고"
+          size="md"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setEmptyRowsWarning(null)}>취소</Button>
+              <Button onClick={() => {
+                setEmptyRowsWarning(null)
+                handleSaveAllConfirmed(true)
+              }}>계속 저장</Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              빈 행 <strong className="text-amber-600">{emptyRowsWarning.emptyCount}개</strong>는 저장되지 않습니다.
+            </p>
+            <p className="text-sm text-gray-700">
+              나머지 <strong className="text-blue-600">{emptyRowsWarning.validCount}개</strong> 행을 저장하시겠습니까?
+            </p>
+            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>빈 행은 저장 후 페이지를 새로고침하면 사라집니다.</span>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 저장할 데이터 없음 경고 */}
+      {modalType === 'no-data-warning' && (
+        <Modal
+          isOpen={true}
+          onClose={() => setModalType(null)}
+          title="저장 불가"
+          size="sm"
+          footer={<Button onClick={() => setModalType(null)}>확인</Button>}
+        >
+          <p className="text-sm text-gray-700">저장할 데이터가 없습니다.</p>
         </Modal>
       )}
 

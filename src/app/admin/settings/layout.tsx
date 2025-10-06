@@ -31,6 +31,11 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           title: '공급상태',
           description: '원물/상품 공급상태 옵션',
           href: '/admin/settings/supply-status'
+        },
+        {
+          title: '출고처/송장주체',
+          description: '출고처 및 송장주체 관리',
+          href: '/admin/settings/shipping-invoice'
         }
       ]
     },

@@ -28,8 +28,8 @@ export function Modal({
   showCloseButton = true
 }: ModalProps) {
   const sizeStyles = {
-    sm: 'max-w-sm',
-    md: 'max-w-xl',
+    sm: 'max-w-md',
+    md: 'max-w-2xl',
     lg: 'max-w-4xl',
     xl: 'max-w-6xl',
     full: 'max-w-[96vw]'
@@ -46,63 +46,90 @@ export function Modal({
     }
   }, [isOpen])
 
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   return (
     <>
-      {/* 오버레이 - 블러 효과 */}
+      {/* 오버레이 */}
       <div
-        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[9998] animate-fadeIn"
+        className={cn(
+          'fixed inset-0 bg-black/50 z-[9998]',
+          'transition-opacity duration-300 ease-out',
+          isOpen ? 'opacity-100' : 'opacity-0'
+        )}
         onClick={closeOnOverlay ? onClose : undefined}
       />
 
       {/* 모달 */}
-      <div className="fixed inset-0 flex items-center justify-center z-[9999] p-3">
+      <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
         <div
           className={cn(
-            'relative bg-white rounded-xl shadow-xl w-full max-h-[92vh] overflow-hidden animate-scaleIn',
-            'border border-gray-100',
+            'relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-hidden',
+            'border border-gray-200 dark:border-gray-700',
+            'transition-all duration-300 ease-out',
+            isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-6 opacity-0 scale-95',
             sizeStyles[size]
           )}
           onClick={(e) => e.stopPropagation()}
         >
           {/* 헤더 */}
           {(title || showCloseButton) && (
-            <div className="px-3 py-2 border-b border-gray-100 bg-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  {title && (
-                    <h3 className="text-[11px] font-semibold text-gray-900">{title}</h3>
-                  )}
-                  {description && (
-                    <p className="mt-0.5 text-[10px] text-gray-500">{description}</p>
-                  )}
-                </div>
-                {showCloseButton && (
-                  <button
-                    onClick={onClose}
-                    className="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                  >
-                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+            <div className="flex items-center justify-between px-6 py-4">
+              <div className="flex-1">
+                {title && (
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {title}
+                  </h3>
+                )}
+                {description && (
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {description}
+                  </p>
                 )}
               </div>
+              {showCloseButton && (
+                <button
+                  onClick={onClose}
+                  className="ml-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+                  aria-label="닫기"
+                >
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
             </div>
           )}
 
-          {/* 본문 - 컴팩트한 스크롤 */}
-          <div className="px-3 py-2 overflow-y-auto max-h-[calc(92vh-100px)] text-[10px]">
+          {/* 본문 */}
+          <div className="px-6 py-5 overflow-y-auto max-h-[calc(90vh-180px)] text-sm text-gray-700 dark:text-gray-300 text-center">
             {children}
           </div>
 
           {/* 푸터 */}
           {footer && (
-            <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
-              <div className="flex justify-end gap-1.5">
-                {footer}
-              </div>
+            <div className="flex justify-end gap-3 px-6 py-4">
+              {footer}
             </div>
           )}
         </div>

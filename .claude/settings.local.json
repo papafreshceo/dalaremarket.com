@@ -6,7 +6,9 @@
       "Bash(cat:*)",
       "Bash(lsof:*)",
       "Bash(npm run dev:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npx supabase db dump:*)",
+      "Bash(npm uninstall:*)"
     ],
     "deny": [],
     "ask": []

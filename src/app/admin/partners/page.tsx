@@ -1,15 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui'
 import { useToast } from '@/components/ui/Toast'
 import { useConfirm } from '@/components/ui/ConfirmModal'
-import { HotTable } from '@handsontable/react'
-import { registerAllModules } from 'handsontable/registry'
-import 'handsontable/dist/handsontable.full.css'
-
-registerAllModules()
+import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 
 interface Partner {
   id: string
@@ -39,12 +35,11 @@ export default function Page() {
 
   const [partners, setPartners] = useState<Partner[]>([])
   const [partnerTypes, setPartnerTypes] = useState<string[]>([])
-  const [tableData, setTableData] = useState<any[]>([])
+  const [tableData, setTableData] = useState<Partner[]>([])
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState('전체')
 
-  const hotTableRef = useRef<any>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -149,14 +144,9 @@ export default function Page() {
   }
 
   const handleSave = async () => {
-    if (!hotTableRef.current) return
-
-    const hotInstance = hotTableRef.current.hotInstance
-    const sourceData = hotInstance.getSourceData()
-
     try {
-      for (let i = 0; i < sourceData.length; i++) {
-        const row = sourceData[i]
+      for (let i = 0; i < tableData.length; i++) {
+        const row = tableData[i]
 
         if (!row.name) {
           continue
@@ -254,121 +244,111 @@ export default function Page() {
     }
   }
 
-  const columns: any[] = [
+  const columns = [
     {
-      data: 'code',
+      key: 'code',
       title: '거래처코드',
       width: 100,
-      className: 'htCenter',
+      className: 'text-center',
       readOnly: true
     },
     {
-      data: 'name',
+      key: 'name',
       title: '거래처명',
       width: 150,
-      className: 'htCenter'
+      className: 'text-center'
     },
     {
-      data: 'partner_category',
+      key: 'partner_category',
       title: '구분',
-      type: 'dropdown',
-      source: ['공급자', '고객'],
+      type: 'dropdown' as const,
+      source: ['공급자', '고객', '벤더사'],
       width: 80,
-      className: 'htCenter'
+      className: 'text-center'
     },
     {
-      data: 'partner_type',
+      key: 'partner_type',
       title: '유형',
-      type: 'dropdown',
+      type: 'dropdown' as const,
       source: partnerTypes,
       width: 80,
-      className: 'htCenter'
+      className: 'text-center'
     },
     {
-      data: 'representative',
+      key: 'representative',
       title: '대표자',
       width: 100,
-      className: 'htCenter'
+      className: 'text-center'
     },
     {
-      data: 'representative_phone',
+      key: 'representative_phone',
       title: '대표자 전화번호',
       width: 130,
-      className: 'htCenter'
+      className: 'text-center'
     },
     {
-      data: 'contact_person',
+      key: 'contact_person',
       title: '담당자',
       width: 100,
-      className: 'htCenter'
+      className: 'text-center'
     },
     {
-      data: 'phone',
+      key: 'phone',
       title: '담당자 전화번호',
       width: 130,
-      className: 'htCenter'
+      className: 'text-center'
     },
     {
-      data: 'email',
+      key: 'email',
       title: '이메일',
       width: 180,
-      className: 'htCenter'
+      className: 'text-center'
     },
     {
-      data: 'bank_name',
+      key: 'bank_name',
       title: '은행명',
       width: 100,
-      className: 'htCenter'
+      className: 'text-center'
     },
     {
-      data: 'bank_account',
+      key: 'bank_account',
       title: '계좌번호',
       width: 150,
-      className: 'htCenter'
+      className: 'text-center'
     },
     {
-      data: 'account_holder',
+      key: 'account_holder',
       title: '예금주',
       width: 100,
-      className: 'htCenter'
+      className: 'text-center'
     },
     {
-      data: 'commission_type',
+      key: 'commission_type',
       title: '수수료방식',
-      type: 'dropdown',
+      type: 'dropdown' as const,
       source: ['정액', '정율'],
       width: 100,
-      className: 'htCenter'
+      className: 'text-center'
     },
     {
-      data: 'commission_rate',
+      key: 'commission_rate',
       title: '수수료',
-      type: 'numeric',
+      type: 'number' as const,
       width: 100,
-      className: 'htRight'
+      className: 'text-right'
     },
     {
-      data: 'address',
+      key: 'address',
       title: '주소',
       width: 200,
-      className: 'htLeft'
+      className: 'text-left'
     },
     {
-      data: 'notes',
+      key: 'notes',
       title: '비고',
       width: 150,
-      className: 'htLeft'
+      className: 'text-left'
     },
-    {
-      title: '삭제',
-      width: 60,
-      readOnly: true,
-      renderer: function(instance: any, td: any, row: any) {
-        td.innerHTML = '<button class="text-red-600 hover:text-red-800">삭제</button>'
-        td.className = 'htCenter'
-        return td
-      }
-    }
   ]
 
   return (
@@ -412,34 +392,19 @@ export default function Page() {
           <div className="text-sm text-gray-600">
             총 {tableData.length}개의 거래처
           </div>
-          <div className="flex gap-2">
-            <Button onClick={handleAddRow} variant="ghost">
-              + 행 추가
-            </Button>
-            <Button onClick={handleSave}>
-              저장
-            </Button>
-          </div>
         </div>
 
-        <HotTable
-          ref={hotTableRef}
+        <EditableAdminGrid
           data={tableData}
           columns={columns}
-          colHeaders={true}
-          rowHeaders={true}
-          height="500"
-          width="100%"
-          licenseKey="non-commercial-and-evaluation"
-          stretchH="all"
-          autoColumnSize={false}
-          manualColumnResize={true}
-          contextMenu={true}
-          afterOnCellMouseDown={(event, coords) => {
-            if (coords.col === 16) {
-              handleDelete(coords.row)
-            }
+          onDataChange={setTableData}
+          onDelete={handleDelete}
+          onSave={handleSave}
+          onDeleteSelected={(indices) => {
+            indices.forEach(index => handleDelete(index))
           }}
+          height="500px"
+          globalSearchPlaceholder="거래처명, 코드, 대표자, 전화번호 검색"
         />
       </div>
     </div>
