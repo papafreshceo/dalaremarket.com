@@ -63,7 +63,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '60px', height: '8px', background: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${rate}%`, height: '100%', background: '#10b981', borderRadius: '4px' }} />
+              <div className="bg-success" style={{ width: `${rate}%`, height: '100%', borderRadius: '4px' }} />
             </div>
             <span style={{ fontSize: '14px', fontWeight: '500' }}>{rate}%</span>
           </div>
@@ -84,12 +84,10 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
         }}
       >
         <div
-          className="dark:bg-[#252526] dark:border-[#3e3e42]"
+          className="card"
           style={{
-            background: 'white',
             padding: '20px',
-            borderRadius: '8px',
-            border: '1px solid #e5e7eb'
+            borderRadius: '8px'
           }}
         >
           <div style={{ fontSize: '14px', marginBottom: '8px' }}>
@@ -101,36 +99,32 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
         </div>
 
         <div
-          className="dark:bg-[#252526] dark:border-[#3e3e42]"
+          className="card"
           style={{
-            background: 'white',
             padding: '20px',
-            borderRadius: '8px',
-            border: '1px solid #e5e7eb'
+            borderRadius: '8px'
           }}
         >
           <div style={{ fontSize: '14px', marginBottom: '8px' }}>
             완료된 정산
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>
+          <div className="text-success" style={{ fontSize: '24px', fontWeight: 'bold' }}>
             ₩{orders.filter(o => o.status === 'shipped')
               .reduce((sum, o) => sum + (o.amount || 0), 0).toLocaleString()}
           </div>
         </div>
 
         <div
-          className="dark:bg-[#252526] dark:border-[#3e3e42]"
+          className="card"
           style={{
-            background: 'white',
             padding: '20px',
-            borderRadius: '8px',
-            border: '1px solid #e5e7eb'
+            borderRadius: '8px'
           }}
         >
           <div style={{ fontSize: '14px', marginBottom: '8px' }}>
             미완료 정산
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>
+          <div className="text-danger" style={{ fontSize: '24px', fontWeight: 'bold' }}>
             ₩{orders.filter(o => o.status !== 'shipped')
               .reduce((sum, o) => sum + (o.amount || 0), 0).toLocaleString()}
           </div>
@@ -162,15 +156,13 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
 
       {/* 결제 수단별 통계 */}
       <div
-        className="dark:bg-[#252526] dark:border-[#3e3e42]"
+        className="card"
         style={{
-          background: 'white',
           borderRadius: '8px',
-          overflow: 'hidden',
-          border: '1px solid #e5e7eb'
+          overflow: 'hidden'
         }}
       >
-        <div className="dark:border-[#3e3e42]" style={{ padding: '16px', borderBottom: '1px solid #e5e7eb' }}>
+        <div className="border-gray-200" style={{ padding: '16px', borderBottom: '1px solid' }}>
           <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
             결제 수단별 통계
           </h3>
@@ -184,12 +176,10 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
             }}
           >
             <div
-              className="dark:bg-[#2d2d30] dark:border-[#3e3e42]"
+              className="card"
               style={{
                 padding: '16px',
-                background: '#f9fafb',
-                borderRadius: '8px',
-                border: '1px solid #e5e7eb'
+                borderRadius: '8px'
               }}
             >
               <div style={{ fontSize: '14px', marginBottom: '8px' }}>
@@ -204,12 +194,10 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
             </div>
 
             <div
-              className="dark:bg-[#2d2d30] dark:border-[#3e3e42]"
+              className="card"
               style={{
                 padding: '16px',
-                background: '#f9fafb',
-                borderRadius: '8px',
-                border: '1px solid #e5e7eb'
+                borderRadius: '8px'
               }}
             >
               <div style={{ fontSize: '14px', marginBottom: '8px' }}>
@@ -224,12 +212,10 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
             </div>
 
             <div
-              className="dark:bg-[#2d2d30] dark:border-[#3e3e42]"
+              className="card"
               style={{
                 padding: '16px',
-                background: '#f9fafb',
-                borderRadius: '8px',
-                border: '1px solid #e5e7eb'
+                borderRadius: '8px'
               }}
             >
               <div style={{ fontSize: '14px', marginBottom: '8px' }}>

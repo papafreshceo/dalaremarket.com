@@ -290,20 +290,20 @@ export default function MaterialMatchingPage() {
 
       <div className="grid gap-6" style={{ gridTemplateColumns: '35% 65%' }}>
         {/* 좌측: 옵션상품 리스트 */}
-        <div className="border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800">
-          <div className="px-4 py-3 border-b border-gray-300 dark:border-gray-600">
+        <div className="border border-border rounded-lg bg-surface">
+          <div className="px-4 py-3 border-b border-border">
             <div className="flex items-center gap-4">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">옵션상품</h2>
+              <h2 className="text-lg font-medium text-text">옵션상품</h2>
 
               <div className="flex items-center gap-2">
-                <span className="text-[13px] text-gray-600 dark:text-gray-400 whitespace-nowrap">품목</span>
+                <span className="text-[13px] text-text-secondary whitespace-nowrap">품목</span>
                 <select
                   value={itemTypeFilter}
                   onChange={(e) => {
                     setItemTypeFilter(e.target.value)
                     setVarietyFilter('')
                   }}
-                  className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-[13px]"
+                  className="border border-border rounded px-3 py-1.5 bg-surface text-text text-[13px]"
                 >
                   <option value="">전체</option>
                   {itemTypes.map(type => (
@@ -311,11 +311,11 @@ export default function MaterialMatchingPage() {
                   ))}
                 </select>
 
-                <span className="text-[13px] text-gray-600 dark:text-gray-400 whitespace-nowrap">품종</span>
+                <span className="text-[13px] text-text-secondary whitespace-nowrap">품종</span>
                 <select
                   value={varietyFilter}
                   onChange={(e) => setVarietyFilter(e.target.value)}
-                  className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-[13px]"
+                  className="border border-border rounded px-3 py-1.5 bg-surface text-text text-[13px]"
                 >
                   <option value="">전체</option>
                   {varieties.map(variety => (
@@ -333,12 +333,12 @@ export default function MaterialMatchingPage() {
                 <col style={{ width: '90px' }} />
                 <col style={{ width: '50px' }} />
               </colgroup>
-              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+              <thead className="bg-background-secondary sticky top-0">
                 <tr>
-                  <th className="border-b border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 font-medium text-left" style={{ fontSize: '14px', padding: '20px 12px' }}>옵션코드</th>
-                  <th className="border-b border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 font-medium text-left" style={{ fontSize: '14px', padding: '20px 12px' }}>상품명</th>
-                  <th className="border-b border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 font-medium text-right" style={{ fontSize: '14px', padding: '20px 12px' }}>표준수량</th>
-                  <th className="border-b border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 font-medium text-center" style={{ fontSize: '14px', padding: '20px 12px' }}>매칭</th>
+                  <th className="border-b border-border text-text font-medium text-left" style={{ fontSize: '14px', padding: '20px 12px' }}>옵션코드</th>
+                  <th className="border-b border-border text-text font-medium text-left" style={{ fontSize: '14px', padding: '20px 12px' }}>상품명</th>
+                  <th className="border-b border-border text-text font-medium text-right" style={{ fontSize: '14px', padding: '20px 12px' }}>표준수량</th>
+                  <th className="border-b border-border text-text font-medium text-center" style={{ fontSize: '14px', padding: '20px 12px' }}>매칭</th>
                 </tr>
               </thead>
               <tbody>
@@ -346,20 +346,20 @@ export default function MaterialMatchingPage() {
                   <tr
                     key={product.id}
                     onClick={() => handleProductSelect(product)}
-                    className={`cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                      selectedProduct?.id === product.id ? 'bg-blue-50 dark:bg-blue-900' : ''
+                    className={`cursor-pointer hover:bg-surface-hover ${
+                      selectedProduct?.id === product.id ? 'bg-primary-100' : ''
                     }`}
                   >
-                    <td className="border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 truncate" style={{ fontSize: '14px', padding: '18px 12px' }}>{product.option_code}</td>
-                    <td className="border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 truncate" style={{ fontSize: '14px', padding: '18px 12px' }}>{product.option_name}</td>
-                    <td className="border-b border-gray-200 dark:border-gray-700 text-right text-gray-900 dark:text-gray-100" style={{ fontSize: '14px', padding: '18px 12px' }}>
+                    <td className="border-b border-border text-text truncate" style={{ fontSize: '14px', padding: '18px 12px' }}>{product.option_code}</td>
+                    <td className="border-b border-border text-text truncate" style={{ fontSize: '14px', padding: '18px 12px' }}>{product.option_name}</td>
+                    <td className="border-b border-border text-right text-text" style={{ fontSize: '14px', padding: '18px 12px' }}>
                       {product.standard_quantity || '-'} {product.standard_unit || ''}
                     </td>
-                    <td className="border-b border-gray-200 dark:border-gray-700 text-center" style={{ fontSize: '14px', padding: '18px 12px' }}>
+                    <td className="border-b border-border text-center" style={{ fontSize: '14px', padding: '18px 12px' }}>
                       {product.has_materials ? (
-                        <span className="text-[#10b981] dark:text-[#34d399] font-medium">✓</span>
+                        <span className="text-success font-medium">✓</span>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-text-disabled">-</span>
                       )}
                     </td>
                   </tr>
@@ -370,15 +370,15 @@ export default function MaterialMatchingPage() {
         </div>
 
         {/* 우측: 연결된 원물 */}
-        <div className="border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800">
-          <div className="px-4 py-3 border-b border-gray-300 dark:border-gray-600">
+        <div className="border border-border rounded-lg bg-surface">
+          <div className="px-4 py-3 border-b border-border">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                <h2 className="text-lg font-medium text-text">
                   {selectedProduct ? selectedProduct.option_name : '연결된 원물'}
                 </h2>
                 {selectedProduct && (
-                  <span className="text-[13px] text-gray-600 dark:text-gray-400">
+                  <span className="text-[13px] text-text-secondary">
                     표준수량 {selectedProduct.standard_quantity || 0}{selectedProduct.standard_unit || ''}
                   </span>
                 )}
@@ -387,14 +387,14 @@ export default function MaterialMatchingPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowMaterialSelector(!showMaterialSelector)}
-                    className="px-3 py-1.5 text-[13px] bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                    className="px-3 py-1.5 text-[13px] bg-primary text-white rounded hover:bg-primary-hover transition-colors"
                   >
                     원물 추가
                   </button>
                   {linkedMaterials.length > 0 && (
                     <button
                       onClick={handleSaveLinks}
-                      className="px-3 py-1.5 text-[13px] bg-[#10b981] text-white rounded hover:bg-[#059669] transition-colors"
+                      className="px-3 py-1.5 text-[13px] bg-success text-white rounded hover:bg-success-hover transition-colors"
                     >
                       저장
                     </button>
@@ -405,45 +405,45 @@ export default function MaterialMatchingPage() {
           </div>
 
           {!selectedProduct ? (
-            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+            <div className="p-8 text-center text-text-secondary">
               <span className="text-[13px]">좌측에서 옵션상품을 선택하세요</span>
             </div>
           ) : (
             <div className="p-4 space-y-4">
               {/* 원물 선택 모달 */}
               {showMaterialSelector && (
-                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700">
+                <div className="border border-border rounded-lg p-4 bg-background-secondary">
                   <div className="mb-3">
                     <input
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder="원물명 또는 원물코드 검색"
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-[13px]"
+                      className="w-full border border-border rounded px-3 py-2 bg-surface text-text text-[13px]"
                     />
                   </div>
                   <div className="max-h-60 overflow-y-auto">
                     <table className="w-full text-[13px]">
-                      <thead className="bg-gray-100 dark:bg-gray-600 sticky top-0">
+                      <thead className="bg-background-secondary sticky top-0">
                         <tr>
-                          <th className="px-3 py-2 text-left border-b border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">원물코드</th>
-                          <th className="px-3 py-2 text-left border-b border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">원물명</th>
-                          <th className="px-3 py-2 text-center border-b border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">표준수량</th>
-                          <th className="px-3 py-2 text-center border-b border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">선택</th>
+                          <th className="px-3 py-2 text-left border-b border-border text-text">원물코드</th>
+                          <th className="px-3 py-2 text-left border-b border-border text-text">원물명</th>
+                          <th className="px-3 py-2 text-center border-b border-border text-text">표준수량</th>
+                          <th className="px-3 py-2 text-center border-b border-border text-text">선택</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredMaterials.map((material) => (
-                          <tr key={material.id} className="hover:bg-gray-200 dark:hover:bg-gray-600">
-                            <td className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">{material.material_code}</td>
-                            <td className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">{material.material_name}</td>
-                            <td className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 text-center text-gray-900 dark:text-gray-100">
+                          <tr key={material.id} className="hover:bg-surface-hover">
+                            <td className="px-3 py-2 border-b border-border text-text">{material.material_code}</td>
+                            <td className="px-3 py-2 border-b border-border text-text">{material.material_name}</td>
+                            <td className="px-3 py-2 border-b border-border text-center text-text">
                               {material.standard_quantity || '-'} {material.standard_unit || ''}
                             </td>
-                            <td className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 text-center">
+                            <td className="px-3 py-2 border-b border-border text-center">
                               <button
                                 onClick={() => handleAddMaterial(material.id)}
-                                className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                                className="text-primary hover:text-primary-hover"
                               >
                                 추가
                               </button>
@@ -458,7 +458,7 @@ export default function MaterialMatchingPage() {
 
               {/* 연결된 원물 테이블 */}
               {linkedMaterials.length === 0 ? (
-                <div className="text-center py-8 text-[13px] text-gray-500 dark:text-gray-400">
+                <div className="text-center py-8 text-[13px] text-text-secondary">
                   연결된 원물이 없습니다
                 </div>
               ) : (
@@ -466,7 +466,7 @@ export default function MaterialMatchingPage() {
                   <div className="mb-3 flex justify-end">
                     <button
                       onClick={autoDistributePercentages}
-                      className="px-3 py-1.5 text-[13px] bg-[#10b981] text-white rounded hover:bg-[#059669] transition-colors"
+                      className="px-3 py-1.5 text-[13px] bg-success text-white rounded hover:bg-success-hover transition-colors"
                     >
                       자동 균등배분
                     </button>
@@ -478,17 +478,17 @@ export default function MaterialMatchingPage() {
                       const percentage = link.percentage || 0
 
                       return (
-                        <div key={link.id} className="border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
+                        <div key={link.id} className="border border-border rounded-lg p-2 bg-surface">
                           <div className="flex items-center gap-3">
                             {/* 원물명 | 원물코드 | 표준 */}
-                            <div className="text-[13px] text-gray-900 dark:text-gray-100 flex-shrink-0" style={{ width: '350px' }}>
+                            <div className="text-[13px] text-text flex-shrink-0" style={{ width: '350px' }}>
                               {link.material_name} <span className="mx-2">|</span> {link.material_code} <span className="mx-2">|</span> 표준 {link.material_standard_quantity || '-'}{link.material_standard_unit || ''}
                             </div>
 
                             {/* 필요량 */}
                             <div className="text-[13px] flex-shrink-0" style={{ width: '120px' }}>
-                              <span className="text-gray-600 dark:text-gray-400">필요량 </span>
-                              <span className="font-medium text-[#10b981] dark:text-[#34d399]">
+                              <span className="text-text-secondary">필요량 </span>
+                              <span className="font-medium text-success">
                                 {requiredPerOne.toFixed(1)} {link.material_standard_unit || ''}
                               </span>
                             </div>
@@ -502,20 +502,20 @@ export default function MaterialMatchingPage() {
                                 step="0.1"
                                 value={percentage}
                                 onChange={(e) => handlePercentageChange(link.id, parseFloat(e.target.value))}
-                                className="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                className="w-32 h-2 bg-background-secondary rounded-lg appearance-none cursor-pointer accent-primary"
                               />
-                              <span className="text-[13px] font-medium text-blue-600 dark:text-blue-400 w-12 text-right">
+                              <span className="text-[13px] font-medium text-primary w-12 text-right">
                                 {percentage.toFixed(1)}%
                               </span>
                             </div>
 
                             {/* 구분선 */}
-                            <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
+                            <div className="w-px h-6 bg-border"></div>
 
                             {/* 삭제 버튼 */}
                             <button
                               onClick={() => handleDeleteMaterial(link.id)}
-                              className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-[13px] flex-shrink-0"
+                              className="text-danger hover:text-danger-hover text-[13px] flex-shrink-0"
                             >
                               삭제
                             </button>
@@ -526,17 +526,17 @@ export default function MaterialMatchingPage() {
                   </div>
 
                   {/* 요약 정보 */}
-                  <div className="border-t border-gray-300 dark:border-gray-600 pt-3 space-y-2">
+                  <div className="border-t border-border pt-3 space-y-2">
                     <div className="flex justify-between text-[13px]">
-                      <span className="text-gray-600 dark:text-gray-400">총 사용 원물:</span>
-                      <span className="font-medium text-gray-900 dark:text-gray-100">{linkedMaterials.length}개</span>
+                      <span className="text-text-secondary">총 사용 원물:</span>
+                      <span className="font-medium text-text">{linkedMaterials.length}개</span>
                     </div>
                     <div className="flex justify-between text-[13px]">
-                      <span className="text-gray-600 dark:text-gray-400">총 비율:</span>
+                      <span className="text-text-secondary">총 비율:</span>
                       <span className={`font-medium ${
                         Math.abs(linkedMaterials.reduce((sum, l) => sum + (l.percentage || 0), 0) - 100) < 0.1
-                          ? 'text-[#10b981] dark:text-[#34d399]'
-                          : 'text-orange-600 dark:text-orange-400'
+                          ? 'text-success'
+                          : 'text-warning'
                       }`}>
                         {linkedMaterials.reduce((sum, l) => sum + (l.percentage || 0), 0).toFixed(1)}%
                       </span>

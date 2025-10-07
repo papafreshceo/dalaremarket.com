@@ -20,12 +20,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       }}>
 
         {/* 발주 캘린더 */}
-        <div style={{
-          background: 'white',
+        <div className="card" style={{
           borderRadius: '12px',
           padding: '20px',
-          marginBottom: '40px',
-          border: '1px solid #e5e7eb'
+          marginBottom: '40px'
         }}>
           <div style={{
             display: 'flex',
@@ -45,17 +43,16 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               gap: '8px',
               alignItems: 'center'
             }}>
-              <button style={{
+              <button className="bg-white border-gray-200" style={{
                 padding: '6px',
-                background: '#ffffff',
-                border: '1px solid #dee2e6',
+                border: '1px solid',
                 borderRadius: '6px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" stroke="#6c757d" strokeWidth="2" fill="none">
+                <svg width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none" opacity="0.6">
                   <path d="M15 18l-6-6 6-6"/>
                 </svg>
               </button>
@@ -67,17 +64,16 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               }}>
                 2025년 1월
               </span>
-              <button style={{
+              <button className="bg-white border-gray-200" style={{
                 padding: '6px',
-                background: '#ffffff',
-                border: '1px solid #dee2e6',
+                border: '1px solid',
                 borderRadius: '6px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" stroke="#6c757d" strokeWidth="2" fill="none">
+                <svg width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none" opacity="0.6">
                   <path d="M9 18l6-6-6-6"/>
                 </svg>
               </button>
@@ -92,11 +88,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             marginBottom: '12px'
           }}>
             {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
-              <div key={idx} style={{
+              <div key={idx} className={idx === 0 ? 'text-danger' : idx === 6 ? 'text-primary' : ''} style={{
                 textAlign: 'center',
                 fontSize: '12px',
                 fontWeight: '600',
-                color: idx === 0 ? '#ef4444' : idx === 6 ? '#2563eb' : undefined,
                 padding: '4px 0'
               }}>
                 {day}
@@ -129,10 +124,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               const dayOfWeek = (day + 2) % 7; // 1일이 수요일
 
               return (
-                <div key={day} style={{
+                <div key={day} className={hasOrder && !isToday ? 'bg-white' : ''} style={{
                   position: 'relative',
-                  background: isToday ? 'rgba(37, 99, 235, 0.1)' : hasOrder ? 'rgba(255, 255, 255, 0.9)' : 'transparent',
-                  border: isToday ? '2px solid #2563eb' : hasOrder ? '1px solid #dee2e6' : 'none',
+                  background: isToday ? 'rgba(37, 99, 235, 0.1)' : hasOrder ? undefined : 'transparent',
+                  border: isToday ? '2px solid' : hasOrder ? '1px solid' : 'none',
+                  borderColor: isToday ? '#2563eb' : hasOrder ? '#dee2e6' : undefined,
                   borderRadius: '8px',
                   padding: '8px 4px',
                   minHeight: '60px',
@@ -151,21 +147,19 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 }}
                 onMouseLeave={(e) => {
                   if (hasOrder && !isToday) {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                    e.currentTarget.style.background = '';
                     e.currentTarget.style.transform = 'scale(1)';
                   }
                 }}>
-                  <span style={{
+                  <span className={dayOfWeek === 0 ? 'text-danger' : dayOfWeek === 6 || isToday ? 'text-primary' : ''} style={{
                     fontSize: '13px',
-                    fontWeight: isToday ? '600' : '500',
-                    color: dayOfWeek === 0 ? '#ef4444' : dayOfWeek === 6 ? '#2563eb' : isToday ? '#2563eb' : undefined
+                    fontWeight: isToday ? '600' : '500'
                   }}>
                     {day}
                   </span>
                   {hasOrder && (
                     <>
-                      <div style={{
-                        background: '#2563eb',
+                      <div className="bg-primary" style={{
                         color: '#ffffff',
                         borderRadius: '10px',
                         padding: '2px 6px',
@@ -174,9 +168,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       }}>
                         {orderCount}건
                       </div>
-                      <div style={{
+                      <div className="text-success" style={{
                         fontSize: '12px',
-                        color: '#10b981',
                         fontWeight: '500'
                       }}>
                         ₩{(orderCount * 450).toLocaleString()}K
@@ -184,11 +177,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     </>
                   )}
                   {isToday && (
-                    <div style={{
+                    <div className="bg-primary" style={{
                       position: 'absolute',
                       bottom: '2px',
                       right: '2px',
-                      background: '#2563eb',
                       color: '#ffffff',
                       borderRadius: '3px',
                       padding: '1px 4px',
@@ -227,24 +219,23 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 width: '12px',
                 height: '12px',
                 background: 'rgba(37, 99, 235, 0.1)',
-                border: '2px solid #2563eb',
+                border: '2px solid',
+                borderColor: '#2563eb',
                 borderRadius: '3px'
               }} />
               <span>오늘</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{
+              <div className="bg-white border-gray-200" style={{
                 width: '12px',
                 height: '12px',
-                background: 'rgba(255, 255, 255, 0.9)',
-                border: '1px solid #dee2e6',
+                border: '1px solid',
                 borderRadius: '3px'
               }} />
               <span>발주일</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{
-                background: '#2563eb',
+              <div className="bg-primary" style={{
                 color: '#ffffff',
                 borderRadius: '10px',
                 padding: '1px 6px',
@@ -266,9 +257,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           marginBottom: '40px'
         }}>
           {/* 이번달 발주액 */}
-          <div style={{
-            background: 'white',
-            border: '1px solid #e5e7eb',
+          <div className="card" style={{
             borderRadius: '12px',
             padding: '20px'
           }}>
@@ -292,15 +281,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               gap: '4px',
               color: '#6b7280'
             }}>
-              <span style={{ color: '#34d399' }}>▲</span>
+              <span className="text-success">▲</span>
               <span>전월 대비 +12.5%</span>
             </div>
           </div>
 
           {/* 어제 발주액 */}
-          <div style={{
-            background: 'white',
-            border: '1px solid #e5e7eb',
+          <div className="card" style={{
             borderRadius: '12px',
             padding: '20px'
           }}>
@@ -324,15 +311,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               gap: '4px',
               color: '#6b7280'
             }}>
-              <span style={{ color: '#fbbf24' }}>▼</span>
+              <span className="text-warning">▼</span>
               <span>전일 대비 -8.2%</span>
             </div>
           </div>
 
           {/* 평균 주문액 */}
-          <div style={{
-            background: 'white',
-            border: '1px solid #e5e7eb',
+          <div className="card" style={{
             borderRadius: '12px',
             padding: '20px'
           }}>
@@ -356,15 +341,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               gap: '4px',
               color: '#6b7280'
             }}>
-              <span style={{ color: '#34d399' }}>▲</span>
+              <span className="text-success">▲</span>
               <span>전월 대비 +5.8%</span>
             </div>
           </div>
 
           {/* 총 발주 건수 */}
-          <div style={{
-            background: 'white',
-            border: '1px solid #e5e7eb',
+          <div className="card" style={{
             borderRadius: '12px',
             padding: '20px'
           }}>
@@ -388,7 +371,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               gap: '4px',
               color: '#6b7280'
             }}>
-              <span style={{ color: '#34d399' }}>▲</span>
+              <span className="text-success">▲</span>
               <span>전월 대비 +22건</span>
             </div>
           </div>
@@ -401,9 +384,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           gap: '32px'
         }}>
           {/* 월별 발주 추이 */}
-          <div style={{
-            background: 'white',
-            border: '1px solid #e5e7eb',
+          <div className="card" style={{
             borderRadius: '12px',
             padding: '20px'
           }}>
@@ -447,9 +428,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           </div>
 
           {/* 판매채널별 발주 비율 */}
-          <div style={{
-            background: 'white',
-            border: '1px solid #e5e7eb',
+          <div className="card" style={{
             borderRadius: '12px',
             padding: '20px'
           }}>
@@ -540,9 +519,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           </div>
 
           {/* 품목별 발주 TOP 5 */}
-          <div style={{
-            background: 'white',
-            border: '1px solid #e5e7eb',
+          <div className="card" style={{
             borderRadius: '12px',
             padding: '20px'
           }}>
@@ -579,16 +556,14 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       {item.amount}
                     </span>
                   </div>
-                  <div style={{
+                  <div className="border-gray-200" style={{
                     height: '6px',
-                    background: '#dee2e6',
                     borderRadius: '3px',
                     overflow: 'hidden'
                   }}>
-                    <div style={{
+                    <div className="bg-primary" style={{
                       width: `${item.percent}%`,
                       height: '100%',
-                      background: '#2563eb',
                       transition: 'width 0.3s'
                     }} />
                   </div>
@@ -598,9 +573,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           </div>
 
           {/* 일별 발주 현황 */}
-          <div style={{
-            background: 'white',
-            border: '1px solid #e5e7eb',
+          <div className="card" style={{
             borderRadius: '12px',
             padding: '20px'
           }}>

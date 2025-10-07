@@ -11,47 +11,94 @@
    ======================== */
 
 :root {
-  /* 색상 팔레트 - 모던 뉴트럴 */
-  --color-neutral-50: #fafafa;
-  --color-neutral-100: #f5f5f5;
-  --color-neutral-200: #e5e5e5;
-  --color-neutral-300: #d4d4d4;
-  --color-neutral-400: #a3a3a3;
-  --color-neutral-500: #737373;
-  --color-neutral-600: #525252;
-  --color-neutral-700: #404040;
-  --color-neutral-800: #262626;
-  --color-neutral-900: #171717;
-  --color-neutral-950: #0a0a0a;
-  
-  /* 프라이머리 - 깊은 인디고 */
-  --color-primary: #5046e5;
-  --color-primary-light: #6366f1;
-  --color-primary-dark: #4338ca;
-  --color-primary-contrast: #ffffff;
-  
-  /* 액센트 색상 */
-  --color-accent-green: #10b981;
-  --color-accent-red: #ef4444;
-  --color-accent-yellow: #eab308;
-  --color-accent-blue: #3b82f6;
-  
+  /* ==================== 라이트 모드 색상 시스템 ==================== */
+
+  /* Primary (파란색 - 메인 브랜드 컬러) */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+
+  /* Success (초록색 - 성공 상태) */
+  --color-success-50: #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-200: #bbf7d0;
+  --color-success-300: #86efac;
+  --color-success-400: #4ade80;
+  --color-success-500: #22c55e;
+  --color-success-600: #10b981;  /* 발송완료 텍스트 색상 */
+  --color-success-700: #059669;
+  --color-success-800: #047857;
+  --color-success-900: #065f46;
+
+  /* Warning (주황색 - 경고 상태) */
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-900: #78350f;
+
+  /* Danger (빨간색 - 에러 상태) */
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-200: #fecaca;
+  --color-danger-300: #fca5a5;
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+  --color-danger-800: #991b1b;
+  --color-danger-900: #7f1d1d;
+
+  /* Gray (회색 - 배경/텍스트/테두리) */
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+
+  /* 시맨틱 컬러 (용도별 매핑) */
+  --color-primary: var(--color-primary-600);
+  --color-primary-hover: var(--color-primary-700);
+  --color-success: var(--color-success-600);
+  --color-success-hover: var(--color-success-700);
+  --color-warning: var(--color-warning-500);
+  --color-warning-hover: var(--color-warning-600);
+  --color-danger: var(--color-danger-600);
+  --color-danger-hover: var(--color-danger-700);
+
   /* 배경 */
   --color-background: #ffffff;
-  --color-background-secondary: #fafafa;
+  --color-background-secondary: var(--color-gray-50);
   --color-surface: #ffffff;
-  --color-surface-hover: #f9fafb;
-  
+  --color-surface-hover: var(--color-gray-50);
+
   /* 텍스트 */
-  --color-text: #171717;
-  --color-text-secondary: #525252;
-  --color-text-tertiary: #737373;
-  --color-text-disabled: #a3a3a3;
-  
+  --color-text: var(--color-gray-900);
+  --color-text-secondary: var(--color-gray-600);
+  --color-text-tertiary: var(--color-gray-500);
+  --color-text-disabled: var(--color-gray-400);
+
   /* 테두리 */
-  --color-border: #e5e5e5;
-  --color-border-hover: #d4d4d4;
-  --color-border-focus: var(--color-primary);
+  --color-border: var(--color-gray-200);
+  --color-border-hover: var(--color-gray-300);
+  --color-border-focus: var(--color-primary-500);
   
   /* 간격 - 8px 그리드 */
   --spacing-xs: 0.25rem;   /* 4px */
@@ -107,24 +154,94 @@
   --z-tooltip: 700;
 }
 
-/* 다크모드 - VSCode 테마 */
+/* ==================== 다크 모드 색상 시스템 ==================== */
 .dark {
+  /* Primary (파란색) - 라이트모드보다 밝게 */
+  --color-primary-50: #1e3a8a;
+  --color-primary-100: #1e40af;
+  --color-primary-200: #1d4ed8;
+  --color-primary-300: #2563eb;
+  --color-primary-400: #3b82f6;
+  --color-primary-500: #60a5fa;
+  --color-primary-600: #93c5fd;
+  --color-primary-700: #bfdbfe;
+  --color-primary-800: #dbeafe;
+  --color-primary-900: #eff6ff;
+
+  /* Success (초록색) - 라이트모드보다 밝게 */
+  --color-success-50: #14532d;
+  --color-success-100: #166534;
+  --color-success-200: #15803d;
+  --color-success-300: #16a34a;
+  --color-success-400: #22c55e;
+  --color-success-500: #4ade80;
+  --color-success-600: #86efac;
+  --color-success-700: #bbf7d0;
+  --color-success-800: #dcfce7;
+  --color-success-900: #f0fdf4;
+
+  /* Warning (주황색) - 라이트모드보다 밝게 */
+  --color-warning-50: #78350f;
+  --color-warning-100: #92400e;
+  --color-warning-200: #b45309;
+  --color-warning-300: #d97706;
+  --color-warning-400: #f59e0b;
+  --color-warning-500: #fbbf24;
+  --color-warning-600: #fcd34d;
+  --color-warning-700: #fde68a;
+  --color-warning-800: #fef3c7;
+  --color-warning-900: #fffbeb;
+
+  /* Danger (빨간색) - 라이트모드보다 밝게 */
+  --color-danger-50: #7f1d1d;
+  --color-danger-100: #991b1b;
+  --color-danger-200: #b91c1c;
+  --color-danger-300: #dc2626;
+  --color-danger-400: #ef4444;
+  --color-danger-500: #f87171;
+  --color-danger-600: #fca5a5;
+  --color-danger-700: #fecaca;
+  --color-danger-800: #fee2e2;
+  --color-danger-900: #fef2f2;
+
+  /* Gray (VSCode 스타일) */
+  --color-gray-50: #0a0a0a;
+  --color-gray-100: #1e1e1e;
+  --color-gray-200: #252526;
+  --color-gray-300: #2d2d30;
+  --color-gray-400: #3e3e42;
+  --color-gray-500: #505050;
+  --color-gray-600: #6e6e6e;
+  --color-gray-700: #9c9c9c;
+  --color-gray-800: #cccccc;
+  --color-gray-900: #e0e0e0;
+
+  /* 시맨틱 컬러 (다크모드용 매핑 - 차분하고 시멘틱하게) */
+  --color-primary: var(--color-primary-400); /* 차분한 파랑 */
+  --color-primary-hover: var(--color-primary-500); /* 호버시 약간 밝게 */
+  --color-success: var(--color-success-300); /* 차분한 초록 */
+  --color-success-hover: var(--color-success-400); /* 호버시 약간 밝게 */
+  --color-warning: var(--color-warning-400); /* 차분한 주황 */
+  --color-warning-hover: var(--color-warning-500); /* 호버시 약간 밝게 */
+  --color-danger: var(--color-danger-400); /* 차분한 빨강 */
+  --color-danger-hover: var(--color-danger-500); /* 호버시 약간 밝게 */
+
+  /* 배경 */
   --color-background: #1e1e1e;
   --color-background-secondary: #252526;
   --color-surface: #2d2d30;
   --color-surface-hover: #3e3e42;
 
+  /* 텍스트 */
   --color-text: #cccccc;
   --color-text-secondary: #9c9c9c;
   --color-text-tertiary: #6e6e6e;
   --color-text-disabled: #5a5a5a;
 
+  /* 테두리 */
   --color-border: #3e3e42;
   --color-border-hover: #505050;
-
-  --color-primary: #007acc;
-  --color-primary-light: #1b9bde;
-  --color-primary-dark: #005a9e;
+  --color-border-focus: var(--color-primary-500);
 }
 
 .dark body {
@@ -135,36 +252,25 @@
 .dark input,
 .dark textarea,
 .dark select {
-  background-color: #2d2d30 !important;
-  border-color: #3e3e42 !important;
-  color: #cccccc !important;
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
 }
 
 .dark input::placeholder,
 .dark textarea::placeholder {
-  color: #6e6e6e !important;
+  color: var(--color-text-tertiary) !important;
 }
 
 .dark input:focus,
 .dark textarea:focus,
 .dark select:focus {
-  border-color: #007acc !important;
+  border-color: var(--color-border-focus) !important;
 }
 
-/* 다크모드 Card */
-.dark [style*="background: #ffffff"],
-.dark [style*="background:#ffffff"] {
-  background: #252526 !important;
-}
-
-.dark [style*="border: 1px solid #bfdbfe"],
-.dark [style*="border:1px solid #bfdbfe"] {
-  border-color: #3e3e42 !important;
-}
-
-/* 다크모드 텍스트 - 강제 적용 */
+/* 다크모드 기본 스타일 */
 .dark * {
-  border-color: #3e3e42;
+  border-color: var(--color-border);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -175,7 +281,7 @@
 .dark h4,
 .dark h5,
 .dark h6 {
-  color: #cccccc !important;
+  color: var(--color-text) !important;
   font-weight: 600 !important;
 }
 
@@ -183,7 +289,7 @@
 .dark span:not([style*="color:"]),
 .dark div:not([style*="color:"]),
 .dark label:not([style*="color:"]) {
-  color: #cccccc !important;
+  color: var(--color-text) !important;
   font-weight: 300 !important;
 }
 
@@ -200,194 +306,277 @@
   font-weight: 400 !important;
 }
 
-.dark [style*="color: #1d4ed8"],
-.dark [style*="color:#1d4ed8"],
-.dark [style*="color: rgb(29, 78, 216)"] {
-  color: #007acc !important;
-}
-
-.dark [style*="color: #64748b"],
-.dark [style*="color:#64748b"],
-.dark [style*="color: rgb(100, 116, 139)"] {
-  color: #9c9c9c !important;
-}
-
-.dark [style*="color: #334155"],
-.dark [style*="color:#334155"],
-.dark [style*="color: rgb(51, 65, 85)"] {
-  color: #cccccc !important;
-}
-
-.dark [style*="color: #111827"],
-.dark [style*="color:#111827"],
-.dark [style*="color: #000000"],
-.dark [style*="color:#000000"],
-.dark [style*="color: rgb(17, 24, 39)"],
-.dark [style*="color: rgb(0, 0, 0)"] {
-  color: #cccccc !important;
-}
-
 .dark .text-gray-900,
 .dark .text-gray-800,
 .dark .text-gray-700,
 .dark .text-gray-600 {
-  color: #cccccc !important;
+  color: var(--color-text) !important;
 }
 
 .dark .text-gray-500,
 .dark .text-gray-400 {
-  color: #9c9c9c !important;
+  color: var(--color-text-secondary) !important;
 }
 
 .dark .bg-white {
-  background-color: #252526 !important;
+  background-color: var(--color-background-secondary) !important;
 }
 
 .dark .bg-gray-50,
 .dark .bg-gray-100 {
-  background-color: #1e1e1e !important;
+  background-color: var(--color-background) !important;
 }
 
 .dark .bg-gray-200 {
-  background-color: #2d2d30 !important;
+  background-color: var(--color-surface) !important;
 }
 
-/* 다크모드 배지 */
-.dark [style*="background-color: #fed7aa"],
-.dark [style*="background-color:#fed7aa"],
-.dark [style*="backgroundColor: #fed7aa"],
-.dark [style*="backgroundColor:#fed7aa"] {
-  background-color: #78350f !important;
-  color: #fef3c7 !important;
+.dark .border-gray-200 {
+  border-color: #3e3e42 !important;
 }
 
-.dark [style*="background-color: #bfdbfe"],
-.dark [style*="background-color:#bfdbfe"],
-.dark [style*="backgroundColor: #bfdbfe"],
-.dark [style*="backgroundColor:#bfdbfe"] {
-  background-color: #1e3a8a !important;
-  color: #dbeafe !important;
+/* 테이블 테두리 강제 통일 */
+table th,
+table td {
+  border: 1px solid #e5e7eb !important;
 }
 
-.dark [style*="background: #bfdbfe"],
-.dark [style*="background:#bfdbfe"] {
-  background: #1e3a8a !important;
-  color: #dbeafe !important;
+.dark table th,
+.dark table td {
+  border: 1px solid #3e3e42 !important;
 }
 
-.dark [style*="color: #c2410c"],
-.dark [style*="color:#c2410c"] {
-  color: #fef3c7 !important;
+/* sticky 헤더 상단 테두리 (inset shadow로 구현) */
+.dark table thead {
+  box-shadow: inset 0 1px 0 0 #3e3e42 !important;
 }
 
-.dark [style*="color: #1d4ed8"],
-.dark [style*="color:#1d4ed8"] {
-  color: #dbeafe !important;
-}
-
-/* 다크모드 선택된 메뉴 */
+/* 다크모드 Tailwind 클래스 매핑 */
 .dark .bg-blue-600,
-.dark [class*="bg-blue-"] {
-  background-color: #005a9e !important;
+.dark .bg-blue-500 {
+  background-color: var(--color-primary) !important;
 }
 
-.dark .text-blue-600 {
-  color: #007acc !important;
+.dark .hover\:bg-blue-700:hover,
+.dark .hover\:bg-blue-600:hover {
+  background-color: var(--color-primary-hover) !important;
+}
+
+/* bg-primary, bg-danger 등 CSS 변수 기반 클래스 강제 적용 */
+.bg-primary {
+  background-color: var(--color-primary) !important;
+}
+
+.hover\:bg-primary-hover:hover {
+  background-color: var(--color-primary-hover) !important;
+}
+
+.dark .bg-primary {
+  background-color: var(--color-primary) !important;
+}
+
+.dark .hover\:bg-primary-hover:hover {
+  background-color: var(--color-primary-hover) !important;
+}
+
+.bg-danger {
+  background-color: var(--color-danger) !important;
+}
+
+.hover\:bg-danger-hover:hover {
+  background-color: var(--color-danger-hover) !important;
+}
+
+.bg-success {
+  background-color: var(--color-success) !important;
+}
+
+.hover\:bg-success-hover:hover {
+  background-color: var(--color-success-hover) !important;
+}
+
+.dark .bg-success,
+.dark button.bg-success {
+  background-color: var(--color-success) !important;
+}
+
+.dark .hover\:bg-success-hover:hover,
+.dark button.hover\:bg-success-hover:hover {
+  background-color: var(--color-success-hover) !important;
+}
+
+.text-primary {
+  color: var(--color-primary) !important;
+}
+
+.text-danger,
+.text-danger * {
+  color: var(--color-danger) !important;
+}
+
+/* inline style이 있어도 강제 적용 */
+div[style*="font"].text-danger,
+span[style*="font"].text-danger {
+  color: var(--color-danger) !important;
+}
+
+.text-success,
+.text-success * {
+  color: var(--color-success) !important;
+}
+
+/* inline style이 있어도 강제 적용 */
+div[style*="font"].text-success,
+span[style*="font"].text-success {
+  color: var(--color-success) !important;
+}
+
+.text-warning,
+.text-warning * {
+  color: var(--color-warning) !important;
+}
+
+/* inline style이 있어도 강제 적용 */
+div[style*="font"].text-warning,
+span[style*="font"].text-warning {
+  color: var(--color-warning) !important;
+}
+
+/* 보라색 (Purple) 추가 */
+.bg-purple {
+  background-color: #8b5cf6 !important;
+}
+
+.hover\:bg-purple-hover:hover {
+  background-color: #7c3aed !important;
+}
+
+.dark .bg-purple {
+  background-color: #a78bfa !important;
+}
+
+.dark .hover\:bg-purple-hover:hover {
+  background-color: #8b5cf6 !important;
+}
+
+/* ==================== 카드 스타일 (그림자 + 그라데이션) ==================== */
+.card {
+  border: none !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%) !important;
+  border-radius: 12px !important;
+}
+
+.dark .card {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3) !important;
+  background: linear-gradient(135deg, #2d2d30 0%, #252526 100%) !important;
+}
+
+/* ==================== 필터 입력 테두리 ==================== */
+.filter-input {
+  border: 1px solid #d1d5db !important; /* gray-300 */
+}
+
+.dark .filter-input {
+  border: 1px solid #6e6e6e !important;
+}
+
+/* 다크모드에서 초록/빨강 글자 색상 유지 및 강조 */
+.dark .text-success {
+  color: #4ade80 !important; /* 밝은 초록 */
+}
+
+.dark .text-danger {
+  color: #f87171 !important; /* 밝은 빨강 */
+}
+
+.dark .text-blue-600,
+.dark .text-blue-500 {
+  color: var(--color-primary) !important;
 }
 
 .dark .border-blue-600,
 .dark .border-blue-300 {
-  border-color: #007acc !important;
+  border-color: var(--color-primary) !important;
+}
+
+.dark .bg-green-600,
+.dark .bg-green-500 {
+  background-color: var(--color-success) !important;
+}
+
+.dark .hover\:bg-green-700:hover,
+.dark .hover\:bg-green-600:hover {
+  background-color: var(--color-success-hover) !important;
+}
+
+.dark .text-green-600,
+.dark .text-green-500 {
+  color: var(--color-success) !important;
+}
+
+.dark .bg-red-600,
+.dark .bg-red-500 {
+  background-color: var(--color-danger) !important;
+}
+
+.dark .hover\:bg-red-700:hover,
+.dark .hover\:bg-red-600:hover {
+  background-color: var(--color-danger-hover) !important;
+}
+
+.dark .text-red-600,
+.dark .text-red-500 {
+  color: var(--color-danger) !important;
+}
+
+.dark .bg-amber-500,
+.dark .bg-yellow-500 {
+  background-color: var(--color-warning) !important;
+}
+
+.dark .hover\:bg-amber-600:hover,
+.dark .hover\:bg-yellow-600:hover {
+  background-color: var(--color-warning-hover) !important;
+}
+
+.dark .text-amber-600,
+.dark .text-yellow-600 {
+  color: var(--color-warning) !important;
 }
 
 /* 다크모드 호버 효과 */
 .dark .hover\:bg-gray-300:hover,
-.dark [class*="hover:bg-gray"]:hover {
-  background-color: #3e3e42 !important;
+.dark .hover\:bg-gray-200:hover,
+.dark .hover\:bg-gray-100:hover {
+  background-color: var(--color-surface-hover) !important;
 }
 
 .dark .hover\:bg-blue-50:hover {
-  background-color: #005a9e !important;
-}
-
-/* 다크모드 버튼 */
-.dark button:not([class*="bg-"]):not([style*="background"]) {
-  color: #cccccc;
-}
-
-/* 다크모드 통계 숫자 색상 유지 */
-.dark [style*="color: #2563eb"],
-.dark [style*="color:#2563eb"] {
-  color: #2563eb !important;
-}
-
-.dark [style*="color: #7c3aed"],
-.dark [style*="color:#7c3aed"] {
-  color: #7c3aed !important;
-}
-
-.dark [style*="color: #ef4444"],
-.dark [style*="color:#ef4444"] {
-  color: #ef4444 !important;
-}
-
-.dark [style*="color: #10b981"],
-.dark [style*="color:#10b981"] {
-  color: #10b981 !important;
-}
-
-.dark [style*="color: #f59e0b"],
-.dark [style*="color:#f59e0b"] {
-  color: #f59e0b !important;
-}
-
-.dark [style*="color: #6b7280"],
-.dark [style*="color:#6b7280"] {
-  color: #6b7280 !important;
-}
-
-.dark [style*="color: #8b5cf6"],
-.dark [style*="color:#8b5cf6"] {
-  color: #8b5cf6 !important;
-}
-
-.dark [style*="color: #ec4899"],
-.dark [style*="color:#ec4899"] {
-  color: #ec4899 !important;
-}
-
-.dark [style*="color: #06b6d4"],
-.dark [style*="color:#06b6d4"] {
-  color: #06b6d4 !important;
-}
-
-.dark [style*="color: #f97316"],
-.dark [style*="color:#f97316"] {
-  color: #f97316 !important;
+  background-color: var(--color-primary-100) !important;
 }
 
 /* 다크모드 사이드바 */
 .dark aside {
-  background: linear-gradient(to bottom, #252526, #1e1e1e) !important;
+  background: linear-gradient(to bottom, var(--color-background-secondary), var(--color-background)) !important;
 }
 
 .dark aside .border-white\/10 {
-  border-color: rgba(62, 62, 66, 0.3) !important;
+  border-color: var(--color-border) !important;
 }
 
 /* 플랫폼 주문 페이지 다크모드 */
 .dark .platform-orders-page {
-  background-color: #1e1e1e !important;
-  color: #cccccc !important;
+  background-color: var(--color-background) !important;
+  color: var(--color-text) !important;
 }
 
 .dark .platform-orders-page > div[style*="background"] {
-  background-color: #1e1e1e !important;
+  background-color: var(--color-background) !important;
 }
 
-/* 플랫폼 주문 페이지 모든 텍스트 기본 색상 */
 .dark .platform-orders-page * {
-  color: #cccccc;
+  color: var(--color-text);
 }
 
 /* 플랫폼 주문 페이지 폰트 굵기 증가 */
@@ -431,147 +620,83 @@
 
 /* 플랫폼 주문 페이지 헤더 */
 .dark .platform-orders-page > div:first-child {
-  background-color: #2d2d30 !important;
-  border-color: #3e3e42 !important;
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
 }
 
 /* 플랫폼 주문 페이지 사이드바 */
 .dark .platform-orders-page > div:nth-child(2) {
-  background-color: #252526 !important;
-  border-color: #3e3e42 !important;
+  background-color: var(--color-background-secondary) !important;
+  border-color: var(--color-border) !important;
 }
 
 /* 플랫폼 주문 페이지 버튼 */
-.dark .platform-orders-page button {
-  background-color: #3e3e42 !important;
-  color: #cccccc !important;
-  border-color: #3e3e42 !important;
+.dark .platform-orders-page button:not(.bg-success):not(.bg-primary):not(.bg-purple):not(.bg-danger) {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
 }
 
-/* 플랫폼 주문 페이지 텍스트 색상 - 회색/검정 텍스트만 변경 */
-.dark .platform-orders-page div[style*="color: #1f2937"]:not([style*="background"]),
-.dark .platform-orders-page div[style*="color:#1f2937"]:not([style*="background"]),
-.dark .platform-orders-page div[style*="color: #6b7280"]:not([style*="background"]),
-.dark .platform-orders-page div[style*="color:#6b7280"]:not([style*="background"]),
-.dark .platform-orders-page div[style*="color: #000000"]:not([style*="background"]),
-.dark .platform-orders-page div[style*="color:#000000"]:not([style*="background"]),
-.dark .platform-orders-page div[style*="color: black"]:not([style*="background"]),
-.dark .platform-orders-page h3[style*="color: #1f2937"]:not([style*="background"]),
-.dark .platform-orders-page h3[style*="color:#1f2937"]:not([style*="background"]) {
-  color: #cccccc !important;
-  font-weight: 500 !important;
-}
-
-/* 색상 유지: 초록색과 빨간색은 그대로 */
-.dark .platform-orders-page div[style*="color: #10b981"],
-.dark .platform-orders-page div[style*="color:#10b981"],
-.dark .platform-orders-page div[style*="color: #ef4444"],
-.dark .platform-orders-page div[style*="color:#ef4444"] {
-  color: inherit !important;
-}
-
-/* 다크모드에서 파란색을 하늘색으로 변경 */
-.dark .platform-orders-page div[style*="color: #2563eb"],
-.dark .platform-orders-page div[style*="color:#2563eb"],
-.dark .platform-orders-page span[style*="color: #2563eb"],
-.dark .platform-orders-page span[style*="color:#2563eb"] {
-  color: #60a5fa !important;
-}
-
-.dark .platform-orders-page div[style*="background: #2563eb"],
-.dark .platform-orders-page div[style*="background:#2563eb"],
-.dark .platform-orders-page button[style*="background: #2563eb"],
-.dark .platform-orders-page button[style*="background:#2563eb"] {
-  background: #60a5fa !important;
-}
-
-.dark .platform-orders-page div[style*="border: 2px solid #2563eb"],
-.dark .platform-orders-page div[style*="border:2px solid #2563eb"] {
-  border-color: #60a5fa !important;
-}
-
-.dark .platform-orders-page circle[stroke="#2563eb"] {
-  stroke: #60a5fa !important;
-}
-
-.dark .platform-orders-page button[style*="background: #2563eb"]:hover {
-  background: #3b82f6 !important;
-}
-
-/* 플랫폼 주문 페이지 흰색/회색 배경만 다크모드로 변경 */
+/* 플랫폼 주문 페이지 배경 */
 .dark .platform-orders-page div[style*="background: white"],
 .dark .platform-orders-page div[style*="background:white"],
 .dark .platform-orders-page div[style*="background: #ffffff"],
 .dark .platform-orders-page div[style*="background:#ffffff"],
 .dark .platform-orders-page div[style*="background: #f9fafb"],
-.dark .platform-orders-page div[style*="background:#f9fafb"],
-.dark .platform-orders-page div[style*="background: #f5f5f5"],
-.dark .platform-orders-page div[style*="background:#f5f5f5"],
-.dark .platform-orders-page div[style*="background: #e5e7eb"],
-.dark .platform-orders-page div[style*="background:#e5e7eb"],
-.dark .platform-orders-page div[style*="background: #dee2e6"],
-.dark .platform-orders-page div[style*="background:#dee2e6"],
-.dark .platform-orders-page div[style*="background: rgba(255, 255, 255"],
-.dark .platform-orders-page div[style*="background:rgba(255,255,255"] {
-  background: #252526 !important;
-}
-
-/* 다크모드 달력 발주 있는 날 호버 효과 */
-.dark .platform-orders-page div[style*="background: rgba(219, 234, 254"],
-.dark .platform-orders-page div[style*="background:rgba(219,234,254"] {
-  background: rgba(96, 165, 250, 0.2) !important;
+.dark .platform-orders-page div[style*="background:#f9fafb"] {
+  background: var(--color-background-secondary) !important;
 }
 
 /* 플랫폼 주문 페이지 보더 */
 .dark .platform-orders-page div[style*="border"],
 .dark .platform-orders-page button[style*="border"] {
-  border-color: #3e3e42 !important;
+  border-color: var(--color-border) !important;
 }
 
-/* 다크모드 테이블 - VSCode 스타일 */
+/* 다크모드 테이블 */
 .dark table {
-  background-color: #1e1e1e;
-  color: #cccccc;
+  background-color: var(--color-background);
+  color: var(--color-text);
 }
 
 .dark table th,
 .dark table td {
-  border-color: #3e3e42 !important;
-  color: #cccccc !important;
-  background-color: #1e1e1e !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+  background-color: var(--color-background) !important;
 }
 
 .dark table th {
-  background-color: #2d2d30 !important;
+  background-color: var(--color-surface) !important;
 }
 
 /* 다크모드 DatePicker */
 .dark .react-datepicker {
-  background-color: #252526 !important;
-  border-color: #3e3e42 !important;
+  background-color: var(--color-background-secondary) !important;
+  border-color: var(--color-border) !important;
 }
 
 .dark .react-datepicker__header {
-  background-color: #2d2d30 !important;
-  border-color: #3e3e42 !important;
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
 }
 
 .dark .react-datepicker__current-month,
 .dark .react-datepicker__day-name,
 .dark .react-datepicker__day {
-  color: #cccccc !important;
+  color: var(--color-text) !important;
 }
 
 .dark .react-datepicker__day:hover {
-  background-color: #3e3e42 !important;
+  background-color: var(--color-surface-hover) !important;
 }
 
 .dark .react-datepicker__day--selected {
-  background-color: #007acc !important;
+  background-color: var(--color-primary) !important;
 }
 
 .dark .react-datepicker__day--today {
-  background-color: #005a9e !important;
+  background-color: var(--color-primary-200) !important;
   color: #ffffff !important;
 }
 

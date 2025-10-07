@@ -161,9 +161,9 @@ export default function OrderRegistrationTab({
           align: 'center' as const,
           renderer: () => (
             <button
+              className="bg-danger"
               style={{
                 padding: '4px 12px',
-                background: '#ef4444',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
@@ -198,9 +198,9 @@ export default function OrderRegistrationTab({
           align: 'center' as const,
           renderer: () => (
             <button
+              className="bg-warning"
               style={{
                 padding: '4px 12px',
-                background: '#f59e0b',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
@@ -235,9 +235,9 @@ export default function OrderRegistrationTab({
           align: 'center' as const,
           renderer: () => (
             <button
+              className="bg-warning"
               style={{
                 padding: '4px 12px',
-                background: '#f59e0b',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
@@ -374,11 +374,11 @@ export default function OrderRegistrationTab({
             <div
               key={stat.status}
               onClick={() => setFilterStatus(stat.status)}
+              className="card"
               style={{
-                background: 'white',
                 padding: '20px',
                 borderRadius: '8px',
-                border: isSelected ? `2px solid ${config.color}` : '1px solid #e5e7eb',
+                border: isSelected ? `2px solid ${config.color}` : undefined,
                 cursor: 'pointer'
               }}
             >
@@ -394,11 +394,9 @@ export default function OrderRegistrationTab({
       </div>
 
       {/* 필터 및 버튼 섹션 */}
-      <div style={{
-        background: 'white',
+      <div className="card" style={{
         padding: '16px',
         borderRadius: '8px',
-        border: '1px solid #e5e7eb',
         marginBottom: '16px',
         display: 'flex',
         justifyContent: 'space-between',
@@ -409,10 +407,10 @@ export default function OrderRegistrationTab({
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as any)}
+            className="filter-input"
             style={{
               width: '120px',
               padding: '4px 8px',
-              border: '1px solid #9ca3af',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px'
@@ -430,10 +428,10 @@ export default function OrderRegistrationTab({
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
+            className="filter-input"
             style={{
               width: '140px',
               padding: '4px 8px',
-              border: '1px solid #9ca3af',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px'
@@ -444,10 +442,10 @@ export default function OrderRegistrationTab({
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
+            className="filter-input"
             style={{
               width: '140px',
               padding: '4px 8px',
-              border: '1px solid #9ca3af',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px'
@@ -459,10 +457,10 @@ export default function OrderRegistrationTab({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="발주번호, 상품명 검색"
+            className="filter-input"
             style={{
               width: '180px',
               padding: '4px 8px',
-              border: '1px solid #9ca3af',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px'
@@ -473,9 +471,9 @@ export default function OrderRegistrationTab({
         {/* 발주서 관리 버튼들 - 우측 */}
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
+            className="bg-success hover:bg-success-hover"
             style={{
               padding: '6px 16px',
-              background: '#10b981',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
@@ -484,21 +482,15 @@ export default function OrderRegistrationTab({
               cursor: 'pointer',
               transition: 'all 0.2s',
               height: '28px'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#059669';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#10b981';
             }}
           >
             엑셀 양식 다운로드
           </button>
           <button
             onClick={() => setShowUploadModal(true)}
+            className="bg-primary hover:bg-primary-hover"
             style={{
               padding: '6px 16px',
-              background: '#2563eb',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
@@ -507,20 +499,14 @@ export default function OrderRegistrationTab({
               cursor: 'pointer',
               transition: 'all 0.2s',
               height: '28px'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#1d4ed8';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#2563eb';
             }}
           >
             엑셀 업로드
           </button>
           <button
+            className="bg-purple hover:bg-purple-hover"
             style={{
               padding: '6px 16px',
-              background: '#8b5cf6',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
@@ -529,12 +515,6 @@ export default function OrderRegistrationTab({
               cursor: 'pointer',
               transition: 'all 0.2s',
               height: '28px'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#7c3aed';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#8b5cf6';
             }}
           >
             새 발주서 작성

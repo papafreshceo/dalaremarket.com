@@ -34,6 +34,7 @@ interface EditableAdminGridProps<T = any> {
   enableAddRow?: boolean
   enableDelete?: boolean
   enableCheckbox?: boolean
+  enableCopy?: boolean
   globalSearchPlaceholder?: string
   customActions?: React.ReactNode
 }
@@ -62,6 +63,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   enableAddRow = true,
   enableDelete = true,
   enableCheckbox = true,
+  enableCopy = true,
   globalSearchPlaceholder = '검색',
   customActions
 }: EditableAdminGridProps<T>) {
@@ -434,7 +436,26 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
   const addToHistory = (newData: T[]) => {
     const newHistory = history.slice(0, historyIndex + 1)
-    newHistory.push(JSON.parse(JSON.stringify(newData)))
+    // 순환 참조 방지를 위해 안전한 복사 수행
+    const safeCopy = newData.map(row => {
+      const newRow: any = {}
+      Object.keys(row).forEach(key => {
+        const value = row[key]
+        // 기본 타입과 null만 복사 (함수, DOM 요소 등 제외)
+        if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          newRow[key] = value
+        } else if (typeof value === 'object' && value !== null && !value.nodeType) {
+          // 간단한 객체만 복사 (DOM 요소 제외)
+          try {
+            newRow[key] = JSON.parse(JSON.stringify(value))
+          } catch {
+            newRow[key] = value
+          }
+        }
+      })
+      return newRow as T
+    })
+    newHistory.push(safeCopy)
     console.log('Adding to history. New index:', newHistory.length - 1, 'Total history length:', newHistory.length)
     setHistory(newHistory)
     setHistoryIndex(newHistory.length - 1)
@@ -1067,7 +1088,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
   return (
     <div className="space-y-2">
-      {(enableFilter || enableCSVExport || enableCSVImport || onSave || onDeleteSelected || onCopy || customActions) && (
+      {(enableFilter || enableCSVExport || enableCSVImport || onSave || onDeleteSelected || enableCopy || customActions) && (
         <div className="flex gap-2 items-center">
           {enableFilter && (
             <div className="relative" style={{ width: '200px' }}>
@@ -1097,7 +1118,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           {enableCSVExport && (
             <button
               onClick={exportToCSV}
-              className="p-1 border border-gray-200 rounded hover:bg-gray-50"
+              className="p-1 border border-gray-200 rounded hover:bg-surface-hover"
               title="엑셀 다운로드"
             >
               <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
@@ -1123,13 +1144,13 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           <div className="flex-1"></div>
           {customActions}
           {modifiedCount > 0 && (
-            <span className="text-sm text-gray-600">수정 {modifiedCount}건</span>
+            <span className="text-sm text-text-secondary">수정 {modifiedCount}건</span>
           )}
           {addedRows.size > 0 && (
-            <span className="text-sm text-green-600">추가 {addedRows.size}건</span>
+            <span className="text-sm text-success">추가 {addedRows.size}건</span>
           )}
           {copiedRows.size > 0 && (
-            <span className="text-sm text-blue-600">복사 {copiedRows.size}건</span>
+            <span className="text-sm text-primary">복사 {copiedRows.size}건</span>
           )}
           {onSave && (
             <button
@@ -1137,7 +1158,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
               disabled={modifiedCount === 0 && addedRows.size === 0 && copiedRows.size === 0}
               className={`px-2 py-1 rounded text-xs ${
                 modifiedCount > 0 || addedRows.size > 0 || copiedRows.size > 0
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  ? 'bg-primary text-white hover:bg-primary-hover'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
             >
@@ -1147,15 +1168,15 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           {selectedRows.size > 0 && onDeleteSelected && (
             <button
               onClick={handleDeleteSelectedClick}
-              className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+              className="px-2 py-1 bg-danger text-white rounded text-xs hover:bg-danger-hover"
             >
               삭제
             </button>
           )}
-          {selectedRows.size > 0 && onCopy && (
+          {selectedRows.size > 0 && enableCopy && (
             <button
               onClick={handleCopyClick}
-              className="px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
+              className="px-2 py-1 bg-primary text-white rounded text-xs hover:bg-primary-hover"
             >
               복사
             </button>
@@ -1165,16 +1186,16 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
       <div
         ref={containerRef}
-        className="overflow-auto bg-white dark:bg-[#1e1e1e] border-b border-gray-200 dark:border-[#3e3e42]"
+        className="overflow-auto bg-surface border-b border-gray-200"
         style={{ maxHeight: height, height: 'auto' }}
         onPaste={handlePaste}
         tabIndex={0}
       >
         <table ref={tableRef} className="w-full border-collapse" style={{ fontSize: '13px', borderSpacing: 0 }}>
-          <thead className="sticky top-0 bg-gray-50 dark:bg-[#2d2d30]" style={{ zIndex: 30 }}>
+          <thead className="sticky top-0 bg-gray-50" style={{ zIndex: 30, boxShadow: 'inset 0 1px 0 0 #e5e7eb' }}>
             <tr>
               {enableCheckbox && (
-                <th className="border border-gray-200 dark:border-[#3e3e42] bg-gray-100 dark:bg-[#2d2d30] px-2 py-1 text-center align-middle" style={{ width: 40, fontSize: '13px' }}>
+                <th className="border border-gray-200 bg-gray-50 px-2 py-1 text-center align-middle sticky top-0" style={{ width: 40, fontSize: '13px', zIndex: 31 }}>
                   <input
                     type="checkbox"
                     checked={selectedRows.size === filteredData.length && filteredData.length > 0}
@@ -1184,11 +1205,11 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                 </th>
               )}
               {showRowNumbers && (
-                <th className="border border-gray-200 dark:border-[#3e3e42] bg-gray-100 dark:bg-[#2d2d30] px-2 py-1 font-semibold text-gray-600 dark:text-[#cccccc] whitespace-nowrap" style={{ width: 50, fontSize: '13px' }}>
+                <th className="border border-gray-200 bg-gray-50 px-2 py-1 font-semibold text-text-secondary whitespace-nowrap sticky top-0" style={{ width: 50, fontSize: '13px', zIndex: 31 }}>
                   {enableAddRow && (
                     <button
                       onClick={handleAddRow}
-                      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-normal"
+                      className="text-primary hover:text-blue-800 dark:hover:text-blue-300 font-normal"
                       style={{ fontSize: '13px' }}
                       title="행 추가"
                     >
@@ -1201,19 +1222,20 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                 return (
                   <th
                     key={column.key}
-                    className="border border-gray-200 dark:border-[#3e3e42] px-2 py-1 font-semibold text-gray-700 dark:text-[#cccccc] whitespace-nowrap bg-gray-50 dark:bg-[#2d2d30]"
+                    className="border border-gray-200 px-2 py-1 font-semibold text-text whitespace-nowrap bg-gray-50 sticky top-0"
                     style={{
                       width: column.width,
-                      fontSize: '13px'
+                      fontSize: '13px',
+                      zIndex: 31
                     }}
                   >
                     <div
-                      className={`flex items-center justify-center gap-1 ${enableSort ? 'cursor-pointer hover:text-blue-600 dark:hover:text-blue-400' : ''}`}
+                      className={`flex items-center justify-center gap-1 ${enableSort ? 'cursor-pointer hover:text-primary' : ''}`}
                       onClick={() => handleSort(column.key)}
                     >
                       <span>{column.title}</span>
                       {enableSort && sortConfig.key === column.key && (
-                        <span className="text-blue-600 dark:text-blue-400">
+                        <span className="text-primary">
                           {sortConfig.direction === 'asc' ? '↑' : '↓'}
                         </span>
                       )}
@@ -1223,8 +1245,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
               })}
               {enableDelete && (
                 <th
-                  className="border border-gray-200 dark:border-[#3e3e42] bg-gray-100 dark:bg-[#2d2d30] px-2 py-1 font-semibold text-gray-700 dark:text-[#cccccc] whitespace-nowrap"
-                  style={{ width: 100, fontSize: '13px' }}
+                  className="border border-gray-200 bg-gray-50 px-2 py-1 font-semibold text-text whitespace-nowrap sticky top-0"
+                  style={{ width: 100, fontSize: '13px', zIndex: 31 }}
                 >
                   삭제
                 </th>
@@ -1245,7 +1267,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   </td>
                 )}
                 {showRowNumbers && (
-                  <td className="border border-gray-200 px-2 py-1 text-xs text-center align-middle text-gray-500">
+                  <td className="border border-gray-200 px-2 py-1 text-xs text-center align-middle text-text-tertiary">
                     {rowIndex + 1}
                   </td>
                 )}
@@ -1271,7 +1293,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   <td className="border border-gray-200 px-2 py-1 text-center align-middle" style={{ height: rowHeight, width: 100 }}>
                     <button
                       onClick={() => onDelete?.(rowIndex)}
-                      className="px-3 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200 whitespace-nowrap"
+                      className="px-3 py-0.5 bg-danger-100 text-danger rounded hover:bg-danger-200 whitespace-nowrap"
                       style={{ fontSize: '13px', minWidth: '50px' }}
                     >
                       삭제

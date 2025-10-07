@@ -272,7 +272,7 @@ export default function CreateOptionProductPage() {
       </>}
     >
       {/* 가격 정책 설정 */}
-      <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
+      <div className="mb-4 p-4 bg-primary-100 rounded-lg border border-blue-200 dark:border-blue-800">
         <h2 className="text-sm font-semibold mb-3" style={{ color: '#1d4ed8' }}>💰 가격 정책 설정</h2>
         <div className="grid grid-cols-6 gap-3 mb-3">
           <div className="col-span-2">
@@ -347,7 +347,7 @@ export default function CreateOptionProductPage() {
         </div>
       </div>
 
-      <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800/30 rounded-lg border border-gray-200 dark:border-gray-700">
+      <div className="mb-4 p-4 bg-background-secondary rounded-lg border border-border">
         <h2 className="text-sm font-semibold mb-3" style={{ color: '#1d4ed8' }}>공통 비용 설정</h2>
 
         {/* 자재비 */}
@@ -761,7 +761,7 @@ export default function CreateOptionProductPage() {
             return (
               <div key={material.id} className="grid gap-2 px-2" style={{ gridTemplateColumns: '200px 150px 100px 100px 100px 200px 120px' }}>
                 {/* 원물명 */}
-                <div className="bg-gray-50 dark:bg-gray-800/30 px-2 py-1.5 rounded border border-gray-200 dark:border-gray-700">
+                <div className="bg-background-secondary px-2 py-1.5 rounded border border-border">
                   <div className="text-xs font-semibold">{material.material_name}</div>
                   <div className="text-xs text-gray-600">
                     {material.latest_price?.toLocaleString()}원/{material.standard_quantity}{material.standard_unit}
@@ -769,12 +769,12 @@ export default function CreateOptionProductPage() {
                 </div>
 
                 {/* 옵션명 (기본) */}
-                <div className="bg-gray-50 dark:bg-gray-800/30 px-2 py-1.5 rounded border border-gray-200 dark:border-gray-700 flex items-center">
+                <div className="bg-background-secondary px-2 py-1.5 rounded border border-border flex items-center">
                   <div className="text-xs font-semibold">{plan.base_name || ''}</div>
                 </div>
 
                 {/* 규격1 */}
-                <div className="bg-gray-50 dark:bg-gray-800/30 px-2 py-1.5 rounded border border-gray-200 dark:border-gray-700">
+                <div className="bg-background-secondary px-2 py-1.5 rounded border border-border">
                   <input
                     type="text"
                     value={plan.spec1 || ''}
@@ -785,7 +785,7 @@ export default function CreateOptionProductPage() {
                 </div>
 
                 {/* 규격2 */}
-                <div className="bg-gray-50 dark:bg-gray-800/30 px-2 py-1.5 rounded border border-gray-200 dark:border-gray-700">
+                <div className="bg-background-secondary px-2 py-1.5 rounded border border-border">
                   <input
                     type="text"
                     value={plan.spec2 || ''}
@@ -796,7 +796,7 @@ export default function CreateOptionProductPage() {
                 </div>
 
                 {/* 규격3 */}
-                <div className="bg-gray-50 dark:bg-gray-800/30 px-2 py-1.5 rounded border border-gray-200 dark:border-gray-700">
+                <div className="bg-background-secondary px-2 py-1.5 rounded border border-border">
                   <input
                     type="text"
                     value={plan.spec3 || ''}
@@ -807,12 +807,12 @@ export default function CreateOptionProductPage() {
                 </div>
 
                 {/* 최종 옵션명 */}
-                <div className="bg-blue-50 dark:bg-blue-900/30 px-2 py-1.5 rounded border border-blue-200 dark:border-blue-800 flex items-center">
+                <div className="bg-primary-100 px-2 py-1.5 rounded border border-blue-200 dark:border-blue-800 flex items-center">
                   <div className="text-xs font-semibold text-blue-900">{plan.option_name || ''}</div>
                 </div>
 
                 {/* 옵션가격 */}
-                <div className="bg-gray-50 dark:bg-gray-800/30 px-2 py-1.5 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-end">
+                <div className="bg-background-secondary px-2 py-1.5 rounded border border-border flex items-center justify-end">
                   <div className="text-xs text-gray-600">
                     {totalPrice.toLocaleString()}원/{subdivisionQty}{material.standard_unit}
                   </div>

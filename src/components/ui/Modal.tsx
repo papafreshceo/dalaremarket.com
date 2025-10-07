@@ -74,8 +74,8 @@ export function Modal({
       <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
         <div
           className={cn(
-            'relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-hidden',
-            'border border-gray-200 dark:border-gray-700',
+            'relative bg-surface rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-hidden',
+            'border border-border',
             'transition-all duration-300 ease-out',
             isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-6 opacity-0 scale-95',
             sizeStyles[size]
@@ -87,12 +87,12 @@ export function Modal({
             <div className="flex items-center justify-between px-6 py-4">
               <div className="flex-1">
                 {title && (
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <h3 className="text-lg font-semibold text-text">
                     {title}
                   </h3>
                 )}
                 {description && (
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {description}
                   </p>
                 )}
@@ -100,7 +100,7 @@ export function Modal({
               {showCloseButton && (
                 <button
                   onClick={onClose}
-                  className="ml-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+                  className="ml-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-surface-hover rounded-lg transition-all duration-200"
                   aria-label="닫기"
                 >
                   <svg
@@ -122,7 +122,7 @@ export function Modal({
           )}
 
           {/* 본문 */}
-          <div className="px-6 py-5 overflow-y-auto max-h-[calc(90vh-180px)] text-sm text-gray-700 dark:text-gray-300 text-center">
+          <div className="px-6 py-5 overflow-y-auto max-h-[calc(90vh-180px)] text-sm text-text text-center">
             {children}
           </div>
 

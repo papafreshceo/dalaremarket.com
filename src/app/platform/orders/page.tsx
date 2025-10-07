@@ -138,9 +138,9 @@ export default function OrdersPage() {
   });
 
   return (
-    <div className="platform-orders-page dark:bg-[#1e1e1e]" style={{ minHeight: '100vh' }}>
+    <div className="platform-orders-page bg-background" style={{ minHeight: '100vh' }}>
       {/* 발주관리 전용 헤더 */}
-      <div className="dark:bg-[#2d2d30] dark:border-[#3e3e42]" style={{
+      <div className="bg-surface border-border" style={{
         position: 'fixed',
         top: 0,
         left: 0,
@@ -159,7 +159,7 @@ export default function OrdersPage() {
           {/* 나가기 버튼 */}
           <button
             onClick={() => { router.push('/'); }}
-            className="dark:bg-[#3e3e42] dark:border-[#3e3e42] dark:text-[#cccccc] dark:hover:bg-[#505050]"
+            className="bg-surface border-border text-text hover:bg-surface-hover"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -194,7 +194,7 @@ export default function OrdersPage() {
           </button>
 
           {/* 로그인 정보 */}
-          <div className="dark:text-[#cccccc]" style={{
+          <div className="text-text" style={{
             fontSize: '14px',
             color: '#1f2937',
             fontWeight: '500'
@@ -208,7 +208,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Sidebar */}
-      <div className="dark:bg-[#252526] dark:border-[#3e3e42]" style={{
+      <div className="bg-background-secondary border-border" style={{
         position: 'fixed',
         top: '70px',
         left: 0,
@@ -226,7 +226,7 @@ export default function OrdersPage() {
           {/* 대시보드 탭 */}
           <button
             onClick={() => setActiveTab('대시보드')}
-            className={`dark:text-[#cccccc] ${activeTab === '대시보드' ? 'dark:bg-[#3e3e42]' : ''}`}
+            className={`text-text ${activeTab === '대시보드' ? 'bg-surface-hover' : ''}`}
             style={{
               width: '100%',
               display: 'flex',
@@ -347,7 +347,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Main content area */}
-      <div className="dark:bg-[#1e1e1e]" style={{
+      <div className="bg-background" style={{
         marginLeft: isMobile ? '42px' : '175px',
         padding: isMobile ? '16px' : '24px',
         paddingTop: '90px',
