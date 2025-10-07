@@ -49,17 +49,17 @@ interface OptionProduct {
   vendor_id: string | null
   vendor_name?: string | null
   // 가격 정책 필드
-  material_cost_policy?: 'auto' | 'fixed' | null
-  seller_supply_price_mode?: 'auto' | 'manual' | null
-  naver_price_mode?: 'auto' | 'manual' | null
-  coupang_price_mode?: 'auto' | 'manual' | null
+  material_cost_policy?: 'auto' | 'fixed' | '자동' | '고정' | null
+  seller_supply_price_mode?: 'auto' | 'manual' | '자동' | '수동' | null
+  naver_price_mode?: 'auto' | 'manual' | '자동' | '수동' | null
+  coupang_price_mode?: 'auto' | 'manual' | '자동' | '수동' | null
   // 마진 계산 필드
   seller_margin_rate?: number | null  // 실제 셀러마진율 (계산값, readOnly)
   seller_margin_amount?: number | null  // 실제 셀러마진액 (계산값, readOnly)
   target_seller_margin_rate?: number | null  // 목표 셀러마진율 (입력값)
   target_margin_rate?: number | null  // 목표 직판마진율
   target_margin_amount?: number | null  // 목표 직판마진액
-  margin_calculation_type?: 'rate' | 'amount' | null
+  margin_calculation_type?: 'rate' | 'amount' | '마진율' | '마진액' | null
   average_material_price?: number | null  // 사용원물 평균가
   calculated_material_cost?: number | null  // 원물원가 (계산값)
   created_at?: string
@@ -108,9 +108,14 @@ export default function OptionProductsManagementPage() {
       : marginCalcTypeRaw === '마진액' ? 'amount'
       : marginCalcTypeRaw || 'rate'
 
+    // 0. 원물비용 계산 (원물가 × 표준수량)
+    const averageMaterialPrice = Number(item.average_material_price) || 0
+    const standardQuantity = Number(item.standard_quantity) || 0
+    const rawMaterialCost = averageMaterialPrice * standardQuantity
+
     // 1. 총원가 계산 (무조건 자동, 택배비 제외)
     const totalCost = (
-      (Number(item.raw_material_cost) || 0) +
+      rawMaterialCost +
       (Number(item.packaging_box_price) || 0) +
       (Number(item.pack_price) || 0) +
       (Number(item.bag_vinyl_price) || 0) +
@@ -126,9 +131,10 @@ export default function OptionProductsManagementPage() {
     const shippingFee = Number(item.shipping_fee) || 0
     const totalCostWithShipping = totalCost + shippingFee
 
-    // 2. 셀러공급가 자동 계산 (모드가 'auto'일 때)
+    // 2. 셀러공급가 자동 계산 (모드가 'auto' 또는 '자동'일 때)
     let sellerSupplyPrice = item.seller_supply_price
-    if (item.seller_supply_price_mode === 'auto') {
+    const sellerMode = item.seller_supply_price_mode
+    if (sellerMode === 'auto' || sellerMode === '자동') {
       const targetMarginRate = Number(item.target_seller_margin_rate) || 0
       if (targetMarginRate > 0 && targetMarginRate < 100) {
         sellerSupplyPrice = Math.round(totalCostWithShipping / (1 - targetMarginRate / 100))
@@ -148,7 +154,8 @@ export default function OptionProductsManagementPage() {
     // 4. 네이버 직판가 자동 계산
     let naverPaidPrice = item.naver_paid_shipping_price
     let naverFreePrice = item.naver_free_shipping_price
-    if (item.naver_price_mode === 'auto') {
+    const naverMode = item.naver_price_mode
+    if (naverMode === 'auto' || naverMode === '자동') {
       if (marginCalcType === 'rate') {
         const targetMarginRate = Number(item.target_margin_rate) || 0
         if (targetMarginRate > 0 && targetMarginRate < 100) {
@@ -169,7 +176,8 @@ export default function OptionProductsManagementPage() {
     // 5. 쿠팡 직판가 자동 계산
     let coupangPaidPrice = item.coupang_paid_shipping_price
     let coupangFreePrice = item.coupang_free_shipping_price
-    if (item.coupang_price_mode === 'auto') {
+    const coupangMode = item.coupang_price_mode
+    if (coupangMode === 'auto' || coupangMode === '자동') {
       if (marginCalcType === 'rate') {
         const targetMarginRate = Number(item.target_margin_rate) || 0
         if (targetMarginRate > 0 && targetMarginRate < 100) {
@@ -188,6 +196,7 @@ export default function OptionProductsManagementPage() {
     }
 
     return {
+      raw_material_cost: Math.round(rawMaterialCost),
       total_cost: totalCost,
       seller_supply_price: sellerSupplyPrice,
       seller_margin_rate: Math.round(actualSellerMarginRate * 10) / 10,
@@ -332,7 +341,7 @@ export default function OptionProductsManagementPage() {
       case 'price':
         return ['option_code','option_name','total_cost','shipping_fee','seller_supply_price','naver_paid_shipping_price','naver_free_shipping_price','coupang_paid_shipping_price','coupang_free_shipping_price','status']
       case 'supply_policy':
-        return ['option_code','option_name','average_material_price','calculated_material_cost','material_cost_policy','total_cost','shipping_fee','seller_supply_price_mode','target_seller_margin_rate','seller_supply_price','seller_margin_rate','seller_margin_amount','status']
+        return ['option_code','option_name','average_material_price','calculated_material_cost','total_cost','shipping_fee','seller_supply_price_mode','target_seller_margin_rate','seller_supply_price','seller_margin_rate','seller_margin_amount','status']
       case 'direct_policy':
         return ['option_code','option_name','total_cost','seller_supply_price','margin_calculation_type','target_margin_rate','target_margin_amount','naver_price_mode','naver_paid_shipping_price','naver_free_shipping_price','coupang_price_mode','coupang_paid_shipping_price','coupang_free_shipping_price','status']
       case 'shipping':
@@ -381,7 +390,8 @@ export default function OptionProductsManagementPage() {
       case 'seller_supply_price_mode':
       case 'naver_price_mode':
       case 'coupang_price_mode':
-        return p[field] === '자동' ? '자동' : '수동'
+        const val = p[field]
+        return (val === 'auto' || val === '자동') ? '자동' : '수동'
       case 'seller_margin_rate':
       case 'target_margin_rate':
         return p[field] != null ? String(p[field]) + '%' : '-'
@@ -481,8 +491,9 @@ export default function OptionProductsManagementPage() {
                   unit_price: m.unit_price,
                   category_1: rawMaterial?.category_1,
                   category_2: rawMaterial?.category_2,
-                  item_type: rawMaterial?.item_type,
-                  variety: rawMaterial?.variety,
+                  category_3: rawMaterial?.category_3,
+                  category_4: rawMaterial?.category_4,
+                  category_5: rawMaterial?.category_5,
                   standard_unit: rawMaterial?.standard_unit,
                   latest_price: rawMaterial?.latest_price,
                   standard_quantity: rawMaterial?.standard_quantity,
@@ -519,6 +530,17 @@ export default function OptionProductsManagementPage() {
             })
           }
 
+          // 대표 원물 (사용량이 가장 많은 원물, 같으면 첫 번째 원물)의 카테고리 사용
+          const primaryMaterial = enrichedMaterials.length > 0
+            ? enrichedMaterials.reduce((prev, current) => {
+                const prevQty = prev.quantity || 0
+                const currQty = current.quantity || 0
+                // 사용량이 같으면 첫 번째 것 유지 (현재보다 클 때만 변경)
+                if (currQty > prevQty) return current
+                return prev
+              })
+            : null
+
           return {
             ...product,
             vendor_name: product.vendor?.name || null,
@@ -528,6 +550,12 @@ export default function OptionProductsManagementPage() {
             used_material_1: enrichedMaterials[0]?.material_name || '',
             used_material_2: enrichedMaterials[1]?.material_name || '',
             used_material_3: enrichedMaterials[2]?.material_name || '',
+            // 원물에서 상속받은 카테고리
+            category_1: primaryMaterial?.category_1 || null,
+            category_2: primaryMaterial?.category_2 || null,
+            category_3: primaryMaterial?.category_3 || null,
+            item_type: primaryMaterial?.category_4 || null,  // category_4 → item_type
+            variety: primaryMaterial?.category_5 || null,    // category_5 → variety
             // 사용원물 평균가
             average_material_price: averageMaterialPrice,
             // 원물원가 (계산값)
@@ -711,32 +739,78 @@ export default function OptionProductsManagementPage() {
         return
       }
 
-      const rows = validRows.map(p => ({
-        id: p.id,
-        option_code: p.option_code || null,
-        option_name: p.option_name || null,
-        item_type: p.item_type || null,
-        variety: p.variety || null,
-        specification_1: p.specification_1 || null,
-        specification_2: p.specification_2 || null,
-        specification_3: p.specification_3 || null,
-        weight: p.weight != null ? Number(p.weight) : null,
-        standard_quantity: p.standard_quantity != null ? Number(p.standard_quantity) : null,
-        standard_unit: p.standard_unit || null,
-        packaging_box_price: p.packaging_box_price != null ? Number(p.packaging_box_price) : null,
-        cushioning_price: p.cushioning_price != null ? Number(p.cushioning_price) : null,
-        raw_material_cost: p.raw_material_cost != null ? Number(p.raw_material_cost) : null,
-        labor_cost: p.labor_cost != null ? Number(p.labor_cost) : null,
-        misc_cost: p.misc_cost != null ? Number(p.misc_cost) : null,
-        shipping_fee: p.shipping_fee != null ? Number(p.shipping_fee) : null,
-        seller_supply_price: p.seller_supply_price != null ? Number(p.seller_supply_price) : null,
-        naver_paid_shipping_price: p.naver_paid_shipping_price != null ? Number(p.naver_paid_shipping_price) : null,
-        naver_free_shipping_price: p.naver_free_shipping_price != null ? Number(p.naver_free_shipping_price) : null,
-        coupang_paid_shipping_price: p.coupang_paid_shipping_price != null ? Number(p.coupang_paid_shipping_price) : null,
-        coupang_free_shipping_price: p.coupang_free_shipping_price != null ? Number(p.coupang_free_shipping_price) : null,
-        status: resolveStatusCode(p.status) || p.status || 'PREPARING',
-        vendor_id: p.vendor_id || null,
-      }))
+      const rows = validRows.map(p => {
+        // 한글 값을 DB 값으로 변환
+        const marginCalcTypeRaw = (p as any).margin_calculation_type
+        const marginCalcType = marginCalcTypeRaw === '마진율' ? 'rate'
+          : marginCalcTypeRaw === '마진액' ? 'amount'
+          : marginCalcTypeRaw || null
+
+        const materialCostPolicyRaw = (p as any).material_cost_policy
+        const materialCostPolicy = materialCostPolicyRaw === '자동' ? 'auto'
+          : materialCostPolicyRaw === '고정' ? 'fixed'
+          : materialCostPolicyRaw || null
+
+        const sellerPriceModeRaw = (p as any).seller_supply_price_mode
+        const sellerPriceMode = sellerPriceModeRaw === '자동' ? 'auto'
+          : sellerPriceModeRaw === '수동' ? 'manual'
+          : sellerPriceModeRaw || null
+
+        const naverPriceModeRaw = (p as any).naver_price_mode
+        const naverPriceMode = naverPriceModeRaw === '자동' ? 'auto'
+          : naverPriceModeRaw === '수동' ? 'manual'
+          : naverPriceModeRaw || null
+
+        const coupangPriceModeRaw = (p as any).coupang_price_mode
+        const coupangPriceMode = coupangPriceModeRaw === '자동' ? 'auto'
+          : coupangPriceModeRaw === '수동' ? 'manual'
+          : coupangPriceModeRaw || null
+
+        return {
+          id: p.id,
+          option_code: p.option_code || null,
+          option_name: p.option_name || null,
+          item_type: p.item_type || null,
+          variety: p.variety || null,
+          specification_1: p.specification_1 || null,
+          specification_2: p.specification_2 || null,
+          specification_3: p.specification_3 || null,
+          weight: p.weight != null ? Number(p.weight) : null,
+          standard_quantity: p.standard_quantity != null ? Number(p.standard_quantity) : null,
+          standard_unit: p.standard_unit || null,
+          packaging_box_price: p.packaging_box_price != null ? Number(p.packaging_box_price) : null,
+          pack_price: p.pack_price != null ? Number(p.pack_price) : null,
+          bag_vinyl_price: p.bag_vinyl_price != null ? Number(p.bag_vinyl_price) : null,
+          cushioning_price: p.cushioning_price != null ? Number(p.cushioning_price) : null,
+          sticker_price: p.sticker_price != null ? Number(p.sticker_price) : null,
+          ice_pack_price: p.ice_pack_price != null ? Number(p.ice_pack_price) : null,
+          other_material_price: p.other_material_price != null ? Number(p.other_material_price) : null,
+          raw_material_cost: p.raw_material_cost != null ? Number(p.raw_material_cost) : null,
+          labor_cost: p.labor_cost != null ? Number(p.labor_cost) : null,
+          misc_cost: p.misc_cost != null ? Number(p.misc_cost) : null,
+          shipping_fee: p.shipping_fee != null ? Number(p.shipping_fee) : null,
+          total_cost: p.total_cost != null ? Number(p.total_cost) : null,
+          // 가격 정책 필드 추가
+          material_cost_policy: materialCostPolicy,
+          fixed_material_cost: p.fixed_material_cost != null ? Number(p.fixed_material_cost) : null,
+          seller_supply_price_mode: sellerPriceMode,
+          target_seller_margin_rate: p.target_seller_margin_rate != null ? Number(p.target_seller_margin_rate) : null,
+          seller_supply_price: p.seller_supply_price != null ? Number(p.seller_supply_price) : null,
+          seller_margin_rate: p.seller_margin_rate != null ? Number(p.seller_margin_rate) : null,
+          seller_margin_amount: p.seller_margin_amount != null ? Number(p.seller_margin_amount) : null,
+          margin_calculation_type: marginCalcType,
+          target_margin_rate: p.target_margin_rate != null ? Number(p.target_margin_rate) : null,
+          target_margin_amount: p.target_margin_amount != null ? Number(p.target_margin_amount) : null,
+          naver_price_mode: naverPriceMode,
+          naver_paid_shipping_price: p.naver_paid_shipping_price != null ? Number(p.naver_paid_shipping_price) : null,
+          naver_free_shipping_price: p.naver_free_shipping_price != null ? Number(p.naver_free_shipping_price) : null,
+          coupang_price_mode: coupangPriceMode,
+          coupang_paid_shipping_price: p.coupang_paid_shipping_price != null ? Number(p.coupang_paid_shipping_price) : null,
+          coupang_free_shipping_price: p.coupang_free_shipping_price != null ? Number(p.coupang_free_shipping_price) : null,
+          status: resolveStatusCode(p.status) || p.status || 'PREPARING',
+          vendor_id: p.vendor_id || null,
+        }
+      })
 
       const { error: upErr } = await supabase.from('option_products').upsert(rows, { onConflict: 'id' })
       if (upErr) throw upErr
@@ -883,6 +957,10 @@ export default function OptionProductsManagementPage() {
                 : undefined,
               readOnly: ['option_code', 'vendor_id', 'used_material_1', 'used_material_2', 'used_material_3', 'total_cost', 'average_material_price', 'calculated_material_cost', 'seller_margin_rate', 'seller_margin_amount'].includes(field)
                 ? true
+                : field === 'target_seller_margin_rate' ? (row: OptionProduct) => {
+                    const mode = (row as any).seller_supply_price_mode
+                    return mode === 'manual' || mode === '수동'
+                  }
                 : field === 'target_margin_rate' ? (row: OptionProduct) => {
                     const calcType = (row as any).margin_calculation_type
                     return calcType !== 'rate' && calcType !== '마진율'
@@ -892,8 +970,22 @@ export default function OptionProductsManagementPage() {
                     return calcType !== 'amount' && calcType !== '마진액'
                   }
                 : false,
+              className: field === 'seller_supply_price' ? ((row: OptionProduct) => {
+                const mode = (row as any).seller_supply_price_mode
+                return mode === 'manual' || mode === '수동' ? '!text-purple-600' : ''
+              }) : undefined,
               align: ['material_cost_policy', 'seller_supply_price_mode', 'naver_price_mode', 'coupang_price_mode', 'margin_calculation_type', 'seller_margin_rate', 'target_seller_margin_rate', 'target_margin_rate'].includes(field) ? 'center' as const : undefined,
-              renderer: field === 'status' ? (value: any, row: OptionProduct) => {
+              renderer: field === 'target_seller_margin_rate' ? (value: any, row: OptionProduct) => {
+                const mode = (row as any).seller_supply_price_mode
+                const isReadOnly = mode === 'manual' || mode === '수동'
+                const displayValue = value != null ? Number(value).toLocaleString('ko-KR') : ''
+                return (
+                  <span style={{ fontSize: '13px' }}>
+                    {displayValue}
+                    {isReadOnly && <span style={{ marginLeft: '4px', color: '#9CA3AF', fontSize: '11px' }}>✕</span>}
+                  </span>
+                )
+              } : field === 'status' ? (value: any, row: OptionProduct) => {
                 if (!row.status) return ''
                 const st = supplyStatuses.find(s => s.name === row.status || s.code === row.status)
                 const bg = st?.color || '#6B7280'
@@ -931,7 +1023,7 @@ export default function OptionProductsManagementPage() {
                 )
                 : field === 'seller_supply_price_mode' || field === 'naver_price_mode' || field === 'coupang_price_mode' ? (value: any, _row: OptionProduct, _rowIndex: number, handleDropdownArrowClick?: (e: React.MouseEvent) => void) => (
                   <div className="relative flex items-center justify-center h-full w-full">
-                    <span style={{ fontSize: '13px' }}>{value === 'auto' ? '자동' : value === 'manual' ? '수동' : value || ''}</span>
+                    <span style={{ fontSize: '13px' }}>{(value === 'auto' || value === '자동') ? '자동' : (value === 'manual' || value === '수동') ? '수동' : value || ''}</span>
                     <div
                       className="absolute right-1 w-5 h-full flex items-center justify-center cursor-pointer"
                       onClick={handleDropdownArrowClick}
@@ -967,7 +1059,8 @@ export default function OptionProductsManagementPage() {
                   <span style={{ fontSize: '13px' }}>{value != null ? value : ''}</span>
                 )
                 : field === 'seller_supply_price' ? (value: any, row: OptionProduct) => {
-                  const badge = row.seller_supply_price_mode === 'manual' ? '⚙️' : '🅰️'
+                  const mode = row.seller_supply_price_mode
+                  const badge = (mode === 'manual' || mode === '수동') ? '⚙️' : '🅰️'
                   return (
                     <span style={{ fontSize: '13px' }}>
                       {value != null ? value.toLocaleString() : ''}
@@ -976,7 +1069,8 @@ export default function OptionProductsManagementPage() {
                   )
                 }
                 : field === 'naver_paid_shipping_price' || field === 'naver_free_shipping_price' ? (value: any, row: OptionProduct) => {
-                  const badge = row.naver_price_mode === 'manual' ? '⚙️' : '🅰️'
+                  const mode = row.naver_price_mode
+                  const badge = (mode === 'manual' || mode === '수동') ? '⚙️' : '🅰️'
                   return (
                     <span style={{ fontSize: '13px' }}>
                       {value != null ? value.toLocaleString() : ''}
@@ -985,7 +1079,8 @@ export default function OptionProductsManagementPage() {
                   )
                 }
                 : field === 'coupang_paid_shipping_price' || field === 'coupang_free_shipping_price' ? (value: any, row: OptionProduct) => {
-                  const badge = row.coupang_price_mode === 'manual' ? '⚙️' : '🅰️'
+                  const mode = row.coupang_price_mode
+                  const badge = (mode === 'manual' || mode === '수동') ? '⚙️' : '🅰️'
                   return (
                     <span style={{ fontSize: '13px' }}>
                       {value != null ? value.toLocaleString() : ''}

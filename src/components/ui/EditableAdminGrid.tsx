@@ -10,7 +10,7 @@ interface Column<T = any> {
   type?: 'text' | 'number' | 'dropdown' | 'checkbox'
   source?: string[]
   readOnly?: boolean | ((row: T) => boolean)
-  className?: string
+  className?: string | ((row: T) => string)
   align?: 'left' | 'center' | 'right'
   renderer?: (value: any, row: T, rowIndex: number, handleDropdownArrowClick?: (e: React.MouseEvent) => void) => React.ReactNode
 }
@@ -77,6 +77,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     return column.readOnly ?? false
   }
   const [editValue, setEditValue] = useState('')
+  const [isKeyboardEdit, setIsKeyboardEdit] = useState(false) // 키보드 입력으로 시작했는지 추적
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({ key: '', direction: null })
   const [globalSearchTerm, setGlobalSearchTerm] = useState<string>('')
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
@@ -108,19 +109,21 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       prevDataRef.current = data
       isInitialMount.current = false
     } else if (!isInitialMount.current) {
-      // 데이터 길이나 참조가 변경된 경우에만 업데이트
-      if (data !== prevDataRef.current && data.length !== gridData.length) {
+      // 데이터 참조가 변경된 경우 업데이트 (길이 변경 조건 제거)
+      if (data !== prevDataRef.current) {
         setGridData(data)
         prevDataRef.current = data
 
-        // 데이터가 변경되면 선택된 행 초기화 (삭제 후 재로딩 시)
-        setSelectedRows(new Set())
-        setAddedRows(new Set())
-        setCopiedRows(new Set())
-        setModifiedCells(new Set())
+        // 길이가 변경된 경우에만 선택된 행 초기화 (삭제 후 재로딩 시)
+        if (data.length !== gridData.length) {
+          setSelectedRows(new Set())
+          setAddedRows(new Set())
+          setCopiedRows(new Set())
+          setModifiedCells(new Set())
+        }
       }
     }
-  }, [data])
+  }, [data, gridData.length])
 
   useEffect(() => {
     if (editingCell && inputRef.current) {
@@ -131,17 +134,25 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
         // 약간의 지연 후 클릭 이벤트 트리거 (브라우저가 포커스를 처리한 후)
         setTimeout(() => {
           if (document.activeElement === selectElement) {
-            selectElement.click()
+            // 마우스 이벤트로 드롭다운 열기
+            const mouseEvent = new MouseEvent('mousedown', {
+              view: window,
+              bubbles: true,
+              cancelable: true
+            })
+            selectElement.dispatchEvent(mouseEvent)
           }
-        }, 10)
+        }, 50)
       } else {
         inputRef.current.focus()
-        if (inputRef.current instanceof HTMLInputElement || inputRef.current instanceof HTMLTextAreaElement) {
-          inputRef.current.select()
+        // 키보드 입력인 경우 커서를 끝으로 이동, 아니면 선택하지 않음
+        if (inputRef.current instanceof HTMLInputElement) {
+          const length = inputRef.current.value.length
+          inputRef.current.setSelectionRange(length, length)
         }
       }
     }
-  }, [editingCell])
+  }, [editingCell, isKeyboardEdit])
 
   // 키보드 이벤트 핸들러
   useEffect(() => {
@@ -190,8 +201,31 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           e.preventDefault()
           // Enter 키로 편집 시작
           const column = columns.find(c => c.key === selectedCell.col)
-          if (!column?.readOnly) {
+          const row = gridData[selectedCell.row]
+          if (column && !isReadOnly(column, row)) {
             handleCellDoubleClick(selectedCell.row, selectedCell.col, gridData[selectedCell.row][selectedCell.col])
+          }
+          return
+        } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          // 일반 문자 키를 누르면 즉시 편집 모드로 전환하고 해당 문자 입력
+          e.preventDefault()
+          const column = columns.find(c => c.key === selectedCell.col)
+          const row = gridData[selectedCell.row]
+          if (column && !isReadOnly(column, row) && column.type !== 'checkbox') {
+            setIsKeyboardEdit(true)
+            setEditingCell(selectedCell)
+            setEditValue(e.key)
+          }
+          return
+        } else if (e.key === 'Backspace' || e.key === 'Delete') {
+          // Backspace나 Delete 키를 누르면 셀 값을 비우고 편집 모드로 전환
+          e.preventDefault()
+          const column = columns.find(c => c.key === selectedCell.col)
+          const row = gridData[selectedCell.row]
+          if (column && !isReadOnly(column, row)) {
+            setIsKeyboardEdit(true)
+            setEditingCell(selectedCell)
+            setEditValue('')
           }
           return
         }
@@ -216,52 +250,41 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     const text = e.clipboardData?.getData('text/plain')
     if (!text) return
 
-    const rows = text.split('\n').filter(row => row.trim())
     const newData = [...gridData]
     const newModifiedCells = new Set(modifiedCells)
     let hasChanges = false
 
-    rows.forEach((rowText, rowOffset) => {
-      const targetRow = selectedCell.row + rowOffset
-      if (targetRow >= gridData.length) return
+    // 줄바꿈과 탭을 모두 공백으로 변환하여 한 셀에 붙여넣기
+    const convertedValue = text.trim()
+      .split(/\r?\n/).join(' ')  // 줄바꿈을 공백으로
+      .split('\t').join(' ')      // 탭을 공백으로
+      .replace(/\s+/g, ' ')       // 연속된 공백을 하나로
 
-      const values = rowText.split('\t')
-      const startColIndex = columns.findIndex(c => c.key === selectedCell.col)
+    const column = columns.find(c => c.key === selectedCell.col)
+    const targetRowData = newData[selectedCell.row]
 
-      values.forEach((value, colOffset) => {
-        const targetColIndex = startColIndex + colOffset
-        if (targetColIndex >= columns.length) return
+    if (column && !isReadOnly(column, targetRowData)) {
+      let processedValue: any = convertedValue
+      if (column.type === 'number') {
+        processedValue = convertedValue === '' ? null : Number(convertedValue.replace(/,/g, ''))
+      }
 
-        const column = columns[targetColIndex]
-        const targetRowData = newData[targetRow]
-        if (isReadOnly(column, targetRowData)) return
+      newData[selectedCell.row][selectedCell.col] = processedValue
 
-        let processedValue: any = value.trim()
-        if (column.type === 'number') {
-          processedValue = value === '' ? null : Number(value.replace(/,/g, ''))
-        } else if (column.type === 'checkbox') {
-          processedValue = value === 'true' || value === '1'
+      const cellKey = `${selectedCell.row}-${selectedCell.col}`
+      const isAddedOrCopied = addedRows.has(selectedCell.row) || copiedRows.has(selectedCell.row)
+
+      if (!isAddedOrCopied) {
+        const originalValue = originalDataRef.current[selectedCell.row]?.[selectedCell.col]
+        if (processedValue === originalValue) {
+          newModifiedCells.delete(cellKey)
+        } else {
+          newModifiedCells.add(cellKey)
         }
+      }
 
-        newData[targetRow][column.key] = processedValue
-
-        // 추가되거나 복사된 행은 modifiedCells에서 제외
-        const cellKey = `${targetRow}-${column.key}`
-        const isAddedOrCopied = addedRows.has(targetRow) || copiedRows.has(targetRow)
-
-        if (!isAddedOrCopied) {
-          // 원본 데이터와 비교 (기존 데이터만)
-          const originalValue = originalDataRef.current[targetRow]?.[column.key]
-          if (processedValue === originalValue) {
-            newModifiedCells.delete(cellKey)
-          } else {
-            newModifiedCells.add(cellKey)
-          }
-        }
-
-        hasChanges = true
-      })
-    })
+      hasChanges = true
+    }
 
     if (hasChanges) {
       // 히스토리 추가
@@ -418,7 +441,18 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   }
 
   const handleCellClick = (rowIndex: number, columnKey: string, currentValue: any) => {
-    setSelectedCell({ row: rowIndex, col: columnKey })
+    const column = columns.find(col => col.key === columnKey)
+    const row = gridData[rowIndex]
+
+    // 이미 선택된 셀을 다시 클릭하면 편집 모드 활성화 (드롭다운 제외)
+    if (selectedCell?.row === rowIndex && selectedCell?.col === columnKey && !isReadOnly(column, row) && column?.type !== 'dropdown') {
+      setIsKeyboardEdit(false)
+      setEditingCell({ row: rowIndex, col: columnKey })
+      setEditValue(currentValue ?? '')
+    } else {
+      // 첫 클릭은 셀 선택만
+      setSelectedCell({ row: rowIndex, col: columnKey })
+    }
   }
 
   const handleDropdownArrowClick = (rowIndex: number, columnKey: string, currentValue: any, e: React.MouseEvent) => {
@@ -438,21 +472,23 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     const row = gridData[rowIndex]
     if (isReadOnly(column, row)) return
 
+    setIsKeyboardEdit(false) // 더블클릭/Enter는 키보드 입력이 아님
     setEditingCell({ row: rowIndex, col: columnKey })
     setEditValue(currentValue ?? '')
   }
 
-  const commitEdit = () => {
+  const commitEdit = (valueOverride?: any) => {
     if (!editingCell) return
 
     const newData = [...gridData]
     const column = columns.find(col => col.key === editingCell.col)
 
-    let processedValue: any = editValue
+    const rawValue = valueOverride !== undefined ? valueOverride : editValue
+    let processedValue: any = rawValue
     if (column?.type === 'number') {
-      processedValue = editValue === '' ? null : Number(editValue)
+      processedValue = rawValue === '' ? null : Number(rawValue)
     } else if (column?.type === 'checkbox') {
-      processedValue = editValue === 'true' || editValue === true
+      processedValue = rawValue === 'true' || rawValue === true
     }
 
     const oldValue = newData[editingCell.row][editingCell.col]
@@ -497,19 +533,86 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     }
 
     setEditingCell(null)
+    setIsKeyboardEdit(false)
   }
 
   const cancelEdit = () => {
+    setIsKeyboardEdit(false)
     setEditingCell(null)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault()
+      e.stopPropagation() // 전역 핸들러로 전달되지 않도록 방지
       commitEdit()
     } else if (e.key === 'Escape') {
       e.preventDefault()
       cancelEdit()
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      // 방향키 입력 시 편집 완료하고 셀 이동
+      e.preventDefault()
+      e.stopPropagation() // 전역 이벤트 핸들러로 버블링 방지
+
+      if (!editingCell) return
+
+      // 현재 편집 내용 커밋
+      const newData = [...gridData]
+      const column = columns.find(col => col.key === editingCell.col)
+
+      let processedValue: any = editValue
+      if (column?.type === 'number') {
+        processedValue = editValue === '' ? null : Number(editValue)
+      } else if (column?.type === 'checkbox') {
+        processedValue = editValue === 'true' || editValue === true
+      }
+
+      const oldValue = newData[editingCell.row][editingCell.col]
+      newData[editingCell.row] = {
+        ...newData[editingCell.row],
+        [editingCell.col]: processedValue
+      }
+
+      if (oldValue !== processedValue) {
+        const cellKey = `${editingCell.row}-${editingCell.col}`
+        const newModifiedCells = new Set(modifiedCells)
+        const rowIndex = editingCell.row
+        const isAddedOrCopied = addedRows.has(rowIndex) || copiedRows.has(rowIndex)
+
+        if (!isAddedOrCopied) {
+          const originalValue = originalDataRef.current[rowIndex]?.[editingCell.col]
+          if (processedValue === originalValue) {
+            newModifiedCells.delete(cellKey)
+          } else {
+            newModifiedCells.add(cellKey)
+          }
+        }
+
+        setModifiedCells(newModifiedCells)
+        addToHistory(newData)
+      }
+
+      setGridData(newData)
+      onDataChange?.(newData)
+      onCellEdit?.(editingCell.row, editingCell.col, processedValue)
+
+      // 방향키에 따라 셀 이동
+      let newRow = editingCell.row
+      let newColIndex = columns.findIndex(c => c.key === editingCell.col)
+
+      if (e.key === 'ArrowUp') {
+        newRow = Math.max(0, editingCell.row - 1)
+      } else if (e.key === 'ArrowDown') {
+        newRow = Math.min(gridData.length - 1, editingCell.row + 1)
+      } else if (e.key === 'ArrowLeft') {
+        newColIndex = Math.max(0, newColIndex - 1)
+      } else if (e.key === 'ArrowRight') {
+        newColIndex = Math.min(columns.length - 1, newColIndex + 1)
+      }
+
+      setEditingCell(null)
+      setIsKeyboardEdit(false)
+      setSelectedCell({ row: newRow, col: columns[newColIndex].key })
     }
   }
 
@@ -681,7 +784,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   }
 
 
-  const getCellClassName = useCallback((rowIndex: number, columnKey: string, column: Column<T>, isSticky: boolean = false) => {
+  const getCellClassName = useCallback((rowIndex: number, columnKey: string, column: Column<T>, row: T, isSticky: boolean = false) => {
     const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === columnKey
     const cellKey = `${rowIndex}-${columnKey}`
     const isModified = modifiedCells.has(cellKey)
@@ -738,14 +841,19 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       classes += 'text-center '
     }
 
-    // readOnly 셀 (getCellClassName은 row 정보 없이 호출되므로 함수형은 지원 안함)
+    // readOnly 셀
     if (!column.readOnly) {
       classes += 'cursor-cell '
     }
 
-    // 기존 className 제거 (bg-blue-50 등의 배경색 제거)
+    // className (함수형 또는 문자열 지원)
     if (column.className) {
-      const customClass = column.className.replace(/bg-\w+-\d+/g, '').trim()
+      let customClass = ''
+      if (typeof column.className === 'function') {
+        customClass = column.className(row)
+      } else {
+        customClass = column.className.replace(/bg-\w+-\d+/g, '').trim()
+      }
       if (customClass) {
         classes += customClass + ' '
       }
@@ -768,8 +876,12 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           <select
             ref={inputRef as React.RefObject<HTMLSelectElement>}
             value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={commitEdit}
+            onChange={(e) => {
+              const newValue = e.target.value
+              setEditValue(newValue)
+              // 값 선택 후 즉시 커밋 (새 값을 직접 전달)
+              setTimeout(() => commitEdit(newValue), 0)
+            }}
             onKeyDown={handleKeyDown}
             className="w-full h-full px-2 py-1 border-none outline-none bg-transparent text-[13px] text-center"
             style={{ fontSize: '13px', margin: 0 }}
@@ -1141,7 +1253,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   return (
                     <td
                       key={column.key}
-                      className={getCellClassName(rowIndex, column.key, column, false)}
+                      className={getCellClassName(rowIndex, column.key, column, row, false)}
                       style={{
                         height: rowHeight,
                         userSelect: 'text'

@@ -23,6 +23,11 @@ export default function ProductsLayout({ children }: { children: ReactNode }) {
           href: '/admin/products/option-products'
         },
         {
+          title: '원물매칭',
+          description: '옵션상품-원물 연결',
+          href: '/admin/products/material-matching'
+        },
+        {
           title: '카테고리 설정',
           description: '상품 분류 체계',
           href: '/admin/settings/categories'
@@ -70,13 +75,13 @@ export default function ProductsLayout({ children }: { children: ReactNode }) {
     <div className="flex gap-6 h-full">
       {/* 좌측 사이드바 */}
       <div className="w-32 flex-shrink-0 space-y-4">
-        <div className="text-lg font-bold text-gray-900">상품관리</div>
+        <div className="text-lg font-bold text-gray-900 dark:text-gray-100">상품관리</div>
 
         {/* 카테고리별 메뉴 */}
         <div className="space-y-3">
           {productCategories.map((category, idx) => (
             <div key={idx}>
-              <div className="text-[11px] font-semibold text-gray-500 mb-1">
+              <div className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
                 {category.category}
               </div>
               <div className="space-y-0.5">
@@ -87,11 +92,11 @@ export default function ProductsLayout({ children }: { children: ReactNode }) {
                       key={item.href}
                       href={item.href}
                       className={`block pl-2 py-1 rounded transition-colors group ${
-                        isActive ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-50'
+                        isActive ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                       }`}
                     >
                       <div className={`text-[14px] font-medium transition-colors ${
-                        isActive ? 'text-blue-600' : 'text-gray-700 group-hover:text-blue-600'
+                        isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400'
                       }`}>
                         {item.title}
                       </div>
@@ -100,7 +105,7 @@ export default function ProductsLayout({ children }: { children: ReactNode }) {
                 })}
               </div>
               {idx < productCategories.length - 1 && (
-                <div className="border-b border-gray-100 mt-3" />
+                <div className="border-b border-gray-100 dark:border-gray-800 mt-3" />
               )}
             </div>
           ))}
