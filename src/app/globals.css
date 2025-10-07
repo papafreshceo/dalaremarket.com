@@ -1422,4 +1422,51 @@ ul, ol {
   animation: scaleIn 150ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+/* 옵션상품 생성 페이지 간단 입력란 */
+.simple-input {
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 13px;
+  width: 100px;
+}
+
+.simple-input::-webkit-outer-spin-button,
+.simple-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.simple-input[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.simple-select {
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 13px;
+  width: 100px;
+}
+
+.simple-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  width: 96px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.dark .simple-input,
+.dark .simple-select {
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.dark .simple-label {
+  color: var(--color-text);
+}
 

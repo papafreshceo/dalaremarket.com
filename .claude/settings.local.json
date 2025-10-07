@@ -16,7 +16,9 @@
       "Bash(node:*)",
       "Bash(taskkill:*)",
       "Bash(tasklist)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(move \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\restored-create-page.tsx\" \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\products\\option-products\\create\\page.tsx\")",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
