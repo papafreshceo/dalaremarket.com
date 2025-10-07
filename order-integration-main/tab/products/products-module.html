@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>상품조회</title>
+    <style>
+        /* ========================================
+           상품조회 레이아웃
+           ======================================== */
+        .products-container {
+            padding: 40px;
+            background: #fafafa;
+            min-height: 100vh;
+        }
+
+        @media (max-width: 768px) {
+            .products-container {
+                padding: 20px;
+            }
+        }
+
+        /* ========================================
+           상단 통계
+           ======================================== */
+        .products-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .stat-content {
+            flex: 1;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            font-weight: 300;
+            color: #6c757d;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #212529;
+        }
+
+        /* ========================================
+           검색 섹션
+           ======================================== */
+        .search-section {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .search-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .search-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: #212529;
+        }
+
+        .search-filters {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .filter-label {
+            font-size: 12px;
+            font-weight: 300;
+            color: #6c757d;
+        }
+
+        .filter-input,
+        .filter-select {
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 300;
+            color: #212529;
+            background: #ffffff;
+            transition: all 0.2s;
+        }
+
+        .filter-input:focus,
+        .filter-select:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        /* ========================================
+           카테고리 필터
+           ======================================== */
+        .category-filters {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .category-btn {
+            padding: 6px 16px;
+            border: 1px solid #dee2e6;
+            border-radius: 20px;
+            background: #ffffff;
+            color: #495057;
+            font-size: 12px;
+            font-weight: 300;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .category-btn:hover {
+            border-color: #2563eb;
+            color: #2563eb;
+            background: #f8f9fa;
+        }
+
+        .category-btn.active {
+            background: #2563eb;
+            color: #ffffff;
+            border-color: #2563eb;
+        }
+
+        /* ========================================
+           뷰 전환 버튼
+           ======================================== */
+        .view-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .view-btn {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #495057;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .view-btn:hover {
+            border-color: #2563eb;
+            color: #2563eb;
+        }
+
+        .view-btn.active {
+            background: #2563eb;
+            color: #ffffff;
+            border-color: #2563eb;
+        }
+
+        /* ========================================
+           검색 버튼
+           ======================================== */
+        .search-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .btn-primary {
+            padding: 10px 24px;
+            background: #2563eb;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 300;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-secondary {
+            padding: 10px 24px;
+            background: #ffffff;
+            color: #495057;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 300;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-secondary:hover {
+            background: #f8f9fa;
+            border-color: #adb5bd;
+        }
+
+        /* ========================================
+           상품 그리드 뷰
+           ======================================== */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .product-card {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .product-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 200px;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .product-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .product-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .badge-new {
+            background: #10b981;
+            color: #ffffff;
+        }
+
+        .badge-sale {
+            background: #ef4444;
+            color: #ffffff;
+        }
+
+        .badge-soldout {
+            background: #6c757d;
+            color: #ffffff;
+        }
+
+        .product-info {
+            padding: 16px;
+        }
+
+        .product-category {
+            font-size: 11px;
+            color: #6c757d;
+            margin-bottom: 4px;
+            font-weight: 300;
+        }
+
+        .product-name {
+            font-size: 14px;
+            font-weight: 400;
+            color: #212529;
+            margin-bottom: 8px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .product-price {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .price-original {
+            font-size: 12px;
+            color: #6c757d;
+            text-decoration: line-through;
+            font-weight: 300;
+        }
+
+        .price-current {
+            font-size: 18px;
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .price-discount {
+            font-size: 12px;
+            color: #ef4444;
+            font-weight: 500;
+        }
+
+        .product-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 8px;
+            border-top: 1px solid #f1f3f5;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: #6c757d;
+            font-weight: 300;
+        }
+
+        /* ========================================
+           상품 리스트 뷰
+           ======================================== */
+        .products-list {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .list-header {
+            display: grid;
+            grid-template-columns: 60px 100px 1fr 150px 120px 100px 100px 80px;
+            padding: 12px 20px;
+            background: #f8f9fa;
+            font-size: 12px;
+            font-weight: 400;
+            color: #6c757d;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .list-item {
+            display: grid;
+            grid-template-columns: 60px 100px 1fr 150px 120px 100px 100px 80px;
+            padding: 12px 20px;
+            border-bottom: 1px solid #f1f3f5;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .list-item:hover {
+            background: #f8f9fa;
+        }
+
+        .list-checkbox {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .list-image {
+            width: 60px;
+            height: 60px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .list-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .list-name {
+            font-size: 14px;
+            font-weight: 400;
+            color: #212529;
+        }
+
+        .list-category {
+            font-size: 12px;
+            font-weight: 300;
+            color: #6c757d;
+        }
+
+        .list-price {
+            font-size: 14px;
+            font-weight: 500;
+            color: #212529;
+        }
+
+        .list-stock {
+            font-size: 12px;
+            font-weight: 300;
+            color: #495057;
+        }
+
+        .stock-low {
+            color: #f59e0b;
+        }
+
+        .stock-out {
+            color: #ef4444;
+        }
+
+        .list-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 400;
+        }
+
+        .status-active {
+            background: #d1fae5;
+            color: #10b981;
+        }
+
+        .status-inactive {
+            background: #fee2e2;
+            color: #ef4444;
+        }
+
+        .list-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .action-btn {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background: #ffffff;
+            color: #6c757d;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            border-color: #2563eb;
+            color: #2563eb;
+        }
+
+        /* ========================================
+           상품 상세 모달
+           ======================================== */
+        .product-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .product-modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #ffffff;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 500;
+            color: #212529;
+        }
+
+        .btn-close {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: none;
+            cursor: pointer;
+            color: #6c757d;
+            transition: all 0.2s;
+        }
+
+        .btn-close:hover {
+            color: #212529;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .product-detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+        }
+
+        @media (max-width: 768px) {
+            .product-detail-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .product-detail-image {
+            width: 100%;
+            height: 400px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .product-detail-info {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .detail-section {
+            padding-bottom: 20px;
+            border-bottom: 1px solid #f1f3f5;
+        }
+
+        .detail-section:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-size: 12px;
+            font-weight: 300;
+            color: #6c757d;
+            margin-bottom: 8px;
+        }
+
+        .detail-value {
+            font-size: 16px;
+            font-weight: 400;
+            color: #212529;
+        }
+
+        .detail-price {
+            font-size: 24px;
+            font-weight: 600;
+            color: #212529;
+        }
+
+        /* ========================================
+           페이지네이션
+           ======================================== */
+        .pagination-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 32px;
+        }
+
+        .page-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #495057;
+            font-size: 12px;
+            font-weight: 300;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .page-btn:hover {
+            background: #f8f9fa;
+            border-color: #adb5bd;
+        }
+
+        .page-btn.active {
+            background: #2563eb;
+            color: #ffffff;
+            border-color: #2563eb;
+        }
+
+        /* ========================================
+           빈 상태
+           ======================================== */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 20px;
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 16px;
+        }
+
+        .empty-icon {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .empty-title {
+            font-size: 18px;
+            font-weight: 400;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+
+        .empty-description {
+            font-size: 14px;
+            font-weight: 300;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="products-container">
+        <!-- 상단 통계 -->
+        <div class="products-stats">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #dbeafe; color: #2563eb;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                        <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-label">전체 상품</div>
+                    <div class="stat-value">1,284</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #d1fae5; color: #10b981;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-label">판매중</div>
+                    <div class="stat-value">956</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #fef3c7; color: #f59e0b;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-label">재고 부족</div>
+                    <div class="stat-value">45</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #fee2e2; color: #ef4444;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-label">품절</div>
+                    <div class="stat-value">23</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #ede9fe; color: #7c3aed;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z"></path>
+                        <path d="M2 17L12 22L22 17"></path>
+                        <path d="M2 12L12 17L22 12"></path>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-label">카테고리</div>
+                    <div class="stat-value">48</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 검색 섹션 -->
+        <div class="search-section">
+            <div class="search-header">
+                <h2 class="search-title">상품 검색</h2>
+                <div class="view-controls">
+                    <button class="view-btn active" onclick="setView('grid')" title="그리드 보기">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                    </button>
+                    <button class="view-btn" onclick="setView('list')" title="리스트 보기">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="8" y1="6" x2="21" y2="6"></line>
+                            <line x1="8" y1="12" x2="21" y2="12"></line>
+                            <line x1="8" y1="18" x2="21" y2="18"></line>
+                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 카테고리 필터 -->
+            <div class="category-filters">
+                <button class="category-btn active" onclick="filterCategory('all')">전체</button>
+                <button class="category-btn" onclick="filterCategory('clothing')">의류</button>
+                <button class="category-btn" onclick="filterCategory('electronics')">전자제품</button>
+                <button class="category-btn" onclick="filterCategory('food')">식품</button>
+                <button class="category-btn" onclick="filterCategory('beauty')">뷰티</button>
+                <button class="category-btn" onclick="filterCategory('home')">홈/리빙</button>
+                <button class="category-btn" onclick="filterCategory('sports')">스포츠</button>
+                <button class="category-btn" onclick="filterCategory('books')">도서</button>
+            </div>
+
+            <!-- 검색 필터 -->
+            <div class="search-filters">
+                <div class="filter-group">
+                    <label class="filter-label">상품명/코드</label>
+                    <input type="text" class="filter-input" id="productSearch" placeholder="상품명 또는 상품코드 입력">
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label">판매 상태</label>
+                    <select class="filter-select" id="statusFilter">
+                        <option value="">전체</option>
+                        <option value="active">판매중</option>
+                        <option value="soldout">품절</option>
+                        <option value="discontinued">판매중지</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label">가격 범위</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="number" class="filter-input" id="minPrice" placeholder="최소">
+                        <span style="color: #6c757d;">~</span>
+                        <input type="number" class="filter-input" id="maxPrice" placeholder="최대">
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label">재고 상태</label>
+                    <select class="filter-select" id="stockFilter">
+                        <option value="">전체</option>
+                        <option value="instock">재고 있음</option>
+                        <option value="lowstock">재고 부족 (10개 이하)</option>
+                        <option value="outofstock">재고 없음</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 검색 버튼 -->
+            <div class="search-actions">
+                <button class="btn-secondary" onclick="resetFilters()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                    초기화
+                </button>
+                <button class="btn-primary" onclick="searchProducts()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    검색
+                </button>
+            </div>
+        </div>
+
+        <!-- 상품 그리드 뷰 -->
+        <div class="products-grid" id="productsGrid">
+            <!-- 상품 카드 예시 -->
+            <div class="product-card" onclick="showProductDetail('PRD001')">
+                <div class="product-image">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='%23f8f9fa'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='14' fill='%236c757d'%3E상품 이미지%3C/text%3E%3C/svg%3E" alt="상품 이미지">
+                    <span class="product-badge badge-new">NEW</span>
+                </div>
+                <div class="product-info">
+                    <div class="product-category">의류 > 상의</div>
+                    <div class="product-name">프리미엄 코튼 반팔 티셔츠</div>
+                    <div class="product-price">
+                        <span class="price-original">39,000원</span>
+                        <span class="price-current">29,000원</span>
+                        <span class="price-discount">25%</span>
+                    </div>
+                    <div class="product-meta">
+                        <div class="meta-item">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            재고: 125
+                        </div>
+                        <div class="meta-item">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
+                            판매: 89
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="product-card" onclick="showProductDetail('PRD002')">
+                <div class="product-image">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='%23f8f9fa'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='14' fill='%236c757d'%3E상품 이미지%3C/text%3E%3C/svg%3E" alt="상품 이미지">
+                    <span class="product-badge badge-sale">SALE</span>
+                </div>
+                <div class="product-info">
+                    <div class="product-category">전자제품 > 이어폰</div>
+                    <div class="product-name">무선 블루투스 이어폰 프로</div>
+                    <div class="product-price">
+                        <span class="price-original">159,000원</span>
+                        <span class="price-current">119,000원</span>
+                        <span class="price-discount">25%</span>
+                    </div>
+                    <div class="product-meta">
+                        <div class="meta-item">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            재고: 45
+                        </div>
+                        <div class="meta-item">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
+                            판매: 234
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="product-card" onclick="showProductDetail('PRD003')">
+                <div class="product-image">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='%23f8f9fa'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='14' fill='%236c757d'%3E상품 이미지%3C/text%3E%3C/svg%3E" alt="상품 이미지">
+                    <span class="product-badge badge-soldout">품절</span>
+                </div>
+                <div class="product-info">
+                    <div class="product-category">식품 > 건강식품</div>
+                    <div class="product-name">프리미엄 종합 비타민</div>
+                    <div class="product-price">
+                        <span class="price-current">45,000원</span>
+                    </div>
+                    <div class="product-meta">
+                        <div class="meta-item" style="color: #ef4444;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            재고: 0
+                        </div>
+                        <div class="meta-item">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
+                            판매: 567
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 더 많은 상품 카드... -->
+        </div>
+
+        <!-- 상품 리스트 뷰 (숨김 상태) -->
+        <div class="products-list" id="productsList" style="display: none;">
+            <div class="list-header">
+                <div>
+                    <input type="checkbox" class="list-checkbox" onchange="toggleSelectAll()">
+                </div>
+                <div>이미지</div>
+                <div>상품명</div>
+                <div>카테고리</div>
+                <div>가격</div>
+                <div>재고</div>
+                <div>상태</div>
+                <div>관리</div>
+            </div>
+            
+            <div class="list-item">
+                <div>
+                    <input type="checkbox" class="list-checkbox">
+                </div>
+                <div class="list-image">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Crect width='60' height='60' fill='%23f8f9fa'/%3E%3C/svg%3E" alt="상품">
+                </div>
+                <div class="list-name">프리미엄 코튼 반팔 티셔츠</div>
+                <div class="list-category">의류 > 상의</div>
+                <div class="list-price">29,000원</div>
+                <div class="list-stock">125개</div>
+                <div><span class="list-status status-active">판매중</span></div>
+                <div class="list-actions">
+                    <button class="action-btn" onclick="editProduct('PRD001')" title="수정">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="action-btn" onclick="deleteProduct('PRD001')" title="삭제">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 더 많은 리스트 아이템... -->
+        </div>
+
+        <!-- 페이지네이션 -->
+        <div class="pagination-container">
+            <button class="page-btn" onclick="goToPage(1)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="11 17 6 12 11 7"></polyline>
+                    <polyline points="18 17 13 12 18 7"></polyline>
+                </svg>
+            </button>
+            <button class="page-btn" onclick="goToPrevPage()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </button>
+            <button class="page-btn active">1</button>
+            <button class="page-btn">2</button>
+            <button class="page-btn">3</button>
+            <button class="page-btn">4</button>
+            <button class="page-btn">5</button>
+            <button class="page-btn" onclick="goToNextPage()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </button>
+            <button class="page-btn" onclick="goToLastPage()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="13 17 18 12 13 7"></polyline>
+                    <polyline points="6 17 11 12 6 7"></polyline>
+                </svg>
+            </button>
+        </div>
+
+        <!-- 상품 상세 모달 -->
+        <div class="product-modal" id="productModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">상품 상세 정보</h3>
+                    <button class="btn-close" onclick="closeProductModal()">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="product-detail-grid">
+                        <div class="product-detail-image">
+                            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Crect width='400' height='400' fill='%23f8f9fa'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='18' fill='%236c757d'%3E상품 이미지%3C/text%3E%3C/svg%3E" alt="상품 상세">
+                        </div>
+                        <div class="product-detail-info">
+                            <div class="detail-section">
+                                <div class="detail-label">상품코드</div>
+                                <div class="detail-value">PRD001</div>
+                            </div>
+                            <div class="detail-section">
+                                <div class="detail-label">상품명</div>
+                                <div class="detail-value">프리미엄 코튼 반팔 티셔츠</div>
+                            </div>
+                            <div class="detail-section">
+                                <div class="detail-label">카테고리</div>
+                                <div class="detail-value">의류 > 상의</div>
+                            </div>
+                            <div class="detail-section">
+                                <div class="detail-label">가격</div>
+                                <div class="detail-price">29,000원</div>
+                                <div style="color: #6c757d; font-size: 14px; text-decoration: line-through;">39,000원</div>
+                            </div>
+                            <div class="detail-section">
+                                <div class="detail-label">재고 현황</div>
+                                <div class="detail-value">
+                                    <div style="display: flex; gap: 20px;">
+                                        <div>현재 재고: 125개</div>
+                                        <div>안전 재고: 50개</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="detail-section">
+                                <div class="detail-label">판매 통계</div>
+                                <div class="detail-value">
+                                    <div style="display: flex; gap: 20px; margin-bottom: 8px;">
+                                        <div>총 판매: 89개</div>
+                                        <div>이번 달: 23개</div>
+                                    </div>
+                                    <div style="display: flex; gap: 20px;">
+                                        <div>평균 일 판매: 3개</div>
+                                        <div>매출: 2,581,000원</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 상태 관리
+        let currentView = 'grid';
+        let selectedCategory = 'all';
+        let selectedProducts = new Set();
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            loadProducts();
+        });
+
+        // 상품 로드
+        function loadProducts() {
+            console.log('상품 목록 로딩...');
+            // API 호출 또는 데이터 로드 로직
+        }
+
+        // 뷰 전환
+        function setView(view) {
+            currentView = view;
+            
+            // 버튼 활성화 상태 변경
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.closest('.view-btn').classList.add('active');
+            
+            // 뷰 전환
+            const grid = document.getElementById('productsGrid');
+            const list = document.getElementById('productsList');
+            
+            if (view === 'grid') {
+                grid.style.display = 'grid';
+                list.style.display = 'none';
+            } else {
+                grid.style.display = 'none';
+                list.style.display = 'block';
+            }
+        }
+
+        // 카테고리 필터
+        function filterCategory(category) {
+            selectedCategory = category;
+            
+            // 버튼 활성화 상태 변경
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // 상품 필터링
+            searchProducts();
+        }
+
+        // 상품 검색
+        function searchProducts() {
+            const filters = {
+                keyword: document.getElementById('productSearch').value,
+                status: document.getElementById('statusFilter').value,
+                minPrice: document.getElementById('minPrice').value,
+                maxPrice: document.getElementById('maxPrice').value,
+                stock: document.getElementById('stockFilter').value,
+                category: selectedCategory
+            };
+            
+            console.log('검색 조건:', filters);
+            
+            // API 호출 또는 필터링 로직
+            loadProducts();
+        }
+
+        // 필터 초기화
+        function resetFilters() {
+            document.getElementById('productSearch').value = '';
+            document.getElementById('statusFilter').value = '';
+            document.getElementById('minPrice').value = '';
+            document.getElementById('maxPrice').value = '';
+            document.getElementById('stockFilter').value = '';
+            
+            // 카테고리 초기화
+            selectedCategory = 'all';
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === '전체') {
+                    btn.classList.add('active');
+                }
+            });
+            
+            searchProducts();
+        }
+
+        // 상품 상세 보기
+        function showProductDetail(productId) {
+            console.log('상품 상세:', productId);
+            document.getElementById('productModal').classList.add('show');
+        }
+
+        // 모달 닫기
+        function closeProductModal() {
+            document.getElementById('productModal').classList.remove('show');
+        }
+
+        // 상품 수정
+        function editProduct(productId) {
+            console.log('상품 수정:', productId);
+            // 수정 페이지로 이동 또는 모달 열기
+        }
+
+        // 상품 삭제
+        function deleteProduct(productId) {
+            if (confirm('정말 이 상품을 삭제하시겠습니까?')) {
+                console.log('상품 삭제:', productId);
+                // 삭제 API 호출
+            }
+        }
+
+        // 전체 선택
+        function toggleSelectAll() {
+            const mainCheckbox = event.target;
+            const checkboxes = document.querySelectorAll('.list-item .list-checkbox');
+            
+            checkboxes.forEach(cb => {
+                cb.checked = mainCheckbox.checked;
+            });
+            
+            // 선택된 상품 업데이트
+            if (mainCheckbox.checked) {
+                checkboxes.forEach(cb => {
+                    selectedProducts.add(cb.value);
+                });
+            } else {
+                selectedProducts.clear();
+            }
+        }
+
+        // 페이지네이션
+        function goToPage(page) {
+            console.log('페이지 이동:', page);
+            // 페이지 이동 로직
+        }
+
+        function goToPrevPage() {
+            console.log('이전 페이지');
+        }
+
+        function goToNextPage() {
+            console.log('다음 페이지');
+        }
+
+        function goToLastPage() {
+            console.log('마지막 페이지');
+        }
+
+        // ESC 키로 모달 닫기
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeProductModal();
+            }
+        });
+    </script>
+</body>
+</html>

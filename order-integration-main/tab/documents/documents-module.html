@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>전자문서</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f5f6fa;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* 헤더 */
+        .header-section {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #212529;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* 통계 카드 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #212529;
+        }
+
+        /* 기안 작성 버튼 영역 */
+        .document-actions {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .action-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #212529;
+            margin-bottom: 16px;
+        }
+
+        .document-templates {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
+        .template-btn {
+            padding: 20px 12px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .template-btn:hover {
+            background: #e7f3ff;
+            border-color: #2563eb;
+            transform: translateY(-2px);
+        }
+
+        .template-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .template-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #212529;
+        }
+
+        /* 탭 네비게이션 */
+        .doc-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #dee2e6;
+            background: #ffffff;
+            padding: 0 20px;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .doc-tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #6c757d;
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .doc-tab.active {
+            color: #2563eb;
+        }
+
+        .doc-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #2563eb;
+        }
+
+        /* 문서 리스트 */
+        .document-list {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 0 0 12px 12px;
+            border-top: none;
+        }
+
+        .list-header {
+            padding: 16px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 8px;
+        }
+
+        .search-input {
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 250px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 400;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-secondary {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            color: #495057;
+        }
+
+        /* 테이블 */
+        .document-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .document-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 500;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .document-table td {
+            padding: 12px;
+            font-size: 14px;
+            color: #212529;
+            border-bottom: 1px solid #f1f3f5;
+        }
+
+        .document-table tbody tr:hover {
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-draft {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-approved {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* 모달 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        /* 기안문 폼 */
+        .document-form {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .form-header {
+            text-align: center;
+            padding: 20px;
+            border-bottom: 2px solid #212529;
+            margin-bottom: 20px;
+        }
+
+        .form-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .form-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        .form-section {
+            margin-bottom: 24px;
+        }
+
+        .form-row {
+            display: flex;
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            width: 120px;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .form-value {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-left: none;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        textarea.form-control {
+            min-height: 150px;
+            resize: vertical;
+        }
+
+        /* 결재선 */
+        .approval-line {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .approver-box {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+        }
+
+        .approver-role {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 4px;
+        }
+
+        .approver-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #212529;
+            margin-bottom: 8px;
+        }
+
+        .approval-status {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .footer-left {
+            display: flex;
+            gap: 8px;
+        }
+
+        .footer-right {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* 첨부파일 */
+        .attachment-area {
+            padding: 12px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            margin-top: 12px;
+        }
+
+        .attachment-list {
+            margin-top: 8px;
+        }
+
+        .attachment-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 헤더 -->
+        <div class="header-section">
+            <h1 class="page-title">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                전자문서
+            </h1>
+        </div>
+
+        <!-- 통계 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">작성중</div>
+                <div class="stat-value">3</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">결재대기</div>
+                <div class="stat-value">5</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">승인완료</div>
+                <div class="stat-value">42</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">반려</div>
+                <div class="stat-value">2</div>
+            </div>
+        </div>
+
+        <!-- 기안 작성 버튼들 -->
+        <div class="document-actions">
+            <h3 class="action-title">새 기안 작성</h3>
+            <div class="document-templates">
+                <button class="template-btn" onclick="createDocument('standard')">
+                    <div class="template-icon">📄</div>
+                    <div class="template-name">표준기안문</div>
+                </button>
+                <button class="template-btn" onclick="createDocument('purchase')">
+                    <div class="template-icon">🛒</div>
+                    <div class="template-name">물품구매기안</div>
+                </button>
+                <button class="template-btn" onclick="createDocument('expense')">
+                    <div class="template-icon">💰</div>
+                    <div class="template-name">지출결의서</div>
+                </button>
+                <button class="template-btn" onclick="createDocument('vacation')">
+                    <div class="template-icon">🏖️</div>
+                    <div class="template-name">휴가신청서</div>
+                </button>
+                <button class="template-btn" onclick="createDocument('overtime')">
+                    <div class="template-icon">⏰</div>
+                    <div class="template-name">연장근무신청</div>
+                </button>
+                <button class="template-btn" onclick="createDocument('report')">
+                    <div class="template-icon">📊</div>
+                    <div class="template-name">업무보고서</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- 문서 탭 -->
+        <div class="doc-tabs">
+            <button class="doc-tab active" onclick="switchTab('my')">내 문서함</button>
+            <button class="doc-tab" onclick="switchTab('approval')">결재함</button>
+            <button class="doc-tab" onclick="switchTab('reference')">참조함</button>
+            <button class="doc-tab" onclick="switchTab('completed')">완료함</button>
+        </div>
+
+        <!-- 문서 리스트 -->
+        <div class="document-list">
+            <div class="list-header">
+                <div class="search-box">
+                    <input type="text" class="search-input" placeholder="문서 제목, 작성자 검색">
+                    <button class="btn btn-secondary">검색</button>
+                </div>
+            </div>
+
+            <table class="document-table">
+                <thead>
+                    <tr>
+                        <th width="80">문서번호</th>
+                        <th width="120">구분</th>
+                        <th>제목</th>
+                        <th width="100">작성자</th>
+                        <th width="100">작성일</th>
+                        <th width="80">상태</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr onclick="viewDocument(1)">
+                        <td>2025-001</td>
+                        <td>물품구매기안</td>
+                        <td>사무용품 구매 건</td>
+                        <td>김철수</td>
+                        <td>2025-01-20</td>
+                        <td><span class="status-badge status-pending">결재중</span></td>
+                    </tr>
+                    <tr onclick="viewDocument(2)">
+                        <td>2025-002</td>
+                        <td>표준기안문</td>
+                        <td>신규 거래처 계약 승인 요청</td>
+                        <td>이영희</td>
+                        <td>2025-01-19</td>
+                        <td><span class="status-badge status-approved">승인</span></td>
+                    </tr>
+                    <tr onclick="viewDocument(3)">
+                        <td>2025-003</td>
+                        <td>휴가신청서</td>
+                        <td>연차 휴가 신청</td>
+                        <td>박민수</td>
+                        <td>2025-01-18</td>
+                        <td><span class="status-badge status-approved">승인</span></td>
+                    </tr>
+                    <tr onclick="viewDocument(4)">
+                        <td>2025-004</td>
+                        <td>지출결의서</td>
+                        <td>1월 마케팅 비용 집행</td>
+                        <td>최지훈</td>
+                        <td>2025-01-17</td>
+                        <td><span class="status-badge status-rejected">반려</span></td>
+                    </tr>
+                    <tr onclick="viewDocument(5)">
+                        <td>2025-005</td>
+                        <td>업무보고서</td>
+                        <td>1월 2주차 주간 업무 보고</td>
+                        <td>정수연</td>
+                        <td>2025-01-16</td>
+                        <td><span class="status-badge status-draft">작성중</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 기안문 작성/보기 모달 -->
+    <div class="modal" id="documentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">표준 기안문</h2>
+                <button onclick="closeModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="document-form">
+                    <!-- 결재선 -->
+                    <div class="approval-line">
+                        <div class="approver-box">
+                            <div class="approver-role">기안자</div>
+                            <div class="approver-name">김철수</div>
+                            <div class="approval-status status-badge status-approved">작성</div>
+                        </div>
+                        <div class="approver-box">
+                            <div class="approver-role">검토</div>
+                            <div class="approver-name">
+                                <select class="form-control" id="reviewer">
+                                    <option>선택</option>
+                                    <option>이영희 과장</option>
+                                    <option>박민수 대리</option>
+                                </select>
+                            </div>
+                            <div class="approval-status status-badge status-draft">대기</div>
+                        </div>
+                        <div class="approver-box">
+                            <div class="approver-role">승인</div>
+                            <div class="approver-name">
+                                <select class="form-control" id="approver">
+                                    <option>선택</option>
+                                    <option>최지훈 부장</option>
+                                    <option>정수연 이사</option>
+                                </select>
+                            </div>
+                            <div class="approval-status status-badge status-draft">대기</div>
+                        </div>
+                    </div>
+
+                    <!-- 기안 내용 -->
+                    <div class="form-section">
+                        <div class="form-row">
+                            <div class="form-label">문서번호</div>
+                            <div class="form-value">2025-006 (자동생성)</div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-label">작성일자</div>
+                            <div class="form-value">2025-01-20</div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-label">제목</div>
+                            <div class="form-value">
+                                <input type="text" class="form-control" id="docTitle" placeholder="제목을 입력하세요">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 문서 종류별 내용 -->
+                    <div id="documentContent">
+                        <!-- 표준 기안문 -->
+                        <div class="form-section" id="standardForm">
+                            <div class="form-row">
+                                <div class="form-label">내용</div>
+                                <div class="form-value">
+                                    <textarea class="form-control" placeholder="기안 내용을 입력하세요"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 물품구매기안 (숨김) -->
+                        <div class="form-section" id="purchaseForm" style="display: none;">
+                            <div class="form-row">
+                                <div class="form-label">품목</div>
+                                <div class="form-value">
+                                    <input type="text" class="form-control" placeholder="구매 품목">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-label">수량</div>
+                                <div class="form-value">
+                                    <input type="number" class="form-control" placeholder="수량">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-label">예상금액</div>
+                                <div class="form-value">
+                                    <input type="text" class="form-control" placeholder="예상 금액">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-label">구매사유</div>
+                                <div class="form-value">
+                                    <textarea class="form-control" placeholder="구매 사유를 입력하세요"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 첨부파일 -->
+                    <div class="attachment-area">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 14px; font-weight: 500;">첨부파일</span>
+                            <button class="btn btn-secondary" onclick="addAttachment()">파일 추가</button>
+                        </div>
+                        <div class="attachment-list">
+                            <div class="attachment-item">
+                                <span>📎 견적서.pdf (2.3MB)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="footer-left">
+                    <button class="btn btn-secondary">임시저장</button>
+                </div>
+                <div class="footer-right">
+                    <button class="btn btn-secondary" onclick="closeModal()">취소</button>
+                    <button class="btn btn-primary" onclick="submitDocument()">결재요청</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'my';
+
+        function switchTab(tab) {
+            currentTab = tab;
+            const tabs = document.querySelectorAll('.doc-tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // 탭에 따른 데이터 로드
+            loadDocuments(tab);
+        }
+
+        function loadDocuments(tab) {
+            // 실제로는 서버에서 데이터를 가져와야 함
+            console.log('Loading documents for tab:', tab);
+        }
+
+        function createDocument(type) {
+            const modal = document.getElementById('documentModal');
+            const title = document.getElementById('modalTitle');
+            
+            // 모든 폼 숨기기
+            document.getElementById('standardForm').style.display = 'none';
+            document.getElementById('purchaseForm').style.display = 'none';
+            
+            // 선택한 양식 표시
+            switch(type) {
+                case 'standard':
+                    title.textContent = '표준 기안문';
+                    document.getElementById('standardForm').style.display = 'block';
+                    break;
+                case 'purchase':
+                    title.textContent = '물품구매 기안';
+                    document.getElementById('purchaseForm').style.display = 'block';
+                    break;
+                case 'expense':
+                    title.textContent = '지출 결의서';
+                    document.getElementById('standardForm').style.display = 'block';
+                    break;
+                case 'vacation':
+                    title.textContent = '휴가 신청서';
+                    document.getElementById('standardForm').style.display = 'block';
+                    break;
+                case 'overtime':
+                    title.textContent = '연장근무 신청서';
+                    document.getElementById('standardForm').style.display = 'block';
+                    break;
+                case 'report':
+                    title.textContent = '업무 보고서';
+                    document.getElementById('standardForm').style.display = 'block';
+                    break;
+            }
+            
+            modal.classList.add('show');
+        }
+
+        function viewDocument(id) {
+            // 문서 상세 보기
+            createDocument('standard');
+            document.getElementById('modalTitle').textContent = '문서 상세';
+            
+            // 실제로는 서버에서 문서 데이터를 가져와서 표시
+            console.log('Viewing document:', id);
+        }
+
+        function closeModal() {
+            document.getElementById('documentModal').classList.remove('show');
+        }
+
+        function submitDocument() {
+            const title = document.getElementById('docTitle').value;
+            const reviewer = document.getElementById('reviewer').value;
+            const approver = document.getElementById('approver').value;
+            
+            if (!title) {
+                alert('제목을 입력해주세요.');
+                return;
+            }
+            
+            if (reviewer === '선택' || approver === '선택') {
+                alert('결재자를 선택해주세요.');
+                return;
+            }
+            
+            alert('결재 요청이 완료되었습니다.');
+            closeModal();
+        }
+
+        function addAttachment() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const item = document.createElement('div');
+                    item.className = 'attachment-item';
+                    item.innerHTML = `<span>📎 ${file.name} (${(file.size / 1048576).toFixed(1)}MB)</span>`;
+                    document.querySelector('.attachment-list').appendChild(item);
+                }
+            };
+            input.click();
+        }
+
+        // 모달 외부 클릭시 닫기
+        document.getElementById('documentModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

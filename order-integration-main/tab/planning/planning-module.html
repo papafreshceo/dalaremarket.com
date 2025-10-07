@@ -1,0 +1,3195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>업무계획 관리</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f5f6fa;
+            padding: 20px;
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* 탭 스타일 */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            background: #ffffff;
+            padding: 4px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            color: #495057;
+            font-size: 14px;
+            font-weight: 400;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .tab-btn:hover {
+            background: #f8f9fa;
+        }
+
+        .tab-btn.active {
+            background: #2563eb;
+            color: white;
+        }
+
+        /* 헤더 */
+        .header-section {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #212529;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* 필터 섹션 */
+        .filter-section {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #495057;
+            background: #ffffff;
+            cursor: pointer;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 4px 12px;
+        }
+
+        .search-input {
+            border: none;
+            outline: none;
+            padding: 4px;
+            font-size: 14px;
+            width: 200px;
+        }
+
+        /* 날짜 네비게이션 */
+        .date-navigation {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #ffffff;
+            padding: 12px 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .date-nav-btn {
+            padding: 6px 12px;
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .date-nav-btn:hover {
+            background: #f8f9fa;
+            border-color: #2563eb;
+        }
+
+        .current-date {
+            font-size: 18px;
+            font-weight: 500;
+            color: #212529;
+            min-width: 200px;
+            text-align: center;
+        }
+
+        /* 뷰 전환 버튼 */
+        .view-toggle {
+            display: flex;
+            gap: 8px;
+        }
+
+        .view-btn {
+            padding: 8px 16px;
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .view-btn.active {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+
+        /* 캘린더 뷰 */
+        .calendar-view {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .calendar-header {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .calendar-header-cell {
+            padding: 12px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .calendar-header-cell:first-child {
+            color: #dc3545;
+        }
+
+        .calendar-header-cell:last-child {
+            color: #2563eb;
+        }
+
+        .calendar-body {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+        }
+
+        .calendar-cell {
+            min-height: 120px;
+            border-right: 1px solid #f1f3f5;
+            border-bottom: 1px solid #f1f3f5;
+            padding: 8px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .calendar-cell:hover {
+            background: #f8f9fa;
+        }
+
+        .calendar-cell:nth-child(7n) {
+            border-right: none;
+        }
+
+        .calendar-date {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .calendar-cell.other-month .calendar-date {
+            color: #adb5bd;
+        }
+
+        .calendar-cell.today {
+            background: #e7f3ff;
+        }
+
+        .task-item {
+            font-size: 11px;
+            padding: 2px 4px;
+            margin: 2px 0;
+            border-radius: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .task-item:hover {
+            transform: translateX(2px);
+        }
+
+        /* 업무 유형별 색상 */
+        .task-urgent {
+            background: #dc3545;
+            color: white;
+        }
+
+        .task-high {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .task-medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .task-low {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .task-short {
+            background: #d4f4e7;
+            color: #166534;
+            border-left: 2px solid #16a34a;
+        }
+
+        .task-long {
+            background: #f3e8ff;
+            color: #6b21a8;
+            border-left: 2px solid #9333ea;
+        }
+
+        .task-repeat {
+            background: #fff7ed;
+            color: #9a3412;
+            border-left: 2px solid #fb923c;
+        }
+
+        /* 리스트 뷰 */
+        .list-view, .repeat-view {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .list-view.active, .repeat-view.active {
+            display: block;
+        }
+
+        .calendar-view.active {
+            display: block;
+        }
+
+        .calendar-view:not(.active) {
+            display: none;
+        }
+
+        .task-list {
+            padding: 20px;
+        }
+
+        .task-group {
+            margin-bottom: 24px;
+        }
+
+        .task-group-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #212529;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #dee2e6;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .task-count {
+            background: #2563eb;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .task-list-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            position: relative;
+        }
+
+        .task-list-item:hover {
+            background: #e9ecef;
+            transform: translateX(4px);
+        }
+
+        .task-list-item.urgent {
+            border-left-color: #dc3545;
+        }
+
+        .task-list-item.short-term {
+            border-left-color: #16a34a;
+        }
+
+        .task-list-item.long-term {
+            border-left-color: #9333ea;
+        }
+
+        .task-checkbox {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+            cursor: pointer;
+        }
+
+        .task-content {
+            flex: 1;
+        }
+
+        .task-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #212529;
+            margin-bottom: 4px;
+        }
+
+        .task-meta {
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .task-priority {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 4px 8px;
+            background: transparent;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: #f8f9fa;
+            border-color: #2563eb;
+        }
+
+        .action-btn.delete:hover {
+            background: #fee2e2;
+            border-color: #dc3545;
+            color: #dc3545;
+        }
+
+        /* 진행률 표시 */
+        .progress-bar {
+            width: 100px;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 0 12px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #2563eb;
+            transition: width 0.3s;
+        }
+
+        /* 태스크 추가 버튼 */
+        .add-task-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 56px;
+            height: 56px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+            transition: all 0.2s;
+            z-index: 100;
+        }
+
+        .add-task-btn:hover {
+            background: #1d4ed8;
+            transform: scale(1.1);
+        }
+
+        /* 모달 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: #212529;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #6c757d;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+
+        textarea.form-control {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid #dee2e6;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-secondary {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            color: #495057;
+        }
+
+        .btn-secondary:hover {
+            background: #f8f9fa;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        /* 로딩 */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2000;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #2563eb;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 범례 */
+        .legend {
+            display: flex;
+            gap: 16px;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+
+        /* 알림 배지 */
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #dc3545;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        /* 토스트 알림 */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #212529;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            display: none;
+            z-index: 3000;
+            animation: slideUp 0.3s;
+        }
+
+        .toast.show {
+            display: block;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateX(-50%) translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* 반복업무 테이블 */
+        .repeat-tasks-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .repeat-tasks-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 500;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .repeat-tasks-table td {
+            padding: 12px;
+            border-bottom: 1px solid #f1f3f5;
+        }
+
+        .repeat-tasks-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-active {
+            background: #d4f4e7;
+            color: #166534;
+        }
+
+        .status-inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .checkbox-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .header-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-section {
+                justify-content: space-between;
+            }
+
+            .calendar-cell {
+                min-height: 80px;
+                padding: 4px;
+            }
+
+            .modal-content {
+                width: 95%;
+            }
+
+            .search-input {
+                width: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 탭 -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('all')">전체</button>
+            <button class="tab-btn" onclick="switchTab('today')">
+                오늘 챙겨야 할 일
+                <span id="todayCount" class="notification-badge" style="display: none;"></span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('short')">단기계획</button>
+            <button class="tab-btn" onclick="switchTab('long')">장기계획</button>
+            <button class="tab-btn" onclick="switchTab('repeat')">반복업무</button>
+        </div>
+
+        <!-- 헤더 -->
+        <div class="header-section">
+            <h1 class="page-title">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="3" y1="9" x2="21" y2="9"></line>
+                    <line x1="8" y1="3" x2="8" y2="9"></line>
+                    <line x1="16" y1="3" x2="16" y2="9"></line>
+                </svg>
+                업무 계획
+            </h1>
+            
+            <div class="filter-section">
+                <select class="filter-select" id="statusFilter" onchange="applyFilters()">
+                    <option value="">전체 상태</option>
+                    <option value="대기">대기</option>
+                    <option value="진행중">진행중</option>
+                    <option value="완료">완료</option>
+                    <option value="보류">보류</option>
+                </select>
+                
+                <select class="filter-select" id="assigneeFilter" onchange="applyFilters()">
+                    <option value="">전체 담당자</option>
+                </select>
+                
+                <div class="search-box">
+                    <input type="text" class="search-input" id="searchInput" placeholder="검색..." onkeyup="applyFilters()">
+                </div>
+                
+                <div class="view-toggle">
+                    <button class="view-btn active" onclick="toggleView('calendar')">캘린더</button>
+                    <button class="view-btn" onclick="toggleView('list')">리스트</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 날짜 네비게이션 (반복업무 탭이 아닐 때만 표시) -->
+        <div class="date-navigation" id="dateNavigation">
+            <button class="date-nav-btn" onclick="changeMonth(-1)">◀</button>
+            <div class="current-date" id="currentDate">2025년 1월</div>
+            <button class="date-nav-btn" onclick="changeMonth(1)">▶</button>
+            <button class="date-nav-btn" onclick="goToToday()">오늘</button>
+        </div>
+
+        <!-- 범례 (반복업무 탭이 아닐 때만 표시) -->
+        <div class="legend" id="legendSection">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #dc3545;"></div>
+                <span>긴급</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #fee2e2;"></div>
+                <span>높음</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #fef3c7;"></div>
+                <span>중간</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #dbeafe;"></div>
+                <span>낮음</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #d4f4e7;"></div>
+                <span>단기계획</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #f3e8ff;"></div>
+                <span>장기계획</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #fff7ed;"></div>
+                <span>반복업무</span>
+            </div>
+        </div>
+
+        <!-- 캘린더 뷰 -->
+        <div class="calendar-view active" id="calendarView">
+            <div class="calendar-header">
+                <div class="calendar-header-cell">일</div>
+                <div class="calendar-header-cell">월</div>
+                <div class="calendar-header-cell">화</div>
+                <div class="calendar-header-cell">수</div>
+                <div class="calendar-header-cell">목</div>
+                <div class="calendar-header-cell">금</div>
+                <div class="calendar-header-cell">토</div>
+            </div>
+            <div class="calendar-body" id="calendarBody"></div>
+        </div>
+
+        <!-- 리스트 뷰 -->
+        <div class="list-view" id="listView">
+            <div class="task-list" id="taskListContent"></div>
+        </div>
+
+        <!-- 반복업무 뷰 -->
+        <div class="repeat-view" id="repeatView">
+            <div style="padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="font-size: 20px; font-weight: 600;">반복업무 관리</h2>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-success" onclick="checkAndCreateRepeatTasks()">오늘 업무 생성</button>
+                        <button class="btn btn-primary" onclick="openRepeatTaskModal()">+ 반복업무 등록</button>
+                    </div>
+                </div>
+                
+                <div style="background: white; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                    <table class="repeat-tasks-table">
+                        <thead>
+                            <tr>
+                                <th>업무명</th>
+                                <th style="width: 100px;">반복유형</th>
+                                <th style="width: 100px;">반복주기</th>
+                                <th style="width: 100px;">담당자</th>
+                                <th style="width: 80px;">우선순위</th>
+                                <th style="width: 100px;">다음실행일</th>
+                                <th style="width: 60px;">상태</th>
+                                <th style="width: 120px;">관리</th>
+                            </tr>
+                        </thead>
+                        <tbody id="repeatTasksList"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 태스크 추가 버튼 (반복업무 탭이 아닐 때만 표시) -->
+        <button class="add-task-btn" id="floatingAddBtn" onclick="openTaskModal()">+</button>
+    </div>
+
+    <!-- 태스크 추가/수정 모달 -->
+    <div class="modal" id="taskModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">새 업무 추가</h3>
+                <button class="modal-close" onclick="closeTaskModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="taskId">
+                <input type="hidden" id="editIndex">
+                
+                <div class="form-group">
+                    <label class="form-label">업무 구분</label>
+                    <select class="form-control" id="taskType" onchange="updateModalFields()">
+                        <option value="task">업무지시</option>
+                        <option value="short">단기계획</option>
+                        <option value="long">장기계획</option>
+                    </select>
+                </div>
+                
+                <div id="taskFields"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="deleteBtn" onclick="deleteTask()" style="display: none;">삭제</button>
+                <button class="btn btn-secondary" onclick="closeTaskModal()">취소</button>
+                <button class="btn btn-primary" onclick="saveTask()">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 반복업무 모달 -->
+    <div class="modal" id="repeatTaskModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="repeatModalTitle">반복업무 등록</h3>
+                <button class="modal-close" onclick="closeRepeatTaskModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="repeatTaskId">
+                
+                <div class="form-group">
+                    <label class="form-label">반복유형 *</label>
+                    <select class="form-control" id="repeatType" onchange="updateRepeatForm()">
+                        <option value="일일">일일</option>
+                        <option value="주간">주간</option>
+                        <option value="월간">월간</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">업무명 *</label>
+                    <input type="text" class="form-control" id="repeatTaskName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">설명</label>
+                    <textarea class="form-control" id="repeatTaskDesc" rows="3"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">담당자 *</label>
+                    <input type="text" class="form-control" id="repeatAssignee" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">우선순위</label>
+                    <select class="form-control" id="repeatPriority">
+                        <option value="낮음">낮음</option>
+                        <option value="중간" selected>중간</option>
+                        <option value="높음">높음</option>
+                        <option value="긴급">긴급</option>
+                    </select>
+                </div>
+                
+                <!-- 주간 반복 옵션 -->
+                <div id="weeklyRepeatOptions" style="display: none;">
+                    <label class="form-label">반복 요일 *</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" name="weekDays" value="월"> 월</label>
+                        <label><input type="checkbox" name="weekDays" value="화"> 화</label>
+                        <label><input type="checkbox" name="weekDays" value="수"> 수</label>
+                        <label><input type="checkbox" name="weekDays" value="목"> 목</label>
+                        <label><input type="checkbox" name="weekDays" value="금"> 금</label>
+                        <label><input type="checkbox" name="weekDays" value="토"> 토</label>
+                        <label><input type="checkbox" name="weekDays" value="일"> 일</label>
+                    </div>
+                </div>
+                
+                <!-- 월간 반복 옵션 -->
+                <div id="monthlyRepeatOptions" style="display: none;">
+                    <label class="form-label">반복 일자 *</label>
+                    <select class="form-control" id="monthlyDay">
+                        <option value="1">1일</option>
+                        <option value="5">5일</option>
+                        <option value="10">10일</option>
+                        <option value="15">15일</option>
+                        <option value="20">20일</option>
+                        <option value="25">25일</option>
+                        <option value="last">마지막날</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">시작일</label>
+                    <input type="date" class="form-control" id="repeatStartDate">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">종료일</label>
+                    <input type="date" class="form-control" id="repeatEndDate">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">실행시간</label>
+                    <input type="time" class="form-control" id="repeatTime" value="09:00">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">활성화</label>
+                    <select class="form-control" id="repeatActive">
+                        <option value="Y">활성</option>
+                        <option value="N">비활성</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="repeatDeleteBtn" onclick="deleteRepeatTask()" style="display: none;">삭제</button>
+                <button class="btn btn-secondary" onclick="closeRepeatTaskModal()">취소</button>
+                <button class="btn btn-primary" onclick="saveRepeatTask()">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 로딩 -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- 토스트 알림 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // 전역 변수
+        let currentDate = new Date();
+        let currentView = 'calendar';
+        let currentTab = 'all';
+        let tasksData = [];
+        let shortTermData = [];
+        let longTermData = [];
+        let repeatTasksData = [];
+        let filteredData = [];
+        let currentUser = null;
+        let editMode = false;
+        const taskDataStore = {};
+
+        // API 엔드포인트
+        const API_BASE = '/api/planning';
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        async function initializeApp() {
+            await getUserInfo();
+            await loadData();
+            updateModalFields();
+            checkTodayTasks();
+            checkAndCreateRepeatTasks(); // 반복업무 자동 생성 체크
+            
+            // 정기 체크 설정
+            setInterval(checkTodayTasks, 60000);
+            setupDailyRepeatCheck(); // 매일 자정 반복업무 체크
+        }
+
+        // 사용자 정보 가져오기
+        async function getUserInfo() {
+            try {
+                // 부모 창에서 사용자 정보 가져오기 (iframe인 경우)
+                if (window.parent && window.parent !== window && window.parent.currentUser) {
+                    currentUser = window.parent.currentUser;
+                    return;
+                }
+                
+                // localStorage에서 사용자 이메일 가져오기
+                const userEmail = localStorage.getItem('userEmail') || sessionStorage.getItem('userEmail');
+                if (userEmail) {
+                    currentUser = {
+                        email: userEmail,
+                        name: userEmail.split('@')[0],
+                        role: 'user'
+                    };
+                } else {
+                    currentUser = { 
+                        name: 'Guest', 
+                        email: 'guest@example.com', 
+                        role: 'user' 
+                    };
+                }
+            } catch (error) {
+                console.log('사용자 정보 로드 실패, 기본값 사용');
+                currentUser = { 
+                    name: 'Guest', 
+                    email: 'guest@example.com', 
+                    role: 'user' 
+                };
+            }
+        }
+
+        // 데이터 로드
+        async function loadData() {
+            showLoading();
+            try {
+                const [tasksRes, shortRes, longRes, repeatRes] = await Promise.all([
+                    fetch(API_BASE, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'getData',
+                            range: '업무지시!A:K'
+                        })
+                    }),
+                    fetch(API_BASE, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'getData',
+                            range: '단기계획!A:L'
+                        })
+                    }),
+                    fetch(API_BASE, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'getData',
+                            range: '장기계획!A:M'
+                        })
+                    }),
+                    fetch(API_BASE, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'getData',
+                            range: '반복업무!A:Q'
+                        })
+                    })
+                ]);
+                
+                const [tasksResult, shortResult, longResult, repeatResult] = await Promise.all([
+                    tasksRes.json(),
+                    shortRes.json(),
+                    longRes.json(),
+                    repeatRes.json()
+                ]);
+                
+                if (tasksResult.success) {
+                    tasksData = parseSheetData(tasksResult.data);
+                }
+                if (shortResult.success) {
+                    shortTermData = parseSheetData(shortResult.data);
+                }
+                if (longResult.success) {
+                    longTermData = parseSheetData(longResult.data);
+                }
+                if (repeatResult.success) {
+                    repeatTasksData = parseSheetData(repeatResult.data);
+                    if (currentTab === 'repeat') {
+                        loadRepeatTasks();
+                    }
+                }
+                
+                updateAssigneeFilter();
+                applyFilters();
+                
+            } catch (error) {
+                console.error('데이터 로드 실패:', error);
+                // 데모 데이터
+                tasksData = [];
+                shortTermData = [];
+                longTermData = [];
+                repeatTasksData = [];
+                updateAssigneeFilter();
+                applyFilters();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 시트 데이터 파싱
+        function parseSheetData(data) {
+            if (!data || data.length < 2) return [];
+            const headers = data[0];
+            return data.slice(1).filter(row => row.some(cell => cell)).map((row, index) => {
+                const obj = { _index: index + 1 };
+                headers.forEach((header, i) => {
+                    obj[header] = row[i] || '';
+                });
+                return obj;
+            });
+        }
+
+        // 반복업무 자동 생성
+        async function checkAndCreateRepeatTasks() {
+            if (!repeatTasksData || repeatTasksData.length === 0) {
+                console.log('반복업무 데이터 없음');
+                return;
+            }
+            
+            const today = new Date().toISOString().split('T')[0];
+            const tasksToCreate = [];
+            const updatesToMake = [];
+            
+            for (const repeatTask of repeatTasksData) {
+                if (repeatTask['활성화'] !== 'Y') continue;
+                
+                const nextExecDate = repeatTask['다음실행일'];
+                
+                // 오늘이 실행일이거나 지난 경우
+                if (!nextExecDate || nextExecDate <= today) {
+                    // 업무지시 생성
+                    const newTask = {
+                        '연번': '',
+                        '등록일': today,
+                        '마감일': today,
+                        '업무제목': `${repeatTask['업무명']} (${repeatTask['반복유형']})`,
+                        '업무내용': repeatTask['설명'],
+                        '담당자': repeatTask['담당자'],
+                        '지시자': '시스템(반복)',
+                        '우선순위': repeatTask['우선순위'],
+                        '상태': '대기',
+                        '완료일': '',
+                        '비고': `반복업무 ID: ${repeatTask['연번']}`
+                    };
+                    
+                    tasksToCreate.push(newTask);
+                    
+                    // 다음 실행일 계산
+                    const nextDate = calculateNextExecutionDate(repeatTask);
+                    updatesToMake.push({
+                        index: repeatTask._index,
+                        lastExec: today,
+                        nextExec: nextDate
+                    });
+                }
+            }
+            
+            if (tasksToCreate.length > 0) {
+                showLoading();
+                try {
+                    // 업무지시 생성
+                    for (const task of tasksToCreate) {
+                        await fetch(API_BASE, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'appendData',
+                                range: '업무지시!A:K',
+                                data: task
+                            })
+                        });
+                    }
+                    
+                    // 반복업무 날짜 업데이트
+                    for (const update of updatesToMake) {
+                        const rowIndex = update.index + 1;
+                        await fetch(API_BASE, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'updateData',
+                                range: `반복업무!N${rowIndex}:O${rowIndex}`,
+                                data: [[update.lastExec, update.nextExec]]
+                            })
+                        });
+                    }
+                    
+                    showToast(`${tasksToCreate.length}개의 반복업무가 자동 생성되었습니다.`);
+                    await loadData();
+                } catch (error) {
+                    console.error('반복업무 생성 실패:', error);
+                    showToast('반복업무 생성 중 오류가 발생했습니다.', 'error');
+                } finally {
+                    hideLoading();
+                }
+            }
+        }
+
+        // 다음 실행일 계산
+        function calculateNextExecutionDate(repeatTask) {
+            const currentDate = new Date();
+            let nextDate = new Date(currentDate);
+            
+            switch(repeatTask['반복주기']) {
+                case '매일':
+                case '일일':
+                    nextDate.setDate(nextDate.getDate() + 1);
+                    break;
+                    
+                case '매주':
+                case '주간':
+                    const weekdays = (repeatTask['반복요일'] || '').split(',');
+                    let found = false;
+                    for (let i = 1; i <= 7; i++) {
+                        nextDate.setDate(currentDate.getDate() + i);
+                        const dayName = ['일', '월', '화', '수', '목', '금', '토'][nextDate.getDay()];
+                        if (weekdays.includes(dayName)) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) nextDate.setDate(currentDate.getDate() + 7);
+                    break;
+                    
+                case '매월':
+                case '월간':
+                    const dayOfMonth = repeatTask['반복일자'];
+                    nextDate.setMonth(currentDate.getMonth() + 1);
+                    if (dayOfMonth === 'last') {
+                        nextDate = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0);
+                    } else {
+                        nextDate.setDate(parseInt(dayOfMonth) || 1);
+                    }
+                    break;
+            }
+            
+            return nextDate.toISOString().split('T')[0];
+        }
+
+        // 매일 자정 반복업무 체크 설정
+        function setupDailyRepeatCheck() {
+            const now = new Date();
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(0, 0, 0, 0);
+            
+            const msUntilMidnight = tomorrow - now;
+            
+            setTimeout(() => {
+                checkAndCreateRepeatTasks();
+                // 이후 24시간마다 반복
+                setInterval(checkAndCreateRepeatTasks, 24 * 60 * 60 * 1000);
+            }, msUntilMidnight);
+        }
+
+        // 반복업무 목록 로드
+        function loadRepeatTasks() {
+            const tbody = document.getElementById('repeatTasksList');
+            if (!tbody) return;
+            
+            let html = '';
+            
+            if (repeatTasksData.length === 0) {
+                html = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #6c757d;">등록된 반복업무가 없습니다.</td></tr>';
+            } else {
+                repeatTasksData.forEach((task, index) => {
+                    const statusClass = task['활성화'] === 'Y' ? 'status-active' : 'status-inactive';
+                    const statusText = task['활성화'] === 'Y' ? '활성' : '비활성';
+                    
+                    html += `
+                        <tr>
+                            <td>${task['업무명']}</td>
+                            <td>${task['반복유형']}</td>
+                            <td>${task['반복주기']} ${task['반복요일'] || task['반복일자'] || ''}</td>
+                            <td>${task['담당자']}</td>
+                            <td>${task['우선순위']}</td>
+                            <td>${task['다음실행일'] || '-'}</td>
+                            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                            <td>
+                                <button class="action-btn" onclick="editRepeatTask(${index})">수정</button>
+                                <button class="action-btn delete" onclick="confirmDeleteRepeatTask(${index})">삭제</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+            
+            tbody.innerHTML = html;
+        }
+
+        // 반복업무 수정
+        function editRepeatTask(index) {
+            const task = repeatTasksData[index];
+            if (!task) return;
+            
+            document.getElementById('repeatModalTitle').textContent = '반복업무 수정';
+            document.getElementById('repeatDeleteBtn').style.display = 'inline-block';
+            document.getElementById('repeatTaskId').value = task._index;
+            
+            document.getElementById('repeatType').value = task['반복유형'];
+            document.getElementById('repeatTaskName').value = task['업무명'];
+            document.getElementById('repeatTaskDesc').value = task['설명'];
+            document.getElementById('repeatAssignee').value = task['담당자'];
+            document.getElementById('repeatPriority').value = task['우선순위'];
+            document.getElementById('repeatStartDate').value = task['시작일'];
+            document.getElementById('repeatEndDate').value = task['종료일'];
+            document.getElementById('repeatTime').value = task['실행시간'] || '09:00';
+            document.getElementById('repeatActive').value = task['활성화'];
+            
+            updateRepeatForm();
+            
+            // 주간/월간 옵션 설정
+            if (task['반복유형'] === '주간') {
+                const weekdays = (task['반복요일'] || '').split(',');
+                document.querySelectorAll('input[name="weekDays"]').forEach(cb => {
+                    cb.checked = weekdays.includes(cb.value);
+                });
+            } else if (task['반복유형'] === '월간') {
+                document.getElementById('monthlyDay').value = task['반복일자'];
+            }
+            
+            document.getElementById('repeatTaskModal').classList.add('show');
+        }
+
+        // 반복업무 저장
+        async function saveRepeatTask() {
+            const taskId = document.getElementById('repeatTaskId').value;
+            const isEdit = taskId !== '';
+            
+            const data = {
+                '연번': isEdit ? taskId : '',
+                '반복유형': document.getElementById('repeatType').value,
+                '업무명': document.getElementById('repeatTaskName').value,
+                '설명': document.getElementById('repeatTaskDesc').value,
+                '담당자': document.getElementById('repeatAssignee').value,
+                '우선순위': document.getElementById('repeatPriority').value,
+                '시작일': document.getElementById('repeatStartDate').value,
+                '종료일': document.getElementById('repeatEndDate').value,
+                '반복주기': '',
+                '반복요일': '',
+                '반복일자': '',
+                '실행시간': document.getElementById('repeatTime').value,
+                '활성화': document.getElementById('repeatActive').value,
+                '마지막실행일': '',
+                '다음실행일': calculateFirstExecutionDate(),
+                '자동생성여부': 'Y',
+                '비고': ''
+            };
+            
+            // 반복 주기 설정
+            const repeatType = data['반복유형'];
+            if (repeatType === '일일') {
+                data['반복주기'] = '매일';
+            } else if (repeatType === '주간') {
+                data['반복주기'] = '매주';
+                const weekdays = Array.from(document.querySelectorAll('input[name="weekDays"]:checked'))
+                    .map(cb => cb.value);
+                data['반복요일'] = weekdays.join(',');
+            } else if (repeatType === '월간') {
+                data['반복주기'] = '매월';
+                data['반복일자'] = document.getElementById('monthlyDay').value;
+            }
+            
+            showLoading();
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: isEdit ? 'updateData' : 'appendData',
+                        range: isEdit ? `반복업무!A${parseInt(taskId) + 1}:Q${parseInt(taskId) + 1}` : '반복업무!A:Q',
+                        data: isEdit ? [Object.values(data)] : data
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    closeRepeatTaskModal();
+                    await loadData();
+                    showToast(isEdit ? '반복업무가 수정되었습니다.' : '반복업무가 등록되었습니다.');
+                }
+            } catch (error) {
+                console.error('반복업무 저장 실패:', error);
+                showToast('저장에 실패했습니다.', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 첫 실행일 계산
+        function calculateFirstExecutionDate() {
+            const startDate = document.getElementById('repeatStartDate').value;
+            if (!startDate) return new Date().toISOString().split('T')[0];
+            
+            const date = new Date(startDate);
+            const repeatType = document.getElementById('repeatType').value;
+            
+            if (repeatType === '일일') {
+                return startDate;
+            } else if (repeatType === '주간') {
+                const weekdays = Array.from(document.querySelectorAll('input[name="weekDays"]:checked'))
+                    .map(cb => cb.value);
+                const dayMap = {'일': 0, '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6};
+                
+                for (let i = 0; i < 7; i++) {
+                    const checkDate = new Date(date);
+                    checkDate.setDate(date.getDate() + i);
+                    const dayName = Object.keys(dayMap).find(key => dayMap[key] === checkDate.getDay());
+                    if (weekdays.includes(dayName)) {
+                        return checkDate.toISOString().split('T')[0];
+                    }
+                }
+            } else if (repeatType === '월간') {
+                const dayOfMonth = document.getElementById('monthlyDay').value;
+                if (dayOfMonth === 'last') {
+                    const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+                    return lastDay.toISOString().split('T')[0];
+                } else {
+                    date.setDate(parseInt(dayOfMonth));
+                    return date.toISOString().split('T')[0];
+                }
+            }
+            
+            return startDate;
+        }
+
+        // 반복업무 모달 닫기
+        function closeRepeatTaskModal() {
+            document.getElementById('repeatTaskModal').classList.remove('show');
+            document.getElementById('repeatTaskId').value = '';
+            document.getElementById('repeatDeleteBtn').style.display = 'none';
+        }
+
+        // 반복업무 모달 열기
+        function openRepeatTaskModal() {
+            document.getElementById('repeatModalTitle').textContent = '반복업무 등록';
+            document.getElementById('repeatDeleteBtn').style.display = 'none';
+            document.getElementById('repeatTaskId').value = '';
+            
+            // 폼 초기화
+            document.getElementById('repeatTaskModal').querySelectorAll('input, textarea, select').forEach(el => {
+                if (el.type === 'checkbox') {
+                    el.checked = false;
+                } else if (el.tagName === 'SELECT') {
+                    el.selectedIndex = 0;
+                } else {
+                    el.value = '';
+                }
+            });
+            
+            // 기본값 설정
+            document.getElementById('repeatTime').value = '09:00';
+            document.getElementById('repeatActive').value = 'Y';
+            
+            updateRepeatForm();
+            document.getElementById('repeatTaskModal').classList.add('show');
+        }
+
+        // 반복업무 폼 업데이트
+        function updateRepeatForm() {
+            const repeatType = document.getElementById('repeatType').value;
+            document.getElementById('weeklyRepeatOptions').style.display = 
+                repeatType === '주간' ? 'block' : 'none';
+            document.getElementById('monthlyRepeatOptions').style.display = 
+                repeatType === '월간' ? 'block' : 'none';
+        }
+
+        // 반복업무 삭제
+        function confirmDeleteRepeatTask(index) {
+            if (confirm('정말 이 반복업무를 삭제하시겠습니까?')) {
+                deleteRepeatTaskByIndex(index);
+            }
+        }
+
+        async function deleteRepeatTaskByIndex(index) {
+            const task = repeatTasksData[index];
+            if (!task) return;
+            
+            showLoading();
+            try {
+                const rowIndex = task._index + 1;
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'deleteRow',
+                        range: `반복업무!A${rowIndex}:Q${rowIndex}`
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    await loadData();
+                    showToast('반복업무가 삭제되었습니다.');
+                }
+            } catch (error) {
+                console.error('반복업무 삭제 실패:', error);
+                showToast('삭제에 실패했습니다.', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 탭 전환
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // UI 요소 표시/숨김
+            const isRepeatTab = tab === 'repeat';
+            document.getElementById('dateNavigation').style.display = isRepeatTab ? 'none' : 'flex';
+            document.getElementById('legendSection').style.display = isRepeatTab ? 'none' : 'flex';
+            document.getElementById('floatingAddBtn').style.display = isRepeatTab ? 'none' : 'block';
+            
+            // 뷰 전환
+            document.getElementById('calendarView').classList.remove('active');
+            document.getElementById('listView').classList.remove('active');
+            document.getElementById('repeatView').classList.remove('active');
+            
+            if (isRepeatTab) {
+                document.getElementById('repeatView').classList.add('active');
+                loadRepeatTasks();
+            } else {
+                applyFilters();
+                if (currentView === 'calendar') {
+                generateCalendar();
+            } else {
+                updateListView();
+            }
+        }
+
+        // 캘린더 생성
+        function generateCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const prevLastDay = new Date(year, month, 0);
+            
+            const firstDayOfWeek = firstDay.getDay();
+            const daysInMonth = lastDay.getDate();
+            const daysInPrevMonth = prevLastDay.getDate();
+            
+            const calendarBody = document.getElementById('calendarBody');
+            calendarBody.innerHTML = '';
+            
+            // 이전 달
+            for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+                const cell = createCalendarCell(daysInPrevMonth - i, true, null);
+                calendarBody.appendChild(cell);
+            }
+            
+            // 현재 달
+            const today = new Date();
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayTasks = getTasksForDate(dateStr);
+                const cell = createCalendarCell(day, false, dayTasks);
+                
+                if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
+                    cell.classList.add('today');
+                }
+                
+                calendarBody.appendChild(cell);
+            }
+            
+            // 다음 달
+            const totalCells = calendarBody.children.length;
+            const remainingCells = (totalCells < 35 ? 35 : 42) - totalCells;
+            for (let day = 1; day <= remainingCells; day++) {
+                const cell = createCalendarCell(day, true, null);
+                calendarBody.appendChild(cell);
+            }
+            
+            updateDateDisplay();
+        }
+
+        // 캘린더 셀 생성
+        function createCalendarCell(day, isOtherMonth, tasks) {
+            const cell = document.createElement('div');
+            cell.className = 'calendar-cell';
+            if (isOtherMonth) {
+                cell.classList.add('other-month');
+            }
+            
+            const dateDiv = document.createElement('div');
+            dateDiv.className = 'calendar-date';
+            dateDiv.textContent = day;
+            cell.appendChild(dateDiv);
+            
+            if (tasks && tasks.length > 0 && !isOtherMonth) {
+                const maxDisplay = 3;
+                tasks.slice(0, maxDisplay).forEach(task => {
+                    const taskEl = document.createElement('div');
+                    taskEl.className = 'task-item';
+                    
+                    // 반복업무 체크
+                    const isRepeat = task['비고'] && task['비고'].includes('반복업무 ID:');
+                    
+                    if (isRepeat) {
+                        taskEl.classList.add('task-repeat');
+                        taskEl.textContent = task['업무제목'];
+                    } else if (task.type === 'task') {
+                        const priority = (task['우선순위'] || 'medium').toLowerCase();
+                        taskEl.classList.add(`task-${priority === '긴급' ? 'urgent' : priority === '높음' ? 'high' : priority === '낮음' ? 'low' : 'medium'}`);
+                        taskEl.textContent = task['업무제목'];
+                    } else if (task.type === 'short') {
+                        taskEl.classList.add('task-short');
+                        taskEl.textContent = task['제목'];
+                    } else if (task.type === 'long') {
+                        taskEl.classList.add('task-long');
+                        taskEl.textContent = task['계획명'];
+                    }
+                    
+                    const taskKey = `${task.type}_${task._index}`;
+                    taskDataStore[taskKey] = task;
+                    
+                    taskEl.onclick = (e) => {
+                        e.stopPropagation();
+                        openEditModal(taskDataStore[taskKey]);
+                    };
+                    cell.appendChild(taskEl);
+                });
+                
+                if (tasks.length > maxDisplay) {
+                    const moreDiv = document.createElement('div');
+                    moreDiv.className = 'task-item';
+                    moreDiv.style.color = '#6c757d';
+                    moreDiv.style.background = '#f8f9fa';
+                    moreDiv.textContent = `+${tasks.length - maxDisplay}개 더`;
+                    cell.appendChild(moreDiv);
+                }
+            }
+            
+            if (!isOtherMonth) {
+                cell.onclick = function() {
+                    const year = currentDate.getFullYear();
+                    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                    const dayStr = String(day).padStart(2, '0');
+                    openTaskModal(`${year}-${month}-${dayStr}`);
+                };
+            }
+            
+            return cell;
+        }
+
+        // 날짜별 업무
+        function getTasksForDate(dateStr) {
+            return filteredData.filter(task => {
+                if (task.type === 'task') {
+                    return task['마감일'] === dateStr || task['등록일'] === dateStr;
+                } else if (task.type === 'short') {
+                    return task['시작일'] <= dateStr && dateStr <= task['종료일'];
+                } else if (task.type === 'long') {
+                    const [year, month] = dateStr.split('-').slice(0, 2);
+                    return task['연도'] == year && 
+                           parseInt(task['시작월']) <= parseInt(month) && 
+                           parseInt(month) <= parseInt(task['종료월']);
+                }
+                return false;
+            });
+        }
+
+        // 리스트 뷰 업데이트
+        function updateListView() {
+            const content = document.getElementById('taskListContent');
+            
+            const grouped = {};
+            filteredData.forEach(item => {
+                const category = item.type === 'task' ? '업무지시' :
+                               item.type === 'short' ? '단기계획' : '장기계획';
+                if (!grouped[category]) {
+                    grouped[category] = [];
+                }
+                grouped[category].push(item);
+            });
+            
+            let html = '';
+            Object.entries(grouped).forEach(([category, items]) => {
+                html += `
+                    <div class="task-group">
+                        <div class="task-group-title">
+                            ${category}
+                            <span class="task-count">${items.length}</span>
+                        </div>
+                `;
+                
+                items.forEach(item => {
+                    const taskKey = `${item.type}_${item._index}`;
+                    taskDataStore[taskKey] = item;
+                    
+                    const title = item['업무제목'] || item['제목'] || item['계획명'] || '';
+                    const meta = [];
+                    
+                    if (item['담당자'] || item['책임자']) {
+                        meta.push(`담당: ${item['담당자'] || item['책임자']}`);
+                    }
+                    if (item['마감일'] || item['종료일'] || item['종료월']) {
+                        const deadline = item['마감일'] || item['종료일'] || 
+                                       (item['종료월'] ? item['종료월'] + '월' : '');
+                        if (deadline) meta.push(`마감: ${deadline}`);
+                    }
+                    
+                    const priority = item['우선순위'] || '';
+                    const progress = item['진행률'] || item['달성률'] || 0;
+                    
+                    const classMap = {
+                        'task': 'urgent',
+                        'short': 'short-term',
+                        'long': 'long-term'
+                    };
+                    
+                    const priorityClass = priority === '긴급' ? 'urgent' : 
+                                        priority === '높음' ? 'high' : 
+                                        priority === '낮음' ? 'low' : 'medium';
+                    
+                    html += `
+                        <div class="task-list-item ${classMap[item.type] || ''}" 
+                             data-id="${item._index}" data-type="${item.type}">
+                            <input type="checkbox" class="task-checkbox" 
+                                   ${item['상태'] === '완료' ? 'checked' : ''}>
+                            <div class="task-content">
+                                <div class="task-title">${title}</div>
+                                <div class="task-meta">${meta.join(' | ')}</div>
+                            </div>
+                    `;
+                    
+                    if (progress) {
+                        html += `
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${progress}%"></div>
+                            </div>
+                        `;
+                    }
+                    
+                    if (priority) {
+                        html += `<span class="task-priority task-${priorityClass}">${priority}</span>`;
+                    }
+                    
+                    html += `
+                            <div class="task-actions">
+                                <button class="action-btn" onclick="openEditModal(taskDataStore['${taskKey}'])">수정</button>
+                                <button class="action-btn delete" onclick="confirmDelete('${item.type}', ${item._index})">삭제</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+            });
+            
+            content.innerHTML = html || '<p style="text-align: center; color: #6c757d; padding: 40px;">등록된 업무가 없습니다.</p>';
+            
+            content.querySelectorAll('.task-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', handleStatusChange);
+            });
+        }
+
+        // 상태 변경
+        async function handleStatusChange(e) {
+            const item = e.target.closest('.task-list-item');
+            const id = item.dataset.id;
+            const type = item.dataset.type;
+            const newStatus = e.target.checked ? '완료' : '진행중';
+            
+            await updateTaskStatus(type, id, newStatus);
+        }
+
+        // 업무 상태 업데이트
+        async function updateTaskStatus(type, index, status) {
+            showLoading();
+            
+            let range, column;
+            if (type === 'task') {
+                range = `업무지시!I${parseInt(index) + 1}`;
+                column = status;
+            } else if (type === 'short') {
+                range = `단기계획!J${parseInt(index) + 1}`;
+                column = status;
+            } else {
+                hideLoading();
+                return;
+            }
+            
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'updateCell',
+                        range: range,
+                        value: column
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    await loadData();
+                    showToast('상태가 업데이트되었습니다.');
+                } else {
+                    showToast('업데이트에 실패했습니다.', 'error');
+                }
+            } catch (error) {
+                console.error('상태 업데이트 실패:', error);
+                showToast('데모 모드: 실제 저장되지 않습니다.', 'warning');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 월 변경
+        function changeMonth(direction) {
+            currentDate.setMonth(currentDate.getMonth() + direction);
+            generateCalendar();
+        }
+
+        // 오늘로 이동
+        function goToToday() {
+            currentDate = new Date();
+            generateCalendar();
+        }
+
+        // 날짜 표시 업데이트
+        function updateDateDisplay() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth() + 1;
+            document.getElementById('currentDate').textContent = `${year}년 ${month}월`;
+        }
+
+        // 뷰 전환
+        function toggleView(view) {
+            currentView = view;
+            const buttons = document.querySelectorAll('.view-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            if (view === 'calendar') {
+                document.getElementById('calendarView').classList.add('active');
+                document.getElementById('listView').classList.remove('active');
+                buttons[0].classList.add('active');
+                generateCalendar();
+            } else {
+                document.getElementById('calendarView').classList.remove('active');
+                document.getElementById('listView').classList.add('active');
+                buttons[1].classList.add('active');
+                updateListView();
+            }
+        }
+
+        // 업무 추가 모달
+        function openTaskModal(date) {
+            editMode = false;
+            document.getElementById('modalTitle').textContent = '새 업무 추가';
+            document.getElementById('deleteBtn').style.display = 'none';
+            document.getElementById('taskId').value = '';
+            document.getElementById('editIndex').value = '';
+            document.getElementById('taskModal').classList.add('show');
+            
+            document.getElementById('taskType').value = 'task';
+            updateModalFields();
+            
+            if (date) {
+                setTimeout(() => {
+                    const dateField = document.getElementById('taskDate') || document.getElementById('startDate');
+                    if (dateField) dateField.value = date;
+                }, 100);
+            }
+        }
+
+        // 업무 수정 모달
+        function openEditModal(task) {
+            if (!task) return;
+            
+            editMode = true;
+            document.getElementById('modalTitle').textContent = '업무 수정';
+            document.getElementById('deleteBtn').style.display = 'inline-block';
+            document.getElementById('taskId').value = task._index;
+            document.getElementById('editIndex').value = task._index;
+            document.getElementById('taskType').value = task.type;
+            document.getElementById('taskModal').classList.add('show');
+            
+            updateModalFields();
+            
+            setTimeout(() => {
+                if (task.type === 'task') {
+                    if (document.getElementById('taskTitle')) document.getElementById('taskTitle').value = task['업무제목'] || '';
+                    if (document.getElementById('taskDate')) document.getElementById('taskDate').value = task['마감일'] || '';
+                    if (document.getElementById('taskAssignee')) document.getElementById('taskAssignee').value = task['담당자'] || '';
+                    if (document.getElementById('taskPriority')) document.getElementById('taskPriority').value = task['우선순위'] || '중간';
+                    if (document.getElementById('taskDescription')) document.getElementById('taskDescription').value = task['업무내용'] || '';
+                    if (document.getElementById('taskStatus')) document.getElementById('taskStatus').value = task['상태'] || '대기';
+                } else if (task.type === 'short') {
+                    if (document.getElementById('planTitle')) document.getElementById('planTitle').value = task['제목'] || '';
+                    if (document.getElementById('planType')) document.getElementById('planType').value = task['계획유형'] || '주간';
+                    if (document.getElementById('startDate')) document.getElementById('startDate').value = task['시작일'] || '';
+                    if (document.getElementById('endDate')) document.getElementById('endDate').value = task['종료일'] || '';
+                    if (document.getElementById('team')) document.getElementById('team').value = task['담당팀'] || '';
+                    if (document.getElementById('goal')) document.getElementById('goal').value = task['목표'] || '';
+                    if (document.getElementById('planProgress')) document.getElementById('planProgress').value = task['진행률'] || 0;
+                    if (document.getElementById('planStatus')) document.getElementById('planStatus').value = task['상태'] || '계획';
+                } else if (task.type === 'long') {
+                    if (document.getElementById('longPlanTitle')) document.getElementById('longPlanTitle').value = task['계획명'] || '';
+                    if (document.getElementById('planYear')) document.getElementById('planYear').value = task['연도'] || new Date().getFullYear();
+                    if (document.getElementById('planQuarter')) document.getElementById('planQuarter').value = task['분기'] || '1';
+                    if (document.getElementById('startMonth')) document.getElementById('startMonth').value = task['시작월'] || '';
+                    if (document.getElementById('endMonth')) document.getElementById('endMonth').value = task['종료월'] || '';
+                    if (document.getElementById('department')) document.getElementById('department').value = task['담당부서'] || '';
+                    if (document.getElementById('longGoal')) document.getElementById('longGoal').value = task['목표'] || '';
+                    if (document.getElementById('achievement')) document.getElementById('achievement').value = task['달성률'] || 0;
+                }
+            }, 100);
+        }
+
+        // 모달 닫기
+        function closeTaskModal() {
+            document.getElementById('taskModal').classList.remove('show');
+            editMode = false;
+        }
+
+        // 모달 필드 업데이트
+        function updateModalFields() {
+            const taskType = document.getElementById('taskType').value;
+            const fieldsContainer = document.getElementById('taskFields');
+            
+            let html = '';
+            
+            if (taskType === 'task') {
+                html = `
+                    <div class="form-group">
+                        <label class="form-label">업무 제목</label>
+                        <input type="text" class="form-control" id="taskTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">마감일</label>
+                        <input type="date" class="form-control" id="taskDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">담당자</label>
+                        <input type="text" class="form-control" id="taskAssignee">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">우선순위</label>
+                        <select class="form-control" id="taskPriority">
+                            <option value="낮음">낮음</option>
+                            <option value="중간" selected>중간</option>
+                            <option value="높음">높음</option>
+                            <option value="긴급">긴급</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">상태</label>
+                        <select class="form-control" id="taskStatus">
+                            <option value="대기">대기</option>
+                            <option value="진행중">진행중</option>
+                            <option value="완료">완료</option>
+                            <option value="보류">보류</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">업무 내용</label>
+                        <textarea class="form-control" id="taskDescription"></textarea>
+                    </div>
+                `;
+            } else if (taskType === 'short') {
+                html = `
+                    <div class="form-group">
+                        <label class="form-label">계획 제목</label>
+                        <input type="text" class="form-control" id="planTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">계획 유형</label>
+                        <select class="form-control" id="planType">
+                            <option value="주간">주간</option>
+                            <option value="월간">월간</option>
+                            <option value="프로젝트">프로젝트</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">시작일</label>
+                        <input type="date" class="form-control" id="startDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">종료일</label>
+                        <input type="date" class="form-control" id="endDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">담당팀</label>
+                        <input type="text" class="form-control" id="team">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">진행률 (%)</label>
+                        <input type="number" class="form-control" id="planProgress" min="0" max="100" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">상태</label>
+                        <select class="form-control" id="planStatus">
+                            <option value="계획">계획</option>
+                            <option value="진행중">진행중</option>
+                            <option value="완료">완료</option>
+                            <option value="보류">보류</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">목표</label>
+                        <textarea class="form-control" id="goal"></textarea>
+                    </div>
+                `;
+            } else if (taskType === 'long') {
+                html = `
+                    <div class="form-group">
+                        <label class="form-label">계획명</label>
+                        <input type="text" class="form-control" id="longPlanTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">연도</label>
+                        <input type="number" class="form-control" id="planYear" value="${new Date().getFullYear()}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">분기</label>
+                        <select class="form-control" id="planQuarter">
+                            <option value="1">1분기</option>
+                            <option value="2">2분기</option>
+                            <option value="3">3분기</option>
+                            <option value="4">4분기</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">시작월</label>
+                        <input type="number" class="form-control" id="startMonth" min="1" max="12">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">종료월</label>
+                        <input type="number" class="form-control" id="endMonth" min="1" max="12">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">담당부서</label>
+                        <input type="text" class="form-control" id="department">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">달성률 (%)</label>
+                        <input type="number" class="form-control" id="achievement" min="0" max="100" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">목표</label>
+                        <textarea class="form-control" id="longGoal"></textarea>
+                    </div>
+                `;
+            }
+            
+            fieldsContainer.innerHTML = html;
+        }
+
+        // 업무 저장
+        async function saveTask() {
+            const taskType = document.getElementById('taskType').value;
+            const editIndex = document.getElementById('editIndex').value;
+            
+            let data = {};
+            let range = '';
+            
+            const getNextNumber = (dataArray) => {
+                if (dataArray.length === 0) return '1';
+                const maxNum = Math.max(...dataArray.map(item => parseInt(item['연번']) || 0));
+                return String(maxNum + 1);
+            };
+            
+            if (taskType === 'task') {
+                data = {
+                    '연번': editMode ? '' : getNextNumber(tasksData),
+                    '등록일': editMode ? '' : new Date().toISOString().split('T')[0],
+                    '마감일': document.getElementById('taskDate').value,
+                    '업무제목': document.getElementById('taskTitle').value,
+                    '업무내용': document.getElementById('taskDescription').value,
+                    '담당자': document.getElementById('taskAssignee').value,
+                    '지시자': currentUser?.name || '',
+                    '우선순위': document.getElementById('taskPriority').value,
+                    '상태': document.getElementById('taskStatus').value,
+                    '완료일': document.getElementById('taskStatus').value === '완료' ? new Date().toISOString().split('T')[0] : '',
+                    '비고': ''
+                };
+                range = editMode ? `업무지시!A${parseInt(editIndex) + 1}:K${parseInt(editIndex) + 1}` : '업무지시!A:K';
+            } else if (taskType === 'short') {
+                data = {
+                    '연번': editMode ? '' : getNextNumber(shortTermData),
+                    '계획유형': document.getElementById('planType').value,
+                    '시작일': document.getElementById('startDate').value,
+                    '종료일': document.getElementById('endDate').value,
+                    '제목': document.getElementById('planTitle').value,
+                    '목표': document.getElementById('goal').value,
+                    '담당팀': document.getElementById('team').value,
+                    '책임자': currentUser?.name || '',
+                    '진행률': document.getElementById('planProgress').value,
+                    '상태': document.getElementById('planStatus').value,
+                    '주요일정': '',
+                    '성과지표': ''
+                };
+                range = editMode ? `단기계획!A${parseInt(editIndex) + 1}:L${parseInt(editIndex) + 1}` : '단기계획!A:L';
+            } else if (taskType === 'long') {
+                data = {
+                    '연번': editMode ? '' : getNextNumber(longTermData),
+                    '연도': document.getElementById('planYear').value,
+                    '분기': document.getElementById('planQuarter').value,
+                    '계획명': document.getElementById('longPlanTitle').value,
+                    '목표': document.getElementById('longGoal').value,
+                    '시작월': document.getElementById('startMonth').value,
+                    '종료월': document.getElementById('endMonth').value,
+                    '예산': '',
+                    '담당부서': document.getElementById('department').value,
+                    '책임자': currentUser?.name || '',
+                    'KPI': '',
+                    '달성률': document.getElementById('achievement').value,
+                    '평가': ''
+                };
+                range = editMode ? `장기계획!A${parseInt(editIndex) + 1}:M${parseInt(editIndex) + 1}` : '장기계획!A:M';
+            }
+            
+            showLoading();
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: editMode ? 'updateData' : 'appendData',
+                        range: range,
+                        data: editMode ? [Object.values(data)] : data
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    closeTaskModal();
+                    await loadData();
+                    showToast(editMode ? '업무가 수정되었습니다.' : '업무가 등록되었습니다.');
+                }
+            } catch (error) {
+                console.error('저장 실패:', error);
+                showToast('데모 모드: 실제 저장되지 않습니다.', 'warning');
+                closeTaskModal();
+                await loadData();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 업무 삭제
+        function confirmDelete(type, index) {
+            if (confirm('정말 삭제하시겠습니까?')) {
+                deleteTaskByIndex(type, index);
+            }
+        }
+
+        function deleteTask() {
+            const taskType = document.getElementById('taskType').value;
+            const editIndex = document.getElementById('editIndex').value;
+            
+            if (!editIndex) return;
+            
+            if (confirm('정말 삭제하시겠습니까?')) {
+                deleteTaskByIndex(taskType, editIndex);
+                closeTaskModal();
+            }
+        }
+
+        async function deleteTaskByIndex(type, index) {
+            showLoading();
+            
+            let range;
+            if (type === 'task') {
+                range = `업무지시!A${parseInt(index) + 1}:K${parseInt(index) + 1}`;
+            } else if (type === 'short') {
+                range = `단기계획!A${parseInt(index) + 1}:L${parseInt(index) + 1}`;
+            } else if (type === 'long') {
+                range = `장기계획!A${parseInt(index) + 1}:M${parseInt(index) + 1}`;
+            }
+            
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'deleteRow',
+                        range: range
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    await loadData();
+                    showToast('삭제되었습니다.');
+                }
+            } catch (error) {
+                console.error('삭제 실패:', error);
+                showToast('데모 모드: 실제 삭제되지 않습니다.', 'warning');
+                await loadData();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 오늘 업무 체크
+        function checkTodayTasks() {
+            const today = new Date().toISOString().split('T')[0];
+            let todayTasks = [];
+            
+            todayTasks = todayTasks.concat(
+                tasksData.filter(t => 
+                    (t['마감일'] === today || t['우선순위'] === '긴급') && 
+                    t['상태'] !== '완료'
+                )
+            );
+            
+            todayTasks = todayTasks.concat(
+                shortTermData.filter(t => 
+                    t['시작일'] <= today && today <= t['종료일'] && 
+                    t['상태'] !== '완료'
+                )
+            );
+            
+            const badge = document.getElementById('todayCount');
+            if (todayTasks.length > 0) {
+                badge.textContent = todayTasks.length;
+                badge.style.display = 'inline-block';
+                
+                const urgentTasks = todayTasks.filter(t => t['우선순위'] === '긴급');
+                if (urgentTasks.length > 0) {
+                    showToast(`긴급 업무가 ${urgentTasks.length}개 있습니다!`, 'warning');
+                }
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // 로딩 표시
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('show');
+        }
+
+        // 토스트 메시지
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.background = type === 'error' ? '#dc3545' : 
+                                    type === 'warning' ? '#f59e0b' : '#212529';
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // 모달 외부 클릭시 닫기
+        document.getElementById('taskModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeTaskModal();
+            }
+        });
+        
+        document.getElementById('repeatTaskModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeRepeatTaskModal();
+            }
+        });
+
+        // 키보드 단축키
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeTaskModal();
+                closeRepeatTaskModal();
+            }
+            
+            if (e.ctrlKey && e.key === 'n') {
+                e.preventDefault();
+                if (currentTab === 'repeat') {
+                    openRepeatTaskModal();
+                } else {
+                    openTaskModal();
+                }
+            }
+            
+            if (e.ctrlKey && e.key === 's' && document.getElementById('taskModal').classList.contains('show')) {
+                e.preventDefault();
+                saveTask();
+            }
+        });
+    </script>
+</body>
+</html> === 'calendar') {
+                    document.getElementById('calendarView').classList.add('active');
+                } else {
+                    document.getElementById('listView').classList.add('active');
+                }
+            }
+        }
+
+        // 담당자 필터 업데이트
+        function updateAssigneeFilter() {
+            const assignees = new Set();
+            
+            tasksData.forEach(task => {
+                if (task['담당자']) assignees.add(task['담당자']);
+            });
+            shortTermData.forEach(task => {
+                if (task['책임자']) assignees.add(task['책임자']);
+            });
+            longTermData.forEach(task => {
+                if (task['책임자']) assignees.add(task['책임자']);
+            });
+            
+            const select = document.getElementById('assigneeFilter');
+            select.innerHTML = '<option value="">전체 담당자</option>';
+            
+            Array.from(assignees).sort().forEach(assignee => {
+                const option = document.createElement('option');
+                option.value = assignee;
+                option.textContent = assignee;
+                select.appendChild(option);
+            });
+        }
+
+        // 필터 적용
+        function applyFilters() {
+            const status = document.getElementById('statusFilter').value;
+            const assignee = document.getElementById('assigneeFilter').value;
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            
+            let allData = [];
+            
+            if (currentTab === 'all') {
+                allData = [
+                    ...tasksData.map(t => ({ ...t, type: 'task' })),
+                    ...shortTermData.map(t => ({ ...t, type: 'short' })),
+                    ...longTermData.map(t => ({ ...t, type: 'long' }))
+                ];
+            } else if (currentTab === 'today') {
+                const today = new Date().toISOString().split('T')[0];
+                allData = [
+                    ...tasksData.filter(t => 
+                        t['마감일'] === today || t['우선순위'] === '긴급'
+                    ).map(t => ({ ...t, type: 'task' })),
+                    ...shortTermData.filter(t => 
+                        t['시작일'] <= today && today <= t['종료일']
+                    ).map(t => ({ ...t, type: 'short' }))
+                ];
+            } else if (currentTab === 'short') {
+                allData = shortTermData.map(t => ({ ...t, type: 'short' }));
+            } else if (currentTab === 'long') {
+                allData = longTermData.map(t => ({ ...t, type: 'long' }));
+            }
+            
+            filteredData = allData.filter(item => {
+                let matchStatus = true;
+                let matchAssignee = true;
+                let matchSearch = true;
+                
+                if (status) {
+                    matchStatus = item['상태'] === status;
+                }
+                
+                if (assignee) {
+                    matchAssignee = item['담당자'] === assignee || item['책임자'] === assignee;
+                }
+                
+                if (search) {
+                    const searchableText = Object.values(item).join(' ').toLowerCase();
+                    matchSearch = searchableText.includes(search);
+                }
+                
+                return matchStatus && matchAssignee && matchSearch;
+            });
+            
+            if (currentView === 'calendar') {
+            generateCalendar();
+        } else {
+            updateListView();
+        }
+    }
+
+
+    // 캘린더 생성
+        function generateCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const prevLastDay = new Date(year, month, 0);
+            
+            const firstDayOfWeek = firstDay.getDay();
+            const daysInMonth = lastDay.getDate();
+            const daysInPrevMonth = prevLastDay.getDate();
+            
+            const calendarBody = document.getElementById('calendarBody');
+            calendarBody.innerHTML = '';
+            
+            // 이전 달
+            for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+                const cell = createCalendarCell(daysInPrevMonth - i, true, null);
+                calendarBody.appendChild(cell);
+            }
+            
+            // 현재 달
+            const today = new Date();
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayTasks = getTasksForDate(dateStr);
+                const cell = createCalendarCell(day, false, dayTasks);
+                
+                if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
+                    cell.classList.add('today');
+                }
+                
+                calendarBody.appendChild(cell);
+            }
+            
+            // 다음 달
+            const totalCells = calendarBody.children.length;
+            const remainingCells = (totalCells < 35 ? 35 : 42) - totalCells;
+            for (let day = 1; day <= remainingCells; day++) {
+                const cell = createCalendarCell(day, true, null);
+                calendarBody.appendChild(cell);
+            }
+            
+            updateDateDisplay();
+        }
+
+        // 캘린더 셀 생성
+        function createCalendarCell(day, isOtherMonth, tasks) {
+            const cell = document.createElement('div');
+            cell.className = 'calendar-cell';
+            if (isOtherMonth) {
+                cell.classList.add('other-month');
+            }
+            
+            const dateDiv = document.createElement('div');
+            dateDiv.className = 'calendar-date';
+            dateDiv.textContent = day;
+            cell.appendChild(dateDiv);
+            
+            if (tasks && tasks.length > 0 && !isOtherMonth) {
+                const maxDisplay = 3;
+                tasks.slice(0, maxDisplay).forEach(task => {
+                    const taskEl = document.createElement('div');
+                    taskEl.className = 'task-item';
+                    
+                    const isRepeat = task['비고'] && task['비고'].includes('반복업무 ID:');
+                    
+                    if (isRepeat) {
+                        taskEl.classList.add('task-repeat');
+                        taskEl.textContent = task['업무제목'];
+                    } else if (task.type === 'task') {
+                        const priority = (task['우선순위'] || 'medium').toLowerCase();
+                        taskEl.classList.add(`task-${priority === '긴급' ? 'urgent' : priority === '높음' ? 'high' : priority === '낮음' ? 'low' : 'medium'}`);
+                        taskEl.textContent = task['업무제목'];
+                    } else if (task.type === 'short') {
+                        taskEl.classList.add('task-short');
+                        taskEl.textContent = task['제목'];
+                    } else if (task.type === 'long') {
+                        taskEl.classList.add('task-long');
+                        taskEl.textContent = task['계획명'];
+                    }
+                    
+                    const taskKey = `${task.type}_${task._index}`;
+                    taskDataStore[taskKey] = task;
+                    
+                    taskEl.onclick = (e) => {
+                        e.stopPropagation();
+                        openEditModal(taskDataStore[taskKey]);
+                    };
+                    cell.appendChild(taskEl);
+                });
+                
+                if (tasks.length > maxDisplay) {
+                    const moreDiv = document.createElement('div');
+                    moreDiv.className = 'task-item';
+                    moreDiv.style.color = '#6c757d';
+                    moreDiv.style.background = '#f8f9fa';
+                    moreDiv.textContent = `+${tasks.length - maxDisplay}개 더`;
+                    cell.appendChild(moreDiv);
+                }
+            }
+            
+            if (!isOtherMonth) {
+                cell.onclick = function() {
+                    const year = currentDate.getFullYear();
+                    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                    const dayStr = String(day).padStart(2, '0');
+                    openTaskModal(`${year}-${month}-${dayStr}`);
+                };
+            }
+            
+            return cell;
+        }
+
+        // 날짜별 업무
+        function getTasksForDate(dateStr) {
+            return filteredData.filter(task => {
+                if (task.type === 'task') {
+                    return task['마감일'] === dateStr || task['등록일'] === dateStr;
+                } else if (task.type === 'short') {
+                    return task['시작일'] <= dateStr && dateStr <= task['종료일'];
+                } else if (task.type === 'long') {
+                    const [year, month] = dateStr.split('-').slice(0, 2);
+                    return task['연도'] == year && 
+                           parseInt(task['시작월']) <= parseInt(month) && 
+                           parseInt(month) <= parseInt(task['종료월']);
+                }
+                return false;
+            });
+        }
+
+        // 리스트 뷰 업데이트
+        function updateListView() {
+            const content = document.getElementById('taskListContent');
+            
+            const grouped = {};
+            filteredData.forEach(item => {
+                const category = item.type === 'task' ? '업무지시' :
+                               item.type === 'short' ? '단기계획' : '장기계획';
+                if (!grouped[category]) {
+                    grouped[category] = [];
+                }
+                grouped[category].push(item);
+            });
+            
+            let html = '';
+            Object.entries(grouped).forEach(([category, items]) => {
+                html += `
+                    <div class="task-group">
+                        <div class="task-group-title">
+                            ${category}
+                            <span class="task-count">${items.length}</span>
+                        </div>
+                `;
+                
+                items.forEach(item => {
+                    const taskKey = `${item.type}_${item._index}`;
+                    taskDataStore[taskKey] = item;
+                    
+                    const title = item['업무제목'] || item['제목'] || item['계획명'] || '';
+                    const meta = [];
+                    
+                    if (item['담당자'] || item['책임자']) {
+                        meta.push(`담당: ${item['담당자'] || item['책임자']}`);
+                    }
+                    if (item['마감일'] || item['종료일'] || item['종료월']) {
+                        const deadline = item['마감일'] || item['종료일'] || 
+                                       (item['종료월'] ? item['종료월'] + '월' : '');
+                        if (deadline) meta.push(`마감: ${deadline}`);
+                    }
+                    
+                    const priority = item['우선순위'] || '';
+                    const progress = item['진행률'] || item['달성률'] || 0;
+                    
+                    const classMap = {
+                        'task': 'urgent',
+                        'short': 'short-term',
+                        'long': 'long-term'
+                    };
+                    
+                    const priorityClass = priority === '긴급' ? 'urgent' : 
+                                        priority === '높음' ? 'high' : 
+                                        priority === '낮음' ? 'low' : 'medium';
+                    
+                    html += `
+                        <div class="task-list-item ${classMap[item.type] || ''}" 
+                             data-id="${item._index}" data-type="${item.type}">
+                            <input type="checkbox" class="task-checkbox" 
+                                   ${item['상태'] === '완료' ? 'checked' : ''}>
+                            <div class="task-content">
+                                <div class="task-title">${title}</div>
+                                <div class="task-meta">${meta.join(' | ')}</div>
+                            </div>
+                    `;
+                    
+                    if (progress) {
+                        html += `
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${progress}%"></div>
+                            </div>
+                        `;
+                    }
+                    
+                    if (priority) {
+                        html += `<span class="task-priority task-${priorityClass}">${priority}</span>`;
+                    }
+                    
+                    html += `
+                            <div class="task-actions">
+                                <button class="action-btn" onclick="openEditModal(taskDataStore['${taskKey}'])">수정</button>
+                                <button class="action-btn delete" onclick="confirmDelete('${item.type}', ${item._index})">삭제</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+            });
+            
+            content.innerHTML = html || '<p style="text-align: center; color: #6c757d; padding: 40px;">등록된 업무가 없습니다.</p>';
+            
+            content.querySelectorAll('.task-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', handleStatusChange);
+            });
+        }
+
+
+        // 캘린더 생성
+        function generateCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const prevLastDay = new Date(year, month, 0);
+            
+            const firstDayOfWeek = firstDay.getDay();
+            const daysInMonth = lastDay.getDate();
+            const daysInPrevMonth = prevLastDay.getDate();
+            
+            const calendarBody = document.getElementById('calendarBody');
+            calendarBody.innerHTML = '';
+            
+            for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+                const cell = createCalendarCell(daysInPrevMonth - i, true, null);
+                calendarBody.appendChild(cell);
+            }
+            
+            const today = new Date();
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayTasks = getTasksForDate(dateStr);
+                const cell = createCalendarCell(day, false, dayTasks);
+                
+                if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
+                    cell.classList.add('today');
+                }
+                
+                calendarBody.appendChild(cell);
+            }
+            
+            const totalCells = calendarBody.children.length;
+            const remainingCells = (totalCells < 35 ? 35 : 42) - totalCells;
+            for (let day = 1; day <= remainingCells; day++) {
+                const cell = createCalendarCell(day, true, null);
+                calendarBody.appendChild(cell);
+            }
+            
+            updateDateDisplay();
+        }
+
+        function createCalendarCell(day, isOtherMonth, tasks) {
+            const cell = document.createElement('div');
+            cell.className = 'calendar-cell';
+            if (isOtherMonth) {
+                cell.classList.add('other-month');
+            }
+            
+            const dateDiv = document.createElement('div');
+            dateDiv.className = 'calendar-date';
+            dateDiv.textContent = day;
+            cell.appendChild(dateDiv);
+            
+            if (tasks && tasks.length > 0 && !isOtherMonth) {
+                const maxDisplay = 3;
+                tasks.slice(0, maxDisplay).forEach(task => {
+                    const taskEl = document.createElement('div');
+                    taskEl.className = 'task-item';
+                    
+                    const isRepeat = task['비고'] && task['비고'].includes('반복업무 ID:');
+                    
+                    if (isRepeat) {
+                        taskEl.classList.add('task-repeat');
+                        taskEl.textContent = task['업무제목'];
+                    } else if (task.type === 'task') {
+                        const priority = (task['우선순위'] || 'medium').toLowerCase();
+                        taskEl.classList.add(`task-${priority === '긴급' ? 'urgent' : priority === '높음' ? 'high' : priority === '낮음' ? 'low' : 'medium'}`);
+                        taskEl.textContent = task['업무제목'];
+                    } else if (task.type === 'short') {
+                        taskEl.classList.add('task-short');
+                        taskEl.textContent = task['제목'];
+                    } else if (task.type === 'long') {
+                        taskEl.classList.add('task-long');
+                        taskEl.textContent = task['계획명'];
+                    }
+                    
+                    const taskKey = `${task.type}_${task._index}`;
+                    taskDataStore[taskKey] = task;
+                    
+                    taskEl.onclick = (e) => {
+                        e.stopPropagation();
+                        openEditModal(taskDataStore[taskKey]);
+                    };
+                    cell.appendChild(taskEl);
+                });
+                
+                if (tasks.length > maxDisplay) {
+                    const moreDiv = document.createElement('div');
+                    moreDiv.className = 'task-item';
+                    moreDiv.style.color = '#6c757d';
+                    moreDiv.style.background = '#f8f9fa';
+                    moreDiv.textContent = `+${tasks.length - maxDisplay}개 더`;
+                    cell.appendChild(moreDiv);
+                }
+            }
+            
+            if (!isOtherMonth) {
+                cell.onclick = function() {
+                    const year = currentDate.getFullYear();
+                    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                    const dayStr = String(day).padStart(2, '0');
+                    openTaskModal(`${year}-${month}-${dayStr}`);
+                };
+            }
+            
+            return cell;
+        }
+
+        function getTasksForDate(dateStr) {
+            return filteredData.filter(task => {
+                if (task.type === 'task') {
+                    return task['마감일'] === dateStr || task['등록일'] === dateStr;
+                } else if (task.type === 'short') {
+                    return task['시작일'] <= dateStr && dateStr <= task['종료일'];
+                } else if (task.type === 'long') {
+                    const [year, month] = dateStr.split('-').slice(0, 2);
+                    return task['연도'] == year && 
+                           parseInt(task['시작월']) <= parseInt(month) && 
+                           parseInt(month) <= parseInt(task['종료월']);
+                }
+                return false;
+            });
+        }
+
+        function updateListView() {
+            const content = document.getElementById('taskListContent');
+            
+            const grouped = {};
+            filteredData.forEach(item => {
+                const category = item.type === 'task' ? '업무지시' :
+                               item.type === 'short' ? '단기계획' : '장기계획';
+                if (!grouped[category]) {
+                    grouped[category] = [];
+                }
+                grouped[category].push(item);
+            });
+            
+            let html = '';
+            Object.entries(grouped).forEach(([category, items]) => {
+                html += `
+                    <div class="task-group">
+                        <div class="task-group-title">
+                            ${category}
+                            <span class="task-count">${items.length}</span>
+                        </div>
+                `;
+                
+                items.forEach(item => {
+                    const taskKey = `${item.type}_${item._index}`;
+                    taskDataStore[taskKey] = item;
+                    
+                    const title = item['업무제목'] || item['제목'] || item['계획명'] || '';
+                    const meta = [];
+                    
+                    if (item['담당자'] || item['책임자']) {
+                        meta.push(`담당: ${item['담당자'] || item['책임자']}`);
+                    }
+                    if (item['마감일'] || item['종료일'] || item['종료월']) {
+                        const deadline = item['마감일'] || item['종료일'] || 
+                                       (item['종료월'] ? item['종료월'] + '월' : '');
+                        if (deadline) meta.push(`마감: ${deadline}`);
+                    }
+                    
+                    const priority = item['우선순위'] || '';
+                    const progress = item['진행률'] || item['달성률'] || 0;
+                    
+                    const classMap = {
+                        'task': 'urgent',
+                        'short': 'short-term',
+                        'long': 'long-term'
+                    };
+                    
+                    const priorityClass = priority === '긴급' ? 'urgent' : 
+                                        priority === '높음' ? 'high' : 
+                                        priority === '낮음' ? 'low' : 'medium';
+                    
+                    html += `
+                        <div class="task-list-item ${classMap[item.type] || ''}" 
+                             data-id="${item._index}" data-type="${item.type}">
+                            <input type="checkbox" class="task-checkbox" 
+                                   ${item['상태'] === '완료' ? 'checked' : ''}>
+                            <div class="task-content">
+                                <div class="task-title">${title}</div>
+                                <div class="task-meta">${meta.join(' | ')}</div>
+                            </div>
+                    `;
+                    
+                    if (progress) {
+                        html += `
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${progress}%"></div>
+                            </div>
+                        `;
+                    }
+                    
+                    if (priority) {
+                        html += `<span class="task-priority task-${priorityClass}">${priority}</span>`;
+                    }
+                    
+                    html += `
+                            <div class="task-actions">
+                                <button class="action-btn" onclick="openEditModal(taskDataStore['${taskKey}'])">수정</button>
+                                <button class="action-btn delete" onclick="confirmDelete('${item.type}', ${item._index})">삭제</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+            });
+            
+            content.innerHTML = html || '<p style="text-align: center; color: #6c757d; padding: 40px;">등록된 업무가 없습니다.</p>';
+            
+            content.querySelectorAll('.task-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', handleStatusChange);
+            });
+        }
+
+        async function handleStatusChange(e) {
+            const item = e.target.closest('.task-list-item');
+            const id = item.dataset.id;
+            const type = item.dataset.type;
+            const newStatus = e.target.checked ? '완료' : '진행중';
+            
+            await updateTaskStatus(type, id, newStatus);
+        }
+
+        async function updateTaskStatus(type, index, status) {
+            showLoading();
+            
+            let range, column;
+            if (type === 'task') {
+                range = `업무지시!I${parseInt(index) + 1}`;
+                column = status;
+            } else if (type === 'short') {
+                range = `단기계획!J${parseInt(index) + 1}`;
+                column = status;
+            } else {
+                hideLoading();
+                return;
+            }
+            
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'updateCell',
+                        range: range,
+                        value: column
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    await loadData();
+                    showToast('상태가 업데이트되었습니다.');
+                } else {
+                    showToast('업데이트에 실패했습니다.', 'error');
+                }
+            } catch (error) {
+                console.error('상태 업데이트 실패:', error);
+                showToast('데모 모드: 실제 저장되지 않습니다.', 'warning');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function changeMonth(direction) {
+            currentDate.setMonth(currentDate.getMonth() + direction);
+            generateCalendar();
+        }
+
+        function goToToday() {
+            currentDate = new Date();
+            generateCalendar();
+        }
+
+        function updateDateDisplay() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth() + 1;
+            document.getElementById('currentDate').textContent = `${year}년 ${month}월`;
+        }
+
+        function toggleView(view) {
+            currentView = view;
+            const buttons = document.querySelectorAll('.view-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            if (view === 'calendar') {
+                document.getElementById('calendarView').classList.add('active');
+                document.getElementById('listView').classList.remove('active');
+                buttons[0].classList.add('active');
+                generateCalendar();
+            } else {
+                document.getElementById('calendarView').classList.remove('active');
+                document.getElementById('listView').classList.add('active');
+                buttons[1].classList.add('active');
+                updateListView();
+            }
+        }
+
+        function openTaskModal(date) {
+            editMode = false;
+            document.getElementById('modalTitle').textContent = '새 업무 추가';
+            document.getElementById('deleteBtn').style.display = 'none';
+            document.getElementById('taskId').value = '';
+            document.getElementById('editIndex').value = '';
+            document.getElementById('taskModal').classList.add('show');
+            
+            document.getElementById('taskType').value = 'task';
+            updateModalFields();
+            
+            if (date) {
+                setTimeout(() => {
+                    const dateField = document.getElementById('taskDate') || document.getElementById('startDate');
+                    if (dateField) dateField.value = date;
+                }, 100);
+            }
+        }
+
+        function openEditModal(task) {
+            if (!task) return;
+            
+            editMode = true;
+            document.getElementById('modalTitle').textContent = '업무 수정';
+            document.getElementById('deleteBtn').style.display = 'inline-block';
+            document.getElementById('taskId').value = task._index;
+            document.getElementById('editIndex').value = task._index;
+            document.getElementById('taskType').value = task.type;
+            document.getElementById('taskModal').classList.add('show');
+            
+            updateModalFields();
+            
+            setTimeout(() => {
+                if (task.type === 'task') {
+                    if (document.getElementById('taskTitle')) document.getElementById('taskTitle').value = task['업무제목'] || '';
+                    if (document.getElementById('taskDate')) document.getElementById('taskDate').value = task['마감일'] || '';
+                    if (document.getElementById('taskAssignee')) document.getElementById('taskAssignee').value = task['담당자'] || '';
+                    if (document.getElementById('taskPriority')) document.getElementById('taskPriority').value = task['우선순위'] || '중간';
+                    if (document.getElementById('taskDescription')) document.getElementById('taskDescription').value = task['업무내용'] || '';
+                    if (document.getElementById('taskStatus')) document.getElementById('taskStatus').value = task['상태'] || '대기';
+                }
+            }, 100);
+        }
+
+        function closeTaskModal() {
+            document.getElementById('taskModal').classList.remove('show');
+            editMode = false;
+        }
+
+        function updateModalFields() {
+            const taskType = document.getElementById('taskType').value;
+            const fieldsContainer = document.getElementById('taskFields');
+            
+            let html = '';
+            
+            if (taskType === 'task') {
+                html = `
+                    <div class="form-group">
+                        <label class="form-label">업무 제목</label>
+                        <input type="text" class="form-control" id="taskTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">마감일</label>
+                        <input type="date" class="form-control" id="taskDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">담당자</label>
+                        <input type="text" class="form-control" id="taskAssignee">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">우선순위</label>
+                        <select class="form-control" id="taskPriority">
+                            <option value="낮음">낮음</option>
+                            <option value="중간" selected>중간</option>
+                            <option value="높음">높음</option>
+                            <option value="긴급">긴급</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">상태</label>
+                        <select class="form-control" id="taskStatus">
+                            <option value="대기">대기</option>
+                            <option value="진행중">진행중</option>
+                            <option value="완료">완료</option>
+                            <option value="보류">보류</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">업무 내용</label>
+                        <textarea class="form-control" id="taskDescription"></textarea>
+                    </div>
+                `;
+            }
+            
+            fieldsContainer.innerHTML = html;
+        }
+
+        async function saveTask() {
+            showToast('데모 모드: 저장 기능은 API 연결이 필요합니다.');
+            closeTaskModal();
+        }
+
+        function confirmDelete(type, index) {
+            if (confirm('정말 삭제하시겠습니까?')) {
+                showToast('데모 모드: 삭제 기능은 API 연결이 필요합니다.');
+            }
+        }
+
+        function deleteTask() {
+            if (confirm('정말 삭제하시겠습니까?')) {
+                showToast('데모 모드: 삭제 기능은 API 연결이 필요합니다.');
+                closeTaskModal();
+            }
+        }
+
+        function checkTodayTasks() {
+            const today = new Date().toISOString().split('T')[0];
+            let todayTasks = tasksData.filter(t => 
+                (t['마감일'] === today || t['우선순위'] === '긴급') && 
+                t['상태'] !== '완료'
+            );
+            
+            const badge = document.getElementById('todayCount');
+            if (todayTasks.length > 0) {
+                badge.textContent = todayTasks.length;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('show');
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.background = type === 'error' ? '#dc3545' : 
+                                    type === 'warning' ? '#f59e0b' : '#212529';
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        document.getElementById('taskModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeTaskModal();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeTaskModal();
+            }
+        });
+    </script>
+</body>
+</html>

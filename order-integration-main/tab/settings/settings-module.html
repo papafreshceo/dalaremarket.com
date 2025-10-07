@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>설정</title>
+    <style>
+        /* ========================================
+           설정 레이아웃
+           ======================================== */
+        .settings-container {
+            padding: 40px;
+            background: #fafafa;
+            min-height: 100vh;
+    </script>
+</body>
+</html>
+
+        @media (max-width: 768px) {
+            .settings-container {
+                padding: 20px;
+            }
+        }
+
+        /* ========================================
+           설정 메뉴
+           ======================================== */
+        .settings-layout {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .settings-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .settings-menu {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 16px;
+            padding: 16px;
+            height: fit-content;
+        }
+
+        .menu-item {
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 300;
+            color: #495057;
+            margin-bottom: 4px;
+        }
+
+        .menu-item:hover {
+            background: #f8f9fa;
+            color: #2563eb;
+        }
+
+        .menu-item.active {
+            background: #2563eb;
+            color: #ffffff;
+        }
+
+        .menu-icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        /* ========================================
+           설정 섹션
+           ======================================== */
+        .settings-content {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 16px;
+            padding: 32px;
+            min-height: 600px;
+        }
+
+        .section-header {
+            margin-bottom: 32px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 500;
+            color: #212529;
+            margin-bottom: 8px;
+        }
+
+        .section-description {
+            font-size: 14px;
+            font-weight: 300;
+            color: #6c757d;
+        }
+
+        .settings-section {
+            display: none;
+        }
+
+        .settings-section.active {
+            display: block;
+        }
+
+        /* ========================================
+           폼 요소
+           ======================================== */
+        .form-section {
+            margin-bottom: 32px;
+        }
+
+        .form-section-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #212529;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 300;
+            color: #6c757d;
+            margin-bottom: 8px;
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 300;
+            color: #212529;
+            background: #ffffff;
+            transition: all 0.2s;
+        }
+
+        .form-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-input:disabled {
+            background: #f8f9fa;
+            cursor: not-allowed;
+        }
+
+        /* ========================================
+           스위치 토글
+           ======================================== */
+        .switch-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f1f3f5;
+        }
+
+        .switch-label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .switch-title {
+            font-size: 14px;
+            font-weight: 400;
+            color: #212529;
+        }
+
+        .switch-desc {
+            font-size: 12px;
+            font-weight: 300;
+            color: #6c757d;
+        }
+
+        .switch {
+            position: relative;
+            width: 48px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #dee2e6;
+            transition: 0.3s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #2563eb;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        /* ========================================
+           버튼
+           ======================================== */
+        .btn-primary {
+            padding: 10px 24px;
+            background: #2563eb;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 300;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-secondary {
+            padding: 10px 24px;
+            background: #ffffff;
+            color: #495057;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 300;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-secondary:hover {
+            background: #f8f9fa;
+            border-color: #adb5bd;
+        }
+
+        .btn-danger {
+            padding: 10px 24px;
+            background: #ef4444;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 300;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid #dee2e6;
+        }
+
+        /* ========================================
+           정보 박스
+           ======================================== */
+        .info-box {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .info-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #212529;
+            margin-bottom: 8px;
+        }
+
+        .info-content {
+            font-size: 13px;
+            font-weight: 300;
+            color: #6c757d;
+            line-height: 1.6;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 1px solid #fde68a;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .warning-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #92400e;
+            margin-bottom: 8px;
+        }
+
+        .warning-content {
+            font-size: 13px;
+            font-weight: 300;
+            color: #78350f;
+        }
+
+        /* ========================================
+           연결 상태
+           ======================================== */
+        .connection-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .connection-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .connection-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+        }
+
+        .connection-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .connection-name {
+            font-size: 14px;
+            font-weight: 400;
+            color: #212529;
+        }
+
+        .connection-status {
+            font-size: 12px;
+            font-weight: 300;
+            color: #6c757d;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        .status-dot.disconnected {
+            background: #ef4444;
+        }
+
+        /* ========================================
+           테이블
+           ======================================== */
+        .settings-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        .settings-table th {
+            padding: 12px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 400;
+            color: #6c757d;
+            border-bottom: 2px solid #dee2e6;
+            background: #f8f9fa;
+        }
+
+        .settings-table td {
+            padding: 12px;
+            font-size: 14px;
+            font-weight: 300;
+            color: #212529;
+            border-bottom: 1px solid #f1f3f5;
+        }
+
+        .settings-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="settings-container">
+        <div class="settings-layout">
+            <!-- 설정 메뉴 -->
+            <div class="settings-menu">
+                <div class="menu-item active" onclick="showSection('general')">
+                    <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 1v6m0 6v6m4.22-13.22l4.24 4.24M1.54 1.54l4.24 4.24M20.46 20.46l-4.24-4.24M1.54 20.46l4.24-4.24"></path>
+                    </svg>
+                    <span>일반 설정</span>
+                </div>
+                <div class="menu-item" onclick="showSection('integration')">
+                    <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
+                        <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+                    </svg>
+                    <span>연동 설정</span>
+                </div>
+                <div class="menu-item" onclick="showSection('mapping')">
+                    <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3h18v18H3zM21 9H3M21 15H3M12 3v18"></path>
+                    </svg>
+                    <span>매핑 설정</span>
+                </div>
+                <div class="menu-item" onclick="showSection('notification')">
+                    <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span>알림 설정</span>
+                </div>
+                <div class="menu-item" onclick="showSection('security')">
+                    <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                    <span>보안 설정</span>
+                </div>
+                <div class="menu-item" onclick="showSection('backup')">
+                    <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 16l-4 4-4-4M12 20V9M20 7h-9l-2-3H4a2 2 0 00-2 2v13a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"></path>
+                    </svg>
+                    <span>백업 설정</span>
+                </div>
+                <div class="menu-item" onclick="showSection('advanced')">
+                    <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 21v-7m0-4V3m8 18v-9m0-4V3m8 18v-5m0-4V3M2 14h4m6-8h4m6 12h4"></path>
+                    </svg>
+                    <span>고급 설정</span>
+                </div>
+                <div class="menu-item" onclick="showSection('users')" id="userManageMenu" style="display:none;">
+                    <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span>사용자 관리</span>
+                </div>
+            </div>
+
+            <!-- 설정 컨텐츠 -->
+            <div class="settings-content">
+                <!-- 일반 설정 -->
+                <div class="settings-section active" id="general-section">
+                    <div class="section-header">
+                        <h2 class="section-title">일반 설정</h2>
+                        <p class="section-description">기본 시스템 설정을 관리합니다.</p>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">회사 정보</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">회사명</label>
+                                <input type="text" class="form-input" id="companyName" placeholder="회사명 입력">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">사업자번호</label>
+                                <input type="text" class="form-input" id="businessNumber" placeholder="000-00-00000">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">대표자명</label>
+                                <input type="text" class="form-input" id="ceoName" placeholder="대표자명">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">대표 연락처</label>
+                                <input type="tel" class="form-input" id="companyPhone" placeholder="02-0000-0000">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">주소</label>
+                            <input type="text" class="form-input" id="companyAddress" placeholder="회사 주소">
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">시스템 설정</h3>
+                        <div class="switch-group">
+                            <div class="switch-label">
+                                <span class="switch-title">자동 저장</span>
+                                <span class="switch-desc">데이터를 자동으로 저장합니다</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="autoSave" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="switch-group">
+                            <div class="switch-label">
+                                <span class="switch-title">다크 모드</span>
+                                <span class="switch-desc">어두운 테마를 사용합니다</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="darkMode">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="switch-group">
+                            <div class="switch-label">
+                                <span class="switch-title">중복 주문 확인</span>
+                                <span class="switch-desc">동일한 주문번호 입력 시 경고합니다</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="duplicateCheck" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn-primary" onclick="saveGeneralSettings()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"></path>
+                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                <polyline points="7 3 7 8 15 8"></polyline>
+                            </svg>
+                            저장
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 연동 설정 -->
+                <div class="settings-section" id="integration-section">
+                    <div class="section-header">
+                        <h2 class="section-title">연동 설정</h2>
+                        <p class="section-description">외부 서비스와의 연동을 관리합니다.</p>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">Google Sheets 연동</h3>
+                        <div class="connection-card">
+                            <div class="connection-info">
+                                <div class="connection-icon" style="background: #0f9d58;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M10,19L8,14H10L11,17L12,14H14L12,19H10Z"/>
+                                    </svg>
+                                </div>
+                                <div class="connection-details">
+                                    <span class="connection-name">Google Sheets</span>
+                                    <span class="connection-status">
+                                        <span class="status-dot"></span>
+                                        연결됨
+                                    </span>
+                                </div>
+                            </div>
+                            <button class="btn-secondary btn-small" onclick="openGoogleSheets()">열기</button>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">주문 저장 스프레드시트 ID</label>
+                            <input type="text" class="form-input" id="orderSheetId" value="1UsUMd_haNOsRm2Yn8sFpFc7HUlJ_CEQ-91QctlkSjJg" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">매핑 시트 ID</label>
+                            <input type="text" class="form-input" id="mappingSheetId" value="1kLjYKemytOfaH6kSXD7dqdiolx3j09Ir-V9deEnNImA" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">상품 마스터 시트 ID</label>
+                            <input type="text" class="form-input" id="productSheetId" value="17MGwbu1DZf5yg-BLhfZr-DO-OPiau3aeyBMtSssv7Sg" disabled>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">Firebase 연동</h3>
+                        <div class="connection-card">
+                            <div class="connection-info">
+                                <div class="connection-icon" style="background: #ffa000;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                                        <path d="M5,3L4.35,6.34C3.7,8.9 3.16,11 3,11.83V20L5,21.17L12,18L19,21.17L21,20V11.83C20.84,11 20.3,8.9 19.65,6.34L19,3L12,6L5,3Z"/>
+                                    </svg>
+                                </div>
+                                <div class="connection-details">
+                                    <span class="connection-name">Firebase Authentication</span>
+                                    <span class="connection-status">
+                                        <span class="status-dot"></span>
+                                        활성화됨
+                                    </span>
+                                </div>
+                            </div>
+                            <button class="btn-secondary btn-small" onclick="testFirebase()">테스트</button>
+                        </div>
+
+                        <div class="info-box">
+                            <div class="info-title">Firebase 설정</div>
+                            <div class="info-content">
+                                프로젝트 ID: order-integration-4c379<br>
+                                인증 도메인: order-integration-4c379.firebaseapp.com<br>
+                                Storage: order-integration-4c379.firebasestorage.app
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn-primary" onclick="saveIntegrationSettings()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"></path>
+                            </svg>
+                            저장
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 매핑 설정 -->
+                <div class="settings-section" id="mapping-section">
+                    <div class="section-header">
+                        <h2 class="section-title">매핑 설정</h2>
+                        <p class="section-description">마켓별 필드 매핑을 관리합니다.</p>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">지원 마켓</h3>
+                        <table class="settings-table">
+                            <thead>
+                                <tr>
+                                    <th>마켓명</th>
+                                    <th>약어</th>
+                                    <th>색상</th>
+                                    <th>감지 문자열</th>
+                                    <th>상태</th>
+                                    <th>관리</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>네이버</td>
+                                    <td>N</td>
+                                    <td><span style="display: inline-block; width: 20px; height: 20px; background: rgb(3,199,90); border-radius: 4px;"></span></td>
+                                    <td>네이버, 스마트스토어</td>
+                                    <td><span style="color: #10b981;">활성</span></td>
+                                    <td><button class="btn-secondary btn-small" onclick="editMarket('네이버')">수정</button></td>
+                                </tr>
+                                <tr>
+                                    <td>쿠팡</td>
+                                    <td>C</td>
+                                    <td><span style="display: inline-block; width: 20px; height: 20px; background: rgb(230,0,17); border-radius: 4px;"></span></td>
+                                    <td>쿠팡, Coupang</td>
+                                    <td><span style="color: #10b981;">활성</span></td>
+                                    <td><button class="btn-secondary btn-small" onclick="editMarket('쿠팡')">수정</button></td>
+                                </tr>
+                                <tr>
+                                    <td>11번가</td>
+                                    <td>11</td>
+                                    <td><span style="display: inline-block; width: 20px; height: 20px; background: rgb(230,0,125); border-radius: 4px;"></span></td>
+                                    <td>11번가, 11st</td>
+                                    <td><span style="color: #10b981;">활성</span></td>
+                                    <td><button class="btn-secondary btn-small" onclick="editMarket('11번가')">수정</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">표준 필드</h3>
+                        <div class="info-box">
+                            <div class="info-title">설정된 표준 필드</div>
+                            <div class="info-content">
+                                마켓명, 연번, 결제일, 주문번호, 상품주문번호, 주문자, 수취인, 전화번호, 
+                                주소, 배송메세지, 옵션명, 수량, 정산예정금액, 특이/요청사항 등
+                            </div>
+                        </div>
+                        <button class="btn-secondary" onclick="openMappingSheet()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                            매핑 시트 열기
+                        </button>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn-primary" onclick="reloadMapping()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                            매핑 다시 로드
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 알림 설정 -->
+                <div class="settings-section" id="notification-section">
+                    <div class="section-header">
+                        <h2 class="section-title">알림 설정</h2>
+                        <p class="section-description">시스템 알림 설정을 관리합니다.</p>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">알림 옵션</h3>
+                        <div class="switch-group">
+                            <div class="switch-label">
+                                <span class="switch-title">주문 알림</span>
+                                <span class="switch-desc">새 주문이 등록될 때 알림을 받습니다</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="orderNotification" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="switch-group">
+                            <div class="switch-label">
+                                <span class="switch-title">발송 알림</span>
+                                <span class="switch-desc">발송 상태가 변경될 때 알림을 받습니다</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="shippingNotification" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="switch-group">
+                            <div class="switch-label">
+                                <span class="switch-title">재고 부족 알림</span>
+                                <span class="switch-desc">재고가 부족할 때 알림을 받습니다</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="stockNotification">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="switch-group">
+                            <div class="switch-label">
+                                <span class="switch-title">이메일 알림</span>
+                                <span class="switch-desc">중요한 알림을 이메일로 받습니다</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="emailNotification">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">알림 수신 설정</h3>
+                        <div class="form-group">
+                            <label class="form-label">알림 이메일 주소</label>
+                            <input type="email" class="form-input" id="notificationEmail" placeholder="email@example.com">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">알림 시작 시간</label>
+                                <input type="time" class="form-input" id="notificationStart" value="09:00">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">알림 종료 시간</label>
+                                <input type="time" class="form-input" id="notificationEnd" value="18:00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn-primary" onclick="saveNotificationSettings()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"></path>
+                            </svg>
+                            저장
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 보안 설정 -->
+                <div class="settings-section" id="security-section">
+                    <div class="section-header">
+                        <h2 class="section-title">보안 설정</h2>
+                        <p class="section-description">계정 보안 및 접근 권한을 관리합니다.</p>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">인증 설정</h3>
+                        <div class="switch-group">
+                            <div class="switch-label">
+                                <span class="switch-title">2단계 인증</span>
+                                <span class="switch-desc">로그인 시 추가 인증을 요구합니다</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="twoFactorAuth">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="switch-group">
+                            <div class="switch-label">
+                                <span class="switch-title">자동 로그아웃</span>
+                                <span class="switch-desc">30분간 활동이 없으면 자동으로 로그아웃됩니다</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="autoLogout" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">비밀번호 변경</h3>
+                        <div class="form-group">
+                            <label class="form-label">현재 비밀번호</label>
+                            <input type="password" class="form-input" id="currentPassword">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">새 비밀번호</label>
+                            <input type="password" class="form-input" id="newPassword">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">새 비밀번호 확인</label>
+                            <input type="password" class="form-input" id="confirmPassword">
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">로그인 기록</h3>
+                        <table class="settings-table">
+                            <thead>
+                                <tr>
+                                    <th>일시</th>
+                                    <th>IP 주소</th>
+                                    <th>브라우저</th>
+                                    <th>상태</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>2025-01-15 14:23</td>
+                                    <td>192.168.0.1</td>
+                                    <td>Chrome 120</td>
+                                    <td style="color: #10b981;">성공</td>
+                                </tr>
+                                <tr>
+                                    <td>2025-01-14 09:15</td>
+                                    <td>192.168.0.1</td>
+                                    <td>Chrome 120</td>
+                                    <td style="color: #10b981;">성공</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn-primary" onclick="saveSecuritySettings()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"></path>
+                            </svg>
+                            저장
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 백업 설정 -->
+                <div class="settings-section" id="backup-section">
+                    <div class="section-header">
+                        <h2 class="section-title">백업 설정</h2>
+                        <p class="section-description">데이터 백업 및 복원을 관리합니다.</p>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">자동 백업</h3>
+                        <div class="switch-group">
+                            <div class="switch-label">
+                                <span class="switch-title">자동 백업 활성화</span>
+                                <span class="switch-desc">매일 자동으로 데이터를 백업합니다</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="autoBackup" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">백업 시간</label>
+                                <input type="time" class="form-input" id="backupTime" value="02:00">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">백업 보관 기간</label>
+                                <select class="form-select" id="backupRetention">
+                                    <option value="7">7일</option>
+                                    <option value="30" selected>30일</option>
+                                    <option value="90">90일</option>
+                                    <option value="365">1년</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">수동 백업</h3>
+                        <div class="info-box">
+                            <div class="info-title">마지막 백업</div>
+                            <div class="info-content">
+                                2025-01-14 02:00:00<br>
+                                백업 크기: 15.3 MB<br>
+                                포함 데이터: 주문 3,456건, 고객 1,234명, 상품 567개
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 12px;">
+                            <button class="btn-primary" onclick="createBackup()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                지금 백업
+                            </button>
+                            <button class="btn-secondary" onclick="restoreBackup()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                                백업 복원
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">백업 기록</h3>
+                        <table class="settings-table">
+                            <thead>
+                                <tr>
+                                    <th>백업 일시</th>
+                                    <th>유형</th>
+                                    <th>크기</th>
+                                    <th>상태</th>
+                                    <th>관리</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>2025-01-14 02:00</td>
+                                    <td>자동</td>
+                                    <td>15.3 MB</td>
+                                    <td style="color: #10b981;">완료</td>
+                                    <td>
+                                        <button class="btn-secondary btn-small" onclick="downloadBackup('20250114')">다운로드</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>2025-01-13 02:00</td>
+                                    <td>자동</td>
+                                    <td>15.1 MB</td>
+                                    <td style="color: #10b981;">완료</td>
+                                    <td>
+                                        <button class="btn-secondary btn-small" onclick="downloadBackup('20250113')">다운로드</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn-primary" onclick="saveBackupSettings()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"></path>
+                            </svg>
+                            저장
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 고급 설정 -->
+                <div class="settings-section" id="advanced-section">
+                    <div class="section-header">
+                        <h2 class="section-title">고급 설정</h2>
+                        <p class="section-description">시스템 고급 설정을 관리합니다.</p>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">성능 설정</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">최대 파일 크기 (MB)</label>
+                                <input type="number" class="form-input" id="maxFileSize" value="50">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">동시 처리 파일 수</label>
+                                <input type="number" class="form-input" id="maxConcurrent" value="5">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">캐시 유효 시간 (분)</label>
+                                <input type="number" class="form-input" id="cacheTimeout" value="30">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">API 타임아웃 (초)</label>
+                                <input type="number" class="form-input" id="apiTimeout" value="30">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">개발자 옵션</h3>
+                        <div class="switch-group">
+                            <div class="switch-label">
+                                <span class="switch-title">디버그 모드</span>
+                                <span class="switch-desc">상세한 로그를 콘솔에 출력합니다</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="debugMode">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="switch-group">
+                            <div class="switch-label">
+                                <span class="switch-title">API 로깅</span>
+                                <span class="switch-desc">모든 API 요청과 응답을 기록합니다</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="apiLogging">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">데이터 관리</h3>
+                        <div class="warning-box">
+                            <div class="warning-title">⚠️ 주의</div>
+                            <div class="warning-content">
+                                아래 작업은 데이터를 영구적으로 변경하거나 삭제합니다. 백업을 먼저 수행하세요.
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 12px;">
+                            <button class="btn-secondary" onclick="clearCache()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                                캐시 삭제
+                            </button>
+                            <button class="btn-danger" onclick="resetSettings()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                </svg>
+                                설정 초기화
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn-primary" onclick="saveAdvancedSettings()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"></path>
+                            </svg>
+                            저장
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 사용자 관리 -->
+                <div class="settings-section" id="users-section">
+                    <div class="section-header">
+                        <h2 class="section-title">사용자 관리</h2>
+                        <p class="section-description">시스템 사용자 승인 및 권한을 관리합니다.</p>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">승인 대기 사용자</h3>
+                        <div id="pendingUsersContainer">
+                            <table class="settings-table" id="pendingUsersTable">
+                                <thead>
+                                    <tr>
+                                        <th>가입일시</th>
+                                        <th>이름</th>
+                                        <th>이메일</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pendingUsersList">
+                                    <tr>
+                                        <td colspan="4" style="text-align: center; color: #6c757d;">
+                                            승인 대기 중인 사용자가 없습니다.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">승인된 사용자</h3>
+                        <div id="approvedUsersContainer">
+                            <table class="settings-table" id="approvedUsersTable">
+                                <thead>
+                                    <tr>
+                                        <th>승인일시</th>
+                                        <th>이름</th>
+                                        <th>이메일</th>
+                                        <th>역할</th>
+                                        <th>마지막 로그인</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="approvedUsersList">
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; color: #6c757d;">
+                                            사용자 목록을 불러오는 중...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn-primary" onclick="refreshUserList()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                            새로고침
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 섹션 전환
+        function showSection(sectionName) {
+            // 모든 메뉴 아이템과 섹션 비활성화
+            document.querySelectorAll('.menu-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelectorAll('.settings-section').forEach(section => {
+                section.classList.remove('active');
+            });
+
+            // 선택된 메뉴와 섹션 활성화
+            event.target.closest('.menu-item').classList.add('active');
+            document.getElementById(`${sectionName}-section`).classList.add('active');
+        }
+
+        // 일반 설정 저장
+        function saveGeneralSettings() {
+            const settings = {
+                companyName: document.getElementById('companyName').value,
+                businessNumber: document.getElementById('businessNumber').value,
+                ceoName: document.getElementById('ceoName').value,
+                companyPhone: document.getElementById('companyPhone').value,
+                companyAddress: document.getElementById('companyAddress').value,
+                autoSave: document.getElementById('autoSave').checked,
+                darkMode: document.getElementById('darkMode').checked,
+                duplicateCheck: document.getElementById('duplicateCheck').checked
+            };
+            
+            console.log('일반 설정 저장:', settings);
+            alert('일반 설정이 저장되었습니다.');
+        }
+
+        // 연동 설정 저장
+        function saveIntegrationSettings() {
+            const settings = {
+                orderSheetId: document.getElementById('orderSheetId').value,
+                mappingSheetId: document.getElementById('mappingSheetId').value,
+                productSheetId: document.getElementById('productSheetId').value
+            };
+            
+            console.log('연동 설정 저장:', settings);
+            alert('연동 설정이 저장되었습니다.');
+        }
+
+        // 알림 설정 저장
+        function saveNotificationSettings() {
+            const settings = {
+                orderNotification: document.getElementById('orderNotification').checked,
+                shippingNotification: document.getElementById('shippingNotification').checked,
+                stockNotification: document.getElementById('stockNotification').checked,
+                emailNotification: document.getElementById('emailNotification').checked,
+                notificationEmail: document.getElementById('notificationEmail').value,
+                notificationStart: document.getElementById('notificationStart').value,
+                notificationEnd: document.getElementById('notificationEnd').value
+            };
+            
+            console.log('알림 설정 저장:', settings);
+            alert('알림 설정이 저장되었습니다.');
+        }
+
+        // 보안 설정 저장
+        function saveSecuritySettings() {
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            if (newPassword && newPassword !== confirmPassword) {
+                alert('새 비밀번호가 일치하지 않습니다.');
+                return;
+            }
+            
+            const settings = {
+                twoFactorAuth: document.getElementById('twoFactorAuth').checked,
+                autoLogout: document.getElementById('autoLogout').checked,
+                passwordChange: newPassword ? { currentPassword, newPassword } : null
+            };
+            
+            console.log('보안 설정 저장:', settings);
+            alert('보안 설정이 저장되었습니다.');
+        }
+
+        // 백업 설정 저장
+        function saveBackupSettings() {
+            const settings = {
+                autoBackup: document.getElementById('autoBackup').checked,
+                backupTime: document.getElementById('backupTime').value,
+                backupRetention: document.getElementById('backupRetention').value
+            };
+            
+            console.log('백업 설정 저장:', settings);
+            alert('백업 설정이 저장되었습니다.');
+        }
+
+        // 고급 설정 저장
+        function saveAdvancedSettings() {
+            const settings = {
+                maxFileSize: document.getElementById('maxFileSize').value,
+                maxConcurrent: document.getElementById('maxConcurrent').value,
+                cacheTimeout: document.getElementById('cacheTimeout').value,
+                apiTimeout: document.getElementById('apiTimeout').value,
+                debugMode: document.getElementById('debugMode').checked,
+                apiLogging: document.getElementById('apiLogging').checked
+            };
+            
+            console.log('고급 설정 저장:', settings);
+            alert('고급 설정이 저장되었습니다.');
+        }
+
+        // Google Sheets 열기
+        function openGoogleSheets() {
+            const sheetId = document.getElementById('orderSheetId').value;
+            if (sheetId) {
+                window.open(`https://docs.google.com/spreadsheets/d/${sheetId}/edit`, '_blank');
+            }
+        }
+
+        // 매핑 시트 열기
+        function openMappingSheet() {
+            const sheetId = document.getElementById('mappingSheetId').value;
+            if (sheetId) {
+                window.open(`https://docs.google.com/spreadsheets/d/${sheetId}/edit`, '_blank');
+            }
+        }
+
+        // Firebase 테스트
+        function testFirebase() {
+            console.log('Firebase 연결 테스트...');
+            const isInIframe = window.parent !== window;
+            const firebaseRef = isInIframe ? window.parent.firebase : (typeof firebase !== 'undefined' ? firebase : null);
+            
+            if (firebaseRef && firebaseRef.auth()) {
+                alert('Firebase 연결이 정상입니다.');
+            } else {
+                alert('Firebase 연결에 문제가 있습니다.');
+            }
+        }
+
+        // 매핑 다시 로드
+        function reloadMapping() {
+            if (confirm('매핑 데이터를 다시 로드하시겠습니까?')) {
+                console.log('매핑 데이터 다시 로드...');
+                // loadMappingData() 함수 호출
+                if (window.parent && window.parent.loadMappingData) {
+                    window.parent.loadMappingData();
+                }
+                alert('매핑 데이터를 다시 로드했습니다.');
+            }
+        }
+
+        // 마켓 편집
+        function editMarket(marketName) {
+            console.log('마켓 편집:', marketName);
+            alert(`${marketName} 마켓 설정을 편집합니다.`);
+        }
+
+        // 백업 생성
+        function createBackup() {
+            if (confirm('지금 백업을 생성하시겠습니까?')) {
+                console.log('백업 생성 중...');
+                alert('백업이 생성되었습니다.');
+            }
+        }
+
+        // 백업 복원
+        function restoreBackup() {
+            if (confirm('백업을 복원하시겠습니까? 현재 데이터가 덮어씌워집니다.')) {
+                console.log('백업 복원 중...');
+                alert('백업이 복원되었습니다.');
+            }
+        }
+
+        // 백업 다운로드
+        function downloadBackup(backupId) {
+            console.log('백업 다운로드:', backupId);
+            alert(`백업 ${backupId}를 다운로드합니다.`);
+        }
+
+        // 캐시 삭제
+        function clearCache() {
+            if (confirm('캐시를 삭제하시겠습니까?')) {
+                console.log('캐시 삭제 중...');
+                localStorage.clear();
+                sessionStorage.clear();
+                alert('캐시가 삭제되었습니다.');
+            }
+        }
+
+        // 설정 초기화
+        function resetSettings() {
+            if (confirm('모든 설정을 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+                if (confirm('정말로 초기화하시겠습니까?')) {
+                    console.log('설정 초기화 중...');
+                    alert('설정이 초기화되었습니다.');
+                }
+            }
+        }
+
+        // ========== 사용자 관리 기능 ==========
+        
+        // 페이지 로드 시 관리자 확인
+        window.addEventListener('load', function() {
+            console.log('설정 페이지 로드됨');
+            checkAdminAccess();
+        });
+
+        // DOMContentLoaded 이벤트에도 추가
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOMContentLoaded - 관리자 확인 시작');
+            setTimeout(() => {
+                checkAdminAccess();
+            }, 1000);
+        });
+
+// 관리자 권한 확인
+        async function checkAdminAccess() {
+            console.log('checkAdminAccess 함수 시작');
+            
+            // iframe에서 실행 중이므로 parent의 Firebase 사용
+            if (window.parent && window.parent !== window) {
+                // parent에서 Firebase 객체 찾기
+                const parentAuth = window.parent.auth;
+                const parentFirebase = window.parent.firebase;
+                const parentDb = window.parent.db;
+                
+                if (!parentAuth || !parentFirebase) {
+                    console.error('Parent Firebase를 찾을 수 없습니다');
+                    setTimeout(() => checkAdminAccess(), 1000);
+                    return;
+                }
+                
+                // Auth 상태 변경 감지
+                parentAuth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('로그인 사용자 확인:', user.email);
+                        
+                        try {
+                            // Firestore에서 사용자 정보 확인
+                            const userDoc = await parentDb.collection('users').doc(user.uid).get();
+                            
+                            if (userDoc.exists) {
+                                const userData = userDoc.data();
+                                console.log('사용자 데이터:', userData);
+                                
+                                // 관리자 확인
+                                if (userData.role === 'admin' || user.email === 'papafresh.ceo@gmail.com') {
+                                    console.log('관리자 권한 확인됨');
+                                    
+                                    // 사용자 관리 메뉴 표시
+                                    const userMenu = document.getElementById('userManageMenu');
+                                    if (userMenu) {
+                                        userMenu.style.display = 'block';
+                                        console.log('사용자 관리 메뉴 표시됨');
+                                    }
+                                    
+                                    // 전역 참조 저장
+                                    window.currentAuth = parentAuth;
+                                    window.currentFirebase = parentFirebase;
+                                    window.currentDb = parentDb;
+                                    
+                                    // 사용자 목록 로드
+                                    loadUserList();
+                                } else {
+                                    console.log('일반 사용자 - 관리자 권한 없음');
+                                }
+                            } else {
+                                console.log('사용자 문서를 찾을 수 없음');
+                            }
+                        } catch (error) {
+                            console.error('사용자 정보 확인 오류:', error);
+                        }
+                    } else {
+                        console.log('로그인된 사용자 없음');
+                    }
+                });
+            } else {
+                console.error('iframe 환경이 아님');
+            }
+        }
+
+        // 사용자 목록 불러오기
+        async function loadUserList() {
+            const db = window.currentDb || window.parent.db;
+            if (!db) {
+                console.error('Firestore 참조를 찾을 수 없습니다');
+                return;
+            }
+            
+            try {
+                // 승인 대기 사용자
+                const pendingSnapshot = await db.collection('users')
+                    .where('approved', '==', false)
+                    .orderBy('createdAt', 'desc')
+                    .get();
+                
+                const pendingHTML = pendingSnapshot.empty ? 
+                    '<tr><td colspan="4" style="text-align: center; color: #6c757d;">승인 대기 중인 사용자가 없습니다.</td></tr>' :
+                    pendingSnapshot.docs.map(doc => {
+                        const data = doc.data();
+                        const createdDate = data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString('ko-KR') : '알 수 없음';
+                        return `
+                            <tr>
+                                <td>${createdDate}</td>
+                                <td>${data.name || '이름 없음'}</td>
+                                <td>${data.email}</td>
+                                <td>
+                                    <button class="btn-primary btn-small" onclick="approveUser('${doc.id}')">승인</button>
+                                    <button class="btn-danger btn-small" onclick="rejectUser('${doc.id}')">거부</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                
+                document.getElementById('pendingUsersList').innerHTML = pendingHTML;
+                
+                // 승인된 사용자
+                const approvedSnapshot = await db.collection('users')
+                    .where('approved', '==', true)
+                    .orderBy('createdAt', 'desc')
+                    .get();
+                
+                const approvedHTML = approvedSnapshot.empty ?
+                    '<tr><td colspan="6" style="text-align: center; color: #6c757d;">승인된 사용자가 없습니다.</td></tr>' :
+                    approvedSnapshot.docs.map(doc => {
+                        const data = doc.data();
+                        const createdDate = data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString('ko-KR') : '알 수 없음';
+                        const lastLoginDate = data.lastLogin ? new Date(data.lastLogin.toDate()).toLocaleString('ko-KR') : '접속 기록 없음';
+                        return `
+                            <tr>
+                                <td>${createdDate}</td>
+                                <td>${data.name || '이름 없음'}</td>
+                                <td>${data.email}</td>
+                                <td>${data.role === 'admin' ? '관리자' : '일반'}</td>
+                                <td>${lastLoginDate}</td>
+                                <td>
+                                    ${data.email === 'papafresh.ceo@gmail.com' ? 
+                                        '<span style="color: #6c757d;">최고관리자</span>' :
+                                        `<button class="btn-secondary btn-small" onclick="toggleAdmin('${doc.id}', '${data.role}')">${data.role === 'admin' ? '관리자 해제' : '관리자 지정'}</button>
+                                         <button class="btn-danger btn-small" onclick="revokeUser('${doc.id}')">승인 취소</button>`
+                                    }
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                
+                document.getElementById('approvedUsersList').innerHTML = approvedHTML;
+                
+            } catch (error) {
+                console.error('사용자 목록 로드 오류:', error);
+                alert('사용자 목록을 불러오는 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 사용자 승인
+        async function approveUser(userId) {
+            if (!confirm('이 사용자를 승인하시겠습니까?')) return;
+            
+            const db = (window.currentFirebase || window.parent.firebase).firestore();
+            
+            try {
+                await db.collection('users').doc(userId).update({
+                    approved: true,
+                    approvedAt: (window.currentFirebase || window.parent.firebase).firestore.FieldValue.serverTimestamp()
+                });
+                alert('사용자가 승인되었습니다.');
+                loadUserList();
+            } catch (error) {
+                console.error('승인 오류:', error);
+                alert('승인 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 사용자 거부
+        async function rejectUser(userId) {
+            if (!confirm('이 사용자를 거부하시겠습니까? 사용자 정보가 삭제됩니다.')) return;
+            
+            const db = (window.currentFirebase || window.parent.firebase).firestore();
+            
+            try {
+                await db.collection('users').doc(userId).delete();
+                alert('사용자가 거부되었습니다.');
+                loadUserList();
+            } catch (error) {
+                console.error('거부 오류:', error);
+                alert('거부 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 승인 취소
+        async function revokeUser(userId) {
+            if (!confirm('이 사용자의 승인을 취소하시겠습니까?')) return;
+            
+            const db = (window.currentFirebase || window.parent.firebase).firestore();
+            
+            try {
+                await db.collection('users').doc(userId).update({
+                    approved: false,
+                    revokedAt: (window.currentFirebase || window.parent.firebase).firestore.FieldValue.serverTimestamp()
+                });
+                alert('사용자 승인이 취소되었습니다.');
+                loadUserList();
+            } catch (error) {
+                console.error('승인 취소 오류:', error);
+                alert('승인 취소 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 사용자 목록 새로고침
+        function refreshUserList() {
+            loadUserList();
+        }
+
+        // 관리자 권한 전환
+        async function toggleAdmin(userId, currentRole) {
+            const newRole = currentRole === 'admin' ? 'user' : 'admin';
+            const action = currentRole === 'admin' ? '해제' : '지정';
+            
+            if (!confirm(`이 사용자를 관리자로 ${action}하시겠습니까?`)) return;
+            
+            const db = (window.currentFirebase || window.parent.firebase).firestore();
+            
+            try {
+                await db.collection('users').doc(userId).update({
+                    role: newRole
+                });
+                alert(`관리자 권한이 ${action}되었습니다.`);
+                loadUserList();
+            } catch (error) {
+                console.error('권한 변경 오류:', error);
+                alert('권한 변경 중 오류가 발생했습니다.');
+            }
+        }

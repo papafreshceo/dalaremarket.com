@@ -1,0 +1,2537 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>대시보드</title>
+    <style>
+        /* ========================================
+           대시보드 레이아웃
+           ======================================== */
+        .dashboard-container {
+            padding: 40px;
+            background: #fafafa;
+            min-height: 100vh;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 20px;
+            }
+        }
+
+        /* ========================================
+           통계 카드 섹션
+           ======================================== */
+        .dashboard-stats-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard-stats-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-stats-container {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+        }
+
+        .stats-card {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: all 0.3s;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .stats-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .stats-content {
+            flex: 1;
+        }
+
+        .stats-label {
+            font-size: 12px;
+            font-weight: 300;
+            color: #6c757d;
+            margin-bottom: 4px;
+        }
+
+        .stats-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #212529;
+            line-height: 1.2;
+        }
+
+        .stats-change {
+            font-size: 12px;
+            font-weight: 300;
+            margin-top: 4px;
+        }
+
+        .stats-change.positive {
+            color: #10b981;
+        }
+
+        .stats-change.negative {
+            color: #ef4444;
+        }
+
+        /* ========================================
+           중단 섹션: 배송 현황과 캘린더
+           ======================================== */
+        .dashboard-middle-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard-middle-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ========================================
+           배송 현황 카드
+           ======================================== */
+        .delivery-status-card {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: #212529;
+        }
+
+        .btn-refresh {
+            width: 32px;
+            height: 32px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-refresh:hover {
+            border-color: #2563eb;
+            color: #2563eb;
+        }
+
+        .delivery-status-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .delivery-item {
+            text-align: center;
+            flex: 1;
+        }
+
+        .delivery-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 300;
+            color: #6c757d;
+            margin-bottom: 8px;
+        }
+
+        .delivery-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .delivery-count {
+            font-size: 24px;
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .delivery-progress {
+            flex: 0 0 auto;
+            padding: 0 8px;
+        }
+
+        .delivery-summary {
+            padding-top: 20px;
+            border-top: 1px solid #f1f3f5;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .summary-label {
+            font-size: 12px;
+            font-weight: 300;
+            color: #6c757d;
+        }
+
+        .summary-value {
+            font-size: 14px;
+            font-weight: 500;
+            color: #212529;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #2563eb;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        /* ========================================
+           캘린더 위젯
+           ======================================== */
+        .calendar-widget-card {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .calendar-navigation {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-nav {
+            width: 32px;
+            height: 32px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-nav:hover {
+            border-color: #2563eb;
+            color: #2563eb;
+        }
+
+        .calendar-month {
+            font-size: 14px;
+            font-weight: 500;
+            color: #212529;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .calendar-content {
+            margin-top: 20px;
+        }
+
+        .calendar-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .weekday {
+            text-align: center;
+            font-size: 12px;
+            font-weight: 400;
+            color: #6c757d;
+            padding: 8px 0;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            background: #ffffff;
+            border: 1px solid #f1f3f5;
+            border-radius: 8px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .calendar-day:hover:not(.empty) {
+            background: #f8f9fa;
+            border-color: #2563eb;
+        }
+
+        .calendar-day.empty {
+            cursor: default;
+            background: transparent;
+            border: none;
+        }
+
+        .calendar-day.today {
+            background: #e7f3ff;
+            border-color: #2563eb;
+        }
+
+        .calendar-day.selected {
+            background: #2563eb;
+            color: white;
+        }
+
+        .calendar-day.selected .calendar-date,
+        .calendar-day.selected .calendar-delivery-count {
+            color: white;
+        }
+
+        .calendar-day.sunday .calendar-date {
+            color: #dc3545;
+        }
+
+        .calendar-day.saturday .calendar-date {
+            color: #2563eb;
+        }
+
+        .calendar-date {
+            font-size: 14px;
+            font-weight: 400;
+            color: #212529;
+        }
+
+        .calendar-delivery-count {
+            font-size: 10px;
+            font-weight: 300;
+            color: #6c757d;
+            margin-top: 2px;
+        }
+
+        /* ========================================
+           차트 섹션
+           ======================================== */
+        .dashboard-charts-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard-charts-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .chart-filter {
+            padding: 6px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: #ffffff;
+            font-size: 12px;
+            font-weight: 300;
+            color: #212529;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chart-filter:hover {
+            border-color: #2563eb;
+        }
+
+        .chart-filter:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .btn-icon {
+            width: 32px;
+            height: 32px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-icon:hover {
+            border-color: #2563eb;
+            color: #2563eb;
+        }
+
+        .chart-content {
+            margin-top: 24px;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        /* ========================================
+           통계 테이블 섹션
+           ======================================== */
+        .statistics-section {
+            margin-bottom: 32px;
+        }
+
+        .stat-table-card {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+        }
+
+        .stat-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            min-width: 1200px;
+        }
+
+        .stat-table thead th {
+            background: #f8f9fa;
+            padding: 8px;
+            font-size: 12px;
+            font-weight: 400;
+            color: #495057;
+            border: 1px solid #dee2e6;
+            text-align: center;
+        }
+
+        .stat-table tbody td {
+            padding: 8px;
+            font-size: 12px;
+            border: 1px solid #f1f3f5;
+            text-align: center;
+        }
+
+        .stat-table tbody td:first-child {
+            font-weight: 500;
+            text-align: left;
+            background: #fafafa;
+        }
+
+        .stat-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .stat-table .total-row {
+            background: #f0f3ff;
+            font-weight: 600;
+        }
+
+        /* ========================================
+           피벗테이블 섹션
+           ======================================== */
+        .pivot-section {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+
+        .pivot-controls {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .pivot-control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pivot-control-group label {
+            font-size: 13px;
+            font-weight: 400;
+            color: #495057;
+        }
+
+        .pivot-control-group select {
+            padding: 6px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 13px;
+            background: #ffffff;
+        }
+
+        .btn-update-pivot {
+            padding: 8px 16px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-update-pivot:hover {
+            background: #1d4ed8;
+        }
+
+        #pivotTable {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        #pivotTable thead th {
+            background: #f5f5f5;
+            padding: 10px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid #dee2e6;
+            text-align: center;
+        }
+
+        #pivotTable tbody td {
+            padding: 8px;
+            font-size: 12px;
+            border: 1px solid #f1f3f5;
+            text-align: right;
+        }
+
+        #pivotTable tbody td:first-child {
+            font-weight: 500;
+            text-align: left;
+            background: white;
+            position: sticky;
+            left: 0;
+            z-index: 1;
+        }
+
+        #pivotTable tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        #pivotTable .total-row {
+            background: #e8f5e9;
+            font-weight: 600;
+        }
+
+        /* ========================================
+           로딩 & 메시지
+           ======================================== */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #2563eb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            z-index: 10000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .message.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- 상단 통계 카드 섹션 -->
+        <div class="dashboard-stats-container">
+            <div class="stats-card">
+                <div class="stats-icon" style="background: #dbeafe; color: #2563eb;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <div class="stats-content">
+                    <div class="stats-label">오늘 주문</div>
+                    <div class="stats-value" id="todayOrders">0</div>
+                    <div class="stats-change" id="todayChange">-</div>
+                </div>
+            </div>
+            
+            <div class="stats-card">
+                <div class="stats-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="16 12 12 8 8 12"></polyline>
+                        <line x1="12" y1="16" x2="12" y2="8"></line>
+                    </svg>
+                </div>
+                <div class="stats-content">
+                    <div class="stats-label">발송 완료</div>
+                    <div class="stats-value" id="completedShipping">0</div>
+                    <div class="stats-change" id="shippingChange">-</div>
+                </div>
+            </div>
+            
+            <div class="stats-card">
+                <div class="stats-icon" style="background: #fef3c7; color: #f59e0b;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                    </svg>
+                </div>
+                <div class="stats-content">
+                    <div class="stats-label">처리 대기</div>
+                    <div class="stats-value" id="pendingOrders">0</div>
+                    <div class="stats-change" id="pendingChange">-</div>
+                </div>
+            </div>
+            
+            <div class="stats-card">
+                <div class="stats-icon" style="background: #ede9fe; color: #2563eb;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                </div>
+                <div class="stats-content">
+                    <div class="stats-label">이번 달 총 주문</div>
+                    <div class="stats-value" id="monthlyOrders">0</div>
+                    <div class="stats-change" id="monthlyChange">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 중단 섹션: 배송 현황과 캘린더 -->
+        <div class="dashboard-middle-container">
+            <!-- 배송 현황 카드 -->
+            <div class="delivery-status-card">
+                <div class="card-header">
+                    <h3 class="card-title">배송 현황</h3>
+                    <button class="btn-refresh" onclick="refreshDeliveryStatus()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="delivery-status-content">
+                    <div class="delivery-item">
+                        <div class="delivery-label">
+                            <span class="delivery-dot" style="background: #2563eb;"></span>
+                            접수
+                        </div>
+                        <div class="delivery-count" id="deliveryReceived">0</div>
+                    </div>
+                    <div class="delivery-progress">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dee2e6" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                    
+                    <div class="delivery-item">
+                        <div class="delivery-label">
+                            <span class="delivery-dot" style="background: #f59e0b;"></span>
+                            처리중
+                        </div>
+                        <div class="delivery-count" id="deliveryProcessing">0</div>
+                    </div>
+                    <div class="delivery-progress">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dee2e6" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                    
+                    <div class="delivery-item">
+                        <div class="delivery-label">
+                            <span class="delivery-dot" style="background: #2563eb;"></span>
+                            배송중
+                        </div>
+                        <div class="delivery-count" id="deliveryShipping">0</div>
+                    </div>
+                    <div class="delivery-progress">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dee2e6" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                    
+                    <div class="delivery-item">
+                        <div class="delivery-label">
+                            <span class="delivery-dot" style="background: #10b981;"></span>
+                            완료
+                        </div>
+                        <div class="delivery-count" id="deliveryCompleted">0</div>
+                    </div>
+                </div>
+                
+                <div class="delivery-summary">
+                    <div class="summary-row">
+                        <span class="summary-label">전체 진행률</span>
+                        <span class="summary-value" id="progressPercent">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressBar" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 캘린더 위젯 -->
+            <div class="calendar-widget-card">
+                <div class="card-header">
+                    <h3 class="card-title">배송 캘린더</h3>
+                    <div class="calendar-navigation">
+                        <button class="btn-nav" onclick="previousMonth()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <span class="calendar-month" id="currentMonth">2025년 1월</span>
+                        <button class="btn-nav" onclick="nextMonth()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="calendar-content">
+                    <div class="calendar-weekdays">
+                        <div class="weekday" style="color: #dc3545;">일</div>
+                        <div class="weekday">월</div>
+                        <div class="weekday">화</div>
+                        <div class="weekday">수</div>
+                        <div class="weekday">목</div>
+                        <div class="weekday">금</div>
+                        <div class="weekday" style="color: #2563eb;">토</div>
+                    </div>
+                    <div class="calendar-grid" id="calendarGrid">
+                        <!-- 캘린더 날짜들이 여기에 동적으로 생성됨 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+<!-- 주간 주문 추이 섹션 -->
+        <div class="dashboard-charts-container">
+            <div class="chart-card" style="grid-column: 1 / -1;">
+                <div class="card-header">
+                    <h3 class="card-title">주간 주문 추이</h3>
+                    <select class="chart-filter" id="weeklyChartFilter">
+                        <option value="7">최근 7일</option>
+                        <option value="30">최근 30일</option>
+                        <option value="90">최근 3개월</option>
+                    </select>
+                </div>
+                <div class="chart-content">
+                    <canvas id="weeklyOrderChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 마켓별 분석 섹션 -->
+        <div class="analysis-section" style="margin-bottom: 32px;">
+            <h2 style="font-size: 20px; font-weight: 500; color: #212529; margin: 32px 0 24px 0;">마켓별 분석</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 24px; margin-bottom: 24px;">
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3 class="card-title">마켓별 주문 비율</h3>
+                        <button class="btn-icon" onclick="refreshMarketChart()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="chart-content">
+                        <canvas id="marketShareChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- 마켓별 상위 5개 간단 통계 -->
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3 class="card-title">마켓별 TOP 5</h3>
+                    </div>
+                    <div class="chart-content">
+                        <div id="marketTop5Stats" style="padding: 10px;">
+                            <!-- 동적으로 생성될 내용 -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 마켓별 30일 추이 차트 -->
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3 class="card-title">마켓별 30일 추이</h3>
+                    </div>
+                    <div class="chart-content">
+                        <canvas id="marketTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 마켓별 상세 통계 테이블 -->
+            <div class="stat-table-card">
+                <div class="card-header">
+                    <h3 class="card-title">마켓별 통계</h3>
+                </div>
+                <table class="stat-table" id="marketStats">
+                    <thead>
+                        <tr>
+                            <th rowspan="3" style="width: 120px;">마켓명</th>
+                            <th colspan="3" rowspan="2">전체</th>
+                            <th colspan="6">공급처</th>
+                            <th colspan="6">판매처</th>
+                            <th colspan="6">발송</th>
+                            <th colspan="6">미발송</th>
+                        </tr>
+                        <tr>
+                            <th colspan="3">자사</th>
+                            <th colspan="3">벤더사</th>
+                            <th colspan="3">자사</th>
+                            <th colspan="3">셀러</th>
+                            <th colspan="3">자사</th>
+                            <th colspan="3">벤더사</th>
+                            <th colspan="3">자사</th>
+                            <th colspan="3">벤더사</th>
+                        </tr>
+                        <tr>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            
+            </div>
+        
+        <!-- 옵션별 분석 섹션 -->
+        <div class="analysis-section" style="margin-bottom: 32px;">
+            <h2 style="font-size: 20px; font-weight: 500; color: #212529; margin: 32px 0 24px 0;">옵션별 분석</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 24px; margin-bottom: 24px;">
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3 class="card-title">옵션별 주문 비율</h3>
+                        <button class="btn-icon" onclick="refreshOptionChart()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="chart-content">
+                        <canvas id="optionShareChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- 옵션별 상위 5개 간단 통계 -->
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3 class="card-title">옵션별 TOP 5</h3>
+                    </div>
+                    <div class="chart-content">
+                        <div id="optionTop5Stats" style="padding: 10px;">
+                            <!-- 동적으로 생성될 내용 -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 옵션별 30일 추이 차트 -->
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3 class="card-title">옵션별 30일 추이</h3>
+                    </div>
+                    <div class="chart-content">
+                        <canvas id="optionTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 옵션별 상세 통계 테이블 -->
+            <div class="stat-table-card">
+                <div class="card-header">
+                    <h3 class="card-title">옵션별 상세 통계</h3>
+                </div>
+                <table class="stat-table" id="optionStats">
+                    <thead>
+                        <tr>
+                            <th rowspan="3" style="width: 180px;">옵션명</th>
+                            <th colspan="3" rowspan="2">전체</th>
+                            <th colspan="6">공급처</th>
+                            <th colspan="6">판매처</th>
+                            <th colspan="6">발송</th>
+                            <th colspan="6">미발송</th>
+                        </tr>
+                        <tr>
+                            <th colspan="3">자사</th>
+                            <th colspan="3">벤더사</th>
+                            <th colspan="3">자사</th>
+                            <th colspan="3">셀러</th>
+                            <th colspan="3">자사</th>
+                            <th colspan="3">벤더사</th>
+                            <th colspan="3">자사</th>
+                            <th colspan="3">벤더사</th>
+                        </tr>
+                        <tr>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                            <th>건수</th>
+                            <th>수량</th>
+                            <th>금액</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- 피벗테이블 섹션 -->
+        <div class="pivot-section">
+            <div class="card-header">
+                <h3 class="card-title">피벗테이블</h3>
+            </div>
+            <div class="pivot-controls">
+                <div class="pivot-control-group">
+                    <label>행:</label>
+                    <select id="pivotRowField">
+                        <option value="마켓명">마켓명</option>
+                        <option value="옵션명">옵션명</option>
+                        <option value="셀러">셀러</option>
+                        <option value="벤더사">벤더사</option>
+                        <option value="송장번호유무">송장유무</option>
+                    </select>
+                </div>
+                <div class="pivot-control-group">
+                    <label>열:</label>
+                    <select id="pivotColField">
+                        <option value="none">없음</option>
+                        <option value="마켓명">마켓명</option>
+                        <option value="옵션명">옵션명</option>
+                        <option value="셀러">셀러</option>
+                        <option value="벤더사">벤더사</option>
+                        <option value="송장번호유무">송장유무</option>
+                    </select>
+                </div>
+                <div class="pivot-control-group">
+                    <label>열2:</label>
+                    <select id="pivotColField2">
+                        <option value="none">없음</option>
+                        <option value="마켓명">마켓명</option>
+                        <option value="옵션명">옵션명</option>
+                        <option value="셀러">셀러</option>
+                        <option value="벤더사">벤더사</option>
+                        <option value="송장번호유무">송장유무</option>
+                    </select>
+                </div>
+                <div class="pivot-control-group">
+                    <label>값:</label>
+                    <select id="pivotValueField">
+                        <option value="count">건수</option>
+                        <option value="수량">수량</option>
+                        <option value="정산예정금액">금액</option>
+                    </select>
+                </div>
+                <button class="btn-update-pivot" onclick="updatePivotTable()">피벗 업데이트</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="pivotTable">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 로딩 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <script>
+        // 대시보드 상태 관리
+        const dashboardState = {
+            currentDate: new Date(),
+            selectedDate: null,
+            orderData: [],
+            marketColors: {},
+            monthlyData: []  // 이번 달 전체 데이터 저장용
+        };
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            renderCalendar();
+            loadDashboardData();
+            
+            // 5분마다 자동 새로고침
+            setInterval(loadDashboardData, 5 * 60 * 1000);
+            
+            // 차트 필터 이벤트
+            document.getElementById('weeklyChartFilter').addEventListener('change', function() {
+                updateWeeklyChart(parseInt(this.value));
+            });
+        });
+
+        // 대시보드 데이터 로드
+        async function loadDashboardData() {
+            console.log('대시보드 데이터 로딩 중...');
+            showLoading();
+            
+            try {
+                // 오늘 날짜 시트 데이터 가져오기
+                const response = await fetch('/api/sheets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'getTodayOrders'
+                    })
+                });
+
+                const result = await response.json();
+                console.log('오늘 주문 데이터:', result);
+                
+                if (result.success) {
+                    dashboardState.orderData = result.data || [];
+                    dashboardState.marketColors = result.colors || {};
+                    
+                    console.log(`오늘 시트 주문 수: ${dashboardState.orderData.length}건`);
+                    
+                    // 이번 달 데이터도 가져오기 (캘린더용)
+                    await loadMonthlyData();
+                    
+                    // 통계 계산 및 업데이트
+                    calculateStatistics();
+                    updateCharts();
+                    updateCalendarData();
+                    displayStatistics();
+                    updatePivotTable();
+                } else {
+                    console.error('데이터 로드 실패:', result.error);
+                    showMessage('오늘 주문 데이터를 찾을 수 없습니다.', 'error');
+                }
+            } catch (error) {
+                console.error('로드 오류:', error);
+                showMessage('데이터 로드 중 오류가 발생했습니다.', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // 이번 달 데이터 로드 (캘린더용)
+        async function loadMonthlyData() {
+            try {
+                const today = new Date();
+                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                
+                const startDate = formatDateForAPI(monthStart);
+                const endDate = formatDateForAPI(monthEnd);
+                
+                const response = await fetch('/api/sheets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'getOrdersByDateRange',
+                        startDate: startDate,
+                        endDate: endDate
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    dashboardState.monthlyData = result.orders || [];
+                    console.log(`이번 달 전체 주문: ${dashboardState.monthlyData.length}건`);
+                }
+            } catch (error) {
+                console.error('월별 데이터 로드 실패:', error);
+            }
+        }
+        
+        // 날짜 포맷 함수
+        function formatDateForAPI(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}${month}${day}`;
+        }
+
+        // 통계 계산
+        function calculateStatistics() {
+            const orders = dashboardState.orderData || [];
+            const monthlyOrders = dashboardState.monthlyData || [];
+            
+            console.log('통계 계산:', {
+                오늘주문: orders.length,
+                월간주문: monthlyOrders.length
+            });
+            
+            // 오늘 주문은 오늘 시트의 전체 데이터
+            const todayOrders = orders.length;
+            
+            // 어제 주문 (월간 데이터에서 찾기)
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = formatDateForAPI(yesterday);
+            
+            const yesterdayOrders = monthlyOrders.filter(order => {
+                // 각 주문이 어느 날짜 시트에서 왔는지 확인
+                return order.sheetDate === yesterdayStr;
+            }).length;
+            
+            // 송장번호 있는 주문과 없는 주문 구분
+            let completedShipping = 0;
+            let pendingOrders = 0;
+            
+            orders.forEach(order => {
+                const hasTracking = order['송장번호'] && 
+                                  String(order['송장번호']).trim() !== '' && 
+                                  order['송장번호'] !== '-';
+                
+                if (hasTracking) {
+                    completedShipping++;
+                } else {
+                    pendingOrders++;
+                }
+            });
+            
+            // 이번 달 통계
+            const monthOrders = monthlyOrders.length;
+            let monthCompleted = 0;
+            let monthPending = 0;
+            
+            monthlyOrders.forEach(order => {
+                const hasTracking = order['송장번호'] && 
+                                  String(order['송장번호']).trim() !== '' && 
+                                  order['송장번호'] !== '-';
+                if (hasTracking) {
+                    monthCompleted++;
+                } else {
+                    monthPending++;
+                }
+            });
+            
+            const todayChange = yesterdayOrders > 0 ? 
+                ((todayOrders - yesterdayOrders) / yesterdayOrders * 100).toFixed(0) : 0;
+            
+            updateStatCards({
+                todayOrders: todayOrders,
+                todayChange: todayChange,
+                completedShipping: completedShipping,
+                pendingOrders: pendingOrders,
+                monthOrders: monthOrders,
+                monthlyChange: 0,
+                processingOrders: pendingOrders
+            });
+        }
+
+        // 통계 카드 업데이트
+        function updateStatCards(stats) {
+            document.getElementById('todayOrders').textContent = stats.todayOrders.toLocaleString('ko-KR');
+            
+            const todayChangeEl = document.getElementById('todayChange');
+            todayChangeEl.textContent = stats.todayChange >= 0 ? 
+                `+${stats.todayChange}% 전일 대비` : `${stats.todayChange}% 전일 대비`;
+            todayChangeEl.className = stats.todayChange >= 0 ? 'stats-change positive' : 'stats-change negative';
+            
+            document.getElementById('completedShipping').textContent = stats.completedShipping.toLocaleString('ko-KR');
+            document.getElementById('pendingOrders').textContent = stats.pendingOrders.toLocaleString('ko-KR');
+            document.getElementById('monthlyOrders').textContent = stats.monthOrders.toLocaleString('ko-KR');
+            
+            // 배송 현황 업데이트
+            document.getElementById('deliveryReceived').textContent = stats.pendingOrders;
+            document.getElementById('deliveryProcessing').textContent = stats.processingOrders;
+            document.getElementById('deliveryShipping').textContent = '0';
+            document.getElementById('deliveryCompleted').textContent = stats.completedShipping;
+            
+            const total = stats.pendingOrders + stats.completedShipping;
+            const percent = total > 0 ? Math.round((stats.completedShipping / total) * 100) : 0;
+            document.getElementById('progressPercent').textContent = `${percent}%`;
+            document.getElementById('progressBar').style.width = `${percent}%`;
+        }
+
+        // 통계 테이블 표시
+        function displayStatistics() {
+            const orders = dashboardState.orderData;
+            if (!orders || orders.length === 0) return;
+            
+            const marketStats = {};
+            const optionStats = {};
+            
+            orders.forEach(order => {
+                const market = order['마켓명'] || '기타';
+                const option = order['옵션명'] || '기타';
+                const quantity = parseInt(order['수량']) || 1;
+                const amount = parseFloat(order['정산예정금액']) || parseFloat(order['상품금액']) || 0;
+                const vendor = String(order['벤더사'] || '').trim();
+                const seller = String(order['셀러'] || '').trim();
+                const hasInvoice = order['송장번호'] && String(order['송장번호']).trim() !== '';
+                
+                // 마켓별 통계
+                if (!marketStats[market]) {
+                    marketStats[market] = createEmptyStats();
+                }
+                updateStats(marketStats[market], order, quantity, amount, vendor, seller, hasInvoice);
+                
+                // 옵션별 통계
+                if (!optionStats[option]) {
+                    optionStats[option] = createEmptyStats();
+                }
+                updateStats(optionStats[option], order, quantity, amount, vendor, seller, hasInvoice);
+            });
+            
+            displayCategorizedStats('marketStats', marketStats);
+            displayCategorizedStats('optionStats', optionStats);
+        }
+        
+        function createEmptyStats() {
+            return {
+                overall: { count: 0, quantity: 0, amount: 0 },
+                companyProduct: { count: 0, quantity: 0, amount: 0 },
+                vendorProduct: { count: 0, quantity: 0, amount: 0 },
+                companySales: { count: 0, quantity: 0, amount: 0 },
+                sellerSales: { count: 0, quantity: 0, amount: 0 },
+                sentCompany: { count: 0, quantity: 0, amount: 0 },
+                sentVendor: { count: 0, quantity: 0, amount: 0 },
+                unsentCompany: { count: 0, quantity: 0, amount: 0 },
+                unsentVendor: { count: 0, quantity: 0, amount: 0 }
+            };
+        }
+        
+        function updateStats(stats, order, quantity, amount, vendor, seller, hasInvoice) {
+            const isCompanyProduct = !vendor || vendor === '달래마켓' || vendor === '자사';
+            const isSellerSales = !!seller && seller !== '자사';
+            
+            stats.overall.count++;
+            stats.overall.quantity += quantity;
+            stats.overall.amount += amount;
+            
+            if (isCompanyProduct) {
+                stats.companyProduct.count++;
+                stats.companyProduct.quantity += quantity;
+                stats.companyProduct.amount += amount;
+            } else {
+                stats.vendorProduct.count++;
+                stats.vendorProduct.quantity += quantity;
+                stats.vendorProduct.amount += amount;
+            }
+            
+            if (isSellerSales) {
+                stats.sellerSales.count++;
+                stats.sellerSales.quantity += quantity;
+                stats.sellerSales.amount += amount;
+            } else {
+                stats.companySales.count++;
+                stats.companySales.quantity += quantity;
+                stats.companySales.amount += amount;
+            }
+            
+            if (hasInvoice) {
+                if (isCompanyProduct) {
+                    stats.sentCompany.count++;
+                    stats.sentCompany.quantity += quantity;
+                    stats.sentCompany.amount += amount;
+                } else {
+                    stats.sentVendor.count++;
+                    stats.sentVendor.quantity += quantity;
+                    stats.sentVendor.amount += amount;
+                }
+            } else {
+                if (isCompanyProduct) {
+                    stats.unsentCompany.count++;
+                    stats.unsentCompany.quantity += quantity;
+                    stats.unsentCompany.amount += amount;
+                } else {
+                    stats.unsentVendor.count++;
+                    stats.unsentVendor.quantity += quantity;
+                    stats.unsentVendor.amount += amount;
+                }
+            }
+        }
+        
+        function displayCategorizedStats(tableId, stats) {
+            const tbody = document.querySelector(`#${tableId} tbody`);
+            tbody.innerHTML = '';
+            
+            const totals = createEmptyStats();
+            
+            Object.keys(stats).sort().forEach(key => {
+                const tr = document.createElement('tr');
+                const stat = stats[key];
+                
+                tr.innerHTML = `
+                    <td>${key}</td>
+                    <td>${stat.overall.count || ''}</td>
+                    <td>${stat.overall.quantity || ''}</td>
+                    <td style="text-align: right;">${stat.overall.amount ? stat.overall.amount.toLocaleString() : ''}</td>
+                    <td>${stat.companyProduct.count || ''}</td>
+                    <td>${stat.companyProduct.quantity || ''}</td>
+                    <td style="text-align: right;">${stat.companyProduct.amount ? stat.companyProduct.amount.toLocaleString() : ''}</td>
+                    <td>${stat.vendorProduct.count || ''}</td>
+                    <td>${stat.vendorProduct.quantity || ''}</td>
+                    <td style="text-align: right;">${stat.vendorProduct.amount ? stat.vendorProduct.amount.toLocaleString() : ''}</td>
+                    <td>${stat.companySales.count || ''}</td>
+                    <td>${stat.companySales.quantity || ''}</td>
+                    <td style="text-align: right;">${stat.companySales.amount ? stat.companySales.amount.toLocaleString() : ''}</td>
+                    <td>${stat.sellerSales.count || ''}</td>
+                    <td>${stat.sellerSales.quantity || ''}</td>
+                    <td style="text-align: right;">${stat.sellerSales.amount ? stat.sellerSales.amount.toLocaleString() : ''}</td>
+                    <td>${stat.sentCompany.count || ''}</td>
+                    <td>${stat.sentCompany.quantity || ''}</td>
+                    <td style="text-align: right;">${stat.sentCompany.amount ? stat.sentCompany.amount.toLocaleString() : ''}</td>
+                    <td>${stat.sentVendor.count || ''}</td>
+                    <td>${stat.sentVendor.quantity || ''}</td>
+                    <td style="text-align: right;">${stat.sentVendor.amount ? stat.sentVendor.amount.toLocaleString() : ''}</td>
+                    <td>${stat.unsentCompany.count || ''}</td>
+                    <td>${stat.unsentCompany.quantity || ''}</td>
+                    <td style="text-align: right;">${stat.unsentCompany.amount ? stat.unsentCompany.amount.toLocaleString() : ''}</td>
+                    <td>${stat.unsentVendor.count || ''}</td>
+                    <td>${stat.unsentVendor.quantity || ''}</td>
+                    <td style="text-align: right;">${stat.unsentVendor.amount ? stat.unsentVendor.amount.toLocaleString() : ''}</td>
+                `;
+                
+                tbody.appendChild(tr);
+                
+                // 합계 누적
+                Object.keys(totals).forEach(k => {
+                    totals[k].count += stat[k].count;
+                    totals[k].quantity += stat[k].quantity;
+                    totals[k].amount += stat[k].amount;
+                });
+            });
+            
+            // 합계 행
+            const totalRow = document.createElement('tr');
+            totalRow.className = 'total-row';
+            totalRow.innerHTML = `
+                <td>합계</td>
+                <td>${totals.overall.count}</td>
+                <td>${totals.overall.quantity}</td>
+                <td style="text-align: right;">${totals.overall.amount.toLocaleString()}</td>
+                <td>${totals.companyProduct.count}</td>
+                <td>${totals.companyProduct.quantity}</td>
+                <td style="text-align: right;">${totals.companyProduct.amount.toLocaleString()}</td>
+                <td>${totals.vendorProduct.count}</td>
+                <td>${totals.vendorProduct.quantity}</td>
+                <td style="text-align: right;">${totals.vendorProduct.amount.toLocaleString()}</td>
+                <td>${totals.companySales.count}</td>
+                <td>${totals.companySales.quantity}</td>
+                <td style="text-align: right;">${totals.companySales.amount.toLocaleString()}</td>
+                <td>${totals.sellerSales.count}</td>
+                <td>${totals.sellerSales.quantity}</td>
+                <td style="text-align: right;">${totals.sellerSales.amount.toLocaleString()}</td>
+                <td>${totals.sentCompany.count}</td>
+                <td>${totals.sentCompany.quantity}</td>
+                <td style="text-align: right;">${totals.sentCompany.amount.toLocaleString()}</td>
+                <td>${totals.sentVendor.count}</td>
+                <td>${totals.sentVendor.quantity}</td>
+                <td style="text-align: right;">${totals.sentVendor.amount.toLocaleString()}</td>
+                <td>${totals.unsentCompany.count}</td>
+                <td>${totals.unsentCompany.quantity}</td>
+                <td style="text-align: right;">${totals.unsentCompany.amount.toLocaleString()}</td>
+                <td>${totals.unsentVendor.count}</td>
+                <td>${totals.unsentVendor.quantity}</td>
+                <td style="text-align: right;">${totals.unsentVendor.amount.toLocaleString()}</td>
+            `;
+            tbody.appendChild(totalRow);
+        }
+
+        // 피벗테이블 업데이트
+        function updatePivotTable() {
+            const orders = dashboardState.orderData;
+            if (!orders || orders.length === 0) return;
+            
+            const rowField = document.getElementById('pivotRowField').value;
+            const colField = document.getElementById('pivotColField').value;
+            const colField2 = document.getElementById('pivotColField2').value;
+            const valueField = document.getElementById('pivotValueField').value;
+            
+            const pivotData = createPivotData(orders, rowField, colField, colField2, valueField);
+            displayPivotTable(pivotData, rowField, colField, colField2, valueField);
+        }
+        
+        function createPivotData(data, rowField, colField, colField2, valueField) {
+            const pivot = {};
+            const colValues = new Set();
+            const colValues2 = new Set();
+            
+            data.forEach(row => {
+                let rowKey = String(row[rowField] || '(빈값)').trim();
+                if (rowField === '송장번호유무') {
+                    rowKey = (row['송장번호'] && String(row['송장번호']).trim() !== '') ? '송장있음' : '송장없음';
+                }
+                
+                if (!pivot[rowKey]) pivot[rowKey] = {};
+                
+                if (colField === 'none') {
+                    if (!pivot[rowKey]['전체']) pivot[rowKey]['전체'] = {};
+                    if (!pivot[rowKey]['전체']['전체']) pivot[rowKey]['전체']['전체'] = [];
+                    pivot[rowKey]['전체']['전체'].push(row);
+                } else {
+                    let colKey = String(row[colField] || '(빈값)').trim();
+                    if (colField === '송장번호유무') {
+                        colKey = (row['송장번호'] && String(row['송장번호']).trim() !== '') ? '송장있음' : '송장없음';
+                    }
+                    
+                    colValues.add(colKey);
+                    if (!pivot[rowKey][colKey]) pivot[rowKey][colKey] = {};
+                    
+                    if (colField2 === 'none') {
+                        if (!pivot[rowKey][colKey]['전체']) pivot[rowKey][colKey]['전체'] = [];
+                        pivot[rowKey][colKey]['전체'].push(row);
+                    } else {
+                        let colKey2 = String(row[colField2] || '(빈값)').trim();
+                        if (colField2 === '송장번호유무') {
+                            colKey2 = (row['송장번호'] && String(row['송장번호']).trim() !== '') ? '송장있음' : '송장없음';
+                        }
+                        
+                        colValues2.add(colKey2);
+                        if (!pivot[rowKey][colKey][colKey2]) pivot[rowKey][colKey][colKey2] = [];
+                        pivot[rowKey][colKey][colKey2].push(row);
+                    }
+                }
+            });
+            
+            return {
+                data: pivot,
+                columns: colField === 'none' ? ['전체'] : Array.from(colValues).sort(),
+                columns2: colField2 === 'none' ? ['전체'] : Array.from(colValues2).sort()
+            };
+        }
+        
+        function displayPivotTable(pivotData, rowField, colField, colField2, valueField) {
+            const table = document.getElementById('pivotTable');
+            const thead = table.querySelector('thead');
+            const tbody = table.querySelector('tbody');
+            
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+            
+            // 헤더 생성
+            if (colField2 === 'none' || pivotData.columns2.length === 1) {
+                const headerRow = document.createElement('tr');
+                
+                const th1 = document.createElement('th');
+                th1.textContent = rowField;
+                th1.style.position = 'sticky';
+                th1.style.left = '0';
+                th1.style.background = '#f5f5f5';
+                th1.style.zIndex = '10';
+                headerRow.appendChild(th1);
+                
+                pivotData.columns.forEach(col => {
+                    const th = document.createElement('th');
+                    th.textContent = col;
+                    th.style.background = '#f5f5f5';
+                    headerRow.appendChild(th);
+                });
+                
+                const thTotal = document.createElement('th');
+                thTotal.textContent = '합계';
+                thTotal.style.background = '#e8f5e9';
+                thTotal.style.fontWeight = 'bold';
+                headerRow.appendChild(thTotal);
+                
+                thead.appendChild(headerRow);
+            } else {
+                const headerRow1 = document.createElement('tr');
+                const headerRow2 = document.createElement('tr');
+                
+                const th1 = document.createElement('th');
+                th1.textContent = rowField;
+                th1.rowSpan = 2;
+                th1.style.position = 'sticky';
+                th1.style.left = '0';
+                th1.style.background = '#f5f5f5';
+                th1.style.zIndex = '10';
+                headerRow1.appendChild(th1);
+                
+                pivotData.columns.forEach(col => {
+                    const th = document.createElement('th');
+                    th.textContent = col;
+                    th.colSpan = pivotData.columns2.length;
+                    th.style.background = '#f5f5f5';
+                    th.style.borderBottom = '1px solid #ddd';
+                    headerRow1.appendChild(th);
+                });
+                
+                const thTotal1 = document.createElement('th');
+                thTotal1.textContent = '합계';
+                thTotal1.rowSpan = 2;
+                thTotal1.style.background = '#e8f5e9';
+                thTotal1.style.fontWeight = 'bold';
+                headerRow1.appendChild(thTotal1);
+                
+                pivotData.columns.forEach(col => {
+                    pivotData.columns2.forEach(col2 => {
+                        const th = document.createElement('th');
+                        th.textContent = col2;
+                        th.style.background = '#f9f9f9';
+                        th.style.fontSize = '0.9em';
+                        headerRow2.appendChild(th);
+                    });
+                });
+                
+                thead.appendChild(headerRow1);
+                thead.appendChild(headerRow2);
+            }
+            
+            // 데이터 행 생성
+            const colTotals = {};
+            let grandTotal = 0;
+            
+            Object.keys(pivotData.data).sort().forEach(rowKey => {
+                const tr = document.createElement('tr');
+                
+                const td1 = document.createElement('td');
+                td1.textContent = rowKey;
+                td1.style.fontWeight = 'bold';
+                td1.style.position = 'sticky';
+                td1.style.left = '0';
+                td1.style.background = 'white';
+                td1.style.borderRight = '2px solid #ddd';
+                tr.appendChild(td1);
+                
+                let rowTotal = 0;
+                
+                pivotData.columns.forEach(col => {
+                    if (colField2 === 'none' || pivotData.columns2.length === 1) {
+                        const td = document.createElement('td');
+                        const cellData = pivotData.data[rowKey][col] ? 
+                            (pivotData.data[rowKey][col]['전체'] || pivotData.data[rowKey][col]) : [];
+                        const value = calculateValue(Array.isArray(cellData) ? cellData : [], valueField);
+                        td.textContent = formatValue(value, valueField);
+                        td.style.textAlign = 'right';
+                        tr.appendChild(td);
+                        
+                        rowTotal += value;
+                        const colKey = col;
+                        if (!colTotals[colKey]) colTotals[colKey] = 0;
+                        colTotals[colKey] += value;
+                    } else {
+                        pivotData.columns2.forEach(col2 => {
+                            const td = document.createElement('td');
+                            const cellData = pivotData.data[rowKey][col] && pivotData.data[rowKey][col][col2] ? 
+                                pivotData.data[rowKey][col][col2] : [];
+                            const value = calculateValue(cellData, valueField);
+                            td.textContent = formatValue(value, valueField);
+                            td.style.textAlign = 'right';
+                            tr.appendChild(td);
+                            
+                            rowTotal += value;
+                            const colKey = `${col}_${col2}`;
+                            if (!colTotals[colKey]) colTotals[colKey] = 0;
+                            colTotals[colKey] += value;
+                        });
+                    }
+                });
+                
+                const tdRowTotal = document.createElement('td');
+                tdRowTotal.textContent = formatValue(rowTotal, valueField);
+                tdRowTotal.style.textAlign = 'right';
+                tdRowTotal.style.background = '#f8f9fa';
+                tdRowTotal.style.fontWeight = 'bold';
+                tr.appendChild(tdRowTotal);
+                
+                tbody.appendChild(tr);
+                grandTotal += rowTotal;
+            });
+            
+            // 합계 행
+            const totalRow = document.createElement('tr');
+            totalRow.style.borderTop = '2px solid #4CAF50';
+            totalRow.style.background = '#e8f5e9';
+            totalRow.style.fontWeight = 'bold';
+            
+            const tdTotalLabel = document.createElement('td');
+            tdTotalLabel.textContent = '합계';
+            tdTotalLabel.style.position = 'sticky';
+            tdTotalLabel.style.left = '0';
+            tdTotalLabel.style.background = '#e8f5e9';
+            totalRow.appendChild(tdTotalLabel);
+            
+            if (colField2 === 'none' || pivotData.columns2.length === 1) {
+                pivotData.columns.forEach(col => {
+                    const td = document.createElement('td');
+                    td.textContent = formatValue(colTotals[col] || 0, valueField);
+                    td.style.textAlign = 'right';
+                    totalRow.appendChild(td);
+                });
+            } else {
+                pivotData.columns.forEach(col => {
+                    pivotData.columns2.forEach(col2 => {
+                        const td = document.createElement('td');
+                        const colKey = `${col}_${col2}`;
+                        td.textContent = formatValue(colTotals[colKey] || 0, valueField);
+                        td.style.textAlign = 'right';
+                        totalRow.appendChild(td);
+                    });
+                });
+            }
+            
+            const tdGrandTotal = document.createElement('td');
+            tdGrandTotal.textContent = formatValue(grandTotal, valueField);
+            tdGrandTotal.style.textAlign = 'right';
+            tdGrandTotal.style.background = '#c8e6c9';
+            totalRow.appendChild(tdGrandTotal);
+            
+            tbody.appendChild(totalRow);
+        }
+        
+        function calculateValue(data, valueField) {
+            if (valueField === 'count') {
+                return data.length;
+            }
+            
+            return data.reduce((sum, row) => {
+                const val = parseFloat(row[valueField]) || 0;
+                return sum + val;
+            }, 0);
+        }
+        
+        function formatValue(value, valueField) {
+            return value.toLocaleString('ko-KR');
+        }
+
+        // 차트 업데이트
+        function updateCharts() {
+            updateWeeklyChart(7);
+            updateMarketChart();
+            updateOptionChart();
+            updateTop5Stats();
+            updateMarketTrendChart();
+            updateOptionTrendChart();
+        }
+        
+        // 마켓별 30일 추이 차트
+        function updateMarketTrendChart() {
+            const canvas = document.getElementById('marketTrendChart');
+            if (!canvas) return;
+            
+            // 고해상도 설정
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = 200 * dpr;
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = '200px';
+            
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+            
+            const monthlyData = dashboardState.monthlyData || [];
+            const today = new Date();
+            
+            // 마켓별 데이터 집계
+            const marketDailyData = {};
+            const dates = [];
+            
+            // 최근 30일 날짜 생성
+            for (let i = 29; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(today.getDate() - i);
+                const dateStr = formatDateForAPI(date);
+                dates.push(`${date.getMonth() + 1}/${date.getDate()}`);
+                
+                // 해당 날짜의 주문 데이터 집계
+                const dayOrders = monthlyData.filter(order => order.sheetDate === dateStr);
+                dayOrders.forEach(order => {
+                    const market = order['마켓명'] || '기타';
+                    if (!marketDailyData[market]) {
+                        marketDailyData[market] = new Array(30).fill(0);
+                    }
+                    marketDailyData[market][29 - i]++;
+                });
+            }
+            
+            // 상위 5개 마켓만 표시
+            const marketTotals = {};
+            Object.keys(marketDailyData).forEach(market => {
+                marketTotals[market] = marketDailyData[market].reduce((a, b) => a + b, 0);
+            });
+            
+            const topMarkets = Object.entries(marketTotals)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([market]) => market);
+            
+            // 캔버스 설정
+            const canvasWidth = rect.width;
+            const canvasHeight = 200;
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            
+            const colors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+            const padding = { left: 35, right: 15, top: 25, bottom: 30 };
+            const graphWidth = canvasWidth - padding.left - padding.right;
+            const graphHeight = canvasHeight - padding.top - padding.bottom;
+            
+            // Y축 최대값 계산
+            let maxValue = 0;
+            topMarkets.forEach(market => {
+                const max = Math.max(...(marketDailyData[market] || []));
+                if (max > maxValue) maxValue = max;
+            });
+            maxValue = Math.max(maxValue, 5);
+            
+            // 격자선 그리기
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i <= 5; i++) {
+                const y = padding.top + (graphHeight * i / 5);
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(canvasWidth - padding.right, y);
+                ctx.stroke();
+                
+                // Y축 레이블 (검정색, 선명하게)
+                ctx.fillStyle = '#000000';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(Math.round(maxValue * (5 - i) / 5), padding.left - 5, y + 3);
+            }
+            
+            // 각 마켓별 선 그리기
+            topMarkets.forEach((market, marketIndex) => {
+                const data = marketDailyData[market] || [];
+                ctx.strokeStyle = colors[marketIndex];
+                ctx.lineWidth = 2.5;  // 더 굵게
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                
+                data.forEach((value, index) => {
+                    const x = padding.left + (graphWidth * index / 29);
+                    const y = padding.top + graphHeight * (1 - value / maxValue);
+                    
+                    if (index === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                
+                ctx.stroke();
+                
+                // 범례
+                const legendX = 10 + marketIndex * 100;
+                const legendY = 10;
+                ctx.fillStyle = colors[marketIndex];
+                ctx.fillRect(legendX, legendY, 20, 4);  // 더 크게
+                ctx.fillStyle = '#000000';  // 검정색
+                ctx.font = 'bold 11px sans-serif';  // 굵게
+                ctx.textAlign = 'left';
+                const marketDisplay = market.length > 8 ? market.substring(0, 8) + '..' : market;
+                ctx.fillText(marketDisplay, legendX + 25, legendY + 5);
+            });
+            
+            // X축 레이블 (5일 간격) - 검정색으로
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.textAlign = 'center';
+            for (let i = 0; i < dates.length; i += 5) {
+                const x = padding.left + (graphWidth * i / 29);
+                ctx.fillText(dates[i], x, canvasHeight - 10);
+            }
+        }
+        
+        // 옵션별 30일 추이 차트
+        function updateOptionTrendChart() {
+            const canvas = document.getElementById('optionTrendChart');
+            if (!canvas) return;
+            
+            // 고해상도 설정
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = 200 * dpr;
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = '200px';
+            
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+            
+            const monthlyData = dashboardState.monthlyData || [];
+            const today = new Date();
+            
+            // 옵션별 데이터 집계
+            const optionDailyData = {};
+            const dates = [];
+            
+            // 최근 30일 날짜 생성
+            for (let i = 29; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(today.getDate() - i);
+                const dateStr = formatDateForAPI(date);
+                dates.push(`${date.getMonth() + 1}/${date.getDate()}`);
+                
+                // 해당 날짜의 주문 데이터 집계
+                const dayOrders = monthlyData.filter(order => order.sheetDate === dateStr);
+                dayOrders.forEach(order => {
+                    const option = order['옵션명'] || '기타';
+                    if (!optionDailyData[option]) {
+                        optionDailyData[option] = new Array(30).fill(0);
+                    }
+                    optionDailyData[option][29 - i]++;
+                });
+            }
+            
+            // 상위 5개 옵션만 표시
+            const optionTotals = {};
+            Object.keys(optionDailyData).forEach(option => {
+                optionTotals[option] = optionDailyData[option].reduce((a, b) => a + b, 0);
+            });
+            
+            const topOptions = Object.entries(optionTotals)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([option]) => option);
+            
+            // 캔버스 설정
+            const canvasWidth = rect.width;
+            const canvasHeight = 200;
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            
+            const colors = ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#2563eb'];
+            const padding = { left: 35, right: 15, top: 25, bottom: 30 };
+            const graphWidth = canvasWidth - padding.left - padding.right;
+            const graphHeight = canvasHeight - padding.top - padding.bottom;
+            
+            // Y축 최대값 계산
+            let maxValue = 0;
+            topOptions.forEach(option => {
+                const max = Math.max(...(optionDailyData[option] || []));
+                if (max > maxValue) maxValue = max;
+            });
+            maxValue = Math.max(maxValue, 5);
+            
+            // 격자선 그리기
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i <= 5; i++) {
+                const y = padding.top + (graphHeight * i / 5);
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(canvasWidth - padding.right, y);
+                ctx.stroke();
+                
+                // Y축 레이블 (검정색, 선명하게)
+                ctx.fillStyle = '#000000';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(Math.round(maxValue * (5 - i) / 5), padding.left - 5, y + 3);
+            }
+            
+            // 각 옵션별 선 그리기
+            topOptions.forEach((option, optionIndex) => {
+                const data = optionDailyData[option] || [];
+                ctx.strokeStyle = colors[optionIndex];
+                ctx.lineWidth = 2.5;  // 더 굵게
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                
+                data.forEach((value, index) => {
+                    const x = padding.left + (graphWidth * index / 29);
+                    const y = padding.top + graphHeight * (1 - value / maxValue);
+                    
+                    if (index === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                
+                ctx.stroke();
+                
+                // 범례
+                const legendX = 10 + optionIndex * 100;
+                const legendY = 10;
+                ctx.fillStyle = colors[optionIndex];
+                ctx.fillRect(legendX, legendY, 20, 4);  // 더 크게
+                ctx.fillStyle = '#000000';  // 검정색
+                ctx.font = 'bold 11px sans-serif';  // 굵게
+                ctx.textAlign = 'left';
+                const optionDisplay = option.length > 8 ? option.substring(0, 8) + '..' : option;
+                ctx.fillText(optionDisplay, legendX + 25, legendY + 5);
+            });
+            
+            // X축 레이블 (5일 간격) - 검정색으로
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.textAlign = 'center';
+            for (let i = 0; i < dates.length; i += 5) {
+                const x = padding.left + (graphWidth * i / 29);
+                ctx.fillText(dates[i], x, canvasHeight - 10);
+            }
+        }
+        
+        // 옵션별 차트 업데이트
+        function updateOptionChart() {
+            const canvas = document.getElementById('optionShareChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const orders = dashboardState.monthlyData.length > 0 ? 
+                          dashboardState.monthlyData : dashboardState.orderData;
+            
+            const optionStats = {};
+            orders.forEach(order => {
+                const option = order['옵션명'] || '기타';
+                optionStats[option] = (optionStats[option] || 0) + 1;
+            });
+            
+            const total = Object.values(optionStats).reduce((a, b) => a + b, 0);
+            if (total === 0) {
+                canvas.width = canvas.parentElement.offsetWidth;
+                canvas.height = 200;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#6c757d';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('데이터 없음', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            const sortedOptions = Object.entries(optionStats)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+            
+            const colors = ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#2563eb'];
+            
+            canvas.width = canvas.parentElement.offsetWidth;
+            canvas.height = 200;
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 60;
+            const innerRadius = 35;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            let currentAngle = -Math.PI / 2;
+            
+            sortedOptions.forEach(([option, count], index) => {
+                const percentage = (count / total) * 100;
+                const angle = (percentage / 100) * Math.PI * 2;
+                
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + angle);
+                ctx.arc(centerX, centerY, innerRadius, currentAngle + angle, currentAngle, true);
+                ctx.closePath();
+                ctx.fillStyle = colors[index];
+                ctx.fill();
+                
+                currentAngle += angle;
+            });
+            
+            let legendY = 20;
+            sortedOptions.forEach(([option, count], index) => {
+                const percentage = ((count / total) * 100).toFixed(1);
+                
+                ctx.fillStyle = colors[index];
+                ctx.fillRect(10, legendY - 8, 12, 12);
+                
+                ctx.fillStyle = '#495057';
+                ctx.font = '12px sans-serif';
+                const optionDisplay = option.length > 15 ? option.substring(0, 15) + '...' : option;
+                ctx.fillText(`${optionDisplay} ${percentage}%`, 30, legendY);
+                
+                legendY += 20;
+            });
+        }
+        
+        // TOP5 통계 업데이트
+        function updateTop5Stats() {
+            // 오늘 주문 데이터 사용 (대시보드의 다른 통계와 일치시키기 위해)
+            const orders = dashboardState.orderData;
+            
+            if (!orders || orders.length === 0) {
+                document.getElementById('marketTop5Stats').innerHTML = '<p style="text-align: center; color: #6c757d;">데이터 없음</p>';
+                document.getElementById('optionTop5Stats').innerHTML = '<p style="text-align: center; color: #6c757d;">데이터 없음</p>';
+                return;
+            }
+            
+            // 마켓별 TOP5
+            const marketStats = {};
+            orders.forEach(order => {
+                const market = order['마켓명'] || '기타';
+                if (!marketStats[market]) {
+                    marketStats[market] = { 
+                        count: 0, 
+                        quantity: 0,
+                        amount: 0 
+                    };
+                }
+                marketStats[market].count++;
+                marketStats[market].quantity += parseInt(order['수량']) || 1;
+                marketStats[market].amount += parseFloat(order['정산예정금액']) || parseFloat(order['상품금액']) || 0;
+            });
+            
+            const marketTop5 = Object.entries(marketStats)
+                .sort((a, b) => b[1].count - a[1].count)
+                .slice(0, 5);
+            
+            const total = orders.length;
+            const marketTop5Html = `
+                <div style="display: flex; flex-direction: column; gap: 12px; padding: 5px;">
+                    ${marketTop5.map(([market, stats], index) => {
+                        const percentage = ((stats.count / total) * 100).toFixed(1);
+                        return `
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div style="flex-shrink: 0; width: 25px; height: 25px; 
+                                            background: ${['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index]}; 
+                                            color: white; border-radius: 50%; 
+                                            display: flex; align-items: center; justify-content: center;
+                                            font-size: 11px; font-weight: 600;">
+                                    ${index + 1}
+                                </div>
+                                <div style="flex: 1; min-width: 0;">
+                                    <div style="font-size: 12px; font-weight: 500; color: #212529; 
+                                                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        ${market}
+                                    </div>
+                                </div>
+                                <div style="flex-shrink: 0; text-align: right; font-size: 11px;">
+                                    <div style="color: #212529; font-weight: 500;">${stats.count}건</div>
+                                    <div style="color: #6c757d;">${percentage}%</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            
+            document.getElementById('marketTop5Stats').innerHTML = marketTop5Html;
+            
+            // 옵션별 TOP5
+            const optionStats = {};
+            orders.forEach(order => {
+                const option = order['옵션명'] || '기타';
+                if (!optionStats[option]) {
+                    optionStats[option] = { count: 0, quantity: 0 };
+                }
+                optionStats[option].count++;
+                optionStats[option].quantity += parseInt(order['수량']) || 1;
+            });
+            
+            const optionTop5 = Object.entries(optionStats)
+                .sort((a, b) => b[1].count - a[1].count)
+                .slice(0, 5);
+            
+            const optionTop5Html = `
+                <div style="display: flex; flex-direction: column; gap: 12px; padding: 5px;">
+                    ${optionTop5.map(([option, stats], index) => {
+                        const percentage = ((stats.count / total) * 100).toFixed(1);
+                        const displayOption = option.length > 25 ? option.substring(0, 25) + '...' : option;
+                        return `
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div style="flex-shrink: 0; width: 25px; height: 25px; 
+                                            background: ${['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#2563eb'][index]}; 
+                                            color: white; border-radius: 50%; 
+                                            display: flex; align-items: center; justify-content: center;
+                                            font-size: 11px; font-weight: 600;">
+                                    ${index + 1}
+                                </div>
+                                <div style="flex: 1; min-width: 0;">
+                                    <div style="font-size: 12px; font-weight: 500; color: #212529; 
+                                                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                                         title="${option}">
+                                        ${displayOption}
+                                    </div>
+                                </div>
+                                <div style="flex-shrink: 0; text-align: right; font-size: 11px;">
+                                    <div style="color: #212529; font-weight: 500;">${stats.count}건</div>
+                                    <div style="color: #6c757d;">수량 ${stats.quantity}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            
+            document.getElementById('optionTop5Stats').innerHTML = optionTop5Html;
+        }
+        
+        function refreshOptionChart() {
+            updateOptionChart();
+        }
+
+        // 주간 차트 업데이트
+        function updateWeeklyChart(days = 7) {
+            const canvas = document.getElementById('weeklyOrderChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const monthlyData = dashboardState.monthlyData || [];
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const dailyData = [];
+            const labels = [];
+            
+            for (let i = days - 1; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(today.getDate() - i);
+                const dateStr = formatDateForAPI(date);
+                
+                const dayOrders = monthlyData.filter(order => {
+                    return order.sheetDate === dateStr;
+                }).length;
+                
+                dailyData.push(dayOrders);
+                
+                if (days <= 7) {
+                    labels.push(['일', '월', '화', '수', '목', '금', '토'][date.getDay()]);
+                } else {
+                    labels.push(`${date.getMonth() + 1}/${date.getDate()}`);
+                }
+            }
+            
+            canvas.width = canvas.parentElement.offsetWidth;
+            canvas.height = 200;
+            
+            const maxValue = Math.max(...dailyData, 10);
+            const barWidth = canvas.width / (dailyData.length * 2);
+            const barSpacing = barWidth;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            dailyData.forEach((value, index) => {
+                const barHeight = (value / maxValue) * (canvas.height - 40);
+                const x = (index * (barWidth + barSpacing)) + barSpacing;
+                const y = canvas.height - barHeight - 20;
+                
+                ctx.fillStyle = '#2563eb';
+                ctx.fillRect(x, y, barWidth, barHeight);
+                
+                ctx.fillStyle = '#6c757d';
+                ctx.font = '11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(labels[index], x + barWidth / 2, canvas.height - 5);
+                ctx.fillText(value, x + barWidth / 2, y - 5);
+            });
+        }
+
+        // 마켓 차트 업데이트
+        function updateMarketChart() {
+            const canvas = document.getElementById('marketShareChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const orders = dashboardState.orderData;
+            
+            const marketStats = {};
+            orders.forEach(order => {
+                const market = order['마켓명'] || '기타';
+                marketStats[market] = (marketStats[market] || 0) + 1;
+            });
+            
+            const total = Object.values(marketStats).reduce((a, b) => a + b, 0);
+            if (total === 0) {
+                canvas.width = canvas.parentElement.offsetWidth;
+                canvas.height = 200;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#6c757d';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('데이터 없음', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            const sortedMarkets = Object.entries(marketStats)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+            
+            const colors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+            
+            canvas.width = canvas.parentElement.offsetWidth;
+            canvas.height = 200;
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 60;
+            const innerRadius = 35;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            let currentAngle = -Math.PI / 2;
+            
+            sortedMarkets.forEach(([market, count], index) => {
+                const percentage = (count / total) * 100;
+                const angle = (percentage / 100) * Math.PI * 2;
+                
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + angle);
+                ctx.arc(centerX, centerY, innerRadius, currentAngle + angle, currentAngle, true);
+                ctx.closePath();
+                ctx.fillStyle = colors[index];
+                ctx.fill();
+                
+                currentAngle += angle;
+            });
+            
+            let legendY = 20;
+            sortedMarkets.forEach(([market, count], index) => {
+                const percentage = ((count / total) * 100).toFixed(1);
+                
+                ctx.fillStyle = colors[index];
+                ctx.fillRect(10, legendY - 8, 12, 12);
+                
+                ctx.fillStyle = '#495057';
+                ctx.font = '12px sans-serif';
+                ctx.fillText(`${market} ${percentage}%`, 30, legendY);
+                
+                legendY += 20;
+            });
+        }
+
+        // 캘린더 렌더링
+        function renderCalendar() {
+            const year = dashboardState.currentDate.getFullYear();
+            const month = dashboardState.currentDate.getMonth();
+            
+            document.getElementById('currentMonth').textContent = `${year}년 ${month + 1}월`;
+            
+            const firstDay = new Date(year, month, 1).getDay();
+            const lastDate = new Date(year, month + 1, 0).getDate();
+            const today = new Date();
+            
+            const calendarGrid = document.getElementById('calendarGrid');
+            calendarGrid.innerHTML = '';
+            
+            for (let i = 0; i < firstDay; i++) {
+                const emptyDay = document.createElement('div');
+                emptyDay.className = 'calendar-day empty';
+                calendarGrid.appendChild(emptyDay);
+            }
+            
+            for (let date = 1; date <= lastDate; date++) {
+                const dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day';
+                
+                const currentDay = new Date(year, month, date);
+                const dayOfWeek = currentDay.getDay();
+                
+                if (year === today.getFullYear() && 
+                    month === today.getMonth() && 
+                    date === today.getDate()) {
+                    dayElement.classList.add('today');
+                }
+                
+                if (dayOfWeek === 0) {
+                    dayElement.classList.add('sunday');
+                } else if (dayOfWeek === 6) {
+                    dayElement.classList.add('saturday');
+                }
+                
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'calendar-date';
+                dateDiv.textContent = date;
+                dayElement.appendChild(dateDiv);
+                
+                dayElement.onclick = () => selectDate(year, month, date);
+                calendarGrid.appendChild(dayElement);
+            }
+            
+            // 캘린더 데이터 업데이트
+            updateCalendarData();
+        }
+
+        // 캘린더 데이터 업데이트
+        function updateCalendarData() {
+            const monthlyData = dashboardState.monthlyData || [];
+            const year = dashboardState.currentDate.getFullYear();
+            const month = dashboardState.currentDate.getMonth();
+            
+            const calendarCells = document.querySelectorAll('.calendar-day:not(.empty)');
+            
+            calendarCells.forEach((cell, index) => {
+                const date = index + 1;
+                const dateStr = formatDateForAPI(new Date(year, month, date));
+                
+                const dayOrders = monthlyData.filter(order => {
+                    return order.sheetDate === dateStr;
+                }).length;
+                
+                // 기존 카운트 제거
+                const existingCount = cell.querySelector('.calendar-delivery-count');
+                if (existingCount) {
+                    existingCount.remove();
+                }
+                
+                // 새 카운트 추가
+                if (dayOrders > 0) {
+                    const countDiv = document.createElement('div');
+                    countDiv.className = 'calendar-delivery-count';
+                    countDiv.textContent = `${dayOrders}건`;
+                    cell.appendChild(countDiv);
+                }
+            });
+        }
+
+        function selectDate(year, month, date) {
+            dashboardState.selectedDate = new Date(year, month, date);
+            
+            document.querySelectorAll('.calendar-day').forEach(day => {
+                day.classList.remove('selected');
+            });
+            
+            event.target.closest('.calendar-day').classList.add('selected');
+            
+            const dateStr = formatDateForAPI(dashboardState.selectedDate);
+            const selectedOrders = (dashboardState.monthlyData || []).filter(order => {
+                return order.sheetDate === dateStr;
+            });
+            
+            console.log(`${year}년 ${month + 1}월 ${date}일 주문:`, selectedOrders.length, '건');
+        }
+
+        function previousMonth() {
+            dashboardState.currentDate.setMonth(dashboardState.currentDate.getMonth() - 1);
+            renderCalendar();
+            loadMonthlyData();
+        }
+
+        function nextMonth() {
+            dashboardState.currentDate.setMonth(dashboardState.currentDate.getMonth() + 1);
+            renderCalendar();
+            loadMonthlyData();
+        }
+
+        function refreshDeliveryStatus() {
+            const refreshBtn = event.target.closest('.btn-refresh');
+            if (refreshBtn) {
+                refreshBtn.style.animation = 'spin 1s linear';
+                setTimeout(() => {
+                    refreshBtn.style.animation = '';
+                }, 1000);
+            }
+            
+            loadDashboardData();
+        }
+
+        function refreshMarketChart() {
+            updateMarketChart();
+        }
+
+        // 날짜 파싱
+        function parseDate(dateStr) {
+            if (!dateStr) return new Date(0);
+            
+            const str = String(dateStr).trim();
+            
+            // YYYYMMDD 형식
+            if (str.match(/^\d{8}$/)) {
+                const year = parseInt(str.substring(0, 4));
+                const month = parseInt(str.substring(4, 6)) - 1;
+                const day = parseInt(str.substring(6, 8));
+                return new Date(year, month, day);
+            }
+            
+            // YYYY-MM-DD 형식
+            if (str.match(/^\d{4}-\d{2}-\d{2}/)) {
+                return new Date(str.split(' ')[0] + 'T00:00:00');
+            }
+            
+            // YYYY/MM/DD 형식
+            if (str.match(/^\d{4}\/\d{1,2}\/\d{1,2}/)) {
+                const parts = str.split(' ')[0].split('/');
+                return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            }
+            
+            // 엑셀 날짜
+            if (!isNaN(str) && str.length <= 6) {
+                const excelDate = parseInt(str);
+                return new Date((excelDate - 25569) * 86400 * 1000);
+            }
+            
+            const parsed = new Date(str);
+            return isNaN(parsed.getTime()) ? new Date(0) : parsed;
+        }
+
+        function isSameDay(date1, date2) {
+            return date1.getFullYear() === date2.getFullYear() &&
+                   date1.getMonth() === date2.getMonth() &&
+                   date1.getDate() === date2.getDate();
+        }
+
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        function showMessage(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            div.textContent = message;
+            document.body.appendChild(div);
+            
+            setTimeout(() => {
+                div.remove();
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

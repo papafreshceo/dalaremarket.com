@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>주문통합관리</title>
+    <link rel="stylesheet" href="order-common.css">
+    <style>
+        /* 탭 버튼 강조 스타일 */
+        .om-tabs {
+            display: flex;
+            gap: 12px;
+            padding: 8px 0;
+        }
+
+        .om-tab-btn {
+            padding: 10px 18px;
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            color: #212529;
+            font-size: 14px;
+            font-weight: 400;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+        }
+
+        .om-tab-btn:hover {
+            background: #f8f9fa;
+            border-color: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .om-tab-btn.active {
+            background: #2563eb;
+            color: #ffffff;
+            border-color: #2563eb;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+        }
+
+        .om-tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40%;
+            height: 3px;
+            background: #2563eb;
+            border-radius: 2px;
+        }
+
+        /* 각 탭별 아이콘 색상 */
+        .om-tab-btn[data-tab="search"] svg {
+            stroke: #2563eb;
+        }
+
+        .om-tab-btn[data-tab="input"] svg {
+            stroke: #10b981;
+        }
+
+        .om-tab-btn[data-tab="excel"] svg {
+            stroke: #f59e0b;
+        }
+
+        .om-tab-btn[data-tab="shipping"] svg {
+            stroke: #8b5cf6;
+        }
+
+        .om-tab-btn[data-tab="cs"] svg {
+            stroke: #ef4444;
+        }
+
+        .om-tab-btn[data-tab="etc"] svg {
+            stroke: #6b7280;
+        }
+
+        /* 활성 상태에서는 아이콘 색상을 흰색으로 */
+        .om-tab-btn.active svg {
+            stroke: #ffffff;
+        }
+
+        /* 호버 시 아이콘 애니메이션 */
+.om-tab-btn:hover svg {
+    transform: scale(1.1);
+}
+
+/* 새로고침 버튼 스타일 */
+.refresh-button {
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 34px;
+    height: 34px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #495057;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.refresh-button:hover {
+    border-color: #2563eb;
+    color: #2563eb;
+    transform: translateY(-50%) rotate(180deg);
+}
+
+.om-header {
+    position: relative;
+}
+
+
+/* 헤더 고정 스타일 */
+.om-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #ffffff;
+    border-bottom: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* 콘텐츠 여백 조정 */
+.om-content {
+    padding-top: 20px;
+}
+
+/* 스크롤 시 헤더 그림자 효과 강화 */
+.om-header.scrolled {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+
+
+    </style>
+</head>
+<body>
+    <div class="om-container">
+                <!-- 통합 헤더 섹션 -->
+        <div class="om-header">
+            <div class="om-header-content">
+                <div class="om-title-wrapper">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    <h1 class="om-title">주문통합관리</h1>
+                </div>
+                
+                <!-- 내부 탭 -->
+                <div class="om-tabs">
+                    <button class="om-tab-btn active" data-tab="search">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        주문조회
+                    </button>
+                    <button class="om-tab-btn" data-tab="input">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2v20M2 12h20"></path>
+                        </svg>
+                        주문입력
+                    </button>
+                    <button class="om-tab-btn" data-tab="excel">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                        </svg>
+                        주문통합(Excel)
+                    </button>
+                    <button class="om-tab-btn" data-tab="shipping">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="1" y="3" width="15" height="13"></rect>
+                            <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                        </svg>
+                        발송관리
+                    </button>
+                    <button class="om-tab-btn" data-tab="cs">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2h-6l-4 4V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        CS
+                    </button>
+                    <button class="om-tab-btn" data-tab="etc">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="1"></circle>
+                            <circle cx="19" cy="12" r="1"></circle>
+                            <circle cx="5" cy="12" r="1"></circle>
+                        </svg>
+                        기타
+                    </button>
+                    <button class="refresh-button" onclick="OrderManage.refreshCurrentTab()" title="새로고침">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+    </svg>
+</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 콘텐츠 -->
+        <div class="om-content">
+            <div class="om-panel active" id="om-panel-search">
+                <div style="padding: 40px; text-align: center;">
+                    <h2>주문조회</h2>
+                    <p style="color: #6c757d; margin-top: 16px;">주문 검색 및 조회 기능</p>
+                </div>
+            </div>
+            <div class="om-panel" id="om-panel-input">
+                <div style="padding: 40px; text-align: center;">
+                    <h2>주문입력</h2>
+                    <p style="color: #6c757d; margin-top: 16px;">건별 주문 입력 기능</p>
+                </div>
+            </div>
+            <div class="om-panel" id="om-panel-excel"></div>
+            <div class="om-panel" id="om-panel-shipping"></div>
+            <div class="om-panel" id="om-panel-cs">
+                <div style="padding: 40px; text-align: center;">
+                    <h2>CS</h2>
+                    <p style="color: #6c757d; margin-top: 16px;">고객 서비스 관리</p>
+                </div>
+            </div>
+            <div class="om-panel" id="om-panel-etc">
+                <div style="padding: 40px; text-align: center;">
+                    <h2>기타</h2>
+                    <p style="color: #6c757d; margin-top: 16px;">기타 기능</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 로딩 -->
+        <div class="om-loading" id="om-loading">
+            <div class="om-spinner"></div>
+        </div>
+    </div>
+    
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+    // 모듈 관리자
+    window.OrderManage = {
+        currentTab: 'search',
+        modules: {},
+        
+        init() {
+            this.setupParentReferences();
+            this.setupTabs();
+            this.loadModule('search');
+            
+            // 스크롤 이벤트 리스너 - 헤더 고정 효과
+            window.addEventListener('scroll', () => {
+                const header = document.querySelector('.om-header');
+                if (window.scrollY > 10) {
+                    header.classList.add('scrolled');
+                } else {
+                    header.classList.remove('scrolled');
+                }
+            });
+        },
+        
+        setupParentReferences() {
+            // iframe 환경인지 체크
+            if (parent.window !== window) {
+                // 부모 window의 전역 객체들 참조
+                window.mappingData = parent.window.mappingData;
+                window.ProductMatching = parent.window.ProductMatching;
+                window.ManualOrder = parent.window.ManualOrder;
+                window.showCenterMessage = parent.window.showCenterMessage;
+                window.showLoading = parent.window.showLoading;
+                window.hideLoading = parent.window.hideLoading;
+                window.API_BASE = parent.window.API_BASE || '';
+            }
+        },
+        
+        setupTabs() {
+            document.querySelectorAll('.om-tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    this.switchTab(btn.dataset.tab);
+                });
+            });
+        },
+        
+        switchTab(tab) {
+            // 탭 버튼 활성화
+            document.querySelectorAll('.om-tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === tab);
+            });
+            
+            // 패널 활성화
+            document.querySelectorAll('.om-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            document.getElementById(`om-panel-${tab}`).classList.add('active');
+            
+            this.currentTab = tab;
+            this.loadModule(tab);
+        },
+        
+        loadModule(tab) {
+            if (this.modules[tab] && this.modules[tab].init) {
+                this.modules[tab].init();
+            } else {
+                if (tab === 'excel') {
+                    this.loadExcelModule();
+                } else if (tab === 'shipping') {
+                    this.loadShippingModule();
+                } else if (tab === 'search') {
+                    this.loadSearchModule();
+                } else if (tab === 'input') {
+                    this.loadInputModule();
+                } else if (tab === 'cs') {
+                    this.loadCsModule();
+                } else {
+                    this.loadGenericModule(tab);
+                }
+            }
+        },
+        
+        loadExcelModule() {
+            if (!window.OrderExcelHandler) {
+                const script = document.createElement('script');
+                script.src = 'order-excel-handler.js';
+                script.onload = () => {
+                    if (window.OrderExcelHandler) {
+                        this.modules.excel = window.OrderExcelHandler;
+                        window.OrderExcelHandler.init();
+                    }
+                };
+                script.onerror = () => {
+                    console.error('Failed to load order-excel-handler.js');
+                };
+                document.head.appendChild(script);
+            } else {
+                this.modules.excel = window.OrderExcelHandler;
+                window.OrderExcelHandler.init();
+            }
+        },
+        
+        loadShippingModule() {
+            if (!window.OrderShippingHandler) {
+                const script = document.createElement('script');
+                script.src = 'order-shipping-handler.js';
+                script.onload = () => {
+                    if (window.OrderShippingHandler) {
+                        this.modules.shipping = window.OrderShippingHandler;
+                        window.OrderShippingHandler.init();
+                    }
+                };
+                script.onerror = () => {
+                    console.error('Failed to load order-shipping-handler.js');
+                };
+                document.head.appendChild(script);
+            } else {
+                this.modules.shipping = window.OrderShippingHandler;
+                window.OrderShippingHandler.init();
+            }
+        },
+        
+        loadSearchModule() {
+            if (!window.OrderSearchHandler) {
+                const script = document.createElement('script');
+                script.src = 'order-search-handler.js';
+                script.onload = () => {
+                    if (window.OrderSearchHandler) {
+                        this.modules.search = window.OrderSearchHandler;
+                        window.OrderSearchHandler.init();
+                    }
+                };
+                script.onerror = () => {
+                    console.error('Failed to load order-search-handler.js');
+                };
+                document.head.appendChild(script);
+            } else {
+                this.modules.search = window.OrderSearchHandler;
+                window.OrderSearchHandler.init();
+            }
+        },
+        
+        loadInputModule() {
+    if (!window.OrderInputHandler) {
+        const script = document.createElement('script');
+        script.src = 'order-input-handler.js';  // 올바른 파일명
+        script.onload = () => {
+            if (window.OrderInputHandler) {
+                this.modules.input = window.OrderInputHandler;
+                window.OrderInputHandler.init();
+            }
+        };
+        script.onerror = () => {
+            console.error('Failed to load order-input-handler.js');
+        };
+        document.head.appendChild(script);
+    } else {
+        this.modules.input = window.OrderInputHandler;
+        window.OrderInputHandler.init();
+    }
+},
+        
+        loadCsModule() {
+            if (!window.OrderCsHandler) {
+                const script = document.createElement('script');
+                script.src = 'order-cs-handler.js';
+                script.onload = () => {
+                    if (window.OrderCsHandler) {
+                        this.modules.cs = window.OrderCsHandler;
+                        window.OrderCsHandler.init();
+                    }
+                };
+                script.onerror = () => {
+                    console.error('Failed to load order-cs-handler.js');
+                    // 파일이 없으면 직접 생성
+                    this.createCsHandler();
+                };
+                document.head.appendChild(script);
+            } else {
+                this.modules.cs = window.OrderCsHandler;
+                window.OrderCsHandler.init();
+            }
+        },
+        
+        createCsHandler() {
+            // OrderCsHandler가 로드되지 않은 경우 직접 생성
+            const panel = document.getElementById('om-panel-cs');
+            if (panel) {
+                panel.innerHTML = `
+                    <div style="padding: 40px; text-align: center;">
+                        <h2>CS 관리</h2>
+                        <p style="color: #6c757d; margin-top: 16px;">CS 기록 조회 기능을 준비 중입니다.</p>
+                        <p style="color: #ef4444; margin-top: 16px;">order-cs-handler.js 파일을 확인해주세요.</p>
+                    </div>
+                `;
+            }
+        },
+        
+        loadGenericModule(tab) {
+            const script = document.createElement('script');
+            script.src = `order-${tab}-handler.js`;
+            script.onload = () => {
+                const handlerName = 'Order' + tab.charAt(0).toUpperCase() + tab.slice(1) + 'Handler';
+                if (window[handlerName]) {
+                    this.modules[tab] = window[handlerName];
+                    this.modules[tab].init();
+                }
+            };
+            script.onerror = () => {
+                console.error(`Failed to load order-${tab}-handler.js`);
+            };
+            document.head.appendChild(script);
+        },
+        
+        showLoading() {
+            document.getElementById('om-loading').classList.add('show');
+        },
+        
+        hideLoading() {
+            document.getElementById('om-loading').classList.remove('show');
+        },
+
+        refreshCurrentTab() {
+            const currentModule = this.modules[this.currentTab];
+            const currentPanel = document.getElementById(`om-panel-${this.currentTab}`);
+            
+            if (currentModule && typeof currentModule.fullReset === 'function') {
+                // 모듈이 fullReset 메서드를 가지고 있으면 호출
+                currentModule.fullReset();
+            } else if (currentPanel) {
+                // fullReset이 없으면 패널 초기화 후 재로드
+                currentPanel.innerHTML = '';
+                
+                // 모듈 인스턴스 초기화
+                if (currentModule) {
+                    // 모듈의 모든 데이터 초기화
+                    if (currentModule.uploadedFiles) currentModule.uploadedFiles = [];
+                    if (currentModule.processedData) currentModule.processedData = null;
+                    if (currentModule.batchEditData) currentModule.batchEditData = {};
+                    if (currentModule.searchResults) currentModule.searchResults = [];
+                    if (currentModule.selectedRows) currentModule.selectedRows = [];
+                }
+                
+                // 모듈 캐시에서 제거
+                delete this.modules[this.currentTab];
+                
+                // 모듈 다시 로드
+                this.loadModule(this.currentTab);
+            }
+        }
+    };
+    
+    // 초기화
+    document.addEventListener('DOMContentLoaded', () => {
+        OrderManage.init();
+    });
+</script>
+</body>
+</html>
