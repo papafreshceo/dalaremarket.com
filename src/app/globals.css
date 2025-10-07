@@ -285,10 +285,10 @@
   font-weight: 600 !important;
 }
 
-.dark p:not([style*="color:"]),
-.dark span:not([style*="color:"]),
-.dark div:not([style*="color:"]),
-.dark label:not([style*="color:"]) {
+.dark p:not([style*="color:"]):not([class*="text-red"]):not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-purple"]),
+.dark span:not([style*="color:"]):not([class*="text-red"]):not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-purple"]),
+.dark div:not([style*="color:"]):not([class*="text-red"]):not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-purple"]),
+.dark label:not([style*="color:"]):not([class*="text-red"]):not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-purple"]) {
   color: var(--color-text) !important;
   font-weight: 300 !important;
 }
@@ -490,6 +490,51 @@ span[style*="font"].text-warning {
   color: #f87171 !important; /* 밝은 빨강 */
 }
 
+/* EditableAdminGrid 변경된 셀 색상 강제 적용 - 라이트/다크 동일 */
+table td.text-red-600,
+table td.text-red-500,
+td.text-red-600,
+td.text-red-500,
+.dark table td.text-red-600,
+.dark table td.text-red-500,
+.dark td.text-red-600,
+.dark td.text-red-500 {
+  color: #ff4444 !important;
+}
+
+table td.text-green-600,
+table td.text-green-500,
+td.text-green-600,
+td.text-green-500,
+.dark table td.text-green-600,
+.dark table td.text-green-500,
+.dark td.text-green-600,
+.dark td.text-green-500 {
+  color: #22c55e !important;
+}
+
+table td.text-purple-600,
+table td.text-purple-400,
+td.text-purple-600,
+td.text-purple-400,
+.dark table td.text-purple-600,
+.dark table td.text-purple-400,
+.dark td.text-purple-600,
+.dark td.text-purple-400 {
+  color: #c084fc !important;
+}
+
+table td.text-blue-600,
+table td.text-blue-500,
+td.text-blue-600,
+td.text-blue-500,
+.dark table td.text-blue-600,
+.dark table td.text-blue-500,
+.dark td.text-blue-600,
+.dark td.text-blue-500 {
+  color: #60a5fa !important;
+}
+
 .dark .text-blue-600,
 .dark .text-blue-500 {
   color: var(--color-primary) !important;
@@ -662,12 +707,17 @@ span[style*="font"].text-warning {
 .dark table th,
 .dark table td {
   border-color: var(--color-border) !important;
-  color: var(--color-text) !important;
   background-color: var(--color-background) !important;
+}
+
+/* 기본 테이블 셀 색상 (특정 색상 클래스가 없을 때만 적용) */
+.dark table td:not([class*="text-red"]):not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-purple"]) {
+  color: var(--color-text) !important;
 }
 
 .dark table th {
   background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
 }
 
 /* 다크모드 DatePicker */
@@ -901,6 +951,95 @@ table textarea {
   padding-bottom: 1px !important;
   line-height: 1 !important;
   font-size: 12px !important;
+}
+
+/* 원물매칭 페이지 테이블 */
+.material-matching-table th,
+.material-matching-table td {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  height: 30px !important;
+}
+
+/* 매칭 지도 색상 */
+.bg-primary-100 {
+  background-color: #dbeafe !important;
+}
+
+.border-primary-300 {
+  border-color: #93c5fd !important;
+}
+
+.text-primary-700 {
+  color: #1d4ed8 !important;
+}
+
+.text-primary-600 {
+  color: #2563eb !important;
+}
+
+.text-primary-500 {
+  color: #3b82f6 !important;
+}
+
+.bg-success-50 {
+  background-color: #f0fdf4 !important;
+}
+
+.border-success-300 {
+  border-color: #86efac !important;
+}
+
+.text-success-700 {
+  color: #15803d !important;
+}
+
+.text-success-600 {
+  color: #16a34a !important;
+}
+
+.text-success-500 {
+  color: #22c55e !important;
+}
+
+.dark .bg-primary-100 {
+  background-color: #1e3a8a !important;
+}
+
+.dark .border-primary-300 {
+  border-color: #3b82f6 !important;
+}
+
+.dark .text-primary-700 {
+  color: #93c5fd !important;
+}
+
+.dark .text-primary-600 {
+  color: #60a5fa !important;
+}
+
+.dark .text-primary-500 {
+  color: #3b82f6 !important;
+}
+
+.dark .bg-success-50 {
+  background-color: #14532d !important;
+}
+
+.dark .border-success-300 {
+  border-color: #22c55e !important;
+}
+
+.dark .text-success-700 {
+  color: #86efac !important;
+}
+
+.dark .text-success-600 {
+  color: #4ade80 !important;
+}
+
+.dark .text-success-500 {
+  color: #22c55e !important;
 }
 
 /* .table-fixed tr {

@@ -13,11 +13,6 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
       category: '기본 데이터 관리',
       items: [
         {
-          title: '품종 마스터',
-          description: '품종별 대/중/소분류 관리',
-          href: '/admin/settings/itemmaster'
-        },
-        {
           title: '거래처 유형',
           description: '거래처 유형 추가 및 수정',
           href: '/admin/settings/partner-types'
@@ -26,16 +21,6 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           title: '카테고리',
           description: '원물 분류 체계 관리',
           href: '/admin/settings/categories'
-        },
-        {
-          title: '공급상태',
-          description: '원물/상품 공급상태 옵션',
-          href: '/admin/settings/supply-status'
-        },
-        {
-          title: '출고처/송장주체',
-          description: '출고처 및 송장주체 관리',
-          href: '/admin/settings/shipping-invoice'
         }
       ]
     },

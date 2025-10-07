@@ -819,6 +819,14 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     )
     const isFillPreview = isFillRange && fillPreviewData && rowIndex !== fillStartCell?.row
 
+    // 수동 모드 체크: 셀러공급가, 네이버/쿠팡 가격
+    const isManualMode =
+      (columnKey === 'seller_supply_price' && (row['seller_supply_price_mode'] === 'manual' || row['seller_supply_price_mode'] === '수동')) ||
+      (columnKey === 'naver_paid_shipping_price' && (row['naver_price_mode'] === 'manual' || row['naver_price_mode'] === '수동')) ||
+      (columnKey === 'naver_free_shipping_price' && (row['naver_price_mode'] === 'manual' || row['naver_price_mode'] === '수동')) ||
+      (columnKey === 'coupang_paid_shipping_price' && (row['coupang_price_mode'] === 'manual' || row['coupang_price_mode'] === '수동')) ||
+      (columnKey === 'coupang_free_shipping_price' && (row['coupang_price_mode'] === 'manual' || row['coupang_price_mode'] === '수동'))
+
     let classes = 'border border-gray-200 px-2 py-1 relative overflow-hidden align-middle '
 
     // 폰트 크기
@@ -828,12 +836,15 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     classes += 'whitespace-nowrap text-ellipsis '
 
     // 수정된 셀은 빨간색, 추가된 행은 초록색, 복사된 행은 파란색 폰트
-    if (isModified || isFillPreview) {
-      classes += '!text-red-600 '
+    // 수동 모드는 보라색
+    if (isManualMode && !isModified && !isFillPreview) {
+      classes += 'text-purple-600 dark:text-purple-400 '
+    } else if (isModified || isFillPreview) {
+      classes += 'text-red-600 dark:text-red-500 '
     } else if (isAdded) {
-      classes += '!text-green-600 '
+      classes += 'text-green-600 dark:text-green-500 '
     } else if (isCopied) {
-      classes += '!text-blue-600 '
+      classes += 'text-blue-600 dark:text-blue-500 '
     }
 
     // 선택된 셀

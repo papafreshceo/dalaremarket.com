@@ -26,11 +26,31 @@ export default function ProductsLayout({ children }: { children: ReactNode }) {
           title: '원물매칭',
           description: '옵션상품-원물 연결',
           href: '/admin/products/material-matching'
+        }
+      ]
+    },
+    {
+      category: '상품 설정',
+      items: [
+        {
+          title: '품종 마스터',
+          description: '품종별 대/중/소분류 관리',
+          href: '/admin/products/item-master'
         },
         {
-          title: '카테고리 설정',
-          description: '상품 분류 체계',
-          href: '/admin/settings/categories'
+          title: '출고처/송장주체',
+          description: '출고처 및 송장주체 관리',
+          href: '/admin/products/shipping-invoice'
+        },
+        {
+          title: '공급상태',
+          description: '원물/상품 공급상태 옵션',
+          href: '/admin/products/supply-status'
+        },
+        {
+          title: '수수료 설정',
+          description: '네이버/쿠팡 수수료',
+          href: '/admin/products/commission'
         }
       ]
     },

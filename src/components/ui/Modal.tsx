@@ -11,7 +11,7 @@ interface ModalProps {
   description?: string
   children: React.ReactNode
   footer?: React.ReactNode
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'
   closeOnOverlay?: boolean
   showCloseButton?: boolean
 }
@@ -32,6 +32,7 @@ export function Modal({
     md: 'max-w-2xl',
     lg: 'max-w-4xl',
     xl: 'max-w-6xl',
+    '2xl': 'max-w-7xl',
     full: 'max-w-[96vw]'
   }
 
@@ -74,8 +75,8 @@ export function Modal({
       <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
         <div
           className={cn(
-            'relative bg-surface rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-hidden',
-            'border border-border',
+            'relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-hidden',
+            'border border-gray-200 dark:border-gray-700',
             'transition-all duration-300 ease-out',
             isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-6 opacity-0 scale-95',
             sizeStyles[size]

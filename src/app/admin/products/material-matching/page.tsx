@@ -50,11 +50,18 @@ export default function MaterialMatchingPage() {
   const [showMaterialSelector, setShowMaterialSelector] = useState(false)
   const [itemTypeFilter, setItemTypeFilter] = useState<string>('')
   const [varietyFilter, setVarietyFilter] = useState<string>('')
+  const [allMaterialLinks, setAllMaterialLinks] = useState<Record<string, MaterialLink[]>>({})
 
   useEffect(() => {
     fetchOptionProducts()
     fetchRawMaterials()
   }, [])
+
+  useEffect(() => {
+    if (rawMaterials.length > 0) {
+      fetchAllMaterialLinks()
+    }
+  }, [rawMaterials])
 
   const fetchOptionProducts = async () => {
     const { data: products, error } = await supabase
@@ -99,6 +106,38 @@ export default function MaterialMatchingPage() {
     }
 
     setRawMaterials(data || [])
+  }
+
+  const fetchAllMaterialLinks = async () => {
+    const { data, error } = await supabase
+      .from('option_product_materials')
+      .select('id, option_product_id, raw_material_id, quantity, unit_price')
+      .order('display_order')
+
+    if (error) {
+      console.error('Error fetching all material links:', error)
+      return
+    }
+
+    // 옵션상품별로 그룹화
+    const grouped: Record<string, MaterialLink[]> = {}
+    data?.forEach((link) => {
+      if (!grouped[link.option_product_id]) {
+        grouped[link.option_product_id] = []
+      }
+
+      const material = rawMaterials.find(m => m.id === link.raw_material_id)
+      grouped[link.option_product_id].push({
+        ...link,
+        material_name: material?.material_name || '',
+        material_code: material?.material_code || '',
+        material_standard_quantity: material?.standard_quantity || null,
+        material_standard_unit: material?.standard_unit || null,
+        percentage: 0
+      })
+    })
+
+    setAllMaterialLinks(grouped)
   }
 
   const fetchLinkedMaterials = async (productId: string) => {
@@ -288,7 +327,7 @@ export default function MaterialMatchingPage() {
         <h1 className="text-2xl font-medium text-gray-900 dark:text-gray-100">원물매칭</h1>
       </div>
 
-      <div className="grid gap-6" style={{ gridTemplateColumns: '35% 65%' }}>
+      <div className="grid gap-6" style={{ gridTemplateColumns: '35% 1fr' }}>
         {/* 좌측: 옵션상품 리스트 */}
         <div className="border border-border rounded-lg bg-surface">
           <div className="px-4 py-3 border-b border-border">
@@ -326,7 +365,7 @@ export default function MaterialMatchingPage() {
             </div>
           </div>
           <div className="max-h-[600px] overflow-y-auto">
-            <table className="w-full table-fixed">
+            <table className="w-full material-matching-table">
               <colgroup>
                 <col style={{ width: '100px' }} />
                 <col style={{ width: 'auto' }} />
@@ -334,11 +373,11 @@ export default function MaterialMatchingPage() {
                 <col style={{ width: '50px' }} />
               </colgroup>
               <thead className="bg-background-secondary sticky top-0">
-                <tr>
-                  <th className="border-b border-border text-text font-medium text-left" style={{ fontSize: '14px', padding: '20px 12px' }}>옵션코드</th>
-                  <th className="border-b border-border text-text font-medium text-left" style={{ fontSize: '14px', padding: '20px 12px' }}>상품명</th>
-                  <th className="border-b border-border text-text font-medium text-right" style={{ fontSize: '14px', padding: '20px 12px' }}>표준수량</th>
-                  <th className="border-b border-border text-text font-medium text-center" style={{ fontSize: '14px', padding: '20px 12px' }}>매칭</th>
+                <tr style={{ height: '30px' }}>
+                  <th className="border-b border-border text-text font-medium text-left" style={{ fontSize: '14px', padding: '6px 12px' }}>옵션코드</th>
+                  <th className="border-b border-border text-text font-medium text-left" style={{ fontSize: '14px', padding: '6px 12px' }}>상품명</th>
+                  <th className="border-b border-border text-text font-medium text-right" style={{ fontSize: '14px', padding: '6px 12px' }}>표준수량</th>
+                  <th className="border-b border-border text-text font-medium text-center" style={{ fontSize: '14px', padding: '6px 12px' }}>매칭</th>
                 </tr>
               </thead>
               <tbody>
@@ -346,16 +385,17 @@ export default function MaterialMatchingPage() {
                   <tr
                     key={product.id}
                     onClick={() => handleProductSelect(product)}
+                    style={{ height: '30px' }}
                     className={`cursor-pointer hover:bg-surface-hover ${
                       selectedProduct?.id === product.id ? 'bg-primary-100' : ''
                     }`}
                   >
-                    <td className="border-b border-border text-text truncate" style={{ fontSize: '14px', padding: '18px 12px' }}>{product.option_code}</td>
-                    <td className="border-b border-border text-text truncate" style={{ fontSize: '14px', padding: '18px 12px' }}>{product.option_name}</td>
-                    <td className="border-b border-border text-right text-text" style={{ fontSize: '14px', padding: '18px 12px' }}>
+                    <td className="border-b border-border text-text truncate" style={{ fontSize: '14px', padding: '6px 12px' }}>{product.option_code}</td>
+                    <td className="border-b border-border text-text truncate" style={{ fontSize: '14px', padding: '6px 12px' }}>{product.option_name}</td>
+                    <td className="border-b border-border text-right text-text" style={{ fontSize: '14px', padding: '6px 12px' }}>
                       {product.standard_quantity || '-'} {product.standard_unit || ''}
                     </td>
-                    <td className="border-b border-border text-center" style={{ fontSize: '14px', padding: '18px 12px' }}>
+                    <td className="border-b border-border text-center" style={{ fontSize: '14px', padding: '6px 12px' }}>
                       {product.has_materials ? (
                         <span className="text-success font-medium">✓</span>
                       ) : (
@@ -370,7 +410,7 @@ export default function MaterialMatchingPage() {
         </div>
 
         {/* 우측: 연결된 원물 */}
-        <div className="border border-border rounded-lg bg-surface">
+        <div className="border border-border rounded-lg bg-surface" style={{ maxWidth: '900px' }}>
           <div className="px-4 py-3 border-b border-border">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
@@ -547,6 +587,60 @@ export default function MaterialMatchingPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* 매칭 지도 */}
+      <div className="border border-border rounded-lg bg-surface p-6">
+        <div className="flex gap-8 overflow-x-auto pb-4">
+          {optionProducts
+            .filter(p => p.has_materials)
+            .slice(0, 10)
+            .map((product) => (
+              <div key={product.id} className="flex-shrink-0">
+                {/* 옵션상품 카드 */}
+                <div className="bg-primary-100 border border-primary-300 rounded-lg p-3 mb-4 min-w-[180px]">
+                  <div className="text-[13px] font-medium text-primary-700">{product.option_code}</div>
+                  <div className="text-[12px] text-primary-600 mt-1 truncate">{product.option_name}</div>
+                  <div className="text-[11px] text-primary-500 mt-1">
+                    {product.standard_quantity} {product.standard_unit}
+                  </div>
+                </div>
+
+                {/* 연결선과 원물 카드들 */}
+                <div className="flex flex-col gap-2 pl-4 border-l-2 border-primary-300">
+                  {(allMaterialLinks[product.id] || [])
+                    .map((material, idx) => (
+                      <div key={material.id} className="relative">
+                        {/* 연결선 */}
+                        <div className="absolute left-0 top-1/2 w-4 h-px bg-primary-300"></div>
+
+                        {/* 원물 카드 */}
+                        <div className="bg-success-50 border border-success-300 rounded p-2 ml-4 min-w-[160px]">
+                          <div className="text-[11px] font-medium text-success-700">
+                            {material.material_code}
+                          </div>
+                          <div className="text-[10px] text-success-600 truncate">
+                            {material.material_name}
+                          </div>
+                          <div className="text-[10px] text-success-500 mt-1">
+                            {material.quantity?.toFixed(1)} {material.material_standard_unit}
+                            <span className="ml-2 text-primary-600 font-medium">
+                              ({material.percentage?.toFixed(1)}%)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            ))}
+        </div>
+
+        {optionProducts.filter(p => p.has_materials).length === 0 && (
+          <div className="text-center py-8 text-[13px] text-text-secondary">
+            매칭된 옵션상품이 없습니다
+          </div>
+        )}
       </div>
     </div>
   )
