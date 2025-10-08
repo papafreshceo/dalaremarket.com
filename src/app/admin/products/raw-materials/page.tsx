@@ -25,11 +25,11 @@ interface RawMaterial {
   id: string
   material_code: string
   material_name: string
-  category_1: string | null  // 대분류
-  category_2: string | null  // 중분류
-  category_3: string | null  // 소분류
-  category_4: string | null  // 품목
-  category_5: string | null  // 품종
+  category_1: string | null  // 대분류 (category_settings와 매칭)
+  category_2: string | null  // 중분류 (category_settings와 매칭)
+  category_3: string | null  // 소분류 (category_settings와 매칭)
+  category_4: string | null  // 품목 (category_settings와 매칭)
+  category_5: string | null  // 품종 (category_settings와 매칭)
   standard_unit: string
   supply_status: string
   main_supplier_id: string | null
@@ -42,7 +42,9 @@ interface RawMaterial {
   season_peak_date?: string
   season_end_date?: string
   color_code?: string
+  is_active?: boolean
   created_at?: string
+  updated_at?: string
   [key: string]: any
 }
 interface SupplyStatus {
@@ -64,8 +66,9 @@ export default function RawMaterialsManagementPage() {
   const [filteredMaterials, setFilteredMaterials] = useState<RawMaterial[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [supplyStatuses, setSupplyStatuses] = useState<SupplyStatus[]>([])
+  const [categorySettings, setCategorySettings] = useState<any[]>([]) // 카테고리 설정 데이터
 
-  const [stats, setStats] = useState({ totalMaterials: 0, shippingMaterials: 0, seasonEndMaterials: 0, todayPriceUpdates: 0 })
+  const [stats, setStats] = useState({ totalMaterials: 0, shippingMaterials: 0, seasonEndMaterials: 0, todayPriceUpdates: 0, unregisteredCategories: 0 })
 
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
   const [searchInput, setSearchInput] = useState<string>('')
@@ -123,6 +126,17 @@ export default function RawMaterialsManagementPage() {
 
   // 시세 기록 확인 모달
   const [priceRecordConfirm, setPriceRecordConfirm] = useState<{ records: any[], summary: string } | null>(null)
+
+  // 엑셀 업로드 모달
+  const [excelUploadModal, setExcelUploadModal] = useState<{ data: any[], mode: 'replace' | 'merge' | null } | null>(null)
+
+  // 엑셀 업로드 결과 모달
+  const [uploadResultModal, setUploadResultModal] = useState<{
+    type: 'replace' | 'merge'
+    added: string[]
+    updated: string[]
+    unchanged: string[]
+  } | null>(null)
 
   // 엑셀 업로드 프리뷰 모달 (덮어쓰기 전)
   const [uploadPreview, setUploadPreview] = useState<{
@@ -233,7 +247,7 @@ export default function RawMaterialsManagementPage() {
   const fetchAll = async () => {
     setLoading(true)
     try {
-      await Promise.all([fetchMaterials(), fetchSuppliers(), fetchSupplyStatuses()])
+      await Promise.all([fetchMaterials(), fetchSuppliers(), fetchSupplyStatuses(), fetchCategorySettings()])
     } finally { setLoading(false) }
   }
 
@@ -252,14 +266,17 @@ export default function RawMaterialsManagementPage() {
         *,
         supplier:partners!main_supplier_id(name)
       `)
-      .order('created_at', { ascending: false })
+      .order('material_code', { ascending: true })
 
     if (data) {
-      // supplier name을 supplier_name 필드로 매핑
-      const mapped = data.map(row => ({
-        ...row,
-        supplier_name: row.supplier?.name || null
-      }))
+      // supplier name을 supplier_name 필드로 매핑하고 supplier 객체는 제거
+      const mapped = data.map(row => {
+        const { supplier, ...rest } = row
+        return {
+          ...rest,
+          supplier_name: supplier?.name || null
+        }
+      })
       setMaterials(mapped)
       setFilteredMaterials(mapped)
       setGridData(mapped) // EditableAdminGrid 데이터 초기화
@@ -273,6 +290,23 @@ export default function RawMaterialsManagementPage() {
   const fetchSupplyStatuses = async () => {
     const { data } = await supabase.from('supply_status_settings').select('*').eq('status_type', 'raw_material').eq('is_active', true).order('display_order')
     if (data) setSupplyStatuses(data)
+  }
+  const fetchCategorySettings = async () => {
+    const { data } = await supabase.from('category_settings').select('*').eq('is_active', true)
+    if (data) setCategorySettings(data)
+  }
+
+  // 카테고리 설정에 등록되어 있는지 확인하는 함수
+  const isCategoryRegistered = (material: RawMaterial): boolean => {
+    if (!material.category_5) return true // 품종이 없으면 체크 안함
+
+    return categorySettings.some(cat =>
+      cat.category_1 === material.category_1 &&
+      cat.category_2 === material.category_2 &&
+      cat.category_3 === material.category_3 &&
+      cat.category_4 === material.category_4 &&
+      cat.category_5 === material.category_5
+    )
   }
 
   // 시세 데이터 가져오기 (카테고리별 복수 원물)
@@ -334,9 +368,13 @@ export default function RawMaterialsManagementPage() {
   }
 
   // 통계
-  useEffect(() => { void refreshStats(materials) }, [materials])
+  useEffect(() => { void refreshStats(materials) }, [materials, categorySettings])
   const refreshStats = async (snapshot: RawMaterial[]) => {
     const today = new Date().toISOString().split('T')[0]
+
+    // 미등록 카테고리 계산
+    const unregisteredCount = snapshot.filter(m => !isCategoryRegistered(m)).length
+
     try {
       const [{ count: total }, { count: shipping }, { count: seasonEnd }, { count: todayCnt }] = await Promise.all([
         supabase.from('raw_materials').select('*', { count: 'exact', head: true }),
@@ -344,13 +382,20 @@ export default function RawMaterialsManagementPage() {
         supabase.from('raw_materials').select('*', { count: 'exact', head: true }).eq('supply_status', '시즌종료'),
         supabase.from('material_price_history').select('*', { count: 'exact', head: true }).gte('created_at', `${today}T00:00:00`).lt('created_at', `${today}T23:59:59`)
       ])
-      setStats({ totalMaterials: total || 0, shippingMaterials: shipping || 0, seasonEndMaterials: seasonEnd || 0, todayPriceUpdates: todayCnt || 0 })
+      setStats({
+        totalMaterials: total || 0,
+        shippingMaterials: shipping || 0,
+        seasonEndMaterials: seasonEnd || 0,
+        todayPriceUpdates: todayCnt || 0,
+        unregisteredCategories: unregisteredCount
+      })
     } catch {
       setStats({
         totalMaterials: snapshot.length,
         shippingMaterials: snapshot.filter(m => m.supply_status === '출하중').length,
         seasonEndMaterials: snapshot.filter(m => m.supply_status === '시즌종료').length,
-        todayPriceUpdates: 0
+        todayPriceUpdates: 0,
+        unregisteredCategories: unregisteredCount
       })
     }
   }
@@ -621,7 +666,10 @@ export default function RawMaterialsManagementPage() {
     }
 
     // 상태 필터 (빈 행도 항상 포함)
-    if (selectedStatus !== 'all') {
+    if (selectedStatus === 'unregistered') {
+      // 미등록 카테고리 필터
+      f = f.filter(m => !isCategoryRegistered(m))
+    } else if (selectedStatus !== 'all') {
       f = f.filter(m => {
         // supply_status가 없거나 빈 값이면 항상 포함
         if (!m.supply_status || m.supply_status === '') return true
@@ -634,7 +682,7 @@ export default function RawMaterialsManagementPage() {
     setGridData(f) // EditableAdminGrid에 필터링된 데이터 전달
     setSelectedRows(new Set())
     setSelectAll(false)
-  }, [materials, selectedStatus, globalSearchTerm, supplyStatuses])
+  }, [materials, selectedStatus, globalSearchTerm, supplyStatuses, categorySettings])
 
   // ===== 선택/삭제 =====
   const handleSelectAll = () => {
@@ -919,16 +967,49 @@ export default function RawMaterialsManagementPage() {
   const rawMaterialColumns = [
     { key: 'material_code', title: '원물코드', width: 120 },
     { key: 'material_name', title: '원물명', width: 160 },
-    { key: 'category_1', title: '대분류', width: 100 },
-    { key: 'category_2', title: '중분류', width: 100 },
-    { key: 'category_3', title: '소분류', width: 100 },
-    { key: 'category_4', title: '품목', width: 100 },
-    { key: 'category_5', title: '품종', width: 100 },
-    { key: 'standard_unit', title: '규격', width: 80 },
-    { key: 'unit_quantity', title: '단위수량', width: 110, type: 'number' as const },
+    {
+      key: 'category_1',
+      title: '대분류',
+      width: 100,
+      className: (row: RawMaterial) => !isCategoryRegistered(row) ? 'bg-red-50' : ''
+    },
+    {
+      key: 'category_2',
+      title: '중분류',
+      width: 100,
+      className: (row: RawMaterial) => !isCategoryRegistered(row) ? 'bg-red-50' : ''
+    },
+    {
+      key: 'category_3',
+      title: '소분류',
+      width: 100,
+      className: (row: RawMaterial) => !isCategoryRegistered(row) ? 'bg-red-50' : ''
+    },
+    {
+      key: 'category_4',
+      title: '품목',
+      width: 100,
+      className: (row: RawMaterial) => !isCategoryRegistered(row) ? 'bg-red-50' : ''
+    },
+    {
+      key: 'category_5',
+      title: '품종',
+      width: 100,
+      className: (row: RawMaterial) => !isCategoryRegistered(row) ? 'bg-red-50' : '',
+      renderer: (value: any, row: RawMaterial) => {
+        const isUnregistered = !isCategoryRegistered(row)
+        return (
+          <span className={isUnregistered ? 'text-red-600 font-semibold' : ''}>
+            {value}
+            {isUnregistered && <span className="ml-1 text-xs">⚠️</span>}
+          </span>
+        )
+      }
+    },
+    { key: 'standard_quantity', title: '표준량', width: 100, type: 'number' as const },
+    { key: 'standard_unit', title: '표준규격', width: 100 },
     { key: 'last_trade_date', title: '최근거래', width: 100 },
     { key: 'latest_price', title: '최근시세', width: 110, type: 'number' as const },
-    { key: 'current_price', title: '현재시세', width: 110, type: 'number' as const },
     {
       key: 'main_supplier_id',
       title: '주거래처',
@@ -937,9 +1018,7 @@ export default function RawMaterialsManagementPage() {
       source: suppliers.map(s => s.name),
       renderer: (value: any, row: RawMaterial) => row.supplier_name || ''
     },
-    { key: 'season', title: '시즌', width: 100 },
     { key: 'season_start_date', title: '시작일', width: 100 },
-    { key: 'season_peak_date', title: '피크시기', width: 100 },
     { key: 'season_end_date', title: '종료일', width: 100 },
     {
       key: 'supply_status',
@@ -963,22 +1042,35 @@ export default function RawMaterialsManagementPage() {
           </span>
         )
       }
-    },
-    {
-      key: 'color_code',
-      title: '색코드',
-      width: 110,
-      renderer: (value: any, row: RawMaterial) => {
-        if (!row.color_code) return '-'
-        return (
-          <div
-            className="w-6 h-6 mx-auto rounded border"
-            style={{ backgroundColor: row.color_code }}
-            title={row.color_code}
-          />
-        )
-      }
     }
+  ]
+
+  // 엑셀 다운로드용 전체 컬럼 (DB의 모든 필드 포함, 화면 테이블과 동일한 헤더명 사용)
+  const exportColumns = [
+    { key: 'id', title: 'ID', width: 120 },
+    { key: 'material_code', title: '원물코드', width: 120 },
+    { key: 'material_name', title: '원물명', width: 160 },
+    { key: 'category_1', title: '대분류', width: 100 },
+    { key: 'category_2', title: '중분류', width: 100 },
+    { key: 'category_3', title: '소분류', width: 100 },
+    { key: 'category_4', title: '품목', width: 100 },
+    { key: 'category_5', title: '품종', width: 100 },
+    { key: 'standard_quantity', title: '표준량', width: 100 },
+    { key: 'standard_unit', title: '표준규격', width: 100 },
+    { key: 'last_trade_date', title: '최근거래', width: 100 },
+    { key: 'latest_price', title: '최근시세', width: 110 },
+    { key: 'supplier_name', title: '주거래처', width: 130 },
+    { key: 'season_start_date', title: '시작일', width: 100 },
+    { key: 'season_end_date', title: '종료일', width: 100 },
+    { key: 'supply_status', title: '상태', width: 90 },
+    { key: 'main_supplier_id', title: '주거래처ID', width: 130 },
+    { key: 'notes', title: '메모', width: 200 },
+    { key: 'metadata', title: '메타데이터', width: 200 },
+    { key: 'is_active', title: '활성화', width: 80 },
+    { key: 'created_at', title: '생성일시', width: 150 },
+    { key: 'updated_at', title: '수정일시', width: 150 },
+    { key: 'created_by', title: '생성자', width: 130 },
+    { key: 'updated_by', title: '수정자', width: 130 }
   ]
 
   // 카테고리별 원물 필터링
@@ -1095,6 +1187,202 @@ export default function RawMaterialsManagementPage() {
 
         {/* 메뉴 버튼들 - 아웃라인 */}
         <div className="flex gap-2">
+          <button
+            onClick={() => {
+              // 필드명을 한글로 매핑
+              const fieldMapping: Record<string, string> = {
+                'id': 'ID',
+                'material_code': '원물코드',
+                'material_name': '원물명',
+                'category_1': '대분류',
+                'category_2': '중분류',
+                'category_3': '소분류',
+                'category_4': '품목',
+                'category_5': '품종',
+                'standard_quantity': '표준량',
+                'standard_unit': '표준규격',
+                'supply_status': '공급상태',
+                'main_supplier_id': '주거래처ID',
+                'latest_price': '최근가격',
+                'last_trade_date': '최근거래일',
+                'season': '시즌',
+                'season_start_date': '시즌시작일',
+                'season_peak_date': '시즌피크일',
+                'season_end_date': '시즌종료일',
+                'is_active': '활성화',
+                'created_at': '생성일',
+                'updated_at': '수정일',
+                'created_by': '생성자',
+                'updated_by': '수정자',
+                'notes': '비고',
+                'metadata': '메타데이터',
+                'color_code': '색상코드',
+                'unit_quantity': '단위수량'
+              }
+
+              // supplier_name 필드 제거하고 한글 헤더로 변환
+              const exportData = materials.map(({ supplier_name, ...rest }) => {
+                const koreanData: Record<string, any> = {}
+                Object.keys(rest).forEach(key => {
+                  const koreanKey = fieldMapping[key] || key
+                  koreanData[koreanKey] = rest[key]
+                })
+                return koreanData
+              })
+
+              const ws = XLSX.utils.json_to_sheet(exportData)
+              const wb = XLSX.utils.book_new()
+              XLSX.utils.book_append_sheet(wb, ws, '원물관리')
+              const dateStr = new Date().toISOString().split('T')[0]
+              XLSX.writeFile(wb, `원물관리_${dateStr}.xlsx`)
+            }}
+            className="p-2 text-sm border border-blue-500 text-blue-600 rounded hover:bg-blue-50 transition-colors"
+            title="엑셀 다운로드"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </button>
+          <button
+            onClick={() => {
+              const input = document.createElement('input')
+              input.type = 'file'
+              input.accept = '.xlsx,.xls'
+              input.onchange = async (e: any) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+
+                const reader = new FileReader()
+                reader.onload = async (e) => {
+                  const data = e.target?.result
+                  const workbook = XLSX.read(data, { type: 'binary', cellDates: true })
+                  const sheetName = workbook.SheetNames[0]
+                  const worksheet = workbook.Sheets[sheetName]
+                  const jsonData = XLSX.utils.sheet_to_json(worksheet)
+
+                  // 한글 헤더를 영문으로 매핑
+                  const reverseFieldMapping: Record<string, string> = {
+                    'ID': 'id',
+                    '원물코드': 'material_code',
+                    '원물명': 'material_name',
+                    '대분류': 'category_1',
+                    '중분류': 'category_2',
+                    '소분류': 'category_3',
+                    '품목': 'category_4',
+                    '품종': 'category_5',
+                    '표준량': 'standard_quantity',
+                    '표준규격': 'standard_unit',
+                    '공급상태': 'supply_status',
+                    '주거래처ID': 'main_supplier_id',
+                    '최근가격': 'latest_price',
+                    '최근거래일': 'last_trade_date',
+                    '시즌': 'season',
+                    '시즌시작일': 'season_start_date',
+                    '시즌피크일': 'season_peak_date',
+                    '시즌종료일': 'season_end_date',
+                    '활성화': 'is_active',
+                    '생성일': 'created_at',
+                    '수정일': 'updated_at',
+                    '생성자': 'created_by',
+                    '수정자': 'updated_by',
+                    '비고': 'notes',
+                    '메타데이터': 'metadata',
+                    '색상코드': 'color_code',
+                    '단위수량': 'unit_quantity'
+                  }
+
+                  // 한글 헤더를 영문으로 변환
+                  const convertedData = jsonData.map((row: any) => {
+                    const englishRow: any = {}
+                    Object.keys(row).forEach(key => {
+                      const englishKey = reverseFieldMapping[key] || key
+                      englishRow[englishKey] = row[key]
+                    })
+                    return englishRow
+                  })
+
+                  // DB 테이블의 모든 필드 정의 (supplier_name 제외)
+                  const dbFields = [
+                    'id', 'material_code', 'material_name', 'standard_unit', 'supply_status',
+                    'season', 'is_active', 'created_at', 'updated_at', 'created_by', 'updated_by',
+                    'category_1', 'category_2', 'category_3', 'category_4', 'category_5',
+                    'last_trade_date', 'latest_price', 'standard_quantity',
+                    'season_start_date', 'season_peak_date', 'season_end_date',
+                    'main_supplier_id', 'notes', 'metadata', 'color_code', 'unit_quantity'
+                  ]
+
+                  // supplier_name 필드 제거 및 데이터 정제
+                  const cleanData = convertedData.map((row: any) => {
+                    const { supplier_name, ...rest } = row
+
+                    // DB 스키마에 맞춰 모든 필드 초기화 (엑셀에 없는 필드는 null)
+                    const normalizedRow: any = {}
+                    dbFields.forEach(field => {
+                      normalizedRow[field] = rest[field] !== undefined ? rest[field] : null
+                    })
+
+                    // 날짜 필드 변환 (Excel 숫자를 날짜 문자열로)
+                    const dateFields = ['last_trade_date', 'season_start_date', 'season_peak_date', 'season_end_date', 'created_at', 'updated_at']
+                    dateFields.forEach(field => {
+                      if (normalizedRow[field]) {
+                        if (typeof normalizedRow[field] === 'number') {
+                          // Excel 날짜 숫자를 JavaScript Date로 변환
+                          const date = new Date((normalizedRow[field] - 25569) * 86400 * 1000)
+                          normalizedRow[field] = date.toISOString().split('T')[0]
+                        } else if (normalizedRow[field] instanceof Date) {
+                          normalizedRow[field] = normalizedRow[field].toISOString().split('T')[0]
+                        } else if (typeof normalizedRow[field] === 'string' && normalizedRow[field].trim() === '') {
+                          normalizedRow[field] = null
+                        }
+                      }
+                    })
+
+                    // 숫자 필드 변환 (콤마 제거)
+                    const numericFields = ['latest_price', 'standard_quantity']
+                    numericFields.forEach(field => {
+                      if (normalizedRow[field]) {
+                        if (typeof normalizedRow[field] === 'string') {
+                          // 콤마 제거하고 숫자로 변환
+                          normalizedRow[field] = parseFloat(normalizedRow[field].replace(/,/g, ''))
+                        }
+                      }
+                    })
+
+                    // 빈 문자열을 null로 변환
+                    Object.keys(normalizedRow).forEach(key => {
+                      if (normalizedRow[key] === '' || normalizedRow[key] === 'undefined' || normalizedRow[key] === 'null') {
+                        normalizedRow[key] = null
+                      }
+                    })
+
+                    return normalizedRow
+                  })
+
+                  // 디버깅: 업로드 데이터 확인
+                  console.log('업로드할 데이터 샘플:', JSON.stringify(cleanData[0], null, 2))
+                  const category5Check = cleanData.map(d => ({
+                    material_code: d.material_code,
+                    category_5: d.category_5,
+                    category_5_type: typeof d.category_5,
+                    has_category_5: 'category_5' in d
+                  })).slice(0, 5)
+                  console.log('category_5 필드 확인:', JSON.stringify(category5Check, null, 2))
+                  console.log('전체 데이터 개수:', cleanData.length)
+
+                  // 모달 열기 (교체/병합 선택)
+                  setExcelUploadModal({ data: cleanData, mode: null })
+                }
+                reader.readAsBinaryString(file)
+              }
+              input.click()
+            }}
+            className="p-2 text-sm border border-green-500 text-green-600 rounded hover:bg-green-50 transition-colors"
+            title="엑셀 업로드"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+          </button>
           <button onClick={() => openModal('material-register')} className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors">
             원물등록관리
           </button>
@@ -1122,6 +1410,15 @@ export default function RawMaterialsManagementPage() {
                   }}
                 >
                   전체 ({materials.length})
+                </button>
+                <button
+                  onClick={() => setSelectedStatus('unregistered')}
+                  className="px-3 py-1 rounded-full text-xs font-medium transition-colors text-white cursor-pointer hover:opacity-90"
+                  style={{
+                    backgroundColor: selectedStatus === 'unregistered' ? '#ef4444' : '#ef444430'
+                  }}
+                >
+                  미등록 카테고리 ({stats.unregisteredCategories})
                 </button>
                 {supplyStatuses.map(s => {
                   const isSelected = selectedStatus === s.name
@@ -1169,13 +1466,9 @@ export default function RawMaterialsManagementPage() {
           }}
           onDelete={handleDeleteRow}
           onSave={handleOpenConfirm}
-          onDeleteSelected={(indices) => {
-            const ids = indices.map(i => gridData[i]?.id).filter(Boolean)
-            setSelectedRows(new Set(ids))
-            setModalType('delete-confirm')
-          }}
           globalSearchPlaceholder="원물코드, 원물명, 대분류, 중분류, 소분류, 품목, 품종 검색"
-          exportFilePrefix="원물관리"
+          enableCSVExport={false}
+          enableCSVImport={false}
         />
       </div>
 
@@ -2068,6 +2361,258 @@ export default function RawMaterialsManagementPage() {
             </p>
             <div className="max-h-[40vh] overflow-auto bg-gray-50 rounded-lg p-3">
               <pre className="text-xs text-gray-700 whitespace-pre-wrap">{priceRecordConfirm.summary}</pre>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 엑셀 업로드 결과 모달 */}
+      {uploadResultModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => setUploadResultModal(null)}
+          title={uploadResultModal.type === 'replace' ? '교체 완료' : '병합 완료'}
+          size="lg"
+        >
+          <div className="space-y-4">
+            {uploadResultModal.type === 'replace' && (
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 mb-4">
+                <p className="text-xs text-orange-600 dark:text-orange-400">
+                  <strong>교체 모드:</strong> 엑셀 파일의 데이터로 완전히 교체했습니다. 엑셀에 없는 원물은 삭제되었습니다.
+                </p>
+              </div>
+            )}
+            {uploadResultModal.type === 'merge' && (
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  <strong>병합 모드:</strong> 기존 데이터를 유지하면서 엑셀 데이터를 추가/수정했습니다.
+                </p>
+              </div>
+            )}
+
+            <div className={`grid ${uploadResultModal.type === 'merge' ? 'grid-cols-3' : 'grid-cols-2'} gap-4 text-center`}>
+              <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{uploadResultModal.added.length}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">추가</div>
+              </div>
+              <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{uploadResultModal.updated.length}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">수정</div>
+              </div>
+              {uploadResultModal.type === 'merge' && (
+                <div className="bg-gray-500/10 border border-gray-500/20 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{uploadResultModal.unchanged.length}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">변경없음</div>
+                </div>
+              )}
+            </div>
+
+            {uploadResultModal.added.length > 0 && (
+              <div>
+                <div className="font-semibold text-blue-600 dark:text-blue-400 mb-2">추가된 원물 ({uploadResultModal.added.length}개)</div>
+                <div className="max-h-40 overflow-auto bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <ul className="text-xs space-y-1 text-gray-700 dark:text-gray-300">
+                    {uploadResultModal.added.map((name, idx) => (
+                      <li key={idx}>• {name}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {uploadResultModal.updated.length > 0 && (
+              <div>
+                <div className="font-semibold text-green-600 dark:text-green-400 mb-2">수정된 원물 ({uploadResultModal.updated.length}개)</div>
+                <div className="max-h-40 overflow-auto bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                  <ul className="text-xs space-y-1 text-gray-700 dark:text-gray-300">
+                    {uploadResultModal.updated.map((name, idx) => (
+                      <li key={idx}>• {name}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {uploadResultModal.unchanged.length > 0 && (
+              <div>
+                <div className="font-semibold text-gray-600 dark:text-gray-400 mb-2">변경없는 원물 ({uploadResultModal.unchanged.length}개)</div>
+                <div className="max-h-40 overflow-auto bg-gray-500/10 border border-gray-500/20 rounded-lg p-3">
+                  <ul className="text-xs space-y-1 text-gray-700 dark:text-gray-300">
+                    {uploadResultModal.unchanged.map((name, idx) => (
+                      <li key={idx}>• {name}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button variant="primary" onClick={() => setUploadResultModal(null)}>확인</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 엑셀 업로드 모달 */}
+      {excelUploadModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => setExcelUploadModal(null)}
+          title="엑셀 업로드"
+          size="md"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              총 <strong className="text-blue-600">{excelUploadModal.data.length}개</strong>의 데이터를 업로드합니다.
+            </p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <p className="text-xs text-yellow-800">
+                <strong>⚠️ 중요:</strong> 엑셀 파일의 <strong>id</strong> 컬럼을 삭제하지 마세요. id가 변경되면 옵션상품과의 연결이 끊어집니다.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={async () => {
+                  // 교체: 엑셀에 있는 material_code만 남기고 나머지는 삭제
+                  const uploadCodes = excelUploadModal.data.map((row: any) => row.material_code).filter(Boolean)
+
+                  // 기존 DB 데이터 조회 (전체 필드)
+                  const { data: existingData } = await supabase.from('raw_materials').select('*')
+                  const existingDataMap = new Map(existingData?.map(d => [d.material_code, d]) || [])
+
+                  // 추가/수정 분류
+                  const added: string[] = []
+                  const updated: string[] = []
+
+                  excelUploadModal.data.forEach((row: any) => {
+                    if (existingDataMap.has(row.material_code)) {
+                      const existing = existingDataMap.get(row.material_code)
+                      // 실제로 값이 변경되었는지 비교
+                      let hasChanges = false
+                      for (const key in row) {
+                        if (key === 'updated_at' || key === 'created_at') continue // 날짜 필드는 제외
+                        if (JSON.stringify(row[key]) !== JSON.stringify(existing[key])) {
+                          hasChanges = true
+                          break
+                        }
+                      }
+                      if (hasChanges) {
+                        updated.push(`${row.material_name} (${row.material_code})`)
+                      }
+                    } else {
+                      added.push(`${row.material_name} (${row.material_code})`)
+                    }
+                  })
+
+                  // 1. 먼저 upsert로 데이터 업데이트/추가
+                  const { error: upsertError } = await supabase.from('raw_materials').upsert(excelUploadModal.data, { onConflict: 'id' })
+                  if (upsertError) {
+                    showToast('업로드 중 오류가 발생했습니다.', 'error')
+                    console.error(upsertError)
+                    return
+                  }
+
+                  // 2. 엑셀에 없는 데이터만 삭제 (외래키 제약 조건 때문에 참조되는 데이터는 자동으로 삭제 실패하고 넘어감)
+                  const { error: deleteError } = await supabase
+                    .from('raw_materials')
+                    .delete()
+                    .not('material_code', 'in', `(${uploadCodes.map(c => `"${c}"`).join(',')})`)
+
+                  if (deleteError && deleteError.code !== '23503') {
+                    // 외래키 오류가 아닌 다른 오류만 표시
+                    showToast('일부 데이터 삭제 중 오류가 발생했습니다.', 'warning')
+                    console.warn(deleteError)
+                  }
+
+                  showToast('교체 완료!', 'success')
+                  await fetchMaterials()
+                  setExcelUploadModal(null)
+
+                  // 결과 모달 표시
+                  setUploadResultModal({
+                    type: 'replace',
+                    added,
+                    updated,
+                    unchanged: []
+                  })
+                }}
+                className="w-full px-4 py-3 text-left border-2 border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+              >
+                <div className="font-semibold text-red-600">교체</div>
+                <div className="text-xs text-gray-600 mt-1">엑셀 파일의 데이터로 교체합니다. (다른 테이블에서 참조 중인 데이터는 유지)</div>
+              </button>
+              <button
+                onClick={async () => {
+                  // 병합: upsert로 기존 데이터 유지하면서 업데이트/추가
+
+                  // 기존 DB 데이터 조회 (전체 필드)
+                  const { data: existingData } = await supabase.from('raw_materials').select('*')
+                  const existingDataMap = new Map(existingData?.map(d => [d.material_code, d]) || [])
+
+                  // 추가/수정/변경없음 분류
+                  const added: string[] = []
+                  const updated: string[] = []
+                  const unchanged: string[] = []
+
+                  excelUploadModal.data.forEach((row: any) => {
+                    if (existingDataMap.has(row.material_code)) {
+                      const existing = existingDataMap.get(row.material_code)
+                      // 실제로 값이 변경되었는지 비교
+                      let hasChanges = false
+                      for (const key in row) {
+                        if (key === 'updated_at' || key === 'created_at') continue // 날짜 필드는 제외
+                        if (JSON.stringify(row[key]) !== JSON.stringify(existing[key])) {
+                          hasChanges = true
+                          break
+                        }
+                      }
+                      if (hasChanges) {
+                        updated.push(`${row.material_name} (${row.material_code})`)
+                      } else {
+                        // 엑셀에 있지만 변경되지 않은 데이터
+                        unchanged.push(`${row.material_name} (${row.material_code})`)
+                      }
+                    } else {
+                      added.push(`${row.material_name} (${row.material_code})`)
+                    }
+                  })
+
+                  // 엑셀에 없는 기존 데이터도 변경없음에 추가
+                  const uploadCodesSet = new Set(excelUploadModal.data.map((row: any) => row.material_code))
+                  existingData?.forEach(d => {
+                    if (!uploadCodesSet.has(d.material_code)) {
+                      unchanged.push(`${d.material_name} (${d.material_code})`)
+                    }
+                  })
+
+                  const { error } = await supabase
+                    .from('raw_materials')
+                    .upsert(excelUploadModal.data, {
+                      onConflict: 'id',
+                      ignoreDuplicates: false
+                    })
+                  if (error) {
+                    showToast('업로드 중 오류가 발생했습니다.', 'error')
+                    console.error(error)
+                  } else {
+                    showToast('병합 완료!', 'success')
+                    await fetchMaterials()
+                    setExcelUploadModal(null)
+
+                    // 결과 모달 표시
+                    setUploadResultModal({
+                      type: 'merge',
+                      added,
+                      updated,
+                      unchanged
+                    })
+                  }
+                }}
+                className="w-full px-4 py-3 text-left border-2 border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                <div className="font-semibold text-blue-600">병합</div>
+                <div className="text-xs text-gray-600 mt-1">기존 데이터를 유지하면서 업데이트하거나 새 데이터를 추가합니다. (빈 값도 반영됩니다)</div>
+              </button>
             </div>
           </div>
         </Modal>

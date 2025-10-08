@@ -23,7 +23,7 @@ interface EditableAdminGridProps<T = any> {
   onDataChange?: (data: T[]) => void
   onCellEdit?: (rowIndex: number, columnKey: string, newValue: any) => void
   onDelete?: (rowIndex: number) => void
-  onSave?: () => void
+  onSave?: (modifiedRows?: T[]) => void
   onDeleteSelected?: (indices: number[]) => void
   onCopy?: (indices: number[]) => void
   // 엑셀 업로드 자동 저장 (이 옵션들이 있으면 모달에서 바로 DB 저장)
@@ -130,6 +130,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     } else if (!isInitialMount.current) {
       // 데이터 참조가 변경된 경우 업데이트 (길이 변경 조건 제거)
       if (data !== prevDataRef.current) {
+        // 원본 데이터 참조 업데이트 (새로 로드된 데이터)
+        originalDataRef.current = JSON.parse(JSON.stringify(data))
         setGridData(data)
         prevDataRef.current = data
 
@@ -138,6 +140,9 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           setSelectedRows(new Set())
           setAddedRows(new Set())
           setCopiedRows(new Set())
+          setModifiedCells(new Set())
+        } else {
+          // 데이터가 새로 로드되었으므로 수정 추적 초기화
           setModifiedCells(new Set())
         }
       }
@@ -477,7 +482,13 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     setHistoryIndex(newHistory.length - 1)
   }
 
-  const handleCellClick = (rowIndex: number, columnKey: string, currentValue: any) => {
+  const handleCellClick = (rowIndex: number, columnKey: string, currentValue: any, e: React.MouseEvent) => {
+    // 텍스트 선택이 있으면 클릭 이벤트 무시
+    const selection = window.getSelection()
+    if (selection && selection.toString().length > 0) {
+      return
+    }
+
     const column = columns.find(col => col.key === columnKey)
     const row = gridData[rowIndex]
 
@@ -1136,6 +1147,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   }
 
   const isNumberColumn = (columnKey: string) => {
+    if (!columnKey) return false
     const column = columns.find(c => c.key === columnKey)
     if (column?.type === 'number') return true
     // 금액 관련 필드명으로도 판단
@@ -1407,13 +1419,42 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
   const handleSaveClick = () => {
     if (onSave) {
-      onSave()
+      // 수정된 행만 추출
+      const modifiedRowIndices = new Set<number>()
+      modifiedCells.forEach(cellKey => {
+        const rowIndex = parseInt(cellKey.split('-')[0])
+        modifiedRowIndices.add(rowIndex)
+      })
+
+      const modifiedRows = Array.from(modifiedRowIndices).map(index => gridData[index])
+
+      // 수정된 행이 있으면 전달, 없으면 undefined
+      onSave(modifiedRows.length > 0 ? modifiedRows : undefined)
     }
   }
 
   const handleDeleteSelectedClick = () => {
     if (onDeleteSelected) {
+      // 커스텀 삭제 핸들러가 있으면 사용
       onDeleteSelected(Array.from(selectedRows))
+    } else {
+      // 기본 삭제 동작: 선택된 행을 데이터에서 제거
+      const selectedIndices = Array.from(selectedRows).sort((a, b) => b - a) // 역순 정렬
+      const newData = [...gridData]
+
+      selectedIndices.forEach(index => {
+        newData.splice(index, 1)
+      })
+
+      setGridData(newData)
+      addToHistory(newData)
+      onDataChange?.(newData)
+      setSelectedRows(new Set())
+
+      // 삭제된 행 인덱스를 추적 상태에서도 제거
+      setModifiedCells(new Set())
+      setAddedRows(new Set())
+      setCopiedRows(new Set())
     }
   }
 
@@ -1534,12 +1575,12 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
               저장
             </button>
           )}
-          {selectedRows.size > 0 && onDeleteSelected && (
+          {selectedRows.size > 0 && enableDelete && (
             <button
               onClick={handleDeleteSelectedClick}
               className="px-2 py-1 bg-danger text-white rounded text-xs hover:bg-danger-hover"
             >
-              삭제
+              삭제 ({selectedRows.size})
             </button>
           )}
           {selectedRows.size > 0 && enableCopy && (
@@ -1555,16 +1596,16 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
       <div
         ref={containerRef}
-        className="overflow-auto bg-surface border-b border-gray-200"
-        style={{ maxHeight: height, height: 'auto' }}
+        className="overflow-x-auto overflow-y-auto bg-surface border-b border-gray-200"
+        style={{ maxHeight: height }}
         onPaste={handlePaste}
         tabIndex={0}
       >
-        <table ref={tableRef} className="w-full border-collapse" style={{ fontSize: '13px', borderSpacing: 0 }}>
+        <table ref={tableRef} className="border-collapse" style={{ fontSize: '13px', borderSpacing: 0, tableLayout: 'auto', minWidth: '100%' }}>
           <thead className="sticky top-0 bg-gray-50" style={{ zIndex: 30, boxShadow: 'inset 0 1px 0 0 #e5e7eb' }}>
-            <tr>
+            <tr key="header-row">
               {enableCheckbox && (
-                <th className="border border-gray-200 bg-gray-50 px-2 py-1 text-center align-middle sticky top-0" style={{ width: 40, fontSize: '13px', zIndex: 31 }}>
+                <th key="checkbox-header" className="border border-gray-200 bg-gray-50 px-2 py-1 text-center align-middle sticky top-0" style={{ width: 40, fontSize: '13px', zIndex: 31 }}>
                   <input
                     type="checkbox"
                     checked={selectedRows.size === filteredData.length && filteredData.length > 0}
@@ -1574,7 +1615,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                 </th>
               )}
               {showRowNumbers && (
-                <th className="border border-gray-200 bg-gray-50 px-2 py-1 font-semibold text-text-secondary whitespace-nowrap sticky top-0" style={{ width: 50, fontSize: '13px', zIndex: 31 }}>
+                <th key="row-number-header" className="border border-gray-200 bg-gray-50 px-2 py-1 font-semibold text-text-secondary whitespace-nowrap sticky top-0" style={{ width: 50, fontSize: '13px', zIndex: 31 }}>
                   {enableAddRow && (
                     <button
                       onClick={handleAddRow}
@@ -1590,7 +1631,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
               {columns.map((column, colIdx) => {
                 return (
                   <th
-                    key={column.key}
+                    key={column.key || `col-${colIdx}`}
                     className="border border-gray-200 px-2 py-1 font-semibold text-text whitespace-nowrap bg-gray-50 sticky top-0"
                     style={{
                       width: column.width,
@@ -1614,6 +1655,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
               })}
               {enableDelete && (
                 <th
+                  key="delete-header"
                   className="border border-gray-200 bg-gray-50 px-2 py-1 font-semibold text-text whitespace-nowrap sticky top-0"
                   style={{ width: 100, fontSize: '13px', zIndex: 31 }}
                 >
@@ -1626,7 +1668,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
             {filteredData.map((row, rowIndex) => (
               <tr key={rowIndex}>
                 {enableCheckbox && (
-                  <td className="border border-gray-200 px-2 py-1 text-center align-middle">
+                  <td key="checkbox" className="border border-gray-200 px-2 py-1 text-center align-middle">
                     <input
                       type="checkbox"
                       checked={selectedRows.has(rowIndex)}
@@ -1636,20 +1678,20 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   </td>
                 )}
                 {showRowNumbers && (
-                  <td className="border border-gray-200 px-2 py-1 text-xs text-center align-middle text-text-tertiary">
+                  <td key="row-number" className="border border-gray-200 px-2 py-1 text-xs text-center align-middle text-text-tertiary">
                     {rowIndex + 1}
                   </td>
                 )}
                 {columns.map((column, colIdx) => {
                   return (
                     <td
-                      key={column.key}
+                      key={column.key || `col-${colIdx}`}
                       className={getCellClassName(rowIndex, column.key, column, row, false)}
                       style={{
                         height: rowHeight,
                         userSelect: 'text'
                       }}
-                      onClick={() => handleCellClick(rowIndex, column.key, row[column.key])}
+                      onClick={(e) => handleCellClick(rowIndex, column.key, row[column.key], e)}
                       onDoubleClick={() => handleCellDoubleClick(rowIndex, column.key, row[column.key])}
                       onMouseEnter={() => setHoverCell({ row: rowIndex, col: column.key })}
                       onMouseLeave={() => !fillStartCell && setHoverCell(null)}
@@ -1659,7 +1701,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   )
                 })}
                 {enableDelete && (
-                  <td className="border border-gray-200 px-2 py-1 text-center align-middle" style={{ height: rowHeight, width: 100 }}>
+                  <td key="delete-btn" className="border border-gray-200 px-2 py-1 text-center align-middle" style={{ height: rowHeight, width: 100 }}>
                     <button
                       onClick={() => onDelete?.(rowIndex)}
                       className="px-3 py-0.5 bg-danger-100 text-danger rounded hover:bg-danger-200 whitespace-nowrap"

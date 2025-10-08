@@ -21,6 +21,16 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           title: '카테고리',
           description: '원물 분류 체계 관리',
           href: '/admin/settings/categories'
+        },
+        {
+          title: '공급상태 설정',
+          description: '원물/옵션상품 공급상태 관리',
+          href: '/admin/settings/supply-status'
+        },
+        {
+          title: '마켓 매핑 설정',
+          description: '마켓별 엑셀 필드 매핑',
+          href: '/admin/settings/mapping'
         }
       ]
     },
@@ -161,7 +171,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
       </div>
 
       {/* 우측 콘텐츠 영역 */}
-      <div className="flex-1">
+      <div className="flex-1 min-w-0 overflow-x-auto">
         {children}
       </div>
     </div>

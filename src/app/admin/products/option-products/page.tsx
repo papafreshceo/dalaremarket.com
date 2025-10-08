@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button, Modal } from '@/components/ui'
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 import { useToast } from '@/components/ui/Toast'
+import * as XLSX from 'xlsx'
 
 // ===== 타입 =====
 interface Vendor {
@@ -95,6 +96,17 @@ export default function OptionProductsManagementPage() {
   const [modalType, setModalType] = useState<string | null>(null)
   const [verificationResults, setVerificationResults] = useState<any>(null)
   const [gridKey, setGridKey] = useState(0) // Grid 강제 리렌더링용
+
+  // 엑셀 업로드 모달
+  const [excelUploadModal, setExcelUploadModal] = useState<{ data: any[], mode: 'replace' | 'merge' | null } | null>(null)
+
+  // 엑셀 업로드 결과 모달
+  const [uploadResultModal, setUploadResultModal] = useState<{
+    type: 'replace' | 'merge'
+    added: string[]
+    updated: string[]
+    unchanged: string[]
+  } | null>(null)
 
   const supabase = createClient()
   const fmtInt = new Intl.NumberFormat('ko-KR')
@@ -1030,26 +1042,330 @@ export default function OptionProductsManagementPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-8">
-        <h1 className="text-2xl font-medium text-gray-900">옵션상품 관리</h1>
-        {/* 통계 */}
-        <div className="flex gap-4 text-sm">
-          <div>
-            <span className="text-gray-600">전체 </span>
-            <span className="font-bold">{(stats.total || 0).toLocaleString()}</span>
-          </div>
-          {supplyStatuses.map(status => (
-            <div key={status.code}>
-              <span className="text-gray-600">{status.name} </span>
-              <span className="font-bold" style={{ color: status.color }}>
-                {(stats[status.code] || 0).toLocaleString()}
-              </span>
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-8">
+          <h1 className="text-2xl font-medium text-gray-900">옵션상품 관리</h1>
+          {/* 통계 */}
+          <div className="flex gap-4 text-sm">
+            <div>
+              <span className="text-gray-600">전체 </span>
+              <span className="font-bold">{(stats.total || 0).toLocaleString()}</span>
             </div>
-          ))}
+            {supplyStatuses.map(status => (
+              <div key={status.code}>
+                <span className="text-gray-600">{status.name} </span>
+                <span className="font-bold" style={{ color: status.color }}>
+                  {(stats[status.code] || 0).toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+          {/* 범례 */}
+          <div className="text-xs text-gray-500 ml-4">
+            🔒 원물가 고정 | ⚙️ 수동 가격
+          </div>
         </div>
-        {/* 범례 */}
-        <div className="text-xs text-gray-500 ml-4">
-          🔒 원물가 고정 | ⚙️ 수동 가격
+
+        {/* 엑셀 버튼 */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              // 필드명을 한글로 매핑
+              const fieldMapping: Record<string, string> = {
+                'id': 'ID',
+                'option_code': '옵션코드',
+                'option_name': '옵션명',
+                'item_type': '품목유형',
+                'variety': '품종',
+                'specification_1': '규격1',
+                'specification_2': '규격2',
+                'specification_3': '규격3',
+                'weight': '중량',
+                'weight_unit': '중량단위',
+                'standard_quantity': '표준수량',
+                'standard_unit': '표준단위',
+                'packaging_box_price': '포장박스가',
+                'pack_price': '팩가',
+                'bag_vinyl_price': '비닐가',
+                'cushioning_price': '완충재가',
+                'sticker_price': '스티커가',
+                'ice_pack_price': '아이스팩가',
+                'other_material_price': '기타재료가',
+                'total_material_cost': '총재료비',
+                'raw_material_cost': '원물비',
+                'labor_cost': '인건비',
+                'misc_cost': '기타비용',
+                'total_cost': '총원가',
+                'vendor_id': '벤더ID',
+                'shipping_type': '발송유형',
+                'shipping_address': '발송주소',
+                'shipping_contact': '발송연락처',
+                'shipping_deadline': '발송마감',
+                'shipping_fee': '택배비',
+                'additional_quantity': '추가수량',
+                'status': '상태',
+                'season': '시즌',
+                'season_start_date': '시즌시작일',
+                'season_peak_date': '시즌피크일',
+                'season_end_date': '시즌종료일',
+                'target_margin_rate': '목표직판마진율',
+                'seller_margin_rate': '실제셀러마진율',
+                'target_seller_margin_rate': '목표셀러마진율',
+                'seller_supply_price_mode': '셀러공급가모드',
+                'seller_supply_auto_price': '셀러공급가자동',
+                'seller_supply_manual_price': '셀러공급가수동',
+                'seller_supply_price': '셀러공급가',
+                'naver_price_mode': '네이버가격모드',
+                'naver_paid_shipping_auto': '네이버유료배송자동',
+                'naver_free_shipping_auto': '네이버무료배송자동',
+                'naver_paid_shipping_manual': '네이버유료배송수동',
+                'naver_free_shipping_manual': '네이버무료배송수동',
+                'naver_paid_shipping_price': '네이버유료배송가',
+                'naver_free_shipping_price': '네이버무료배송가',
+                'coupang_price_mode': '쿠팡가격모드',
+                'coupang_paid_shipping_auto': '쿠팡유료배송자동',
+                'coupang_free_shipping_auto': '쿠팡무료배송자동',
+                'coupang_paid_shipping_manual': '쿠팡유료배송수동',
+                'coupang_free_shipping_manual': '쿠팡무료배송수동',
+                'coupang_paid_shipping_price': '쿠팡유료배송가',
+                'coupang_free_shipping_price': '쿠팡무료배송가',
+                'thumbnail_url': '썸네일URL',
+                'detail_page_url': '상세페이지URL',
+                'has_detail_page': '상세페이지유무',
+                'has_images': '이미지유무',
+                'is_best': '베스트',
+                'is_recommended': '추천',
+                'description': '설명',
+                'notes': '비고',
+                'is_active': '활성화',
+                'created_at': '생성일',
+                'updated_at': '수정일',
+                'material_cost_policy': '원물가정책',
+                'seller_margin_amount': '실제셀러마진액',
+                'target_margin_amount': '목표직판마진액',
+                'margin_calculation_type': '마진계산유형',
+                'average_material_price': '평균원물가',
+                'calculated_material_cost': '계산된원물비'
+              }
+
+              // 가상 필드 제거 (프론트엔드에서 추가한 필드들)
+              const virtualFields = [
+                'vendor_name', 'used_material_1', 'used_material_2', 'used_material_3',
+                'used_materials', 'category_1', 'category_2', 'category_3', 'category_4', 'category_5',
+                'average_material_price', 'calculated_material_cost', 'seller_margin_rate',
+                'seller_margin_amount', 'target_margin_amount', 'margin_calculation_type',
+                'total_material_cost', 'total_cost', 'vendor'
+              ]
+
+              // 첫 번째 상품의 실제 필드 확인
+              if (products.length > 0) {
+                console.log('다운로드할 상품의 필드:', Object.keys(products[0]))
+              }
+
+              const exportData = products.map((product) => {
+                const koreanData: Record<string, any> = {}
+                Object.keys(product).forEach(key => {
+                  // 가상 필드 제외
+                  if (virtualFields.includes(key)) return
+
+                  const koreanKey = fieldMapping[key] || key
+                  koreanData[koreanKey] = product[key]
+                })
+                return koreanData
+              })
+
+              const ws = XLSX.utils.json_to_sheet(exportData)
+              const wb = XLSX.utils.book_new()
+              XLSX.utils.book_append_sheet(wb, ws, '옵션상품관리')
+              const dateStr = new Date().toISOString().split('T')[0]
+              XLSX.writeFile(wb, `옵션상품관리_${dateStr}.xlsx`)
+            }}
+            className="p-2 text-sm border border-blue-500 text-blue-600 rounded hover:bg-blue-50 transition-colors"
+            title="엑셀 다운로드"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </button>
+          <button
+            onClick={() => {
+              const input = document.createElement('input')
+              input.type = 'file'
+              input.accept = '.xlsx,.xls'
+              input.onchange = async (e: any) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+
+                const reader = new FileReader()
+                reader.onload = async (e) => {
+                  const data = e.target?.result
+                  const workbook = XLSX.read(data, { type: 'binary', cellDates: true })
+                  const sheetName = workbook.SheetNames[0]
+                  const worksheet = workbook.Sheets[sheetName]
+                  const jsonData = XLSX.utils.sheet_to_json(worksheet)
+
+                  // 한글 헤더를 영문으로 매핑 (다운로드와 동일한 매핑의 역방향)
+                  const reverseFieldMapping: Record<string, string> = {
+                    'ID': 'id',
+                    '옵션코드': 'option_code',
+                    '옵션명': 'option_name',
+                    '품목유형': 'item_type',
+                    '품종': 'variety',
+                    '규격1': 'specification_1',
+                    '규격2': 'specification_2',
+                    '규격3': 'specification_3',
+                    '중량': 'weight',
+                    '중량단위': 'weight_unit',
+                    '표준수량': 'standard_quantity',
+                    '표준단위': 'standard_unit',
+                    '포장박스가': 'packaging_box_price',
+                    '팩가': 'pack_price',
+                    '비닐가': 'bag_vinyl_price',
+                    '완충재가': 'cushioning_price',
+                    '스티커가': 'sticker_price',
+                    '아이스팩가': 'ice_pack_price',
+                    '기타재료가': 'other_material_price',
+                    '총재료비': 'total_material_cost',
+                    '원물비': 'raw_material_cost',
+                    '인건비': 'labor_cost',
+                    '기타비용': 'misc_cost',
+                    '총원가': 'total_cost',
+                    '벤더ID': 'vendor_id',
+                    '발송유형': 'shipping_type',
+                    '발송주소': 'shipping_address',
+                    '발송연락처': 'shipping_contact',
+                    '발송마감': 'shipping_deadline',
+                    '택배비': 'shipping_fee',
+                    '추가수량': 'additional_quantity',
+                    '상태': 'status',
+                    '시즌': 'season',
+                    '시즌시작일': 'season_start_date',
+                    '시즌피크일': 'season_peak_date',
+                    '시즌종료일': 'season_end_date',
+                    '목표직판마진율': 'target_margin_rate',
+                    '실제셀러마진율': 'seller_margin_rate',
+                    '목표셀러마진율': 'target_seller_margin_rate',
+                    '셀러공급가모드': 'seller_supply_price_mode',
+                    '셀러공급가자동': 'seller_supply_auto_price',
+                    '셀러공급가수동': 'seller_supply_manual_price',
+                    '셀러공급가': 'seller_supply_price',
+                    '네이버가격모드': 'naver_price_mode',
+                    '네이버유료배송자동': 'naver_paid_shipping_auto',
+                    '네이버무료배송자동': 'naver_free_shipping_auto',
+                    '네이버유료배송수동': 'naver_paid_shipping_manual',
+                    '네이버무료배송수동': 'naver_free_shipping_manual',
+                    '네이버유료배송가': 'naver_paid_shipping_price',
+                    '네이버무료배송가': 'naver_free_shipping_price',
+                    '쿠팡가격모드': 'coupang_price_mode',
+                    '쿠팡유료배송자동': 'coupang_paid_shipping_auto',
+                    '쿠팡무료배송자동': 'coupang_free_shipping_auto',
+                    '쿠팡유료배송수동': 'coupang_paid_shipping_manual',
+                    '쿠팡무료배송수동': 'coupang_free_shipping_manual',
+                    '쿠팡유료배송가': 'coupang_paid_shipping_price',
+                    '쿠팡무료배송가': 'coupang_free_shipping_price',
+                    '썸네일URL': 'thumbnail_url',
+                    '상세페이지URL': 'detail_page_url',
+                    '상세페이지유무': 'has_detail_page',
+                    '이미지유무': 'has_images',
+                    '베스트': 'is_best',
+                    '추천': 'is_recommended',
+                    '설명': 'description',
+                    '비고': 'notes',
+                    '활성화': 'is_active',
+                    '생성일': 'created_at',
+                    '수정일': 'updated_at',
+                    '원물가정책': 'material_cost_policy',
+                    '실제셀러마진액': 'seller_margin_amount',
+                    '목표직판마진액': 'target_margin_amount',
+                    '마진계산유형': 'margin_calculation_type',
+                    '평균원물가': 'average_material_price',
+                    '계산된원물비': 'calculated_material_cost'
+                  }
+
+                  // 한글 헤더를 영문으로 변환
+                  const convertedData = jsonData.map((row: any) => {
+                    const englishRow: any = {}
+                    Object.keys(row).forEach(key => {
+                      const englishKey = reverseFieldMapping[key] || key
+                      englishRow[englishKey] = row[key]
+                    })
+                    return englishRow
+                  })
+
+                  // 엑셀에서 업로드된 데이터의 필드 그대로 사용
+                  // (다운로드 시 이미 가상 필드를 제거했으므로 추가 필터링 불필요)
+                  const dbFields = Object.keys(convertedData[0] || {})
+
+                  // vendor_name 필드 제거 및 데이터 정제
+                  const cleanData = convertedData.map((row: any) => {
+                    const { vendor_name, ...rest } = row
+
+                    // DB 스키마에 맞춰 모든 필드 초기화 (엑셀에 없는 필드는 null)
+                    const normalizedRow: any = {}
+                    dbFields.forEach(field => {
+                      normalizedRow[field] = rest[field] !== undefined ? rest[field] : null
+                    })
+
+                    // 날짜 필드 변환
+                    const dateFields = ['season_start_date', 'season_peak_date', 'season_end_date', 'created_at', 'updated_at']
+                    dateFields.forEach(field => {
+                      if (normalizedRow[field]) {
+                        if (typeof normalizedRow[field] === 'number') {
+                          const date = new Date((normalizedRow[field] - 25569) * 86400 * 1000)
+                          normalizedRow[field] = date.toISOString().split('T')[0]
+                        } else if (normalizedRow[field] instanceof Date) {
+                          normalizedRow[field] = normalizedRow[field].toISOString().split('T')[0]
+                        } else if (typeof normalizedRow[field] === 'string' && normalizedRow[field].trim() === '') {
+                          normalizedRow[field] = null
+                        }
+                      }
+                    })
+
+                    // 숫자 필드 변환 (콤마 제거)
+                    const numericFields = [
+                      'weight', 'standard_quantity', 'packaging_box_price', 'pack_price', 'bag_vinyl_price',
+                      'cushioning_price', 'sticker_price', 'ice_pack_price', 'other_material_price',
+                      'total_material_cost', 'raw_material_cost', 'labor_cost', 'total_cost',
+                      'shipping_fee', 'target_margin_rate',
+                      'seller_supply_auto_price', 'seller_supply_manual_price',
+                      'seller_supply_price', 'naver_paid_shipping_auto', 'naver_free_shipping_auto',
+                      'naver_paid_shipping_manual', 'naver_free_shipping_manual', 'naver_paid_shipping_price',
+                      'naver_free_shipping_price', 'coupang_paid_shipping_auto', 'coupang_free_shipping_auto',
+                      'coupang_paid_shipping_manual', 'coupang_free_shipping_manual', 'coupang_paid_shipping_price',
+                      'coupang_free_shipping_price'
+                    ]
+                    numericFields.forEach(field => {
+                      if (normalizedRow[field]) {
+                        if (typeof normalizedRow[field] === 'string') {
+                          normalizedRow[field] = parseFloat(normalizedRow[field].replace(/,/g, ''))
+                        }
+                      }
+                    })
+
+                    // 빈 문자열을 null로 변환
+                    Object.keys(normalizedRow).forEach(key => {
+                      if (normalizedRow[key] === '' || normalizedRow[key] === 'undefined' || normalizedRow[key] === 'null') {
+                        normalizedRow[key] = null
+                      }
+                    })
+
+                    return normalizedRow
+                  })
+
+                  // 모달 열기 (교체/병합 선택)
+                  setExcelUploadModal({ data: cleanData, mode: null })
+                }
+                reader.readAsBinaryString(file)
+              }
+              input.click()
+            }}
+            className="p-2 text-sm border border-green-500 text-green-600 rounded hover:bg-green-50 transition-colors"
+            title="엑셀 업로드"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -1417,17 +1733,11 @@ export default function OptionProductsManagementPage() {
             setFilteredProducts(dataWithCalculations)
           }}
           onSave={handleSave}
-          onDeleteSelected={(indices) => {
-            const ids = indices.map(i => filteredProducts[i]?.id).filter(Boolean)
-            setSelectedRows(new Set(ids))
-            setModalType('delete-confirm')
-          }}
           globalSearchPlaceholder="옵션코드, 상품명, 품목, 품종 검색"
           height="900px"
           rowHeight={26}
-          enableCSVExport={viewMode === 'full'}
-          enableCSVImport={viewMode === 'full'}
-          exportFilePrefix="옵션상품"
+          enableCSVExport={false}
+          enableCSVImport={false}
         />
       </div>
 
@@ -1519,6 +1829,296 @@ export default function OptionProductsManagementPage() {
                 변경사항이 없습니다.
               </div>
             )}
+          </div>
+        </Modal>
+      )}
+
+      {/* 엑셀 업로드 결과 모달 */}
+      {uploadResultModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => setUploadResultModal(null)}
+          title={uploadResultModal.type === 'replace' ? '교체 완료' : '병합 완료'}
+          size="lg"
+        >
+          <div className="space-y-4">
+            {uploadResultModal.type === 'replace' && (
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 mb-4">
+                <p className="text-xs text-orange-600 dark:text-orange-400">
+                  <strong>교체 모드:</strong> 엑셀 파일의 데이터로 완전히 교체했습니다. 엑셀에 없는 옵션상품은 삭제되었습니다.
+                </p>
+              </div>
+            )}
+            {uploadResultModal.type === 'merge' && (
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  <strong>병합 모드:</strong> 기존 데이터를 유지하면서 엑셀 데이터를 추가/수정했습니다.
+                </p>
+              </div>
+            )}
+
+            <div className={`grid ${uploadResultModal.type === 'merge' ? 'grid-cols-3' : 'grid-cols-2'} gap-4 text-center`}>
+              <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{uploadResultModal.added.length}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">추가</div>
+              </div>
+              <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{uploadResultModal.updated.length}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">수정</div>
+              </div>
+              {uploadResultModal.type === 'merge' && (
+                <div className="bg-gray-500/10 border border-gray-500/20 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{uploadResultModal.unchanged.length}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">변경없음</div>
+                </div>
+              )}
+            </div>
+
+            {uploadResultModal.added.length > 0 && (
+              <div>
+                <div className="font-semibold text-blue-600 dark:text-blue-400 mb-2">추가된 옵션상품 ({uploadResultModal.added.length}개)</div>
+                <div className="max-h-40 overflow-auto bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <ul className="text-xs space-y-1 text-gray-700 dark:text-gray-300">
+                    {uploadResultModal.added.map((name, idx) => (
+                      <li key={idx}>• {name}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {uploadResultModal.updated.length > 0 && (
+              <div>
+                <div className="font-semibold text-green-600 dark:text-green-400 mb-2">수정된 옵션상품 ({uploadResultModal.updated.length}개)</div>
+                <div className="max-h-40 overflow-auto bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                  <ul className="text-xs space-y-1 text-gray-700 dark:text-gray-300">
+                    {uploadResultModal.updated.map((name, idx) => (
+                      <li key={idx}>• {name}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {uploadResultModal.unchanged.length > 0 && (
+              <div>
+                <div className="font-semibold text-gray-600 dark:text-gray-400 mb-2">변경없는 옵션상품 ({uploadResultModal.unchanged.length}개)</div>
+                <div className="max-h-40 overflow-auto bg-gray-500/10 border border-gray-500/20 rounded-lg p-3">
+                  <ul className="text-xs space-y-1 text-gray-700 dark:text-gray-300">
+                    {uploadResultModal.unchanged.map((name, idx) => (
+                      <li key={idx}>• {name}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button variant="primary" onClick={() => setUploadResultModal(null)}>확인</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 엑셀 업로드 모달 */}
+      {excelUploadModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => setExcelUploadModal(null)}
+          title="엑셀 업로드"
+          size="md"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              총 <strong className="text-blue-600 dark:text-blue-400">{excelUploadModal.data.length}개</strong>의 데이터를 업로드합니다.
+            </p>
+            <div className="bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/30 rounded-lg p-3">
+              <p className="text-xs text-yellow-800 dark:text-yellow-400">
+                <strong>⚠️ 중요:</strong> 엑셀 파일의 <strong>id</strong> 컬럼을 삭제하지 마세요. id가 변경되면 원물과의 연결이 끊어집니다.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={async () => {
+                  // 교체: 엑셀에 있는 option_code만 남기고 나머지는 삭제
+                  const uploadCodes = excelUploadModal.data.map((row: any) => row.option_code).filter(Boolean)
+
+                  // 기존 DB 데이터 조회 (전체 필드)
+                  const { data: existingData } = await supabase.from('option_products').select('*')
+                  const existingDataMap = new Map(existingData?.map(d => [d.option_code, d]) || [])
+
+                  // 추가/수정 분류
+                  const added: string[] = []
+                  const updated: string[] = []
+
+                  // 값 정규화 함수를 forEach 밖으로 이동
+                  const normalizeValue = (val: any) => {
+                    if (val === null || val === undefined || val === '' || val === 'null' || val === 'undefined') return null
+                    if (typeof val === 'number' && isNaN(val)) return null
+                    return val
+                  }
+
+                  excelUploadModal.data.forEach((row: any) => {
+                    if (existingDataMap.has(row.option_code)) {
+                      const existing = existingDataMap.get(row.option_code)
+                      // 실제로 값이 변경되었는지 비교
+                      let hasChanges = false
+                      const changedFields: string[] = []
+
+                      for (const key in row) {
+                        if (key === 'updated_at' || key === 'created_at') continue
+
+                        // 자동 계산 모드인 가격 필드는 비교 제외
+                        const sellerMode = existing.seller_supply_price_mode
+                        const naverMode = existing.naver_price_mode
+                        const coupangMode = existing.coupang_price_mode
+
+                        if (key === 'seller_supply_price' && (sellerMode === 'auto' || sellerMode === '자동')) continue
+                        if ((key === 'naver_paid_shipping_price' || key === 'naver_free_shipping_price') && (naverMode === 'auto' || naverMode === '자동')) continue
+                        if ((key === 'coupang_paid_shipping_price' || key === 'coupang_free_shipping_price') && (coupangMode === 'auto' || coupangMode === '자동')) continue
+
+                        const newVal = normalizeValue(row[key])
+                        const oldVal = normalizeValue(existing[key])
+
+                        if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
+                          hasChanges = true
+                          changedFields.push(`${key}: ${JSON.stringify(oldVal)} → ${JSON.stringify(newVal)}`)
+                        }
+                      }
+
+                      if (hasChanges) {
+                        console.log(`변경감지: ${row.option_name}`, changedFields)
+                        updated.push(`${row.option_name} (${row.option_code})`)
+                      }
+                    } else {
+                      added.push(`${row.option_name} (${row.option_code})`)
+                    }
+                  })
+
+                  // 1. 먼저 upsert로 데이터 업데이트/추가
+                  const { error: upsertError } = await supabase.from('option_products').upsert(excelUploadModal.data, { onConflict: 'id' })
+                  if (upsertError) {
+                    console.error(upsertError)
+                    return
+                  }
+
+                  // 2. 엑셀에 없는 데이터만 삭제
+                  const { error: deleteError } = await supabase
+                    .from('option_products')
+                    .delete()
+                    .not('option_code', 'in', `(${uploadCodes.map(c => `"${c}"`).join(',')})`)
+
+                  if (deleteError && deleteError.code !== '23503') {
+                    console.warn(deleteError)
+                  }
+
+                  await fetchProducts()
+                  setExcelUploadModal(null)
+
+                  // 결과 모달 표시
+                  setUploadResultModal({
+                    type: 'replace',
+                    added,
+                    updated,
+                    unchanged: []
+                  })
+                }}
+                className="w-full px-4 py-3 text-left border-2 border-red-300 dark:border-red-500/30 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+              >
+                <div className="font-semibold text-red-600 dark:text-red-400">교체</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">엑셀 파일의 데이터로 교체합니다. (다른 테이블에서 참조 중인 데이터는 유지)</div>
+              </button>
+              <button
+                onClick={async () => {
+                  // 병합: upsert로 기존 데이터 유지하면서 업데이트/추가
+
+                  // 기존 DB 데이터 조회 (전체 필드)
+                  const { data: existingData } = await supabase.from('option_products').select('*')
+                  const existingDataMap = new Map(existingData?.map(d => [d.option_code, d]) || [])
+
+                  // 추가/수정/변경없음 분류
+                  const added: string[] = []
+                  const updated: string[] = []
+                  const unchanged: string[] = []
+
+                  // 값 정규화 함수
+                  const normalizeValue = (val: any) => {
+                    if (val === null || val === undefined || val === '' || val === 'null' || val === 'undefined') return null
+                    if (typeof val === 'number' && isNaN(val)) return null
+                    return val
+                  }
+
+                  excelUploadModal.data.forEach((row: any) => {
+                    if (existingDataMap.has(row.option_code)) {
+                      const existing = existingDataMap.get(row.option_code)
+                      // 실제로 값이 변경되었는지 비교
+                      let hasChanges = false
+                      for (const key in row) {
+                        if (key === 'updated_at' || key === 'created_at') continue
+
+                        // 자동 계산 모드인 가격 필드는 비교 제외
+                        const sellerMode = existing.seller_supply_price_mode
+                        const naverMode = existing.naver_price_mode
+                        const coupangMode = existing.coupang_price_mode
+
+                        if (key === 'seller_supply_price' && (sellerMode === 'auto' || sellerMode === '자동')) continue
+                        if ((key === 'naver_paid_shipping_price' || key === 'naver_free_shipping_price') && (naverMode === 'auto' || naverMode === '자동')) continue
+                        if ((key === 'coupang_paid_shipping_price' || key === 'coupang_free_shipping_price') && (coupangMode === 'auto' || coupangMode === '자동')) continue
+
+                        const newVal = normalizeValue(row[key])
+                        const oldVal = normalizeValue(existing[key])
+
+                        if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
+                          hasChanges = true
+                          break
+                        }
+                      }
+                      if (hasChanges) {
+                        updated.push(`${row.option_name} (${row.option_code})`)
+                      } else {
+                        // 엑셀에 있지만 변경되지 않은 데이터
+                        unchanged.push(`${row.option_name} (${row.option_code})`)
+                      }
+                    } else {
+                      added.push(`${row.option_name} (${row.option_code})`)
+                    }
+                  })
+
+                  // 엑셀에 없는 기존 데이터도 변경없음에 추가
+                  const uploadCodesSet = new Set(excelUploadModal.data.map((row: any) => row.option_code))
+                  existingData?.forEach(d => {
+                    if (!uploadCodesSet.has(d.option_code)) {
+                      unchanged.push(`${d.option_name} (${d.option_code})`)
+                    }
+                  })
+
+                  const { error } = await supabase
+                    .from('option_products')
+                    .upsert(excelUploadModal.data, {
+                      onConflict: 'id',
+                      ignoreDuplicates: false
+                    })
+                  if (error) {
+                    console.error(error)
+                  } else {
+                    await fetchProducts()
+                    setExcelUploadModal(null)
+
+                    // 결과 모달 표시
+                    setUploadResultModal({
+                      type: 'merge',
+                      added,
+                      updated,
+                      unchanged
+                    })
+                  }
+                }}
+                className="w-full px-4 py-3 text-left border-2 border-blue-300 dark:border-blue-500/30 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors"
+              >
+                <div className="font-semibold text-blue-600 dark:text-blue-400">병합</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">기존 데이터를 유지하면서 업데이트하거나 새 데이터를 추가합니다. (빈 값도 반영됩니다)</div>
+              </button>
+            </div>
           </div>
         </Modal>
       )}

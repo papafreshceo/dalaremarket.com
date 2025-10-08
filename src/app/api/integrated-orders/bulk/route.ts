@@ -1,187 +1,193 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-// POST: 대량 주문 생성 (엑셀 업로드용)
+/**
+ * POST /api/integrated-orders/bulk
+ * 대량 주문 생성/업데이트 (UPSERT)
+ */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const body = await request.json()
+    const supabase = await createClient();
+    const { orders } = await request.json();
 
-    if (!Array.isArray(body.orders) || body.orders.length === 0) {
+    if (!orders || !Array.isArray(orders) || orders.length === 0) {
       return NextResponse.json(
-        { error: '주문 데이터가 필요합니다.' },
+        { success: false, error: '주문 데이터가 필요합니다.' },
         { status: 400 }
-      )
+      );
     }
 
-    // 현재 사용자 확인
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json(
-        { error: '인증이 필요합니다.' },
-        { status: 401 }
-      )
-    }
+    // 제품 매핑 데이터 한 번에 로드
+    const { data: mappings } = await supabase
+      .from('product_mapping')
+      .select('*')
+      .eq('is_active', true);
 
-    // 대량 삽입 데이터 준비
-    const ordersData = body.orders.map((order: any) => ({
-      sheet_date: order.sheet_date || new Date().toISOString().split('T')[0],
-      market_name: order.market_name,
-      order_number: order.order_number,
-      payment_date: order.payment_date || null,
-      recipient_name: order.recipient_name,
-      recipient_phone: order.recipient_phone || null,
-      recipient_address: order.recipient_address || null,
-      recipient_zipcode: order.recipient_zipcode || null,
-      delivery_message: order.delivery_message || null,
-      option_name: order.option_name,
-      quantity: order.quantity || 1,
-      seller_supply_price: order.seller_supply_price || null,
-      shipping_status: order.shipping_status || '미발송',
-      tracking_number: order.tracking_number || null,
-      courier_company: order.courier_company || null,
-      shipped_date: order.shipped_date || null,
-      cs_status: order.cs_status || null,
-      cs_type: order.cs_type || null,
-      cs_memo: order.cs_memo || null,
-      memo: order.memo || null,
-      tags: order.tags || null,
-      created_by: user.id,
-      updated_by: user.id,
-    }))
+    const mappingMap = new Map(
+      mappings?.map((m) => [m.option_name.toLowerCase(), m]) || []
+    );
 
-    // upsert 옵션 (중복 시 업데이트)
+    // 각 주문에 제품 매핑 적용
+    const processedOrders = orders.map((order) => {
+      // sheet_date 기본값
+      if (!order.sheet_date) {
+        order.sheet_date = new Date().toISOString().split('T')[0];
+      }
+
+      // 제품 매핑 적용
+      if (order.option_name) {
+        const mapping = mappingMap.get(order.option_name.toLowerCase());
+        if (mapping) {
+          order.shipping_source = order.shipping_source || mapping.shipping_source;
+          order.invoice_issuer = order.invoice_issuer || mapping.invoice_issuer;
+          order.vendor_name = order.vendor_name || mapping.vendor_name;
+          order.shipping_location_name = order.shipping_location_name || mapping.shipping_location_name;
+          order.shipping_location_address = order.shipping_location_address || mapping.shipping_location_address;
+          order.shipping_location_phone = order.shipping_location_phone || mapping.shipping_location_phone;
+          order.shipping_cost = order.shipping_cost || mapping.shipping_cost;
+
+          // 셀러공급가 계산
+          if (!order.seller_supply_price && mapping.seller_supply_price) {
+            order.seller_supply_price = mapping.seller_supply_price * (order.quantity || 1);
+          }
+        }
+      }
+
+      return order;
+    });
+
+    // UPSERT 수행 (중복 주문 업데이트)
     const { data, error } = await supabase
       .from('integrated_orders')
-      .upsert(ordersData, {
+      .upsert(processedOrders, {
         onConflict: 'market_name,order_number,option_name',
         ignoreDuplicates: false,
       })
-      .select()
+      .select();
 
     if (error) {
-      console.error('Database error:', error)
+      console.error('대량 주문 생성 실패:', error);
       return NextResponse.json(
-        { error: '대량 주문 생성 중 오류가 발생했습니다.', details: error.message },
+        { success: false, error: error.message },
         { status: 500 }
-      )
+      );
     }
 
     return NextResponse.json({
       success: true,
-      data,
       count: data?.length || 0,
-    })
-  } catch (error) {
-    console.error('Server error:', error)
+      data,
+    });
+  } catch (error: any) {
+    console.error('POST /api/integrated-orders/bulk 오류:', error);
     return NextResponse.json(
-      { error: '서버 오류가 발생했습니다.' },
+      { success: false, error: error.message },
       { status: 500 }
-    )
+    );
   }
 }
 
-// PUT: 대량 주문 수정
+/**
+ * PUT /api/integrated-orders/bulk
+ * 대량 주문 수정
+ */
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const body = await request.json()
+    const supabase = await createClient();
+    const { orders } = await request.json();
 
-    if (!Array.isArray(body.orders) || body.orders.length === 0) {
+    if (!orders || !Array.isArray(orders) || orders.length === 0) {
       return NextResponse.json(
-        { error: '주문 데이터가 필요합니다.' },
+        { success: false, error: '주문 데이터가 필요합니다.' },
         { status: 400 }
-      )
+      );
     }
 
-    // 현재 사용자 확인
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json(
-        { error: '인증이 필요합니다.' },
-        { status: 401 }
-      )
-    }
-
-    const results = []
-    const errors = []
-
-    // 각 주문을 개별적으로 업데이트 (트랜잭션 대안)
-    for (const order of body.orders) {
+    // 각 주문 개별 업데이트
+    const updatePromises = orders.map((order) => {
       if (!order.id) {
-        errors.push({ order, error: 'ID가 없습니다.' })
-        continue
+        throw new Error('각 주문에 ID가 필요합니다.');
       }
 
-      const { id, ...updateData } = order
-      updateData.updated_by = user.id
+      const { id, ...updateData } = order;
 
-      const { data, error } = await supabase
+      return supabase
         .from('integrated_orders')
         .update(updateData)
         .eq('id', id)
         .select()
-        .single()
+        .single();
+    });
 
-      if (error) {
-        errors.push({ order, error: error.message })
-      } else {
-        results.push(data)
-      }
+    const results = await Promise.all(updatePromises);
+    const errors = results.filter((r) => r.error);
+
+    if (errors.length > 0) {
+      console.error('일부 주문 수정 실패:', errors);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `${errors.length}개 주문 수정 실패`,
+          details: errors.map((e) => e.error?.message),
+        },
+        { status: 500 }
+      );
     }
 
+    const data = results.map((r) => r.data);
+
     return NextResponse.json({
-      success: errors.length === 0,
-      data: results,
-      successCount: results.length,
-      errorCount: errors.length,
-      errors: errors.length > 0 ? errors : undefined,
-    })
-  } catch (error) {
-    console.error('Server error:', error)
+      success: true,
+      count: data.length,
+      data,
+    });
+  } catch (error: any) {
+    console.error('PUT /api/integrated-orders/bulk 오류:', error);
     return NextResponse.json(
-      { error: '서버 오류가 발생했습니다.' },
+      { success: false, error: error.message },
       { status: 500 }
-    )
+    );
   }
 }
 
-// DELETE: 대량 주문 삭제
+/**
+ * DELETE /api/integrated-orders/bulk
+ * 대량 주문 삭제
+ */
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const body = await request.json()
+    const supabase = await createClient();
+    const { ids } = await request.json();
 
-    if (!Array.isArray(body.ids) || body.ids.length === 0) {
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json(
-        { error: '삭제할 주문 ID가 필요합니다.' },
+        { success: false, error: 'IDs 배열이 필요합니다.' },
         { status: 400 }
-      )
+      );
     }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('integrated_orders')
       .delete()
-      .in('id', body.ids)
-      .select()
+      .in('id', ids);
 
     if (error) {
-      console.error('Database error:', error)
+      console.error('대량 주문 삭제 실패:', error);
       return NextResponse.json(
-        { error: '대량 삭제 중 오류가 발생했습니다.', details: error.message },
+        { success: false, error: error.message },
         { status: 500 }
-      )
+      );
     }
 
     return NextResponse.json({
       success: true,
-      deletedCount: data?.length || 0,
-    })
-  } catch (error) {
-    console.error('Server error:', error)
+      count: ids.length,
+    });
+  } catch (error: any) {
+    console.error('DELETE /api/integrated-orders/bulk 오류:', error);
     return NextResponse.json(
-      { error: '서버 오류가 발생했습니다.' },
+      { success: false, error: error.message },
       { status: 500 }
-    )
+    );
   }
 }

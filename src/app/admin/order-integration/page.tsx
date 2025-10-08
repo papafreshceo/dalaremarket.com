@@ -13,6 +13,7 @@ type Tab = 'search' | 'input' | 'excel' | 'shipping' | 'cs' | 'etc';
 
 export default function OrderIntegrationPage() {
   const [activeTab, setActiveTab] = useState<Tab>('search');
+  const [tabKey, setTabKey] = useState(0);
 
   const tabs = [
     { id: 'search' as Tab, label: '주문조회', icon: Search, color: '#2563eb' },
@@ -24,14 +25,14 @@ export default function OrderIntegrationPage() {
   ];
 
   const handleRefresh = () => {
-    console.log('Refresh tab:', activeTab);
-    // TODO: 각 탭별 새로고침 로직
+    // key 값을 변경하여 현재 탭 컴포넌트를 재마운트 (완전 초기화)
+    setTabKey(prev => prev + 1);
   };
 
   return (
     <div className="min-h-screen bg-background">
       {/* 헤더 - sticky */}
-      <header className="sticky top-0 z-100 bg-surface border-b border-border shadow-sm">
+      <header className="sticky top-0 bg-white dark:bg-[#2d2d30] border-b border-gray-200 dark:border-gray-700" style={{ zIndex: 100 }}>
         <div className="px-6 py-4">
           {/* 타이틀 */}
           <div className="flex items-center gap-3 mb-4">
@@ -40,8 +41,8 @@ export default function OrderIntegrationPage() {
           </div>
 
           {/* 탭 + 새로고침 버튼 */}
-          <div className="flex items-center gap-3 relative">
-            <div className="flex gap-3 flex-1 flex-wrap">
+          <div className="flex items-center gap-2 relative -mx-6 px-6 pb-0">
+            <div className="flex gap-1 flex-1 flex-wrap">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -51,10 +52,10 @@ export default function OrderIntegrationPage() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`
-                      flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all relative
+                      flex items-center gap-1.5 px-3 py-1.5 rounded-t border transition-all relative
                       ${isActive
-                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                        : 'bg-surface text-text-secondary border-border hover:bg-surface-hover hover:border-primary hover:-translate-y-0.5'
+                        ? 'bg-primary text-primary-foreground border-gray-200 dark:border-gray-700 border-b-0 -mb-px'
+                        : 'bg-surface text-text-secondary border-gray-200 dark:border-gray-700 hover:bg-surface-hover hover:border-gray-300 dark:hover:border-gray-600'
                       }
                     `}
                     style={{
@@ -74,10 +75,10 @@ export default function OrderIntegrationPage() {
                     }}
                   >
                     <Icon
-                      className="w-4 h-4 transition-transform hover:scale-110"
+                      className="w-3.5 h-3.5"
                       style={{ color: isActive ? 'currentColor' : tab.color }}
                     />
-                    <span className="text-sm font-medium">{tab.label}</span>
+                    <span className="text-xs font-medium">{tab.label}</span>
                   </button>
                 );
               })}
@@ -86,10 +87,10 @@ export default function OrderIntegrationPage() {
             {/* 새로고침 버튼 */}
             <button
               onClick={handleRefresh}
-              className="w-9 h-9 flex items-center justify-center border border-border rounded-lg bg-surface hover:bg-surface-hover hover:border-primary hover:rotate-180 transition-all duration-200"
+              className="w-7 h-7 flex items-center justify-center border border-gray-200 dark:border-gray-700 rounded bg-surface hover:bg-surface-hover hover:border-gray-300 dark:hover:border-gray-600 hover:rotate-180 transition-all duration-200"
               title="새로고침"
             >
-              <RefreshCw className="w-4 h-4 text-text-secondary" />
+              <RefreshCw className="w-3.5 h-3.5 text-text-secondary" />
             </button>
           </div>
         </div>
@@ -97,12 +98,12 @@ export default function OrderIntegrationPage() {
 
       {/* 콘텐츠 */}
       <main className="p-6">
-        {activeTab === 'search' && <SearchTab />}
-        {activeTab === 'input' && <InputTab />}
-        {activeTab === 'excel' && <ExcelTab />}
-        {activeTab === 'shipping' && <ShippingTab />}
-        {activeTab === 'cs' && <CSTab />}
-        {activeTab === 'etc' && <EtcTab />}
+        {activeTab === 'search' && <SearchTab key={`search-${tabKey}`} />}
+        {activeTab === 'input' && <InputTab key={`input-${tabKey}`} />}
+        {activeTab === 'excel' && <ExcelTab key={`excel-${tabKey}`} />}
+        {activeTab === 'shipping' && <ShippingTab key={`shipping-${tabKey}`} />}
+        {activeTab === 'cs' && <CSTab key={`cs-${tabKey}`} />}
+        {activeTab === 'etc' && <EtcTab key={`etc-${tabKey}`} />}
       </main>
 
       {/* 로딩 오버레이 */}

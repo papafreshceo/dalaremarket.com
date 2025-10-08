@@ -1,439 +1,296 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Truck, Package, CheckCircle, Clock, Search, Download, Edit } from 'lucide-react';
+import { Truck, Package, CheckCircle, Clock, Search, Download, Upload } from 'lucide-react';
+import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
+import * as XLSX from 'xlsx';
 
-interface ShippingOrder {
-  seq: number;
-  marketName: string;
-  orderNumber: string;
-  recipientName: string;
-  recipientPhone: string;
-  recipientAddress: string;
-  optionName: string;
+interface Order {
+  id: number;
+  sheet_date: string;
+  market_name: string;
+  order_number: string;
+  recipient_name: string;
+  recipient_phone?: string;
+  recipient_address?: string;
+  option_name: string;
   quantity: number;
-  paymentDate: string;
-  shippingStatus: '발송대기' | '발송완료' | '배송중' | '배송완료';
-  trackingNumber: string;
-  shippingVendor: string;
-  shippingDate: string;
+  vendor_name?: string;
+  shipping_status: string;
+  tracking_number?: string;
+  courier_company?: string;
+  shipped_date?: string;
+}
+
+interface VendorStats {
+  vendor_name: string;
+  total_orders: number;
+  total_quantity: number;
+  shipped: number;
+  unshipped: number;
 }
 
 export default function ShippingTab() {
-  const [orders, setOrders] = useState<ShippingOrder[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<ShippingOrder[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [vendorStats, setVendorStats] = useState<VendorStats[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchKeyword, setSearchKeyword] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set());
-  const [editingTracking, setEditingTracking] = useState<number | null>(null);
-  const [tempTrackingNumber, setTempTrackingNumber] = useState('');
-  const [tempShippingVendor, setTempShippingVendor] = useState('');
+  const [selectedVendor, setSelectedVendor] = useState<string>('');
+
+  // EditableAdminGrid 컬럼 정의
+  const columns = [
+    { field: 'vendor_name', headerName: '벤더사', width: 100 },
+    { field: 'market_name', headerName: '마켓명', width: 100 },
+    { field: 'order_number', headerName: '주문번호', width: 150 },
+    { field: 'recipient_name', headerName: '수취인', width: 100 },
+    { field: 'recipient_phone', headerName: '전화번호', width: 120 },
+    { field: 'recipient_address', headerName: '주소', width: 250 },
+    { field: 'option_name', headerName: '옵션명', width: 200 },
+    { field: 'quantity', headerName: '수량', width: 70, type: 'number' as const },
+    { field: 'shipping_status', headerName: '발송상태', width: 90 },
+    { field: 'courier_company', headerName: '택배사', width: 100 },
+    { field: 'tracking_number', headerName: '송장번호', width: 130 },
+    { field: 'shipped_date', headerName: '발송일', width: 100, type: 'date' as const },
+  ];
 
   useEffect(() => {
     loadOrders();
   }, []);
 
-  useEffect(() => {
-    applyFilters();
-  }, [orders, searchKeyword, statusFilter]);
-
   const loadOrders = async () => {
     setLoading(true);
     try {
-      // TODO: API 호출하여 발송 대상 주문 조회
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 미발송 + 발송준비 주문만 조회
+      const params = new URLSearchParams();
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      params.append('startDate', sevenDaysAgo.toISOString().split('T')[0]);
+      params.append('endDate', new Date().toISOString().split('T')[0]);
+      params.append('limit', '1000');
 
-      // 임시 데이터
-      const mockOrders: ShippingOrder[] = Array.from({ length: 20 }, (_, i) => ({
-        seq: i + 1,
-        marketName: ['스마트스토어', '쿠팡', '11번가'][i % 3],
-        orderNumber: `ORD-${Date.now()}-${i}`,
-        recipientName: `수취인${i + 1}`,
-        recipientPhone: `010-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
-        recipientAddress: `서울시 강남구 테헤란로 ${i + 100}`,
-        optionName: `상품명${i + 1}`,
-        quantity: Math.floor(Math.random() * 5) + 1,
-        paymentDate: new Date().toISOString().split('T')[0],
-        shippingStatus: ['발송대기', '발송완료', '배송중', '배송완료'][i % 4] as any,
-        trackingNumber: i % 2 === 0 ? `${Math.floor(Math.random() * 1000000000000)}` : '',
-        shippingVendor: i % 2 === 0 ? ['CJ대한통운', '로젠택배', '한진택배'][i % 3] : '',
-        shippingDate: i % 2 === 0 ? new Date().toISOString().split('T')[0] : '',
-      }));
+      const response = await fetch(`/api/integrated-orders?${params}`);
+      const result = await response.json();
 
-      setOrders(mockOrders);
+      if (result.success) {
+        setOrders(result.data || []);
+        calculateVendorStats(result.data || []);
+      }
     } catch (error) {
       console.error('주문 조회 실패:', error);
-      alert('주문 조회 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
   };
 
-  const applyFilters = () => {
-    let filtered = [...orders];
+  // 벤더사별 집계
+  const calculateVendorStats = (orderData: Order[]) => {
+    const statsMap = new Map<string, VendorStats>();
 
-    // 상태 필터
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(order => order.shippingStatus === statusFilter);
-    }
-
-    // 검색어 필터
-    if (searchKeyword) {
-      const keyword = searchKeyword.toLowerCase();
-      filtered = filtered.filter(order =>
-        order.orderNumber.toLowerCase().includes(keyword) ||
-        order.recipientName.toLowerCase().includes(keyword) ||
-        order.trackingNumber.toLowerCase().includes(keyword)
-      );
-    }
-
-    setFilteredOrders(filtered);
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedOrders.size === filteredOrders.length) {
-      setSelectedOrders(new Set());
-    } else {
-      setSelectedOrders(new Set(filteredOrders.map(o => o.seq)));
-    }
-  };
-
-  const toggleSelect = (seq: number) => {
-    const newSelected = new Set(selectedOrders);
-    if (newSelected.has(seq)) {
-      newSelected.delete(seq);
-    } else {
-      newSelected.add(seq);
-    }
-    setSelectedOrders(newSelected);
-  };
-
-  const startEditTracking = (order: ShippingOrder) => {
-    setEditingTracking(order.seq);
-    setTempTrackingNumber(order.trackingNumber);
-    setTempShippingVendor(order.shippingVendor);
-  };
-
-  const saveTracking = (seq: number) => {
-    const updated = orders.map(order => {
-      if (order.seq === seq) {
-        return {
-          ...order,
-          trackingNumber: tempTrackingNumber,
-          shippingVendor: tempShippingVendor,
-          shippingStatus: tempTrackingNumber ? '발송완료' as const : '발송대기' as const,
-          shippingDate: tempTrackingNumber ? new Date().toISOString().split('T')[0] : '',
-        };
+    orderData.forEach((order) => {
+      const vendor = order.vendor_name || '미지정';
+      if (!statsMap.has(vendor)) {
+        statsMap.set(vendor, {
+          vendor_name: vendor,
+          total_orders: 0,
+          total_quantity: 0,
+          shipped: 0,
+          unshipped: 0,
+        });
       }
-      return order;
+
+      const stats = statsMap.get(vendor)!;
+      stats.total_orders += 1;
+      stats.total_quantity += order.quantity;
+
+      if (order.shipping_status === '발송완료' || order.shipped_date) {
+        stats.shipped += 1;
+      } else {
+        stats.unshipped += 1;
+      }
     });
 
-    setOrders(updated);
-    setEditingTracking(null);
-    setTempTrackingNumber('');
-    setTempShippingVendor('');
-
-    // TODO: API 호출하여 송장번호 저장
-    console.log('송장 저장:', { seq, trackingNumber: tempTrackingNumber, vendor: tempShippingVendor });
+    const statsArray = Array.from(statsMap.values());
+    statsArray.sort((a, b) => b.total_orders - a.total_orders);
+    setVendorStats(statsArray);
   };
 
-  const cancelEdit = () => {
-    setEditingTracking(null);
-    setTempTrackingNumber('');
-    setTempShippingVendor('');
-  };
+  // 벤더사별 엑셀 다운로드
+  const handleVendorExcelDownload = (vendorName: string) => {
+    const vendorOrders = orders.filter((o) => (o.vendor_name || '미지정') === vendorName);
 
-  const handleBulkExport = () => {
-    if (selectedOrders.size === 0) {
-      alert('선택된 주문이 없습니다.');
+    if (vendorOrders.length === 0) {
+      alert('다운로드할 주문이 없습니다.');
       return;
     }
 
-    console.log('엑셀 다운로드:', Array.from(selectedOrders));
-    // TODO: 선택된 주문 엑셀 다운로드
-    alert(`${selectedOrders.size}개 주문을 엑셀로 다운로드합니다.`);
+    const exportData = vendorOrders.map((order) => ({
+      주문번호: order.order_number,
+      수취인: order.recipient_name,
+      전화번호: order.recipient_phone || '',
+      주소: order.recipient_address || '',
+      옵션명: order.option_name,
+      수량: order.quantity,
+      발송상태: order.shipping_status,
+      택배사: order.courier_company || '',
+      송장번호: order.tracking_number || '',
+      발송일: order.shipped_date || '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, vendorName);
+
+    const fileName = `${vendorName}_발송목록_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
   };
 
-  const handleBulkShipping = () => {
-    if (selectedOrders.size === 0) {
-      alert('선택된 주문이 없습니다.');
-      return;
+  // 송장번호 업데이트
+  const handleSaveData = async (updatedData: any[]) => {
+    try {
+      // 변경된 데이터만 추출
+      const updates = updatedData.filter((row) => row.id);
+
+      if (updates.length === 0) {
+        return;
+      }
+
+      const response = await fetch('/api/integrated-orders/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: updates }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`${result.count}개 주문이 수정되었습니다.`);
+        loadOrders(); // 새로고침
+      } else {
+        alert('수정 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('저장 오류:', error);
+      alert('저장 중 오류가 발생했습니다.');
     }
-
-    const selectedOrdersList = filteredOrders.filter(o => selectedOrders.has(o.seq));
-    const missingTracking = selectedOrdersList.filter(o => !o.trackingNumber);
-
-    if (missingTracking.length > 0) {
-      alert(`송장번호가 없는 주문이 ${missingTracking.length}개 있습니다.`);
-      return;
-    }
-
-    console.log('일괄 발송 처리:', Array.from(selectedOrders));
-    // TODO: 일괄 발송 처리 API 호출
-    alert(`${selectedOrders.size}개 주문을 발송 처리합니다.`);
   };
 
-  const getStatusBadge = (status: string) => {
-    const styles = {
-      '발송대기': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-      '발송완료': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-      '배송중': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-      '배송완료': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    };
-    return styles[status as keyof typeof styles] || styles['발송대기'];
-  };
+  // 필터링된 주문
+  const filteredOrders = selectedVendor
+    ? orders.filter((o) => (o.vendor_name || '미지정') === selectedVendor)
+    : orders;
 
-  const statusCounts = {
-    all: orders.length,
-    '발송대기': orders.filter(o => o.shippingStatus === '발송대기').length,
-    '발송완료': orders.filter(o => o.shippingStatus === '발송완료').length,
-    '배송중': orders.filter(o => o.shippingStatus === '배송중').length,
-    '배송완료': orders.filter(o => o.shippingStatus === '배송완료').length,
+  const statusStats = {
+    total: orders.length,
+    미발송: orders.filter((o) => o.shipping_status === '미발송').length,
+    발송준비: orders.filter((o) => o.shipping_status === '발송준비').length,
+    발송완료: orders.filter((o) => o.shipping_status === '발송완료').length,
   };
 
   return (
-    <div className="space-y-6">
-      {/* 상태 요약 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <button
-          onClick={() => setStatusFilter('all')}
-          className={`p-4 rounded-lg border transition-colors ${
-            statusFilter === 'all'
-              ? 'border-primary bg-primary/5'
-              : 'border-border bg-surface hover:bg-surface-hover'
-          }`}
-        >
-          <div className="text-center">
-            <div className="text-sm text-text-secondary mb-1">전체</div>
-            <div className="text-2xl font-semibold text-text">{statusCounts.all}</div>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setStatusFilter('발송대기')}
-          className={`p-4 rounded-lg border transition-colors ${
-            statusFilter === '발송대기'
-              ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20'
-              : 'border-border bg-surface hover:bg-surface-hover'
-          }`}
-        >
-          <div className="text-center">
-            <Clock className="w-5 h-5 text-yellow-600 mx-auto mb-1" />
-            <div className="text-sm text-text-secondary mb-1">발송대기</div>
-            <div className="text-2xl font-semibold text-yellow-600">{statusCounts['발송대기']}</div>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setStatusFilter('발송완료')}
-          className={`p-4 rounded-lg border transition-colors ${
-            statusFilter === '발송완료'
-              ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
-              : 'border-border bg-surface hover:bg-surface-hover'
-          }`}
-        >
-          <div className="text-center">
-            <Package className="w-5 h-5 text-blue-600 mx-auto mb-1" />
-            <div className="text-sm text-text-secondary mb-1">발송완료</div>
-            <div className="text-2xl font-semibold text-blue-600">{statusCounts['발송완료']}</div>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setStatusFilter('배송중')}
-          className={`p-4 rounded-lg border transition-colors ${
-            statusFilter === '배송중'
-              ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/20'
-              : 'border-border bg-surface hover:bg-surface-hover'
-          }`}
-        >
-          <div className="text-center">
-            <Truck className="w-5 h-5 text-purple-600 mx-auto mb-1" />
-            <div className="text-sm text-text-secondary mb-1">배송중</div>
-            <div className="text-2xl font-semibold text-purple-600">{statusCounts['배송중']}</div>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setStatusFilter('배송완료')}
-          className={`p-4 rounded-lg border transition-colors ${
-            statusFilter === '배송완료'
-              ? 'border-green-500 bg-green-50 dark:bg-green-950/20'
-              : 'border-border bg-surface hover:bg-surface-hover'
-          }`}
-        >
-          <div className="text-center">
-            <CheckCircle className="w-5 h-5 text-green-600 mx-auto mb-1" />
-            <div className="text-sm text-text-secondary mb-1">배송완료</div>
-            <div className="text-2xl font-semibold text-green-600">{statusCounts['배송완료']}</div>
-          </div>
-        </button>
-      </div>
-
-      {/* 검색 및 액션 */}
-      <div className="bg-surface border border-border rounded-lg p-4">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-muted" />
-            <input
-              type="text"
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-              placeholder="주문번호, 수취인명, 송장번호 검색"
-              className="w-full pl-10 pr-3 py-2 border border-border rounded-lg bg-surface text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleBulkExport}
-              disabled={selectedOrders.size === 0}
-              className="flex items-center gap-2 px-4 py-2 border border-border bg-surface text-text rounded-lg hover:bg-surface-hover transition-colors disabled:opacity-50"
-            >
-              <Download className="w-4 h-4" />
-              엑셀 다운로드 ({selectedOrders.size})
-            </button>
-            <button
-              onClick={handleBulkShipping}
-              disabled={selectedOrders.size === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              <Truck className="w-4 h-4" />
-              일괄 발송 ({selectedOrders.size})
-            </button>
-          </div>
+    <div className="space-y-4">
+      {/* 통계 카드 */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-sm text-gray-600 mb-1">총 주문</div>
+          <div className="text-2xl font-semibold text-gray-900">{statusStats.total.toLocaleString()}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-sm text-gray-600 mb-1">미발송</div>
+          <div className="text-2xl font-semibold text-red-600">{statusStats.미발송.toLocaleString()}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-sm text-gray-600 mb-1">발송준비</div>
+          <div className="text-2xl font-semibold text-yellow-600">{statusStats.발송준비.toLocaleString()}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-sm text-gray-600 mb-1">발송완료</div>
+          <div className="text-2xl font-semibold text-green-600">{statusStats.발송완료.toLocaleString()}</div>
         </div>
       </div>
 
-      {/* 주문 테이블 */}
-      <div className="bg-surface border border-border rounded-lg overflow-hidden">
+      {/* 벤더사별 집계 테이블 */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">벤더사별 집계</h3>
+        </div>
         <div className="overflow-x-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="text-center py-20">
-              <Package className="w-12 h-12 text-text-muted mx-auto mb-4" />
-              <p className="text-text-secondary">주문이 없습니다.</p>
-            </div>
-          ) : (
-            <table className="w-full">
-              <thead className="bg-surface-secondary sticky top-0">
-                <tr>
-                  <th className="px-4 py-3 text-center border-b border-border">
-                    <input
-                      type="checkbox"
-                      checked={selectedOrders.size === filteredOrders.length && filteredOrders.length > 0}
-                      onChange={toggleSelectAll}
-                      className="w-4 h-4 rounded border-gray-300"
-                    />
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider border-b border-border">연번</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider border-b border-border">상태</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider border-b border-border">마켓명</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider border-b border-border">주문번호</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider border-b border-border">수취인</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider border-b border-border">전화번호</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider border-b border-border">주소</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider border-b border-border">상품명</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider border-b border-border">수량</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider border-b border-border">택배사</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider border-b border-border">송장번호</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-text-secondary uppercase tracking-wider border-b border-border">액션</th>
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">벤더사</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-600">총 주문</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-600">총 수량</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-600">발송완료</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-600">미발송</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-600">액션</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {vendorStats.map((stat) => (
+                <tr key={stat.vendor_name} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{stat.vendor_name}</td>
+                  <td className="px-4 py-3 text-sm text-center text-gray-700">{stat.total_orders.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-sm text-center text-gray-700">{stat.total_quantity.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-sm text-center text-green-600">{stat.shipped.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-sm text-center text-red-600">{stat.unshipped.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() =>
+                          selectedVendor === stat.vendor_name
+                            ? setSelectedVendor('')
+                            : setSelectedVendor(stat.vendor_name)
+                        }
+                        className="px-3 py-1 text-xs border border-gray-300 bg-white text-gray-700 rounded hover:bg-gray-50"
+                      >
+                        {selectedVendor === stat.vendor_name ? '전체 보기' : '필터'}
+                      </button>
+                      <button
+                        onClick={() => handleVendorExcelDownload(stat.vendor_name)}
+                        className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
+                      >
+                        <Download className="w-3 h-3" />
+                        엑셀
+                      </button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="bg-surface divide-y divide-border">
-                {filteredOrders.map((order) => (
-                  <tr key={order.seq} className="hover:bg-surface-hover">
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedOrders.has(order.seq)}
-                        onChange={() => toggleSelect(order.seq)}
-                        className="w-4 h-4 rounded border-gray-300"
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-sm text-text whitespace-nowrap">{order.seq}</td>
-                    <td className="px-4 py-3 text-sm whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(order.shippingStatus)}`}>
-                        {order.shippingStatus}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-text whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs font-medium rounded bg-primary/10 text-primary">
-                        {order.marketName}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-text whitespace-nowrap">{order.orderNumber}</td>
-                    <td className="px-4 py-3 text-sm text-text whitespace-nowrap">{order.recipientName}</td>
-                    <td className="px-4 py-3 text-sm text-text whitespace-nowrap">{order.recipientPhone}</td>
-                    <td className="px-4 py-3 text-sm text-text max-w-xs truncate">{order.recipientAddress}</td>
-                    <td className="px-4 py-3 text-sm text-text">{order.optionName}</td>
-                    <td className="px-4 py-3 text-sm text-text whitespace-nowrap">{order.quantity}</td>
-                    <td className="px-4 py-3 text-sm text-text whitespace-nowrap">
-                      {editingTracking === order.seq ? (
-                        <select
-                          value={tempShippingVendor}
-                          onChange={(e) => setTempShippingVendor(e.target.value)}
-                          className="w-full px-2 py-1 text-xs border border-border rounded bg-surface text-text focus:outline-none focus:ring-1 focus:ring-primary"
-                        >
-                          <option value="">선택</option>
-                          <option value="CJ대한통운">CJ대한통운</option>
-                          <option value="로젠택배">로젠택배</option>
-                          <option value="한진택배">한진택배</option>
-                          <option value="우체국택배">우체국택배</option>
-                          <option value="롯데택배">롯데택배</option>
-                        </select>
-                      ) : (
-                        order.shippingVendor || '-'
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-text whitespace-nowrap">
-                      {editingTracking === order.seq ? (
-                        <input
-                          type="text"
-                          value={tempTrackingNumber}
-                          onChange={(e) => setTempTrackingNumber(e.target.value)}
-                          placeholder="송장번호"
-                          className="w-full px-2 py-1 text-xs border border-border rounded bg-surface text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                      ) : (
-                        order.trackingNumber || '-'
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
-                      {editingTracking === order.seq ? (
-                        <div className="flex gap-1 justify-center">
-                          <button
-                            onClick={() => saveTracking(order.seq)}
-                            className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                          >
-                            저장
-                          </button>
-                          <button
-                            onClick={cancelEdit}
-                            className="px-2 py-1 text-xs border border-border bg-surface text-text rounded hover:bg-surface-hover transition-colors"
-                          >
-                            취소
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => startEditTracking(order)}
-                          className="px-2 py-1 text-xs border border-border bg-surface text-text rounded hover:bg-surface-hover transition-colors"
-                        >
-                          <Edit className="w-3 h-3 inline" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              ))}
+              {vendorStats.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                    데이터가 없습니다.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* EditableAdminGrid */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">
+            {selectedVendor ? `${selectedVendor} - 주문 목록` : '전체 주문 목록'} ({filteredOrders.length}건)
+          </h3>
+          {selectedVendor && (
+            <button
+              onClick={() => setSelectedVendor('')}
+              className="px-3 py-1.5 text-sm border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50"
+            >
+              필터 해제
+            </button>
           )}
         </div>
+        <EditableAdminGrid
+          columns={columns}
+          data={filteredOrders}
+          onSave={handleSaveData}
+          height="calc(100vh - 580px)"
+          enableExport={true}
+          enableImport={false}
+          pageSize={50}
+        />
       </div>
     </div>
   );
