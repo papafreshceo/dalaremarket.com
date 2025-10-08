@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { Upload, FileSpreadsheet, Download, Save, RefreshCw, Edit, CheckCircle } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface UploadedFile {
   name: string;
@@ -9,6 +10,7 @@ interface UploadedFile {
   rowCount: number;
   isToday: boolean;
   lastModified: number;
+  file?: File;
 }
 
 export default function ExcelTab() {
@@ -47,22 +49,40 @@ export default function ExcelTab() {
   const handleFiles = async (files: FileList) => {
     const validFiles = Array.from(files).filter(file => {
       const ext = file.name.split('.').pop()?.toLowerCase();
-      return ['xlsx', 'xls', 'csv'].includes(ext || '');
+      return ['xlsx', 'xls'].includes(ext || '');
     });
 
     if (validFiles.length === 0) {
-      alert('유효한 파일이 없습니다. (xlsx, xls, csv 파일만 업로드 가능)');
+      alert('유효한 파일이 없습니다. (xlsx, xls 파일만 업로드 가능)');
       return;
     }
 
-    // 임시로 파일 정보만 저장
-    const fileInfos: UploadedFile[] = validFiles.map(file => ({
-      name: file.name,
-      marketName: detectMarketFromFileName(file.name),
-      rowCount: Math.floor(Math.random() * 100) + 10, // 임시 데이터
-      isToday: isFileToday(file.lastModified),
-      lastModified: file.lastModified,
-    }));
+    // 파일 읽기 및 행 수 계산
+    const fileInfoPromises = validFiles.map(async (file) => {
+      try {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data);
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
+
+        // 헤더 제외한 행 수
+        const rowCount = Math.max(0, jsonData.length - 1);
+
+        return {
+          name: file.name,
+          marketName: detectMarketFromFileName(file.name),
+          rowCount,
+          isToday: isFileToday(file.lastModified),
+          lastModified: file.lastModified,
+          file, // 실제 파일 객체도 저장
+        } as UploadedFile & { file: File };
+      } catch (error) {
+        console.error(`파일 읽기 실패: ${file.name}`, error);
+        return null;
+      }
+    });
+
+    const fileInfos = (await Promise.all(fileInfoPromises)).filter(f => f !== null) as (UploadedFile & { file: File })[];
 
     setUploadedFiles([...uploadedFiles, ...fileInfos]);
   };
@@ -94,29 +114,61 @@ export default function ExcelTab() {
 
     const oldFiles = uploadedFiles.filter(f => !f.isToday);
     if (oldFiles.length > 0) {
-      alert('오늘 날짜가 아닌 파일이 포함되어 있습니다. 해당 파일들을 제거해주세요.');
-      return;
+      const confirm = window.confirm('오늘 날짜가 아닌 파일이 포함되어 있습니다. 계속 진행하시겠습니까?');
+      if (!confirm) return;
     }
 
     setProcessing(true);
 
     try {
-      // TODO: 실제 엑셀 파일 읽기 및 처리
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const allOrders: any[] = [];
 
-      // 임시 데이터
-      const mockData = Array.from({ length: 50 }, (_, i) => ({
-        seq: i + 1,
-        marketName: uploadedFiles[i % uploadedFiles.length].marketName,
-        orderNumber: `ORD-${Date.now()}-${i}`,
-        recipientName: `수취인${i + 1}`,
-        optionName: `상품명${i + 1}`,
-        quantity: Math.floor(Math.random() * 5) + 1,
-        sellerSupplyPrice: (Math.floor(Math.random() * 50) + 10) * 1000,
-      }));
+      // 각 파일에서 주문 데이터 추출
+      for (const uploadedFile of uploadedFiles) {
+        if (!uploadedFile.file) continue;
 
-      setProcessedData(mockData);
-      alert(`${mockData.length}개 주문이 통합되었습니다.`);
+        const data = await uploadedFile.file.arrayBuffer();
+        const workbook = XLSX.read(data);
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet) as any[];
+
+        // 데이터 매핑 (필드명은 엑셀 헤더에 맞게 조정 필요)
+        const orders = jsonData.map((row: any) => ({
+          market_name: uploadedFile.marketName,
+          order_number: row['주문번호'] || row['orderNumber'] || '',
+          payment_date: row['결제일'] || row['paymentDate'] || null,
+          recipient_name: row['수취인'] || row['수취인명'] || row['recipientName'] || '',
+          recipient_phone: row['전화번호'] || row['연락처'] || row['phone'] || null,
+          recipient_address: row['주소'] || row['address'] || null,
+          recipient_zipcode: row['우편번호'] || row['zipcode'] || null,
+          delivery_message: row['배송메시지'] || row['deliveryMessage'] || null,
+          option_name: row['옵션명'] || row['상품명'] || row['optionName'] || row['productName'] || '',
+          quantity: parseInt(row['수량'] || row['quantity'] || '1'),
+          seller_supply_price: parseFloat(row['셀러공급가'] || row['sellerSupplyPrice'] || '0') || null,
+          sheet_date: new Date().toISOString().split('T')[0],
+        }));
+
+        allOrders.push(...orders);
+      }
+
+      // 필수 필드가 없는 주문 필터링
+      const validOrders = allOrders.filter(order =>
+        order.order_number && order.recipient_name && order.option_name
+      );
+
+      if (validOrders.length === 0) {
+        alert('유효한 주문 데이터가 없습니다. 엑셀 형식을 확인해주세요.');
+        setProcessing(false);
+        return;
+      }
+
+      // 미리보기 데이터 설정
+      setProcessedData(validOrders.map((order, index) => ({
+        seq: index + 1,
+        ...order,
+      })));
+
+      alert(`${validOrders.length}개 주문이 통합되었습니다. (전체: ${allOrders.length}개 중)`);
     } catch (error) {
       console.error('처리 실패:', error);
       alert('처리 중 오류가 발생했습니다.');
@@ -126,15 +178,87 @@ export default function ExcelTab() {
   };
 
   const handleExport = () => {
-    console.log('엑셀 다운로드');
-    // TODO: 엑셀 다운로드 기능
-    alert('엑셀 다운로드 기능은 추후 구현 예정입니다.');
+    if (processedData.length === 0) {
+      alert('다운로드할 데이터가 없습니다.');
+      return;
+    }
+
+    // 엑셀 데이터 준비
+    const excelData = processedData.map((order) => ({
+      '연번': order.seq,
+      '주문통합일': order.sheet_date,
+      '마켓명': order.market_name,
+      '주문번호': order.order_number,
+      '결제일': order.payment_date || '',
+      '수취인': order.recipient_name,
+      '전화번호': order.recipient_phone || '',
+      '주소': order.recipient_address || '',
+      '우편번호': order.recipient_zipcode || '',
+      '배송메시지': order.delivery_message || '',
+      '옵션명': order.option_name,
+      '수량': order.quantity,
+      '셀러공급가': order.seller_supply_price || 0,
+    }));
+
+    // 워크시트 생성
+    const ws = XLSX.utils.json_to_sheet(excelData);
+
+    // 컬럼 너비 자동 조정
+    const colWidths = Object.keys(excelData[0] || {}).map(key => ({
+      wch: Math.max(key.length * 2, 10)
+    }));
+    ws['!cols'] = colWidths;
+
+    // 워크북 생성
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '주문통합');
+
+    // 파일 다운로드
+    const dateStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `주문통합_${dateStr}.xlsx`);
   };
 
-  const handleSave = () => {
-    console.log('구글 시트 저장');
-    // TODO: 구글 시트 저장 기능
-    alert('저장 기능은 추후 구현 예정입니다.');
+  const handleSave = async () => {
+    if (processedData.length === 0) {
+      alert('저장할 데이터가 없습니다.');
+      return;
+    }
+
+    const confirm = window.confirm(`${processedData.length}개의 주문을 저장하시겠습니까?`);
+    if (!confirm) return;
+
+    setProcessing(true);
+
+    try {
+      // seq 제거 (DB에 저장할 필요 없음)
+      const ordersToSave = processedData.map(({ seq, ...order }) => order);
+
+      const response = await fetch('/api/integrated-orders/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orders: ordersToSave }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`${result.count}개의 주문이 저장되었습니다.`);
+
+        // 성공 후 초기화
+        setUploadedFiles([]);
+        setProcessedData([]);
+      } else {
+        console.error('저장 실패:', result.error);
+        alert(`저장 실패: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('저장 실패:', error);
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const handleReset = () => {

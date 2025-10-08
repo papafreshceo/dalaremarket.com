@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Button } from '@/components/ui'
+import * as XLSX from 'xlsx'
+import { createClient } from '@/lib/supabase/client'
 
 interface Column<T = any> {
   key: string
@@ -24,6 +26,11 @@ interface EditableAdminGridProps<T = any> {
   onSave?: () => void
   onDeleteSelected?: (indices: number[]) => void
   onCopy?: (indices: number[]) => void
+  // 엑셀 업로드 자동 저장 (이 옵션들이 있으면 모달에서 바로 DB 저장)
+  tableName?: string  // Supabase 테이블 이름 (있으면 엑셀 업로드 시 자동 저장)
+  onDataReload?: () => Promise<void>  // 저장 완료 후 데이터 재조회 함수
+  validateRow?: (row: T) => boolean  // 행 유효성 검사 (false 반환 시 해당 행 스킵)
+  excludeEmptyColumns?: string[]  // 모든 값이 비어있으면 스킵할 컬럼들 (예: ['category_1', 'category_2'])
   height?: string
   rowHeight?: number
   showRowNumbers?: boolean
@@ -37,6 +44,8 @@ interface EditableAdminGridProps<T = any> {
   enableCopy?: boolean
   globalSearchPlaceholder?: string
   customActions?: React.ReactNode
+  exportFilePrefix?: string
+  mergeKeyGetter?: (row: T) => string  // 병합 모드에서 중복 체크를 위한 키 생성 함수
 }
 
 interface CellPosition {
@@ -53,6 +62,10 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   onSave,
   onDeleteSelected,
   onCopy,
+  tableName,
+  onDataReload,
+  validateRow,
+  excludeEmptyColumns,
   height = '900px',
   rowHeight = 26,
   showRowNumbers = true,
@@ -65,7 +78,9 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   enableCheckbox = true,
   enableCopy = true,
   globalSearchPlaceholder = '검색',
-  customActions
+  customActions,
+  exportFilePrefix = 'export',
+  mergeKeyGetter
 }: EditableAdminGridProps<T>) {
   const [gridData, setGridData] = useState<T[]>([])
   const [editingCell, setEditingCell] = useState<CellPosition | null>(null)
@@ -88,6 +103,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   const [modifiedCells, setModifiedCells] = useState<Set<string>>(new Set())
   const [addedRows, setAddedRows] = useState<Set<number>>(new Set())
   const [copiedRows, setCopiedRows] = useState<Set<number>>(new Set())
+  const [showImportModeDialog, setShowImportModeDialog] = useState(false)
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null)
   const [hoverCell, setHoverCell] = useState<CellPosition | null>(null)
   const [fillStartCell, setFillStartCell] = useState<CellPosition | null>(null)
   const [fillPreviewData, setFillPreviewData] = useState<T[] | null>(null)
@@ -146,8 +163,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           }
         }, 50)
       } else {
+        // 즉시 포커스 (키보드 입력이 자연스럽게 input으로 전달되도록)
         inputRef.current.focus()
-        // 키보드 입력인 경우 커서를 끝으로 이동, 아니면 선택하지 않음
         if (inputRef.current instanceof HTMLInputElement) {
           const length = inputRef.current.value.length
           inputRef.current.setSelectionRange(length, length)
@@ -208,15 +225,13 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
             handleCellDoubleClick(selectedCell.row, selectedCell.col, gridData[selectedCell.row][selectedCell.col])
           }
           return
-        } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-          // 일반 문자 키를 누르면 즉시 편집 모드로 전환하고 해당 문자 입력
+        } else if (e.key === 'F2') {
+          // F2 키로 편집 모드 진입 (Excel 방식)
           e.preventDefault()
           const column = columns.find(c => c.key === selectedCell.col)
           const row = gridData[selectedCell.row]
-          if (column && !isReadOnly(column, row) && column.type !== 'checkbox') {
-            setIsKeyboardEdit(true)
-            setEditingCell(selectedCell)
-            setEditValue(e.key)
+          if (column && !isReadOnly(column, row)) {
+            handleCellDoubleClick(selectedCell.row, selectedCell.col, gridData[selectedCell.row][selectedCell.col])
           }
           return
         } else if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -243,6 +258,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       window.removeEventListener('keydown', handleKeyDown)
     }
   }, [selectedCell, editingCell, gridData, columns])
+
 
   // 붙여넣기 핸들러
   const handlePaste = async (e: React.ClipboardEvent) => {
@@ -689,74 +705,397 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     })
   }, [gridData, globalSearchTerm, columns])
 
-  const exportToCSV = () => {
-    const headers = columns.map(col => col.title).join(',')
-    const rows = gridData.map(row =>
-      columns.map(col => {
-        const value = row[col.key]
-        const strValue = String(value ?? '')
-        return strValue.includes(',') || strValue.includes('"')
-          ? `"${strValue.replace(/"/g, '""')}"`
-          : strValue
-      }).join(',')
-    ).join('\n')
+  const exportToExcel = () => {
+    // ID 컬럼이 있는지 확인
+    const hasIdInColumns = columns.some(col => col.key === 'id')
+    const hasIdInData = gridData.length > 0 && 'id' in gridData[0]
 
-    const csv = `${headers}\n${rows}`
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `export_${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
+    // ID를 포함할지 결정 (데이터에는 있지만 columns에는 없는 경우 자동 추가)
+    const exportColumns = hasIdInData && !hasIdInColumns
+      ? [{ key: 'id', title: 'ID' }, ...columns]
+      : columns
+
+    // 헤더와 데이터 준비
+    const headers = exportColumns.map(col => col.title)
+    const data = gridData.map(row =>
+      exportColumns.map(col => row[col.key] ?? '')
+    )
+
+    // 워크시트 생성
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data])
+
+    // 컬럼 너비 자동 조정
+    const colWidths = exportColumns.map(col => ({
+      wch: Math.max(col.title.length * 2, 10)
+    }))
+    ws['!cols'] = colWidths
+
+    // 워크북 생성
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1')
+
+    // 파일 다운로드
+    const dateStr = new Date().toISOString().split('T')[0]
+    XLSX.writeFile(wb, `${exportFilePrefix}_${dateStr}.xlsx`)
   }
 
-  const importFromCSV = (file: File) => {
+  const importFromExcel = async (file: File, mode: 'replace' | 'merge' = 'replace') => {
     const reader = new FileReader()
-    reader.onload = (e) => {
-      const text = e.target?.result as string
-      const lines = text.split('\n').filter(line => line.trim())
-      const headers = lines[0].split(',').map(h => h.trim())
+    reader.onload = async (e) => {
+      const data = e.target?.result
+      const workbook = XLSX.read(data, { type: 'binary' })
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
 
-      const imported = lines.slice(1).map(line => {
-        const values: string[] = []
-        let current = ''
-        let inQuotes = false
+      if (jsonData.length < 2) {
+        alert('데이터가 없습니다.')
+        return
+      }
 
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i]
-          if (char === '"') {
-            if (inQuotes && line[i + 1] === '"') {
-              current += '"'
-              i++
-            } else {
-              inQuotes = !inQuotes
-            }
-          } else if (char === ',' && !inQuotes) {
-            values.push(current.trim())
-            current = ''
-          } else {
-            current += char
-          }
+      // 첫 번째 행을 헤더로 사용
+      const excelHeaders = jsonData[0] as string[]
+
+      // 헤더 이름으로 컬럼 매칭 (순서 무관)
+      const columnMap = new Map<number, Column<T>>()
+      excelHeaders.forEach((header, excelIdx) => {
+        const matchedColumn = columns.find(col => col.title === header)
+        if (matchedColumn) {
+          columnMap.set(excelIdx, matchedColumn)
         }
-        values.push(current.trim())
-
-        const row: any = {}
-        columns.forEach((col, idx) => {
-          const value = values[idx] || ''
-          if (col.type === 'number') {
-            row[col.key] = value === '' ? null : Number(value)
-          } else if (col.type === 'checkbox') {
-            row[col.key] = value === 'true' || value === '1'
-          } else {
-            row[col.key] = value
-          }
-        })
-        return row as T
       })
 
-      setGridData(imported)
-      onDataChange?.(imported)
+      // 매칭되지 않은 필수 컬럼이 있는지 확인
+      const unmatchedColumns = columns
+        .filter(col => !Array.from(columnMap.values()).some(c => c.key === col.key))
+        .map(col => col.title)
+
+      if (unmatchedColumns.length > 0) {
+        const proceed = confirm(
+          `다음 컬럼이 엑셀에 없습니다:\n${unmatchedColumns.join(', ')}\n\n계속 진행하시겠습니까?`
+        )
+        if (!proceed) return
+      }
+
+      // 데이터 파싱 및 검증
+      const errors: string[] = []
+      const imported = jsonData.slice(1).map((row, rowIdx) => {
+        const rowData: any = {}
+
+        // 헤더로 매칭된 컬럼만 처리
+        columnMap.forEach((column, excelIdx) => {
+          const value = row[excelIdx]
+
+          if (column.type === 'number') {
+            const numValue = Number(value)
+            if (value !== '' && value !== null && value !== undefined && isNaN(numValue)) {
+              errors.push(`행 ${rowIdx + 2}, ${column.title}: 숫자가 아닙니다 (값: ${value})`)
+              rowData[column.key] = null
+            } else {
+              rowData[column.key] = value === '' || value === null || value === undefined ? null : numValue
+            }
+          } else if (column.type === 'checkbox') {
+            rowData[column.key] = value === true || value === 'true' || value === '1' || value === 1
+          } else {
+            rowData[column.key] = value ?? ''
+          }
+        })
+
+        // 매칭되지 않은 컬럼은 기본값 설정
+        columns.forEach(col => {
+          if (!(col.key in rowData)) {
+            if (col.type === 'number') {
+              rowData[col.key] = null
+            } else if (col.type === 'checkbox') {
+              rowData[col.key] = false
+            } else {
+              rowData[col.key] = ''
+            }
+          }
+        })
+
+        return rowData as T
+      })
+
+      // 검증 오류가 있으면 경고
+      if (errors.length > 0) {
+        const showErrors = errors.slice(0, 10).join('\n')
+        const moreErrors = errors.length > 10 ? `\n\n... 외 ${errors.length - 10}개 오류` : ''
+        const proceed = confirm(
+          `데이터 검증 오류가 발견되었습니다:\n\n${showErrors}${moreErrors}\n\n계속 진행하시겠습니까?`
+        )
+        if (!proceed) return
+      }
+
+      // tableName이 있으면 DB 저장까지 처리 (모달에서 바로 저장)
+      if (tableName) {
+        try {
+          const supabase = createClient()
+
+          // 1단계: 데이터 유효성 검사 및 중복 제거
+          const seen = new Map<string, T>()
+          const uniqueRows: T[] = []
+
+          imported.forEach(row => {
+            // excludeEmptyColumns 체크
+            if (excludeEmptyColumns && excludeEmptyColumns.length > 0) {
+              const allEmpty = excludeEmptyColumns.every(col => !row[col])
+              if (allEmpty) return // 모든 필수 컬럼이 비어있으면 스킵
+            }
+
+            // validateRow 체크
+            if (validateRow && !validateRow(row)) {
+              return // 유효성 검사 실패 시 스킵
+            }
+
+            // mergeKeyGetter로 중복 체크
+            const key = mergeKeyGetter ? mergeKeyGetter(row) : JSON.stringify(row)
+            if (!seen.has(key)) {
+              seen.set(key, row)
+              uniqueRows.push(row)
+            }
+          })
+
+          if (uniqueRows.length < imported.length) {
+            const duplicateCount = imported.length - uniqueRows.length
+            alert(`엑셀 파일에서 ${duplicateCount}개의 중복이 발견되어 제거했습니다.`)
+          }
+
+          if (mode === 'replace') {
+            // 전체 교체 모드: 기존 데이터 모두 삭제 후 새로 삽입
+            const { error: deleteError } = await supabase
+              .from(tableName)
+              .delete()
+              .neq('id', '00000000-0000-0000-0000-000000000000') // 모든 행 삭제
+
+            if (deleteError) {
+              alert(`기존 데이터 삭제 실패: ${deleteError.message}`)
+              return
+            }
+
+            // 중복 체크 후 새 데이터 삽입
+            const insertedKeys = new Set<string>()
+
+            for (let i = 0; i < uniqueRows.length; i++) {
+              const row = uniqueRows[i]
+              const key = mergeKeyGetter ? mergeKeyGetter(row) : JSON.stringify(row)
+
+              if (insertedKeys.has(key)) {
+                console.log('저장 중 중복 스킵:', row)
+                continue
+              }
+
+              // id 제거 (DB에서 자동 생성)
+              const { id, ...rowWithoutId } = row as any
+
+              const { error } = await supabase.from(tableName).insert([rowWithoutId])
+
+              if (error) {
+                alert(`데이터 등록 실패: ${error.message}`)
+                return
+              }
+
+              insertedKeys.add(key)
+            }
+
+            alert('전체 교체가 완료되었습니다.')
+          } else {
+            // 병합 모드: 기존 데이터와 병합
+            const insertedKeys = new Set<string>()
+
+            for (let i = 0; i < uniqueRows.length; i++) {
+              const row = uniqueRows[i]
+              const key = mergeKeyGetter ? mergeKeyGetter(row) : JSON.stringify(row)
+
+              // 이번 저장에서 이미 삽입했는지 체크
+              if (insertedKeys.has(key)) {
+                console.log('저장 중 중복 스킵:', row)
+                continue
+              }
+
+              // mergeKeyGetter가 있으면 해당 키로 DB 중복 체크
+              if (mergeKeyGetter) {
+                // 키를 파싱해서 각 필드로 쿼리 생성
+                // 예: "사입|대분류|중분류|||" -> {expense_type: '사입', category_1: '대분류', ...}
+                const keyParts = key.split('|')
+                let query = supabase.from(tableName).select('id')
+
+                // 컬럼 순서대로 필터 적용 (mergeKeyGetter와 동일한 순서)
+                const keyColumns = Object.keys(row).filter(k => k !== 'id' && k !== 'notes' && k !== 'is_active' && k !== 'created_at' && k !== 'updated_at')
+                keyColumns.forEach((col: string, idx) => {
+                  if (idx < keyParts.length) {
+                    query = query.eq(col, keyParts[idx] || null)
+                  }
+                })
+
+                const { data: existing } = await query.limit(1)
+
+                if (existing && existing.length > 0) {
+                  console.log('DB 중복 스킵:', row)
+                  continue
+                }
+              }
+
+              // id 제거 (DB에서 자동 생성)
+              const { id, ...rowWithoutId } = row as any
+
+              const { error } = await supabase.from(tableName).insert([rowWithoutId])
+
+              if (error) {
+                alert(`데이터 등록 실패: ${error.message}`)
+                return
+              }
+
+              insertedKeys.add(key)
+            }
+
+            alert('병합이 완료되었습니다.')
+          }
+
+          // 완료 후 콜백 실행 (데이터 재조회 등)
+          if (onDataReload) {
+            await onDataReload()
+          }
+
+          // 저장 완료 후 상태 초기화 (저장 버튼 비활성화)
+          setAddedRows(new Set())
+          setModifiedCells(new Set())
+          setCopiedRows(new Set())
+        } catch (error) {
+          console.error('엑셀 업로드 저장 실패:', error)
+          alert('엑셀 업로드 중 오류가 발생했습니다.')
+        }
+        return
+      }
+
+      // excelImportConfig가 없으면 기존 방식 (테이블에 표시만)
+      if (mode === 'replace') {
+        // 전체 교체 모드
+        // 모든 행을 추가된 행으로 표시
+        const newAddedRows = new Set<number>()
+        imported.forEach((_, idx) => {
+          newAddedRows.add(idx)
+        })
+        setAddedRows(newAddedRows)
+
+        // 히스토리에 추가
+        addToHistory(imported)
+
+        setGridData(imported)
+        onDataChange?.(imported)
+      } else {
+        // 병합 모드 (ID 기반 또는 커스텀 키 기반 + 신규 추가)
+        const existingDataMap = new Map<string, T>()
+
+        // mergeKeyGetter가 제공되면 커스텀 키로, 없으면 ID로 맵핑
+        gridData.forEach(row => {
+          if (mergeKeyGetter) {
+            // 커스텀 키로 중복 체크 (예: 카테고리 조합)
+            const key = mergeKeyGetter(row)
+            existingDataMap.set(key, row)
+          } else {
+            // ID로 중복 체크 (기존 방식)
+            const id = (row as any).id
+            if (id && !String(id).startsWith('temp_')) {
+              existingDataMap.set(String(id), row)
+            }
+          }
+        })
+
+        // 업데이트 및 새로 추가할 항목 분류
+        const updatedItems: T[] = []
+        const newItems: T[] = []
+        let skippedCount = 0
+        const processedKeys = new Set<string>() // 이번 업로드에서 이미 처리한 키 추적
+
+        imported.forEach(importedRow => {
+          let key: string
+
+          if (mergeKeyGetter) {
+            // 커스텀 키로 중복 체크
+            key = mergeKeyGetter(importedRow)
+          } else {
+            // ID로 중복 체크
+            const id = (importedRow as any).id
+            key = id && !String(id).startsWith('temp_') ? String(id) : ''
+          }
+
+          if (key && existingDataMap.has(key)) {
+            // 기존 데이터에 존재하면 업데이트 (중복 체크)
+            if (processedKeys.has(key)) {
+              // 이미 처리한 키면 스킵
+              skippedCount++
+            } else {
+              const existing = existingDataMap.get(key)!
+              updatedItems.push({ ...existing, ...importedRow })
+              existingDataMap.delete(key)
+              processedKeys.add(key)
+            }
+          } else if (mergeKeyGetter && key) {
+            // 커스텀 키가 있지만 기존 데이터에 없으면 중복 체크 후 추가
+            if (processedKeys.has(key)) {
+              // 이미 처리한 키면 스킵
+              skippedCount++
+            } else {
+              // 신규 추가 (temp_ ID 부여)
+              const newRow = { ...importedRow, id: `temp_${Date.now()}_${Math.random()}` }
+              newItems.push(newRow as T)
+              processedKeys.add(key)
+            }
+          } else if (!mergeKeyGetter && !key) {
+            // ID가 없으면 신규 추가 (기존 방식)
+            const newRow = { ...importedRow, id: `temp_${Date.now()}_${Math.random()}` }
+            newItems.push(newRow as T)
+          }
+        })
+
+        // 업데이트되지 않은 기존 항목들
+        const unchangedItems = Array.from(existingDataMap.values())
+
+        // 최종 데이터 = 기존(유지) + 업데이트 + 신규
+        const mergedData = [...unchangedItems, ...updatedItems, ...newItems]
+
+        // 신규 추가된 항목들의 인덱스를 addedRows에 추가
+        const newAddedRows = new Set(addedRows)
+        newItems.forEach((_, idx) => {
+          const rowIndex = unchangedItems.length + updatedItems.length + idx
+          newAddedRows.add(rowIndex)
+        })
+        setAddedRows(newAddedRows)
+
+        // 업데이트된 항목들을 modifiedCells에 추가
+        const newModifiedCells = new Set(modifiedCells)
+        updatedItems.forEach((_, idx) => {
+          const rowIndex = unchangedItems.length + idx
+          // 모든 컬럼을 수정된 것으로 표시
+          columns.forEach(column => {
+            const cellKey = `${rowIndex}-${column.key}`
+            newModifiedCells.add(cellKey)
+          })
+        })
+        setModifiedCells(newModifiedCells)
+
+        // 히스토리에 추가
+        addToHistory(mergedData)
+
+        setGridData(mergedData)
+        onDataChange?.(mergedData)
+
+        const message = skippedCount > 0
+          ? `병합 완료:\n업데이트: ${updatedItems.length}건\n신규 추가: ${newItems.length}건\n유지: ${unchangedItems.length}건\n중복 스킵: ${skippedCount}건`
+          : `병합 완료:\n업데이트: ${updatedItems.length}건\n신규 추가: ${newItems.length}건\n유지: ${unchangedItems.length}건`
+        alert(message)
+      }
     }
-    reader.readAsText(file)
+    reader.readAsBinaryString(file)
+  }
+
+  const handleImportModeSelect = (mode: 'replace' | 'merge') => {
+    if (pendingImportFile) {
+      importFromExcel(pendingImportFile, mode)
+      setPendingImportFile(null)
+      setShowImportModeDialog(false)
+    }
   }
 
   // 채우기 핸들 마우스 다운
@@ -947,6 +1286,19 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={commitEdit}
             onKeyDown={handleKeyDown}
+            onCompositionStart={(e) => {
+              // IME 조합 시작 (한글 입력 시작)
+              e.stopPropagation()
+            }}
+            onCompositionUpdate={(e) => {
+              // IME 조합 중
+              e.stopPropagation()
+            }}
+            onCompositionEnd={(e) => {
+              // IME 조합 완료 (한글 입력 완료)
+              e.stopPropagation()
+              setEditValue((e.target as HTMLInputElement).value)
+            }}
             className={`w-full h-full px-2 py-1 border-none outline-none bg-transparent resize-none overflow-hidden ${
               isNumberCol ? 'text-right' : 'text-center'
             }`}
@@ -1098,9 +1450,9 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   }
 
   return (
-    <div className="space-y-2">
+    <div>
       {(enableFilter || enableCSVExport || enableCSVImport || onSave || onDeleteSelected || enableCopy || customActions) && (
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center mb-2">
           {enableFilter && (
             <div className="relative" style={{ width: '200px' }}>
               <input
@@ -1128,11 +1480,11 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           )}
           {enableCSVExport && (
             <button
-              onClick={exportToCSV}
+              onClick={exportToExcel}
               className="p-1 border border-gray-200 rounded hover:bg-surface-hover"
               title="엑셀 다운로드"
             >
-              <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
                 <path d="M14 2v6h6M9.5 13.5L12 16l2.5-2.5M12 10v6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
@@ -1142,11 +1494,17 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
             <label className="cursor-pointer p-1 border border-gray-200 rounded hover:bg-gray-50" title="엑셀 업로드">
               <input
                 type="file"
-                accept=".csv"
-                onChange={(e) => e.target.files?.[0] && importFromCSV(e.target.files[0])}
+                accept=".xlsx,.xls"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    setPendingImportFile(e.target.files[0])
+                    setShowImportModeDialog(true)
+                    e.target.value = '' // 같은 파일 재선택 가능하도록
+                  }
+                }}
                 className="hidden"
               />
-              <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
                 <path d="M14 2v6h6M12 10v6m-2.5-3.5L12 10l2.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
@@ -1316,6 +1674,50 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           </tbody>
         </table>
       </div>
+
+      {/* 엑셀 업로드 모드 선택 다이얼로그 */}
+      {showImportModeDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">엑셀 업로드 방식 선택</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              엑셀 파일을 어떻게 적용하시겠습니까?
+            </p>
+
+            <div className="space-y-3 mb-6">
+              <button
+                onClick={() => handleImportModeSelect('replace')}
+                className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 text-left transition-colors"
+              >
+                <div className="font-semibold text-gray-900">전체 교체</div>
+                <div className="text-sm text-gray-600 mt-1">
+                  현재 데이터를 모두 삭제하고 엑셀 파일로 교체합니다
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleImportModeSelect('merge')}
+                className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 text-left transition-colors"
+              >
+                <div className="font-semibold text-gray-900">병합 (ID 기반)</div>
+                <div className="text-sm text-gray-600 mt-1">
+                  ID가 일치하는 항목은 업데이트하고, 새로운 항목은 추가합니다
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowImportModeDialog(false)
+                setPendingImportFile(null)
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

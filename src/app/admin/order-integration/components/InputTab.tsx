@@ -42,21 +42,63 @@ export default function InputTab() {
 
   const handleSubmit = async () => {
     try {
-      console.log('주문 저장:', { orderData, items });
-      // TODO: API 호출하여 주문 저장
-      alert('주문이 저장되었습니다.');
+      // 필수 필드 검증
+      if (!orderData.marketName || !orderData.orderNumber || !orderData.recipientName) {
+        alert('마켓명, 주문번호, 수취인명은 필수 항목입니다.');
+        return;
+      }
 
-      // 폼 초기화
-      setOrderData({
-        marketName: '',
-        paymentDate: new Date().toISOString().split('T')[0],
-        orderNumber: '',
-        recipientName: '',
-        recipientPhone: '',
-        recipientAddress: '',
-        deliveryMessage: '',
+      // 옵션명이 없는 항목 확인
+      const invalidItems = items.filter(item => !item.optionName);
+      if (invalidItems.length > 0) {
+        alert('모든 상품의 옵션명을 입력해주세요.');
+        return;
+      }
+
+      // 각 항목을 개별 주문으로 저장
+      const orders = items.map(item => ({
+        market_name: orderData.marketName,
+        payment_date: orderData.paymentDate,
+        order_number: orderData.orderNumber,
+        recipient_name: orderData.recipientName,
+        recipient_phone: orderData.recipientPhone,
+        recipient_address: orderData.recipientAddress,
+        delivery_message: orderData.deliveryMessage,
+        option_name: item.optionName,
+        quantity: item.quantity,
+        seller_supply_price: item.sellerSupplyPrice || null,
+        sheet_date: new Date().toISOString().split('T')[0],
+      }));
+
+      // API 호출
+      const response = await fetch('/api/integrated-orders/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orders }),
       });
-      setItems([{ optionName: '', quantity: 1, sellerSupplyPrice: 0 }]);
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`주문 ${result.count}건이 저장되었습니다.`);
+
+        // 폼 초기화
+        setOrderData({
+          marketName: '',
+          paymentDate: new Date().toISOString().split('T')[0],
+          orderNumber: '',
+          recipientName: '',
+          recipientPhone: '',
+          recipientAddress: '',
+          deliveryMessage: '',
+        });
+        setItems([{ optionName: '', quantity: 1, sellerSupplyPrice: 0 }]);
+      } else {
+        console.error('저장 실패:', result.error);
+        alert(`저장 실패: ${result.error}`);
+      }
     } catch (error) {
       console.error('주문 저장 실패:', error);
       alert('주문 저장 중 오류가 발생했습니다.');

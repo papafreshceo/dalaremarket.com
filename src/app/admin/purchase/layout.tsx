@@ -7,9 +7,8 @@ export default function PurchaseLayout({ children }: { children: React.ReactNode
   const router = useRouter()
 
   const tabs = [
-    { key: 'saiup', label: '사입관리', path: '/admin/purchase/saiup' },
-    { key: 'buy', label: '구매관리', path: '/admin/purchase/buy' },
-    { key: 'expense', label: '지출관리', path: '/admin/purchase/expense' },
+    { key: 'saiup', label: '사입', path: '/admin/purchase/saiup' },
+    { key: 'buy', label: '지출', path: '/admin/purchase/buy' },
   ]
 
   const activeTab = tabs.find(tab => pathname.includes(tab.path))?.key || 'saiup'

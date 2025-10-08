@@ -239,7 +239,7 @@ export default function OptionProductsManagementPage() {
     // 원가
     raw_material_cost: '원물비용',
     average_material_price: '원물가',
-    calculated_material_cost: '원물원가',
+    calculated_material_cost: '원물비용',
     total_material_cost: '총자재비',
     total_cost: '총원가',
     material_cost_policy: '원물가정책',
@@ -1055,7 +1055,7 @@ export default function OptionProductsManagementPage() {
 
       {/* 테이블 */}
       <div>
-        <div className="px-6 py-4 border-b border-gray-100">
+        <div className="px-6 py-4">
           {/* 뷰 모드 선택기 */}
           <div className="mb-4 flex items-center gap-3">
             <div className="flex gap-2">
@@ -1151,11 +1151,9 @@ export default function OptionProductsManagementPage() {
                      'raw_material_cost', 'labor_cost', 'misc_cost', 'shipping_fee', 'total_material_cost', 'fixed_material_cost', 'additional_quantity',
                      'seller_supply_price', 'naver_paid_shipping_price', 'naver_free_shipping_price', 'coupang_paid_shipping_price',
                      'coupang_free_shipping_price', 'standard_quantity', 'seller_margin_rate', 'target_seller_margin_rate', 'target_margin_rate', 'target_margin_amount'].includes(field) ? 'number' as const
-                : ['material_cost_policy', 'seller_supply_price_mode', 'naver_price_mode', 'coupang_price_mode', 'margin_calculation_type', 'status',
-                   'standard_unit'].includes(field) ? 'dropdown' as const
+                : ['material_cost_policy', 'margin_calculation_type', 'status', 'standard_unit'].includes(field) ? 'dropdown' as const
                 : 'text' as const,
               source: field === 'material_cost_policy' ? ['자동', '고정']
-                : field === 'seller_supply_price_mode' || field === 'naver_price_mode' || field === 'coupang_price_mode' ? ['자동', '수동']
                 : field === 'margin_calculation_type' ? ['마진율', '마진액']
                 : field === 'status' ? supplyStatuses.map(s => s.name)
                 : field === 'standard_unit' ? ['kg', 'g', 'box', '개', 'L', 'ml']
@@ -1226,34 +1224,72 @@ export default function OptionProductsManagementPage() {
                     </div>
                   </div>
                 )
-                : field === 'seller_supply_price_mode' || field === 'naver_price_mode' || field === 'coupang_price_mode' ? (value: any, _row: OptionProduct, _rowIndex: number, handleDropdownArrowClick?: (e: React.MouseEvent) => void) => (
-                  <div className="relative flex items-center justify-center h-full w-full">
-                    <span style={{ fontSize: '13px' }}>{(value === 'auto' || value === '자동') ? '자동' : (value === 'manual' || value === '수동') ? '수동' : value || ''}</span>
-                    <div
-                      className="absolute right-1 w-5 h-full flex items-center justify-center cursor-pointer"
-                      onClick={handleDropdownArrowClick}
-                      style={{ zIndex: 10 }}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ opacity: 0.5 }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
+                : field === 'seller_supply_price_mode' || field === 'naver_price_mode' || field === 'coupang_price_mode' ? (value: any, row: OptionProduct, rowIndex: number) => {
+                  const isAuto = value === 'auto' || value === '자동'
+                  return (
+                    <div className="flex items-center justify-center h-full w-full">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const newValue = isAuto ? '수동' : '자동'
+                          // 데이터 직접 업데이트
+                          const newData = [...filteredProducts]
+                          newData[rowIndex] = { ...newData[rowIndex], [field]: newValue }
+
+                          // products 전체 업데이트
+                          setProducts(prev => {
+                            const updated = [...prev]
+                            const productIndex = updated.findIndex(p => p.id === newData[rowIndex].id)
+                            if (productIndex !== -1) {
+                              updated[productIndex] = { ...updated[productIndex], [field]: newValue }
+                            }
+                            return updated
+                          })
+                        }}
+                        className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                          isAuto
+                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {isAuto ? '자동' : '수동'}
+                      </button>
                     </div>
-                  </div>
-                )
-                : field === 'margin_calculation_type' ? (value: any, _row: OptionProduct, _rowIndex: number, handleDropdownArrowClick?: (e: React.MouseEvent) => void) => (
-                  <div className="relative flex items-center justify-center h-full w-full">
-                    <span style={{ fontSize: '13px' }}>{value === 'rate' ? '마진율' : value === 'amount' ? '마진액' : value || ''}</span>
-                    <div
-                      className="absolute right-1 w-5 h-full flex items-center justify-center cursor-pointer"
-                      onClick={handleDropdownArrowClick}
-                      style={{ zIndex: 10 }}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ opacity: 0.5 }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
+                  )
+                }
+                : field === 'margin_calculation_type' ? (value: any, _row: OptionProduct, rowIndex: number) => {
+                  const isRate = value === 'rate' || value === '마진율'
+                  return (
+                    <div className="flex items-center justify-center h-full w-full">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const newValue = isRate ? '마진액' : '마진율'
+                          // 데이터 직접 업데이트
+                          const newData = [...filteredProducts]
+                          newData[rowIndex] = { ...newData[rowIndex], [field]: newValue }
+
+                          // products 전체 업데이트
+                          setProducts(prev => {
+                            const updated = [...prev]
+                            const productIndex = updated.findIndex(p => p.id === newData[rowIndex].id)
+                            if (productIndex !== -1) {
+                              updated[productIndex] = { ...updated[productIndex], [field]: newValue }
+                            }
+                            return updated
+                          })
+                        }}
+                        className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                          isRate
+                            ? 'bg-green-600 text-white hover:bg-green-700'
+                            : 'bg-purple-600 text-white hover:bg-purple-700'
+                        }`}
+                      >
+                        {isRate ? '마진율' : '마진액'}
+                      </button>
                     </div>
-                  </div>
-                )
+                  )
+                }
                 : field === 'seller_margin_rate' ? (value: any) => (
                   <span style={{ fontSize: '13px', color: '#059669', fontWeight: '500' }}>{value != null ? `${Number(value).toFixed(1)}%` : '-'}</span>
                 )
@@ -1389,6 +1425,9 @@ export default function OptionProductsManagementPage() {
           globalSearchPlaceholder="옵션코드, 상품명, 품목, 품종 검색"
           height="900px"
           rowHeight={26}
+          enableCSVExport={viewMode === 'full'}
+          enableCSVImport={viewMode === 'full'}
+          exportFilePrefix="옵션상품"
         />
       </div>
 

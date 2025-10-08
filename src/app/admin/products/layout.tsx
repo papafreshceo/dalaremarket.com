@@ -33,9 +33,9 @@ export default function ProductsLayout({ children }: { children: ReactNode }) {
       category: '상품 설정',
       items: [
         {
-          title: '품종 마스터',
-          description: '품종별 대/중/소분류 관리',
-          href: '/admin/products/item-master'
+          title: '카테고리 설정',
+          description: '카테고리 조견표 관리',
+          href: '/admin/products/category-settings'
         },
         {
           title: '출고처/송장주체',

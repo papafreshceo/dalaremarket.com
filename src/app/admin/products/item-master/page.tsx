@@ -9,11 +9,11 @@ import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 
 interface Variety {
   id: string
-  item_name: string
   category_1: string | null
   category_2: string | null
   category_3: string | null
   category_4: string | null
+  category_5: string | null
   is_active: boolean
   notes: string | null
 }
@@ -58,11 +58,11 @@ export default function ItemMasterPage() {
   const handleAddRow = () => {
     const newRow = {
       id: `temp_${Date.now()}`,
-      item_name: '',
       category_1: '',
       category_2: '',
       category_3: '',
       category_4: '',
+      category_5: '',
       is_active: true,
       notes: ''
     }
@@ -74,39 +74,41 @@ export default function ItemMasterPage() {
       for (let i = 0; i < tableData.length; i++) {
         const row = tableData[i]
 
-        if (!row.item_name) {
-          continue // 품종명이 없으면 스킵
+        if (!row.category_5) {
+          continue // 품종이 없으면 스킵
         }
 
-        if (row.id.startsWith('temp_')) {
+        if (!row.id || String(row.id).startsWith('temp_')) {
           // 신규 데이터
           const { error } = await supabase.from('item_master').insert([{
-            item_name: row.item_name,
+            item_name: row.category_5, // 품종을 item_name으로 저장
             category_1: row.category_1 || null,
             category_2: row.category_2 || null,
             category_3: row.category_3 || null,
-            category_4: row.item_name, // 품종명과 동일
+            category_4: row.category_4 || null,
+            category_5: row.category_5 || null,
             is_active: true,
             notes: row.notes || null
           }])
 
           if (error) {
-            showToast(`품종 등록 실패 (${row.item_name}): ${error.message}`, 'error')
+            showToast(`품종 등록 실패 (${row.category_5}): ${error.message}`, 'error')
             return
           }
         } else {
           // 기존 데이터 업데이트
           const { error } = await supabase.from('item_master').update({
-            item_name: row.item_name,
+            item_name: row.category_5, // 품종을 item_name으로 저장
             category_1: row.category_1 || null,
             category_2: row.category_2 || null,
             category_3: row.category_3 || null,
-            category_4: row.item_name,
+            category_4: row.category_4 || null,
+            category_5: row.category_5 || null,
             notes: row.notes || null
           }).eq('id', row.id)
 
           if (error) {
-            showToast(`품종 수정 실패 (${row.item_name}): ${error.message}`, 'error')
+            showToast(`품종 수정 실패 (${row.category_5}): ${error.message}`, 'error')
             return
           }
         }
@@ -148,10 +150,11 @@ export default function ItemMasterPage() {
   }
 
   const columns = [
-    { key: 'item_name', title: '품종명', width: 150, className: 'text-center' },
     { key: 'category_1', title: '대분류', width: 120, className: 'text-center' },
     { key: 'category_2', title: '중분류', width: 120, className: 'text-center' },
     { key: 'category_3', title: '소분류', width: 120, className: 'text-center' },
+    { key: 'category_4', title: '품목', width: 120, className: 'text-center' },
+    { key: 'category_5', title: '품종', width: 120, className: 'text-center' },
     { key: 'notes', title: '비고', width: 200, className: 'text-center' }
   ]
 
@@ -177,7 +180,7 @@ export default function ItemMasterPage() {
           console.log('복사할 행:', indices)
         }}
         height="600px"
-        globalSearchPlaceholder="품종명, 대분류, 중분류, 소분류, 비고 검색"
+        globalSearchPlaceholder="대분류, 중분류, 소분류, 품목, 품종, 비고 검색"
       />
     </div>
   )

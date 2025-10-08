@@ -1021,6 +1021,7 @@ export default function RawMaterialsManagementPage() {
         material_id: materialId,
         supplier_id: priceRecordForm.supplier_id || null,
         price: Number(data.price),
+        currency: 'KRW',
         unit_quantity: 1,
         effective_date: data.date || priceRecordForm.bulk_date,
         price_type: priceRecordForm.price_type,
@@ -1174,6 +1175,7 @@ export default function RawMaterialsManagementPage() {
             setModalType('delete-confirm')
           }}
           globalSearchPlaceholder="원물코드, 원물명, 대분류, 중분류, 소분류, 품목, 품종 검색"
+          exportFilePrefix="원물관리"
         />
       </div>
 

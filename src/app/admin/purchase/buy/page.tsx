@@ -60,7 +60,7 @@ const formatDateWithDay = (dateStr: string): string => {
   return `${dateStr} (${dayOfWeek})`
 }
 
-export default function SaiupManagementPage() {
+export default function BuyManagementPage() {
   const { showToast } = useToast()
   const { confirm } = useConfirm()
 
@@ -76,7 +76,6 @@ export default function SaiupManagementPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
-  const [filterCategory, setFilterCategory] = useState<'전체' | '중매인' | '농가' | '기타'>('전체')
 
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false)
   const [isItemModalOpen, setIsItemModalOpen] = useState(false)
@@ -112,11 +111,6 @@ export default function SaiupManagementPage() {
 
       if (!inDateRange) return false
 
-      // 필터 카테고리 체크
-      if (filterCategory !== '전체' && r.purchase_category !== filterCategory) {
-        return false
-      }
-
       if (searchTerm) {
         return (
           r.supplier_name?.includes(searchTerm) ||
@@ -130,7 +124,7 @@ export default function SaiupManagementPage() {
     })
 
     setTableData(filtered)
-  }, [records, startDate, endDate, searchTerm, filterCategory])
+  }, [records, startDate, endDate, searchTerm])
 
   const fetchRecords = async () => {
     setLoading(true)
@@ -203,14 +197,14 @@ export default function SaiupManagementPage() {
       purchase_id: '',
       purchase_date: new Date().toISOString().split('T')[0],
       supplier_name: '',
-      purchase_category: filterCategory === '전체' ? '중매인' : filterCategory,
+      purchase_category: '지출',
       category_1: '',
       category_2: '',
       category_3: '',
       category_4: '',
       category_5: '',
       shipper_name: '',
-      classification: filterCategory === '전체' ? '' : filterCategory, // Auto-set based on active tab
+      classification: '지출', // 지출로 고정
       quantity: 0,
       unit_price: 0,
       amount: 0,
@@ -516,38 +510,6 @@ export default function SaiupManagementPage() {
 
   return (
     <div className="space-y-4">
-      {/* 필터 버튼 */}
-      <div className="flex gap-2">
-        <Button
-          onClick={() => setFilterCategory('전체')}
-          variant={filterCategory === '전체' ? 'default' : 'ghost'}
-          className={filterCategory === '전체' ? 'underline' : ''}
-        >
-          전체
-        </Button>
-        <Button
-          onClick={() => setFilterCategory('중매인')}
-          variant={filterCategory === '중매인' ? 'default' : 'ghost'}
-          className={filterCategory === '중매인' ? 'underline' : ''}
-        >
-          중매인
-        </Button>
-        <Button
-          onClick={() => setFilterCategory('농가')}
-          variant={filterCategory === '농가' ? 'default' : 'ghost'}
-          className={filterCategory === '농가' ? 'underline' : ''}
-        >
-          농가
-        </Button>
-        <Button
-          onClick={() => setFilterCategory('기타')}
-          variant={filterCategory === '기타' ? 'default' : 'ghost'}
-          className={filterCategory === '기타' ? 'underline' : ''}
-        >
-          기타
-        </Button>
-      </div>
-
       {/* 필터 영역 */}
       <div className="grid grid-cols-12 gap-4">
           <div>
@@ -661,7 +623,7 @@ export default function SaiupManagementPage() {
           fetchItems()
           setIsItemModalOpen(false)
         }}
-        defaultTab="variety"
+        defaultTab="expense"
       />
 
       {/* 거래명세서 모달 */}
