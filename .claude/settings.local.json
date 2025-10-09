@@ -23,7 +23,8 @@
       "Bash(del \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\database\\migrations\\create_integrated_orders.sql\")",
       "Bash(Get-Content \"database\\migrations\\008_restructure_mapping_fields.sql\")",
       "Bash(del fetch-market-colors.js)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

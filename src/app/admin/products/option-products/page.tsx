@@ -10,18 +10,6 @@ import { useToast } from '@/components/ui/Toast'
 import * as XLSX from 'xlsx'
 
 // ===== 타입 =====
-interface Vendor {
-  id: string
-  code: string
-  name: string
-  business_number?: string
-  contact_person?: string
-  phone?: string
-  email?: string
-  address?: string
-  is_active: boolean
-}
-
 interface OptionProduct {
   id: string
   option_code: string
@@ -36,6 +24,7 @@ interface OptionProduct {
   raw_material_cost: number | null
   labor_cost: number | null
   misc_cost: number | null
+  shipping_cost: number | null
   shipping_fee: number | null
   total_cost: number | null
   seller_supply_price: number | null
@@ -44,8 +33,6 @@ interface OptionProduct {
   coupang_paid_shipping_price: number | null
   coupang_free_shipping_price: number | null
   status: string
-  vendor_id: string | null
-  vendor_name?: string | null
   // 가격 정책 필드
   material_cost_policy?: 'auto' | 'fixed' | '자동' | '고정' | null
   seller_supply_price_mode?: 'auto' | 'manual' | '자동' | '수동' | null
@@ -78,7 +65,6 @@ export default function OptionProductsManagementPage() {
 
   const [products, setProducts] = useState<OptionProduct[]>([])
   const [filteredProducts, setFilteredProducts] = useState<OptionProduct[]>([])
-  const [vendors, setVendors] = useState<Vendor[]>([])
   const [supplyStatuses, setSupplyStatuses] = useState<SupplyStatus[]>([])
 
   const [stats, setStats] = useState<Record<string, number>>({})
@@ -261,14 +247,15 @@ export default function OptionProductsManagementPage() {
     supplier_id: '원물거래처',
     shipping_vendor_id: '출고처',
     invoice_entity: '송장주체',
-    vendor_id: '벤더사',
     shipping_location_name: '발송지명',
     shipping_location_address: '발송지주소',
     shipping_location_contact: '발송지연락처',
     shipping_deadline: '발송기한',
 
     // 택배비 및 부가
+    shipping_cost: '상품출고비용',
     shipping_fee: '택배비',
+    shipping_additional_quantity: '택배비 부가수량',
     additional_quantity: '부가수량',
 
     // 셀러공급
@@ -324,11 +311,11 @@ export default function OptionProductsManagementPage() {
     'raw_material_cost','total_material_cost','total_cost','material_cost_policy','fixed_material_cost',
 
     // 거래처 및 출고
-    'supplier_id','shipping_vendor_id','invoice_entity','vendor_id',
+    'supplier_id','shipping_vendor_id','invoice_entity',
     'shipping_location_name','shipping_location_address','shipping_location_contact','shipping_deadline',
 
     // 택배비 및 부가
-    'shipping_fee','additional_quantity','misc_cost',
+    'shipping_cost','shipping_fee','additional_quantity','misc_cost',
 
     // 셀러공급
     'is_seller_supply',
@@ -351,9 +338,9 @@ export default function OptionProductsManagementPage() {
   const getVisibleFields = (mode: string) => {
     switch(mode) {
       case 'basic':
-        return ['option_code','option_name','specification_1','standard_quantity','standard_unit','total_cost','shipping_fee','seller_supply_price','status','vendor_id']
+        return ['thumbnail_url','option_code','option_name','specification_1','standard_quantity','standard_unit','total_cost','shipping_fee','seller_supply_price','status']
       case 'cost':
-        return ['option_code','option_name','raw_material_cost','packaging_box_price','pack_price','bag_vinyl_price','cushioning_price','sticker_price','ice_pack_price','other_material_price','labor_cost','misc_cost','total_material_cost','total_cost','shipping_fee','seller_supply_price','status']
+        return ['option_code','option_name','raw_material_cost','packaging_box_price','pack_price','bag_vinyl_price','cushioning_price','sticker_price','ice_pack_price','other_material_price','labor_cost','misc_cost','total_material_cost','total_cost','shipping_cost','shipping_fee','seller_supply_price','status']
       case 'price':
         return ['option_code','option_name','total_cost','shipping_fee','seller_supply_price','naver_paid_shipping_price','naver_free_shipping_price','coupang_paid_shipping_price','coupang_free_shipping_price','status']
       case 'supply_policy':
@@ -361,7 +348,7 @@ export default function OptionProductsManagementPage() {
       case 'direct_policy':
         return ['option_code','option_name','total_cost','seller_supply_price','margin_calculation_type','target_margin_rate','target_margin_amount','naver_price_mode','naver_paid_shipping_price','naver_free_shipping_price','naver_margin_display','coupang_price_mode','coupang_paid_shipping_price','coupang_free_shipping_price','coupang_margin_display']
       case 'shipping':
-        return ['option_code','option_name','supplier_id','shipping_vendor_id','invoice_entity','vendor_id','shipping_location_name','shipping_location_address','shipping_location_contact','shipping_deadline','total_cost','shipping_fee','seller_supply_price','status']
+        return ['option_code','option_name','supplier_id','shipping_vendor_id','invoice_entity','shipping_location_name','shipping_location_address','shipping_location_contact','shipping_deadline','total_cost','shipping_cost','shipping_fee','seller_supply_price','status']
       case 'full':
       default:
         return FIELD_ORDER
@@ -379,15 +366,6 @@ export default function OptionProductsManagementPage() {
     const byName = supplyStatuses.find(s => s.name === input.trim())
     if (byName) return byName.code
     return null
-  }
-
-  const resolveVendorIdByName = (name?: string | null) => {
-    if (!name) return null
-    const t = name.trim()
-    const exact = vendors.find(v => v.name === t)
-    if (exact) return exact.id
-    const part = vendors.filter(v => v.name.includes(t)).sort((a,b)=>a.name.length-b.name.length)[0]
-    return part?.id || null
   }
 
   // 표시용
@@ -440,8 +418,7 @@ export default function OptionProductsManagementPage() {
         return p[field] ? 'Y' : 'N'
       case 'supplier_id':
       case 'shipping_vendor_id':
-      case 'vendor_id':
-        return p.vendor_name || '-'
+        return '-' // TODO: 거래처 정보 표시 필요 시 구현
       case 'status':
         const st = supplyStatuses.find(s => s.code === p.status)
         return st?.name || p.status || '-'
@@ -459,17 +436,14 @@ export default function OptionProductsManagementPage() {
   useEffect(() => { void fetchAll() }, [])
 
   const fetchAll = async () => {
-    await Promise.all([fetchProducts(), fetchVendors(), fetchSupplyStatuses()])
+    await Promise.all([fetchProducts(), fetchSupplyStatuses()])
   }
 
 
   const fetchProducts = async () => {
     const { data, error } = await supabase
       .from('option_products')
-      .select(`
-        *,
-        vendor:partners!vendor_id(name)
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -593,15 +567,6 @@ export default function OptionProductsManagementPage() {
     }
   }
 
-  const fetchVendors = async () => {
-    const { data } = await supabase
-      .from('partners')
-      .select('*')
-      .eq('is_active', true)
-      .order('name')
-    if (data) setVendors(data)
-  }
-
   const fetchSupplyStatuses = async () => {
     const { data, error } = await supabase
       .from('supply_status_settings')
@@ -623,7 +588,7 @@ export default function OptionProductsManagementPage() {
     const statusCounts: Record<string, number> = { total: snapshot.length }
 
     supplyStatuses.forEach(status => {
-      const count = snapshot.filter(p => p.status === status.code || p.status === status.name).length
+      const count = snapshot.filter(p => p.status === status.name).length
       statusCounts[status.code] = count
     })
 
@@ -675,7 +640,6 @@ export default function OptionProductsManagementPage() {
     if (selectedStatus !== 'all') {
       const selectedStatusObj = supplyStatuses.find(s => s.code === selectedStatus)
       f = f.filter(p =>
-        p.status === selectedStatus ||
         (selectedStatusObj && p.status === selectedStatusObj.name) ||
         !p.status ||
         p.status === ''
@@ -839,7 +803,6 @@ export default function OptionProductsManagementPage() {
           coupang_paid_shipping_price: p.coupang_paid_shipping_price != null ? Number(p.coupang_paid_shipping_price) : null,
           coupang_free_shipping_price: p.coupang_free_shipping_price != null ? Number(p.coupang_free_shipping_price) : null,
           status: resolveStatusCode(p.status) || p.status || 'PREPARING',
-          vendor_id: p.vendor_id || null,
         }
       })
 
@@ -1027,7 +990,7 @@ export default function OptionProductsManagementPage() {
           results.push({
             optionCode: dbProduct.option_code || '',
             optionName: dbProduct.option_name || '',
-            changes: changes.map(c => `${c.label}: ${c.beforeValue} → ${c.afterValue}`)
+            changes: changes
           })
         }
       }
@@ -1070,84 +1033,6 @@ export default function OptionProductsManagementPage() {
         <div className="flex gap-2">
           <button
             onClick={() => {
-              // 필드명을 한글로 매핑
-              const fieldMapping: Record<string, string> = {
-                'id': 'ID',
-                'option_code': '옵션코드',
-                'option_name': '옵션명',
-                'item_type': '품목유형',
-                'variety': '품종',
-                'specification_1': '규격1',
-                'specification_2': '규격2',
-                'specification_3': '규격3',
-                'weight': '중량',
-                'weight_unit': '중량단위',
-                'standard_quantity': '표준수량',
-                'standard_unit': '표준단위',
-                'packaging_box_price': '포장박스가',
-                'pack_price': '팩가',
-                'bag_vinyl_price': '비닐가',
-                'cushioning_price': '완충재가',
-                'sticker_price': '스티커가',
-                'ice_pack_price': '아이스팩가',
-                'other_material_price': '기타재료가',
-                'total_material_cost': '총재료비',
-                'raw_material_cost': '원물비',
-                'labor_cost': '인건비',
-                'misc_cost': '기타비용',
-                'total_cost': '총원가',
-                'vendor_id': '벤더ID',
-                'shipping_type': '발송유형',
-                'shipping_address': '발송주소',
-                'shipping_contact': '발송연락처',
-                'shipping_deadline': '발송마감',
-                'shipping_fee': '택배비',
-                'additional_quantity': '추가수량',
-                'status': '상태',
-                'season': '시즌',
-                'season_start_date': '시즌시작일',
-                'season_peak_date': '시즌피크일',
-                'season_end_date': '시즌종료일',
-                'target_margin_rate': '목표직판마진율',
-                'seller_margin_rate': '실제셀러마진율',
-                'target_seller_margin_rate': '목표셀러마진율',
-                'seller_supply_price_mode': '셀러공급가모드',
-                'seller_supply_auto_price': '셀러공급가자동',
-                'seller_supply_manual_price': '셀러공급가수동',
-                'seller_supply_price': '셀러공급가',
-                'naver_price_mode': '네이버가격모드',
-                'naver_paid_shipping_auto': '네이버유료배송자동',
-                'naver_free_shipping_auto': '네이버무료배송자동',
-                'naver_paid_shipping_manual': '네이버유료배송수동',
-                'naver_free_shipping_manual': '네이버무료배송수동',
-                'naver_paid_shipping_price': '네이버유료배송가',
-                'naver_free_shipping_price': '네이버무료배송가',
-                'coupang_price_mode': '쿠팡가격모드',
-                'coupang_paid_shipping_auto': '쿠팡유료배송자동',
-                'coupang_free_shipping_auto': '쿠팡무료배송자동',
-                'coupang_paid_shipping_manual': '쿠팡유료배송수동',
-                'coupang_free_shipping_manual': '쿠팡무료배송수동',
-                'coupang_paid_shipping_price': '쿠팡유료배송가',
-                'coupang_free_shipping_price': '쿠팡무료배송가',
-                'thumbnail_url': '썸네일URL',
-                'detail_page_url': '상세페이지URL',
-                'has_detail_page': '상세페이지유무',
-                'has_images': '이미지유무',
-                'is_best': '베스트',
-                'is_recommended': '추천',
-                'description': '설명',
-                'notes': '비고',
-                'is_active': '활성화',
-                'created_at': '생성일',
-                'updated_at': '수정일',
-                'material_cost_policy': '원물가정책',
-                'seller_margin_amount': '실제셀러마진액',
-                'target_margin_amount': '목표직판마진액',
-                'margin_calculation_type': '마진계산유형',
-                'average_material_price': '평균원물가',
-                'calculated_material_cost': '계산된원물비'
-              }
-
               // 가상 필드 제거 (프론트엔드에서 추가한 필드들)
               const virtualFields = [
                 'vendor_name', 'used_material_1', 'used_material_2', 'used_material_3',
@@ -1157,10 +1042,29 @@ export default function OptionProductsManagementPage() {
                 'total_material_cost', 'total_cost', 'vendor'
               ]
 
-              // 첫 번째 상품의 실제 필드 확인
-              if (products.length > 0) {
-                console.log('다운로드할 상품의 필드:', Object.keys(products[0]))
+              // 추가 필드 매핑 (FIELD_LABELS에 없는 DB 필드들)
+              const additionalMapping: Record<string, string> = {
+                'id': 'ID',
+                'item_type': '품목유형',
+                'variety': '품종',
+                'weight': '중량',
+                'weight_unit': '중량단위',
+                'shipping_type': '발송유형',
+                'shipping_address': '발송주소',
+                'shipping_contact': '발송연락처',
+                'season': '시즌',
+                'season_start_date': '시즌시작일',
+                'season_peak_date': '시즌피크일',
+                'season_end_date': '시즌종료일',
+                'detail_page_url': '상세페이지URL',
+                'is_active': '활성화',
+                'created_at': '생성일',
+                'updated_at': '수정일'
               }
+
+              // 디버깅: FIELD_LABELS와 매핑 확인
+              console.log('=== 엑셀 다운로드 디버깅 ===')
+              console.log('FIELD_LABELS:', FIELD_LABELS)
 
               const exportData = products.map((product) => {
                 const koreanData: Record<string, any> = {}
@@ -1168,11 +1072,30 @@ export default function OptionProductsManagementPage() {
                   // 가상 필드 제외
                   if (virtualFields.includes(key)) return
 
-                  const koreanKey = fieldMapping[key] || key
-                  koreanData[koreanKey] = product[key]
+                  // FIELD_LABELS 우선 사용, 없으면 additionalMapping, 둘 다 없으면 영문 그대로
+                  const koreanKey = FIELD_LABELS[key] || additionalMapping[key] || key
+
+                  // status 값을 한글 이름으로 변환
+                  let value = product[key]
+                  if (key === 'status' && value) {
+                    const statusObj = supplyStatuses.find(s => s.code === value || s.name === value)
+                    value = statusObj?.name || value
+                  }
+
+                  koreanData[koreanKey] = value
                 })
                 return koreanData
               })
+
+              // 첫 번째 행의 헤더 확인
+              if (exportData.length > 0) {
+                const headers = Object.keys(exportData[0])
+                console.log('엑셀 헤더:', headers)
+                console.log('헤더 개수:', headers.length)
+
+                // 처음 10개 헤더만 alert로 표시
+                alert(`엑셀 헤더 (총 ${headers.length}개):\n${headers.slice(0, 10).join('\n')}\n...`)
+              }
 
               const ws = XLSX.utils.json_to_sheet(exportData)
               const wb = XLSX.utils.book_new()
@@ -1204,90 +1127,54 @@ export default function OptionProductsManagementPage() {
                   const worksheet = workbook.Sheets[sheetName]
                   const jsonData = XLSX.utils.sheet_to_json(worksheet)
 
-                  // 한글 헤더를 영문으로 매핑 (다운로드와 동일한 매핑의 역방향)
-                  const reverseFieldMapping: Record<string, string> = {
+                  // 추가 필드 역매핑 (FIELD_LABELS에 없는 필드들)
+                  const additionalReverseMapping: Record<string, string> = {
                     'ID': 'id',
-                    '옵션코드': 'option_code',
-                    '옵션명': 'option_name',
                     '품목유형': 'item_type',
                     '품종': 'variety',
-                    '규격1': 'specification_1',
-                    '규격2': 'specification_2',
-                    '규격3': 'specification_3',
                     '중량': 'weight',
                     '중량단위': 'weight_unit',
-                    '표준수량': 'standard_quantity',
-                    '표준단위': 'standard_unit',
-                    '포장박스가': 'packaging_box_price',
-                    '팩가': 'pack_price',
-                    '비닐가': 'bag_vinyl_price',
-                    '완충재가': 'cushioning_price',
-                    '스티커가': 'sticker_price',
-                    '아이스팩가': 'ice_pack_price',
-                    '기타재료가': 'other_material_price',
-                    '총재료비': 'total_material_cost',
-                    '원물비': 'raw_material_cost',
-                    '인건비': 'labor_cost',
-                    '기타비용': 'misc_cost',
-                    '총원가': 'total_cost',
-                    '벤더ID': 'vendor_id',
                     '발송유형': 'shipping_type',
                     '발송주소': 'shipping_address',
                     '발송연락처': 'shipping_contact',
-                    '발송마감': 'shipping_deadline',
-                    '택배비': 'shipping_fee',
-                    '추가수량': 'additional_quantity',
-                    '상태': 'status',
                     '시즌': 'season',
                     '시즌시작일': 'season_start_date',
                     '시즌피크일': 'season_peak_date',
                     '시즌종료일': 'season_end_date',
-                    '목표직판마진율': 'target_margin_rate',
-                    '실제셀러마진율': 'seller_margin_rate',
-                    '목표셀러마진율': 'target_seller_margin_rate',
-                    '셀러공급가모드': 'seller_supply_price_mode',
-                    '셀러공급가자동': 'seller_supply_auto_price',
-                    '셀러공급가수동': 'seller_supply_manual_price',
-                    '셀러공급가': 'seller_supply_price',
-                    '네이버가격모드': 'naver_price_mode',
-                    '네이버유료배송자동': 'naver_paid_shipping_auto',
-                    '네이버무료배송자동': 'naver_free_shipping_auto',
-                    '네이버유료배송수동': 'naver_paid_shipping_manual',
-                    '네이버무료배송수동': 'naver_free_shipping_manual',
-                    '네이버유료배송가': 'naver_paid_shipping_price',
-                    '네이버무료배송가': 'naver_free_shipping_price',
-                    '쿠팡가격모드': 'coupang_price_mode',
-                    '쿠팡유료배송자동': 'coupang_paid_shipping_auto',
-                    '쿠팡무료배송자동': 'coupang_free_shipping_auto',
-                    '쿠팡유료배송수동': 'coupang_paid_shipping_manual',
-                    '쿠팡무료배송수동': 'coupang_free_shipping_manual',
-                    '쿠팡유료배송가': 'coupang_paid_shipping_price',
-                    '쿠팡무료배송가': 'coupang_free_shipping_price',
-                    '썸네일URL': 'thumbnail_url',
                     '상세페이지URL': 'detail_page_url',
-                    '상세페이지유무': 'has_detail_page',
-                    '이미지유무': 'has_images',
-                    '베스트': 'is_best',
-                    '추천': 'is_recommended',
-                    '설명': 'description',
-                    '비고': 'notes',
                     '활성화': 'is_active',
                     '생성일': 'created_at',
-                    '수정일': 'updated_at',
-                    '원물가정책': 'material_cost_policy',
-                    '실제셀러마진액': 'seller_margin_amount',
-                    '목표직판마진액': 'target_margin_amount',
-                    '마진계산유형': 'margin_calculation_type',
-                    '평균원물가': 'average_material_price',
-                    '계산된원물비': 'calculated_material_cost'
+                    '수정일': 'updated_at'
                   }
+
+                  // 숫자로 변환해야 하는 필드 목록
+                  const numericFields = [
+                    'id', 'shipping_deadline', 'shipping_fee', 'shipping_additional_quantity',
+                    'standard_quantity', 'packaging_box_price', 'pack_price', 'bag_vinyl_price',
+                    'cushioning_price', 'sticker_price', 'ice_pack_price', 'other_material_price',
+                    'raw_material_cost', 'labor_cost', 'misc_cost', 'target_margin_rate',
+                    'target_seller_margin_rate', 'seller_supply_price', 'naver_paid_shipping_price',
+                    'naver_free_shipping_price', 'coupang_paid_shipping_price', 'coupang_free_shipping_price',
+                    'fixed_material_cost'
+                  ]
 
                   // 한글 헤더를 영문으로 변환
                   const convertedData = jsonData.map((row: any) => {
                     const englishRow: any = {}
                     Object.keys(row).forEach(key => {
-                      const englishKey = reverseFieldMapping[key] || key
-                      englishRow[englishKey] = row[key]
+                      // FIELD_LABELS에서 한글 헤더에 해당하는 영문 필드명 찾기
+                      const fieldLabelsEntry = Object.entries(FIELD_LABELS).find(([_, label]) => label === key)
+                      let englishKey = fieldLabelsEntry ? fieldLabelsEntry[0] : (additionalReverseMapping[key] || key)
+
+                      let value = row[key]
+
+                      // 숫자 필드는 문자열이면 숫자로 변환
+                      if (numericFields.includes(englishKey) && value !== null && value !== undefined && value !== '') {
+                        const numValue = typeof value === 'string' ? Number(value) : value
+                        value = isNaN(numValue) ? value : numValue
+                      }
+
+                      englishRow[englishKey] = value
                     })
                     return englishRow
                   })
@@ -1458,10 +1345,10 @@ export default function OptionProductsManagementPage() {
             return visibleFields.map(field => ({
               key: field,
               title: FIELD_LABELS[field] || field,
-              width: field === 'option_code' ? 120
+              width: field === 'thumbnail_url' ? 80
+                : field === 'option_code' ? 120
                 : field === 'option_name' ? 200
                 : field === 'status' ? 90
-                : field === 'vendor_id' ? 130
                 : 110,
               type: ['packaging_box_price', 'pack_price', 'bag_vinyl_price', 'cushioning_price', 'sticker_price', 'ice_pack_price', 'other_material_price',
                      'raw_material_cost', 'labor_cost', 'misc_cost', 'shipping_fee', 'total_material_cost', 'fixed_material_cost', 'additional_quantity',
@@ -1474,7 +1361,7 @@ export default function OptionProductsManagementPage() {
                 : field === 'status' ? supplyStatuses.map(s => s.name)
                 : field === 'standard_unit' ? ['kg', 'g', 'box', '개', 'L', 'ml']
                 : undefined,
-              readOnly: ['option_code', 'vendor_id', 'used_material_1', 'used_material_2', 'used_material_3', 'total_cost', 'average_material_price', 'calculated_material_cost', 'seller_margin_rate', 'seller_margin_amount', 'category_1', 'category_2', 'category_3', 'category_4', 'category_5', 'naver_margin_display', 'coupang_margin_display'].includes(field)
+              readOnly: ['thumbnail_url', 'option_code', 'used_material_1', 'used_material_2', 'used_material_3', 'total_cost', 'average_material_price', 'calculated_material_cost', 'seller_margin_rate', 'seller_margin_amount', 'category_1', 'category_2', 'category_3', 'category_4', 'category_5', 'naver_margin_display', 'coupang_margin_display'].includes(field)
                 ? true
                 : field === 'target_seller_margin_rate' ? (row: OptionProduct) => {
                     const mode = (row as any).seller_supply_price_mode
@@ -1494,7 +1381,27 @@ export default function OptionProductsManagementPage() {
                 return mode === 'manual' || mode === '수동' ? '!text-purple-600' : ''
               }) : undefined,
               align: ['material_cost_policy', 'seller_supply_price_mode', 'naver_price_mode', 'coupang_price_mode', 'margin_calculation_type', 'seller_margin_rate', 'target_seller_margin_rate', 'target_margin_rate'].includes(field) ? 'center' as const : undefined,
-              renderer: field === 'target_seller_margin_rate' ? (value: any, row: OptionProduct) => {
+              renderer: field === 'thumbnail_url' ? (value: any, _row: OptionProduct) => {
+                if (!value) return <div style={{ width: '60px', height: '60px', backgroundColor: '#F3F4F6', borderRadius: '4px' }} />
+                return (
+                  <img
+                    src={value}
+                    alt="썸네일"
+                    style={{
+                      width: '60px',
+                      height: '60px',
+                      objectFit: 'cover',
+                      borderRadius: '4px',
+                      border: '1px solid #E5E7EB'
+                    }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none'
+                      const parent = (e.target as HTMLImageElement).parentElement
+                      if (parent) parent.innerHTML = '<div style="width: 60px; height: 60px; background-color: #F3F4F6; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #9CA3AF;">이미지 없음</div>'
+                    }}
+                  />
+                )
+              } : field === 'target_seller_margin_rate' ? (value: any, row: OptionProduct) => {
                 const mode = (row as any).seller_supply_price_mode
                 const isReadOnly = mode === 'manual' || mode === '수동'
                 const displayValue = value != null ? Number(value).toLocaleString('ko-KR') : ''
@@ -1519,10 +1426,7 @@ export default function OptionProductsManagementPage() {
                     {st?.name || row.status}
                   </span>
                 )
-              } : field === 'vendor_id' ? (value: any, row: OptionProduct) => (
-                  <span style={{ fontSize: '13px' }}>{row.vendor_name || ''}</span>
-                )
-                : field === 'option_name' ? (value: any, row: OptionProduct) => {
+              } : field === 'option_name' ? (value: any, row: OptionProduct) => {
                   const policyBadge = row.material_cost_policy === 'fixed' ? ' 🔒' : ''
                   return <span style={{ fontSize: '13px' }}>{(row.option_name || '-') + policyBadge}</span>
                 }
@@ -1953,8 +1857,23 @@ export default function OptionProductsManagementPage() {
 
                   // 값 정규화 함수를 forEach 밖으로 이동
                   const normalizeValue = (val: any) => {
-                    if (val === null || val === undefined || val === '' || val === 'null' || val === 'undefined') return null
+                    // null/undefined 체크
+                    if (val === null || val === undefined || val === 'null' || val === 'undefined') return null
+
+                    // 빈 문자열 체크 (숫자 변환 전에)
+                    if (val === '') return null
+
+                    // 숫자 문자열을 숫자로 변환 (Excel에서 "1"로 읽히는 경우 대비)
+                    if (typeof val === 'string') {
+                      const trimmed = val.trim()
+                      if (trimmed !== '' && !isNaN(Number(trimmed))) {
+                        return Number(trimmed)
+                      }
+                    }
+
+                    // NaN 체크
                     if (typeof val === 'number' && isNaN(val)) return null
+
                     return val
                   }
 
@@ -1995,8 +1914,9 @@ export default function OptionProductsManagementPage() {
                     }
                   })
 
-                  // 1. 먼저 upsert로 데이터 업데이트/추가
-                  const { error: upsertError } = await supabase.from('option_products').upsert(excelUploadModal.data, { onConflict: 'id' })
+                  // 1. upsert로 데이터 업데이트/추가
+                  const dataToUpsert = excelUploadModal.data
+                  const { error: upsertError } = await supabase.from('option_products').upsert(dataToUpsert, { onConflict: 'id' })
                   if (upsertError) {
                     console.error(upsertError)
                     return
@@ -2043,8 +1963,23 @@ export default function OptionProductsManagementPage() {
 
                   // 값 정규화 함수
                   const normalizeValue = (val: any) => {
-                    if (val === null || val === undefined || val === '' || val === 'null' || val === 'undefined') return null
+                    // null/undefined 체크
+                    if (val === null || val === undefined || val === 'null' || val === 'undefined') return null
+
+                    // 빈 문자열 체크 (숫자 변환 전에)
+                    if (val === '') return null
+
+                    // 숫자 문자열을 숫자로 변환 (Excel에서 "1"로 읽히는 경우 대비)
+                    if (typeof val === 'string') {
+                      const trimmed = val.trim()
+                      if (trimmed !== '' && !isNaN(Number(trimmed))) {
+                        return Number(trimmed)
+                      }
+                    }
+
+                    // NaN 체크
                     if (typeof val === 'number' && isNaN(val)) return null
+
                     return val
                   }
 
@@ -2092,9 +2027,11 @@ export default function OptionProductsManagementPage() {
                     }
                   })
 
+                  // upsert
+                  const dataToUpsert = excelUploadModal.data
                   const { error } = await supabase
                     .from('option_products')
-                    .upsert(excelUploadModal.data, {
+                    .upsert(dataToUpsert, {
                       onConflict: 'id',
                       ignoreDuplicates: false
                     })

@@ -15,6 +15,7 @@ interface Column<T = any> {
   className?: string | ((row: T) => string)
   align?: 'left' | 'center' | 'right'
   renderer?: (value: any, row: T, rowIndex: number, handleDropdownArrowClick?: (e: React.MouseEvent) => void) => React.ReactNode
+  cellStyle?: (value: any, row: T, rowIndex: number) => React.CSSProperties
 }
 
 interface EditableAdminGridProps<T = any> {
@@ -717,6 +718,9 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   }, [gridData, globalSearchTerm, columns])
 
   const exportToExcel = () => {
+    console.log('=== EditableAdminGrid 엑셀 다운로드 ===')
+    console.log('Columns:', columns)
+
     // ID 컬럼이 있는지 확인
     const hasIdInColumns = columns.some(col => col.key === 'id')
     const hasIdInData = gridData.length > 0 && 'id' in gridData[0]
@@ -726,8 +730,12 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       ? [{ key: 'id', title: 'ID' }, ...columns]
       : columns
 
+    console.log('Export Columns:', exportColumns)
+    console.log('다운로드할 상품의 필드:', gridData.length > 0 ? Object.keys(gridData[0]) : [])
+
     // 헤더와 데이터 준비
     const headers = exportColumns.map(col => col.title)
+    console.log('엑셀 헤더:', headers)
     const data = gridData.map(row =>
       exportColumns.map(col => row[col.key] ?? '')
     )
@@ -1683,13 +1691,22 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   </td>
                 )}
                 {columns.map((column, colIdx) => {
+                  const cellValue = row[column.key];
+                  const customStyle = column.cellStyle ? column.cellStyle(cellValue, row, rowIndex) : {};
+
                   return (
                     <td
                       key={column.key || `col-${colIdx}`}
                       className={getCellClassName(rowIndex, column.key, column, row, false)}
                       style={{
                         height: rowHeight,
-                        userSelect: 'text'
+                        ...(column.width ? {
+                          width: column.width,
+                          minWidth: column.width,
+                          maxWidth: column.width
+                        } : {}),
+                        userSelect: 'text',
+                        ...customStyle
                       }}
                       onClick={(e) => handleCellClick(rowIndex, column.key, row[column.key], e)}
                       onDoubleClick={() => handleCellDoubleClick(rowIndex, column.key, row[column.key])}

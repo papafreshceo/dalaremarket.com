@@ -34,7 +34,8 @@ export default function Page() {
   const { confirm } = useConfirm()
 
   const [partners, setPartners] = useState<Partner[]>([])
-  const [partnerTypes, setPartnerTypes] = useState<string[]>([])
+  const [partnerTypes, setPartnerTypes] = useState<Array<{category: string, code_prefix: string, type_name: string}>>([])
+  const [partnerCategories, setPartnerCategories] = useState<string[]>([])
   const [tableData, setTableData] = useState<Partner[]>([])
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -88,17 +89,27 @@ export default function Page() {
   const fetchPartnerTypes = async () => {
     const { data } = await supabase
       .from('partner_types')
-      .select('type_name')
+      .select('partner_category, code_prefix, type_name')
       .eq('is_active', true)
       .order('type_name')
 
     if (data) {
-      setPartnerTypes(data.map(t => t.type_name))
+      setPartnerTypes(data.map(t => ({
+        category: t.partner_category,
+        code_prefix: t.code_prefix,
+        type_name: t.type_name
+      })))
+
+      // 고유한 구분 값들만 추출
+      const uniqueCategories = [...new Set(data.map(t => t.partner_category))]
+      setPartnerCategories(uniqueCategories)
     }
   }
 
   const generatePartnerCode = async (category: string) => {
-    const prefix = category === '공급자' ? 'SUP' : 'CUS'
+    // 해당 구분의 이니셜 찾기
+    const partnerType = partnerTypes.find(t => t.category === category)
+    const prefix = partnerType?.code_prefix || 'GEN'  // 기본값 GEN (General)
 
     const { data } = await supabase
       .from('partners')
@@ -109,7 +120,7 @@ export default function Page() {
 
     if (data && data.length > 0) {
       const lastCode = data[0].code
-      const lastNumber = parseInt(lastCode.substring(3))
+      const lastNumber = parseInt(lastCode.substring(prefix.length))
       const newNumber = lastNumber + 1
       return `${prefix}${String(newNumber).padStart(4, '0')}`
     }
@@ -244,6 +255,45 @@ export default function Page() {
     }
   }
 
+  const getColumns = (rowData?: Partner) => {
+    // 현재 행의 구분에 맞는 유형들만 필터링
+    const filteredTypes = rowData?.partner_category
+      ? partnerTypes.filter(t => t.category === rowData.partner_category).map(t => t.type_name)
+      : partnerTypes.map(t => t.type_name)
+
+    return [
+      {
+        key: 'code',
+        title: '거래처코드',
+        width: 100,
+        className: 'text-center',
+        readOnly: true
+      },
+      {
+        key: 'name',
+        title: '거래처명',
+        width: 150,
+        className: 'text-center'
+      },
+      {
+        key: 'partner_category',
+        title: '구분',
+        type: 'dropdown' as const,
+        source: ['공급자', '고객', '벤더사'],
+        width: 80,
+        className: 'text-center'
+      },
+      {
+        key: 'partner_type',
+        title: '유형',
+        type: 'dropdown' as const,
+        source: filteredTypes,
+        width: 80,
+        className: 'text-center'
+      },
+    ]
+  }
+
   const columns = [
     {
       key: 'code',
@@ -262,7 +312,7 @@ export default function Page() {
       key: 'partner_category',
       title: '구분',
       type: 'dropdown' as const,
-      source: ['공급자', '고객', '벤더사'],
+      source: partnerCategories,
       width: 80,
       className: 'text-center'
     },
@@ -270,7 +320,7 @@ export default function Page() {
       key: 'partner_type',
       title: '유형',
       type: 'dropdown' as const,
-      source: partnerTypes,
+      source: partnerTypes.map(t => t.type_name),
       width: 80,
       className: 'text-center'
     },
@@ -369,11 +419,11 @@ export default function Page() {
           </Button>
           {partnerTypes.map(type => (
             <Button
-              key={type}
-              variant={typeFilter === type ? 'primary' : 'ghost'}
-              onClick={() => setTypeFilter(type)}
+              key={type.type_name}
+              variant={typeFilter === type.type_name ? 'primary' : 'ghost'}
+              onClick={() => setTypeFilter(type.type_name)}
             >
-              {type}
+              {type.type_name}
             </Button>
           ))}
         </div>
@@ -398,6 +448,22 @@ export default function Page() {
           data={tableData}
           columns={columns}
           onDataChange={setTableData}
+          onCellEdit={async (rowIndex, columnKey, newValue) => {
+            // partner_category 변경 시 자동으로 코드 생성 및 유형 초기화
+            if (columnKey === 'partner_category') {
+              const newCode = await generatePartnerCode(newValue)
+              // 해당 구분에 맞는 첫 번째 유형 가져오기
+              const firstType = partnerTypes.find(t => t.category === newValue)?.type_name || ''
+              const newData = [...tableData]
+              newData[rowIndex] = {
+                ...newData[rowIndex],
+                partner_category: newValue,
+                code: newCode,
+                partner_type: firstType
+              }
+              setTableData(newData)
+            }
+          }}
           onDelete={handleDelete}
           onSave={handleSave}
           onDeleteSelected={(indices) => {

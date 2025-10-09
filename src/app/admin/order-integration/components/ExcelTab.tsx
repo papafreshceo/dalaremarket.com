@@ -7,6 +7,9 @@ import * as XLSX from 'xlsx';
 
 interface UploadedOrder {
   id?: number;
+  _optionNameModified?: boolean;  // 옵션명 수정 여부
+  _optionNameInDB?: boolean;      // DB에 옵션명 존재 여부
+  match_status?: 'matched' | 'unmatched';
   field_1?: string;  // 마켓명
   field_2?: string;  // 연번
   field_3?: string;  // 결제일
@@ -53,12 +56,18 @@ interface UploadedOrder {
   [key: string]: any; // 동적 필드 지원
 }
 
-interface ProductMapping {
+interface OptionProduct {
+  id: string;
+  option_code: string;
   option_name: string;
-  shipping_source?: string;
-  invoice_issuer?: string;
-  vendor_name?: string;
-  seller_supply_price?: number;
+  seller_supply_price: number | null;
+  shipping_vendor_id: string | null;
+  invoice_entity: string | null;
+  shipping_location_name: string | null;
+  shipping_location_address: string | null;
+  shipping_location_contact: string | null;
+  shipping_cost: number | null;
+  [key: string]: any;
 }
 
 interface MarketTemplate {
@@ -81,12 +90,13 @@ interface FilePreview {
   marketName: string;
   detectedTemplate: MarketTemplate | null;
   orderCount: number;
+  isToday: boolean; // 오늘 수정된 파일인지 여부
 }
 
 export default function ExcelTab() {
   const [orders, setOrders] = useState<UploadedOrder[]>([]);
   const [loading, setLoading] = useState(false);
-  const [productMappings, setProductMappings] = useState<Map<string, ProductMapping>>(new Map());
+  const [optionProducts, setOptionProducts] = useState<Map<string, OptionProduct>>(new Map());
   const [marketTemplates, setMarketTemplates] = useState<Map<string, MarketTemplate>>(new Map());
   const [stats, setStats] = useState({
     total: 0,
@@ -99,63 +109,61 @@ export default function ExcelTab() {
   const [marketFieldMappings, setMarketFieldMappings] = useState<Map<string, any>>(new Map());
   const [standardFields, setStandardFields] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [resultMessage, setResultMessage] = useState({ title: '', content: '' });
 
-  // 제품 매핑, 마켓 템플릿, 표준 필드 로드
+  // 옵션상품, 마켓 템플릿, 표준 필드 로드
   useEffect(() => {
-    loadProductMappings();
+    loadOptionProducts();
     loadMarketTemplates();
     loadStandardFields();
   }, []);
 
-  // 마켓 템플릿이 로드되면 컬럼에 렌더러 추가 (한 번만)
-  const [rendererAdded, setRendererAdded] = React.useState(false);
-
+  // marketTemplates와 columns가 로드되면 마켓 컬럼에 렌더러 추가
   useEffect(() => {
-    console.log('useEffect 실행 - columns:', columns.length, 'marketTemplates:', marketTemplates.size, 'rendererAdded:', rendererAdded);
+    if (marketTemplates.size > 0 && columns.length > 0) {
+      // 이미 렌더러가 있는지 확인 (무한 루프 방지)
+      const marketColumn = columns.find(c => c.isMarketColumn);
+      if (marketColumn && !marketColumn.renderer) {
+        const updatedColumns = columns.map((column) => {
+          if (column.isMarketColumn) {
+            return {
+              ...column,
+              renderer: (value: any, row: any, rowIndex: number, _dropdownHandler?: any) => {
+                const marketName = value ?? '';
+                if (!marketName) return <span style={{ fontSize: '13px' }}></span>;
 
-    if (columns.length > 0 && marketTemplates.size > 0 && !rendererAdded) {
-      console.log('렌더러 추가 시작');
+                const template = marketTemplates.get(String(marketName).toLowerCase());
+                let marketColor = '#6B7280';
 
-      const columnsWithRender = columns.map((col) => {
-        if (col.key === 'field_1') {
-          console.log('field_1에 렌더러 추가');
-          return {
-            ...col,
-            renderer: (value: any, row: any, rowIndex: number) => {
-              const marketName = value;
-              if (!marketName) return marketName;
-
-              // 마켓 템플릿에서 색상 가져오기
-              const template = marketTemplates.get(marketName.toLowerCase());
-              let marketColor = '#6B7280'; // 기본 회색
-
-              if (template?.color_rgb) {
-                if (template.color_rgb.includes(',')) {
-                  marketColor = `rgb(${template.color_rgb})`;
-                } else {
-                  marketColor = template.color_rgb;
+                if (template?.color_rgb) {
+                  if (template.color_rgb.includes(',')) {
+                    marketColor = `rgb(${template.color_rgb})`;
+                  } else {
+                    marketColor = template.color_rgb;
+                  }
                 }
+
+                return (
+                  <span
+                    className="px-2 py-0.5 rounded text-white text-xs font-medium"
+                    style={{ backgroundColor: marketColor }}
+                  >
+                    {String(marketName)}
+                  </span>
+                );
               }
+            };
+          }
+          return column;
+        });
 
-              return (
-                <span
-                  className="px-2 py-0.5 rounded text-white text-xs font-medium"
-                  style={{ backgroundColor: marketColor }}
-                >
-                  {marketName}
-                </span>
-              );
-            }
-          };
-        }
-        return col;
-      });
-
-      console.log('렌더러가 추가된 컬럼:', columnsWithRender[0]);
-      setColumns(columnsWithRender);
-      setRendererAdded(true);
+        setColumns(updatedColumns);
+        console.log('✓ 마켓 렌더러 추가 완료, marketTemplates 크기:', marketTemplates.size);
+      }
     }
-  }, [marketTemplates.size, columns.length, rendererAdded]);
+  }, [marketTemplates, columns]);
+
 
   const loadStandardFields = async () => {
     try {
@@ -178,15 +186,69 @@ export default function ExcelTab() {
             const fieldValue = standardRow[fieldKey];
 
             if (fieldValue && fieldValue.trim()) {
-              dynamicColumns.push({
+              const column: any = {
                 key: fieldKey,
-                title: fieldValue,
-                width: 120
-              });
+                title: fieldValue
+              };
+
+              // 특정 필드만 너비 고정
+              if (i === 4) column.width = 150; // 주문번호
+              if (i === 5) column.width = 100; // 주문자
+              if (i === 7) column.width = 100; // 수령인
+              if (i === 9) column.width = 250; // 주소
+              if (i === 10) column.width = 120; // 배송메시지
+
+              // field_1 (마켓명) - 마켓 배지 렌더러는 제거 (아래에서 처리)
+              if (i === 1) {
+                column.isMarketColumn = true; // 마커 추가
+              }
+
+              // field_11 (옵션명)에 특별 처리
+              if (i === 11) {
+                column.renderer = (value: any, row: any, rowIndex: number, _dropdownHandler?: any) => {
+                  const isModified = row?._optionNameModified;
+                  const isInDB = row?._optionNameInDB;
+                  const displayValue = value ?? '';
+
+                  return (
+                    <div className="relative flex items-center" style={{ fontSize: '13px' }}>
+                      <span>{String(displayValue)}</span>
+                      {!isInDB && !isModified && <span className="ml-1">⚠️</span>}
+                      {isModified && <span className="ml-1">✏️</span>}
+                    </div>
+                  );
+                };
+
+                column.cellStyle = (value: any, row: any) => {
+                  if (!row?._optionNameInDB && !row?._optionNameModified) {
+                    return { backgroundColor: '#FED7AA' }; // 주황색 배경
+                  }
+                  if (row?._optionNameModified) {
+                    return { backgroundColor: '#BBF7D0' }; // 초록색 배경
+                  }
+                  return {};
+                };
+              }
+
+              dynamicColumns.push(column);
             }
           }
 
-          console.log('생성된 컬럼:', dynamicColumns);
+          console.log('생성된 컬럼 수:', dynamicColumns.length);
+          console.log('컬럼 샘플:', dynamicColumns.slice(0, 5).map(c => ({ key: c.key, title: c.title, width: c.width, hasRenderer: !!c.renderer })));
+          console.log('marketTemplates 크기:', marketTemplates.size);
+          console.log('marketTemplates 샘플:', Array.from(marketTemplates.entries()).slice(0, 3));
+
+          // 컬럼 검증 - renderer가 함수인지 확인
+          dynamicColumns.forEach((col, idx) => {
+            if (col.renderer && typeof col.renderer !== 'function') {
+              console.error(`컬럼 ${idx} (${col.key})의 renderer가 함수가 아닙니다:`, typeof col.renderer, col.renderer);
+            }
+            if (col.cellStyle && typeof col.cellStyle !== 'function') {
+              console.error(`컬럼 ${idx} (${col.key})의 cellStyle이 함수가 아닙니다:`, typeof col.cellStyle, col.cellStyle);
+            }
+          });
+
           setColumns(dynamicColumns);
           setStandardFields(standardRow); // 표준필드 정보 저장
         } else {
@@ -208,20 +270,31 @@ export default function ExcelTab() {
     }
   };
 
-  const loadProductMappings = async () => {
+  const loadOptionProducts = async () => {
     try {
-      const response = await fetch('/api/product-mapping?limit=10000');
-      const result = await response.json();
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
 
-      if (result.success) {
-        const mappingMap = new Map<string, ProductMapping>();
-        result.data.forEach((mapping: ProductMapping) => {
-          mappingMap.set(mapping.option_name.toLowerCase(), mapping);
+      const { data, error } = await supabase
+        .from('option_products')
+        .select('id, option_code, option_name, seller_supply_price, shipping_vendor_id, invoice_entity, shipping_location_name, shipping_location_address, shipping_location_contact, shipping_cost')
+        .order('option_name');
+
+      if (error) {
+        console.error('옵션상품 로드 실패:', error);
+        return;
+      }
+
+      if (data) {
+        const productMap = new Map<string, OptionProduct>();
+        data.forEach((product: OptionProduct) => {
+          productMap.set(product.option_name.toLowerCase(), product);
         });
-        setProductMappings(mappingMap);
+        setOptionProducts(productMap);
+        console.log('옵션상품 로드 완료:', productMap.size, '개');
       }
     } catch (error) {
-      console.error('제품 매핑 로드 실패:', error);
+      console.error('옵션상품 로드 실패:', error);
     }
   };
 
@@ -249,72 +322,141 @@ export default function ExcelTab() {
     }
   };
 
-  // 옵션명에 제품 매핑 적용
+  // option_products 컬럼명 → 한글 레이블 매핑
+  const OPTION_PRODUCT_LABELS: Record<string, string> = {
+    seller_supply_price: '셀러공급가',
+    shipping_vendor_id: '출고처',
+    invoice_entity: '송장주체',
+    shipping_location_name: '발송지명',
+    shipping_location_address: '발송지주소',
+    shipping_location_contact: '발송지연락처',
+    shipping_cost: '상품출고비용'
+  };
+
+  // 옵션상품 데이터를 주문에 동적으로 매핑
+  const mapOptionProductToOrder = (order: any, product: OptionProduct): any => {
+    if (!standardFields) return order;
+
+    const mappedOrder = { ...order };
+
+    // 표준필드(field_1~43)를 순회하면서 매칭
+    for (let i = 1; i <= 43; i++) {
+      const fieldKey = `field_${i}`;
+      const standardFieldName = standardFields[fieldKey]; // 예: "셀러공급가"
+
+      if (!standardFieldName) continue;
+
+      // 이 표준필드명에 해당하는 option_products 컬럼 찾기
+      const optionProductColumn = Object.entries(OPTION_PRODUCT_LABELS)
+        .find(([_, label]) => label === standardFieldName)?.[0];
+
+      if (optionProductColumn && product[optionProductColumn] !== undefined && product[optionProductColumn] !== null) {
+        // 기존 값이 없을 때만 매핑 (엑셀 데이터 우선)
+        if (!mappedOrder[fieldKey]) {
+          mappedOrder[fieldKey] = product[optionProductColumn];
+        }
+      }
+    }
+
+    return mappedOrder;
+  };
+
+  // 옵션명에 옵션상품 매칭 적용
   const applyProductMapping = (orders: UploadedOrder[]): UploadedOrder[] => {
     return orders.map((order) => {
-      if (!order.option_name) {
-        return { ...order, match_status: 'unmatched' as const };
-      }
+      // field_11이 옵션명
+      const optionName = order.field_11;
 
-      const mapping = productMappings.get(order.option_name.trim().toLowerCase());
-
-      if (mapping) {
+      if (!optionName) {
         return {
           ...order,
-          shipping_source: order.shipping_source || mapping.shipping_source,
-          invoice_issuer: order.invoice_issuer || mapping.invoice_issuer,
-          vendor_name: order.vendor_name || mapping.vendor_name,
-          seller_supply_price:
-            order.seller_supply_price ||
-            (mapping.seller_supply_price ? mapping.seller_supply_price * order.quantity : undefined),
+          match_status: 'unmatched' as const,
+          _optionNameInDB: false
+        };
+      }
+
+      const product = optionProducts.get(optionName.trim().toLowerCase());
+
+      if (product) {
+        const mappedOrder = mapOptionProductToOrder(order, product);
+        return {
+          ...mappedOrder,
           match_status: 'matched' as const,
+          _optionNameInDB: true
         };
       } else {
-        return { ...order, match_status: 'unmatched' as const };
+        return {
+          ...order,
+          match_status: 'unmatched' as const,
+          _optionNameInDB: false
+        };
       }
     });
   };
 
-  // 파일명 또는 내용으로 마켓 템플릿 감지
+  // 파일명 또는 내용으로 마켓 템플릿 감지 (우선순위 기반)
   const detectMarketTemplate = (fileName: string, firstRow: any): MarketTemplate | null => {
     const lowerFileName = fileName.toLowerCase();
     const rowText = Object.keys(firstRow).join(',').toLowerCase();
 
-    // 모든 템플릿을 순회하며 감지
-    for (const template of marketTemplates.values()) {
-      let matched = false;
+    console.log('마켓 감지 시작 - 파일명:', fileName);
+    console.log('헤더:', rowText);
 
-      // 1. detect_string1로 파일명 검사
+    // 각 템플릿별 매칭 점수 계산
+    const candidates: Array<{ template: MarketTemplate; score: number; reason: string }> = [];
+
+    for (const template of marketTemplates.values()) {
+      let score = 0;
+      const reasons: string[] = [];
+
+      // 1. detect_string1로 파일명 검사 (높은 점수)
       if (template.detect_string1 && template.detect_string1.trim()) {
         const detectStrings = template.detect_string1.split(',').map(s => s.trim().toLowerCase());
-        if (detectStrings.some(str => str && lowerFileName.includes(str))) {
-          matched = true;
+        const matched = detectStrings.filter(str => str && lowerFileName.includes(str));
+        if (matched.length > 0) {
+          score += 100 * matched.length; // 파일명 매칭은 100점씩
+          reasons.push(`파일명(${matched.join(',')})`);
         }
       }
 
-      // 2. detect_string2로 헤더 검사 (여러 개의 특수 컬럼명 중 하나라도 있으면 매칭)
-      if (!matched && template.detect_string2 && template.detect_string2.trim()) {
+      // 2. detect_string2로 헤더 검사 (매칭된 개수만큼 점수)
+      if (template.detect_string2 && template.detect_string2.trim()) {
         const headerStrings = template.detect_string2.split(',').map(s => s.trim().toLowerCase());
-        // 하나라도 헤더에 있으면 매칭 (OR 조건)
-        if (headerStrings.some(str => str && rowText.includes(str))) {
-          matched = true;
+        const matched = headerStrings.filter(str => str && rowText.includes(str));
+        if (matched.length > 0) {
+          score += 10 * matched.length; // 헤더 매칭은 10점씩
+          reasons.push(`헤더(${matched.length}개)`);
         }
       }
 
-      // 3. detect_string3으로 추가 검사
-      if (!matched && template.detect_string3 && template.detect_string3.trim()) {
-        const detectStrings = template.detect_string3.split(',').map(s => s.trim().toLowerCase());
-        if (detectStrings.some(str => str && (lowerFileName.includes(str) || rowText.includes(str)))) {
-          matched = true;
-        }
-      }
-
-      if (matched) {
-        return template;
+      if (score > 0) {
+        candidates.push({
+          template,
+          score,
+          reason: reasons.join(' + ')
+        });
+        console.log(`${template.market_name} - 점수: ${score}, 이유: ${reasons.join(' + ')}`);
       }
     }
 
-    return null;
+    // 점수가 가장 높은 것 선택
+    if (candidates.length === 0) {
+      console.log('✗ 매칭되는 마켓을 찾을 수 없음');
+      return null;
+    }
+
+    // 점수 내림차순 정렬
+    candidates.sort((a, b) => b.score - a.score);
+
+    const winner = candidates[0];
+    console.log(`✓ ${winner.template.market_name}로 감지됨 (점수: ${winner.score}, 이유: ${winner.reason})`);
+
+    // 동점자가 있는지 확인 (같은 마켓이 아닌 경우만)
+    if (candidates.length > 1 && candidates[1].score === winner.score && candidates[1].template.market_name !== winner.template.market_name) {
+      console.warn(`⚠ 경고: ${candidates[1].template.market_name}도 같은 점수(${winner.score})입니다`);
+    }
+
+    return winner.template;
   };
 
   // 마켓명 배지 렌더러
@@ -415,6 +557,22 @@ export default function ExcelTab() {
     return result;
   };
 
+  // 엑셀 날짜를 YYYY-MM-DD HH:MM:SS 형식으로 변환
+  const convertExcelDate = (value: any): string => {
+    if (typeof value === 'number') {
+      // 엑셀 날짜는 1900-01-01부터의 일 수
+      const date = new Date((value - 25569) * 86400 * 1000);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
+    return value;
+  };
+
   // 템플릿 기반 필드 매핑 (field_1~field_43 구조로 변환)
   const mapFieldsUsingTemplate = (row: any, template: MarketTemplate, marketFieldMappings: any): any => {
     const mappedData: any = {
@@ -428,7 +586,14 @@ export default function ExcelTab() {
       const marketFieldName = marketFieldMappings[fieldKey]; // 예: "결제일"
 
       if (marketFieldName && row[marketFieldName] !== undefined) {
-        mappedData[fieldKey] = row[marketFieldName];
+        let value = row[marketFieldName];
+
+        // field_3 (결제일)은 날짜 변환
+        if (i === 3 && typeof value === 'number') {
+          value = convertExcelDate(value);
+        }
+
+        mappedData[fieldKey] = value;
       }
     }
 
@@ -448,6 +613,9 @@ export default function ExcelTab() {
 
     setLoading(true);
     try {
+      console.log('marketTemplates 크기:', marketTemplates.size);
+      console.log('optionProducts 크기:', optionProducts.size);
+
       const filePreviews: FilePreview[] = [];
 
       // 모든 파일의 마켓명 감지
@@ -485,11 +653,20 @@ export default function ExcelTab() {
         });
         const orderCount = dataRows.length;
 
+        // 파일이 오늘 수정되었는지 확인
+        const today = new Date();
+        const fileDate = new Date(file.lastModified);
+        const isToday =
+          fileDate.getFullYear() === today.getFullYear() &&
+          fileDate.getMonth() === today.getMonth() &&
+          fileDate.getDate() === today.getDate();
+
         filePreviews.push({
           file,
           marketName: marketName || '알 수 없음',
           detectedTemplate: template,
           orderCount,
+          isToday,
         });
       }
 
@@ -604,22 +781,34 @@ export default function ExcelTab() {
       console.log('전체 통합된 주문 수:', allOrders.length);
       console.log('전체 주문 데이터:', allOrders);
 
+      // 옵션명 기준으로 자동 매칭
+      const ordersWithMapping = applyProductMapping(allOrders);
+
+      console.log('옵션명 매칭 완료');
+
       // 주문통합 완료 - 로컬에만 저장 (DB 저장 안 함)
-      setOrders(allOrders);
+      setOrders(ordersWithMapping);
       setIntegrationStage('integrated');
 
       // 통계 계산
+      const matchedCount = ordersWithMapping.filter((o) => o.match_status === 'matched').length;
+      const unmatchedCount = ordersWithMapping.filter((o) => o.match_status === 'unmatched').length;
+
       setStats({
-        total: allOrders.length,
-        matched: 0,
-        unmatched: 0,
+        total: ordersWithMapping.length,
+        matched: matchedCount,
+        unmatched: unmatchedCount,
       });
 
-      alert(
-        `주문 통합 완료\n\n` +
-          `총 ${allOrders.length}개 주문이 표준필드로 매핑되었습니다.\n\n` +
-          `"옵션명 매칭" 버튼을 클릭하여 제품 정보를 매칭하세요.`
-      );
+      setResultMessage({
+        title: '주문 통합 완료',
+        content: `총 ${ordersWithMapping.length}개 주문\n✓ 옵션명 매칭 성공: ${matchedCount}개\n✗ 옵션명 매칭 실패: ${unmatchedCount}개\n\n${
+          unmatchedCount > 0
+            ? '매칭 실패한 옵션명은 출고 정보가 자동으로 입력되지 않았습니다.'
+            : '모든 주문의 출고 정보가 자동으로 입력되었습니다!'
+        }`
+      });
+      setShowResultModal(true);
     } catch (error) {
       console.error('엑셀 파일 읽기 실패:', error);
       alert('엑셀 파일을 읽는 중 오류가 발생했습니다.');
@@ -646,28 +835,16 @@ export default function ExcelTab() {
 
     setLoading(true);
     try {
-      // 제품 매핑 데이터 로드
-      let mappingMap = productMappings;
-      if (mappingMap.size === 0) {
-        const response = await fetch('/api/product-mapping?limit=10000');
-        const result = await response.json();
-
-        if (result.success) {
-          mappingMap = new Map<string, ProductMapping>();
-          result.data.forEach((mapping: ProductMapping) => {
-            mappingMap.set(mapping.option_name.toLowerCase(), mapping);
-          });
-          setProductMappings(mappingMap);
-          console.log('제품 매핑 로드 완료:', mappingMap.size, '개');
-        } else {
-          alert('제품 매핑 데이터를 불러오지 못했습니다.');
-          return;
-        }
+      // 옵션상품 데이터 로드 (캐시가 없는 경우)
+      let productMap = optionProducts;
+      if (productMap.size === 0) {
+        await loadOptionProducts();
+        productMap = optionProducts;
       }
 
-      console.log('매칭 시작 - 주문 수:', orders.length, '매핑 데이터 수:', mappingMap.size);
+      console.log('매칭 시작 - 주문 수:', orders.length, '옵션상품 수:', productMap.size);
 
-      // 제품 매핑 적용
+      // 옵션상품 매칭 적용
       const ordersWithMapping = orders.map((order, index) => {
         if (!order.option_name) {
           console.log(`[${index}] 옵션명 없음`);
@@ -675,18 +852,16 @@ export default function ExcelTab() {
         }
 
         const trimmedOption = order.option_name.trim().toLowerCase();
-        const mapping = mappingMap.get(trimmedOption);
+        const product = productMap.get(trimmedOption);
 
-        if (mapping) {
-          console.log(`[${index}] 매칭 성공: "${order.option_name}" → ${mapping.vendor_name}`);
+        if (product) {
+          console.log(`[${index}] 매칭 성공: "${order.option_name}" → ${product.vendor_name}`);
           return {
             ...order,
-            shipping_source: order.shipping_source || mapping.shipping_source,
-            invoice_issuer: order.invoice_issuer || mapping.invoice_issuer,
-            vendor_name: order.vendor_name || mapping.vendor_name,
+            vendor_name: order.vendor_name || product.vendor_name,
             seller_supply_price:
               order.seller_supply_price ||
-              (mapping.seller_supply_price ? mapping.seller_supply_price * order.quantity : undefined),
+              (product.seller_supply_price ? product.seller_supply_price * order.quantity : undefined),
             match_status: 'matched' as const,
           };
         } else {
@@ -708,12 +883,12 @@ export default function ExcelTab() {
       });
 
       alert(
-        `옵션명 매칭 완료\n\n` +
-          `✓ 매칭 성공: ${matchedCount}개\n` +
-          `✗ 매칭 실패: ${unmatchedCount}개\n\n` +
+        `옵션명 검증 완료\n\n` +
+          `✓ 검증 성공: ${matchedCount}개\n` +
+          `✗ 검증 실패: ${unmatchedCount}개\n\n` +
           (unmatchedCount > 0
-            ? `매칭 실패한 옵션명은 출고처, 송장주체, 벤더사 정보가 자동으로 입력되지 않습니다.`
-            : `모든 주문이 성공적으로 매칭되었습니다!`)
+            ? `검증 실패한 옵션명은 출고 정보가 자동으로 입력되지 않았습니다.`
+            : `모든 주문의 출고 정보가 자동으로 입력되었습니다!`)
       );
     } catch (error) {
       console.error('옵션명 매칭 오류:', error);
@@ -776,22 +951,43 @@ export default function ExcelTab() {
 
   // 데이터 수정 핸들러
   const handleDataChange = (updatedData: any[]) => {
-    setOrders(updatedData);
+    // field_11 (옵션명)이 수정되었는지 확인
+    const dataWithModifiedFlag = updatedData.map((row, index) => {
+      const originalRow = orders[index];
+
+      // 옵션명(field_11)이 수정되었는지 확인
+      if (originalRow && row.field_11 !== originalRow.field_11) {
+        // 수정한 옵션명이 DB에 있는지 확인
+        const newOptionName = row.field_11;
+        const isInDB = newOptionName ? optionProducts.has(newOptionName.trim().toLowerCase()) : false;
+
+        return {
+          ...row,
+          _optionNameModified: true,
+          _optionNameInDB: isInDB,
+          match_status: isInDB ? 'matched' : 'unmatched'
+        };
+      }
+
+      return row;
+    });
+
+    setOrders(dataWithModifiedFlag);
 
     // 통계 재계산
-    const matchedCount = updatedData.filter((o) => o.match_status === 'matched').length;
-    const unmatchedCount = updatedData.filter((o) => o.match_status === 'unmatched').length;
+    const matchedCount = dataWithModifiedFlag.filter((o) => o.match_status === 'matched').length;
+    const unmatchedCount = dataWithModifiedFlag.filter((o) => o.match_status === 'unmatched').length;
 
     setStats({
-      total: updatedData.length,
+      total: dataWithModifiedFlag.length,
       matched: matchedCount,
       unmatched: unmatchedCount,
     });
   };
 
   // 행 삭제 핸들러
-  const handleDeleteRows = (rowsToDelete: any[]) => {
-    const remainingOrders = orders.filter((order) => !rowsToDelete.includes(order));
+  const handleDeleteRows = (indices: number[]) => {
+    const remainingOrders = orders.filter((_, index) => !indices.includes(index));
     setOrders(remainingOrders);
 
     // 통계 재계산
@@ -839,10 +1035,18 @@ export default function ExcelTab() {
       {integrationStage === 'file-preview' && uploadedFiles.length > 0 && (
         <div className="max-w-[1000px] mx-auto">
           {/* 선택 결과 통계 */}
-          <div className="flex items-center gap-4 mb-3 text-sm text-gray-600">
-            <span>파일 <strong className="text-gray-900">{uploadedFiles.length}개</strong></span>
-            <span>마켓 <strong className="text-gray-900">{new Set(uploadedFiles.map(f => f.marketName)).size}개</strong></span>
-            <span>주문 <strong className="text-gray-900">{uploadedFiles.reduce((sum, f) => sum + f.orderCount, 0).toLocaleString()}건</strong></span>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-4 text-sm text-gray-600">
+              <span>파일 <strong className="text-gray-900">{uploadedFiles.length}개</strong></span>
+              <span>마켓 <strong className="text-gray-900">{new Set(uploadedFiles.map(f => f.marketName)).size}개</strong></span>
+              <span>주문 <strong className="text-gray-900">{uploadedFiles.reduce((sum, f) => sum + f.orderCount, 0).toLocaleString()}건</strong></span>
+            </div>
+            {/* 오늘 파일 아닌 것 배지 */}
+            {uploadedFiles.filter(f => !f.isToday).length > 0 && (
+              <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+                오늘 파일 아님 {uploadedFiles.filter(f => !f.isToday).length}개
+              </span>
+            )}
           </div>
 
           <div className="space-y-2 mb-4">
@@ -917,7 +1121,7 @@ export default function ExcelTab() {
             </button>
             <button
               onClick={handleIntegrateFiles}
-              disabled={loading}
+              disabled={loading || uploadedFiles.some(f => !f.isToday)}
               className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium"
             >
               {loading ? (
@@ -983,7 +1187,7 @@ export default function ExcelTab() {
                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400"
               >
                 <CheckCircle className="w-4 h-4" />
-                {loading ? '매칭 중...' : '옵션명 매칭'}
+                {loading ? '검증 중...' : '옵션명 검증'}
               </button>
               <button
                 onClick={handleSaveToDatabase}
@@ -998,8 +1202,8 @@ export default function ExcelTab() {
           <EditableAdminGrid
             columns={columns}
             data={orders}
-            onSave={handleDataChange}
-            onDelete={handleDeleteRows}
+            onDataChange={handleDataChange}
+            onDeleteSelected={handleDeleteRows}
             height="calc(100vh - 450px)"
             enableCSVExport={true}
             enableCSVImport={false}
@@ -1012,6 +1216,22 @@ export default function ExcelTab() {
         <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
           <FileSpreadsheet className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">엑셀 파일을 업로드하세요</h3>
+        </div>
+      )}
+
+      {/* 결과 모달 */}
+      {showResultModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">{resultMessage.title}</h3>
+            <p className="text-gray-700 whitespace-pre-line mb-6">{resultMessage.content}</p>
+            <button
+              onClick={() => setShowResultModal(false)}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              확인
+            </button>
+          </div>
         </div>
       )}
     </div>

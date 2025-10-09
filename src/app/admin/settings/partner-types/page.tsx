@@ -9,6 +9,8 @@ import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 
 interface PartnerType {
   id: string
+  partner_category: string
+  code_prefix: string
   type_name: string
   description: string | null
   is_active: boolean
@@ -54,6 +56,8 @@ export default function PartnerTypesPage() {
   const handleAddRow = () => {
     const newRow = {
       id: `temp_${Date.now()}`,
+      partner_category: '공급자',
+      code_prefix: 'SUP',
       type_name: '',
       description: '',
       is_active: true
@@ -72,6 +76,8 @@ export default function PartnerTypesPage() {
 
         if (row.id.startsWith('temp_')) {
           const { error } = await supabase.from('partner_types').insert([{
+            partner_category: row.partner_category,
+            code_prefix: row.code_prefix,
             type_name: row.type_name,
             description: row.description || null,
             is_active: true
@@ -83,6 +89,8 @@ export default function PartnerTypesPage() {
           }
         } else {
           const { error } = await supabase.from('partner_types').update({
+            partner_category: row.partner_category,
+            code_prefix: row.code_prefix,
             type_name: row.type_name,
             description: row.description || null
           }).eq('id', row.id)
@@ -128,6 +136,18 @@ export default function PartnerTypesPage() {
   }
 
   const columns = [
+    {
+      key: 'partner_category',
+      title: '구분',
+      width: 100,
+      className: 'text-center'
+    },
+    {
+      key: 'code_prefix',
+      title: '이니셜',
+      width: 80,
+      className: 'text-center'
+    },
     { key: 'type_name', title: '유형명', width: 200, className: 'text-center' },
     { key: 'description', title: '설명', width: 400, className: 'text-left' }
   ]
