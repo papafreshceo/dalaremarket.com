@@ -17,47 +17,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 제품 매핑 데이터 한 번에 로드
-    const { data: mappings } = await supabase
-      .from('product_mapping')
-      .select('*')
-      .eq('is_active', true);
-
-    const mappingMap = new Map(
-      mappings?.map((m) => [m.option_name.toLowerCase(), m]) || []
-    );
-
-    // 각 주문에 제품 매핑 적용
+    // sheet_date 기본값 설정
     const processedOrders = orders.map((order) => {
-      // sheet_date 기본값
       if (!order.sheet_date) {
         order.sheet_date = new Date().toISOString().split('T')[0];
       }
-
-      // 제품 매핑 적용
-      if (order.option_name) {
-        const mapping = mappingMap.get(order.option_name.toLowerCase());
-        if (mapping) {
-          order.shipping_source = order.shipping_source || mapping.shipping_source;
-          order.invoice_issuer = order.invoice_issuer || mapping.invoice_issuer;
-          order.vendor_name = order.vendor_name || mapping.vendor_name;
-          order.shipping_location_name = order.shipping_location_name || mapping.shipping_location_name;
-          order.shipping_location_address = order.shipping_location_address || mapping.shipping_location_address;
-          order.shipping_location_phone = order.shipping_location_phone || mapping.shipping_location_phone;
-          order.shipping_cost = order.shipping_cost || mapping.shipping_cost;
-
-          // 셀러공급가 계산
-          if (!order.seller_supply_price && mapping.seller_supply_price) {
-            order.seller_supply_price = mapping.seller_supply_price * (order.quantity || 1);
-          }
-        }
-      }
-
       return order;
     });
 
     // UPSERT 수행 (중복 주문 업데이트)
-    const { data, error } = await supabase
+    // market_name, order_number, option_name 기준
+    const { data, error} = await supabase
       .from('integrated_orders')
       .upsert(processedOrders, {
         onConflict: 'market_name,order_number,option_name',

@@ -574,9 +574,10 @@ export default function ExcelTab() {
   };
 
   // 템플릿 기반 필드 매핑 (field_1~field_43 구조로 변환)
-  const mapFieldsUsingTemplate = (row: any, template: MarketTemplate, marketFieldMappings: any): any => {
+  const mapFieldsUsingTemplate = (row: any, template: MarketTemplate, marketFieldMappings: any, sequenceNumber?: number): any => {
     const mappedData: any = {
-      field_1: template.market_name // 첫 번째 필드는 마켓명
+      field_1: template.market_name, // 첫 번째 필드는 마켓명
+      field_2: sequenceNumber?.toString() || '' // 연번
     };
 
     // marketFieldMappings는 mapping_settings_standard_fields에서 해당 마켓의 매핑 정보
@@ -595,6 +596,11 @@ export default function ExcelTab() {
 
         mappedData[fieldKey] = value;
       }
+    }
+
+    // field_13 (마켓): 마켓이니셜 + 시퀀스
+    if (template.initial && sequenceNumber) {
+      mappedData.field_13 = `${template.initial}${sequenceNumber}`;
     }
 
     // 정산예정금액 계산 (field_26)
@@ -698,6 +704,7 @@ export default function ExcelTab() {
     setLoading(true);
     try {
       let allOrders: UploadedOrder[] = [];
+      let globalSequence = 0; // 전체 주문의 연번 카운터
 
       // 모든 파일 처리
       for (const filePreview of uploadedFiles) {
@@ -731,7 +738,8 @@ export default function ExcelTab() {
 
           // 템플릿 기반 매핑 (field_1~field_43 구조로)
           const mappedOrders = jsonData.map((row: any, index: number) => {
-            const mapped = mapFieldsUsingTemplate(row, template, marketMapping);
+            globalSequence++; // 전체 연번 증가
+            const mapped = mapFieldsUsingTemplate(row, template, marketMapping, globalSequence);
             if (index === 0) {
               console.log('첫 번째 행 원본:', row);
               console.log('첫 번째 행 매핑 결과:', mapped);
@@ -920,11 +928,57 @@ export default function ExcelTab() {
 
     setLoading(true);
     try {
-      // sheet_date 추가
-      const ordersToSave = orders.map((order) => ({
-        ...order,
-        sheet_date: new Date().toISOString().split('T')[0],
-      }));
+      // field_X를 표준명으로 매핑
+      const ordersToSave = orders.map((order) => {
+        const { _optionNameModified, _optionNameInDB, match_status, id, ...cleanOrder } = order;
+
+        return {
+          market_name: cleanOrder.field_1,
+          sequence_number: cleanOrder.field_2,
+          payment_date: cleanOrder.field_3,
+          order_number: cleanOrder.field_4,
+          buyer_name: cleanOrder.field_5,
+          buyer_phone: cleanOrder.field_6,
+          recipient_name: cleanOrder.field_7,
+          recipient_phone: cleanOrder.field_8,
+          recipient_address: cleanOrder.field_9,
+          delivery_message: cleanOrder.field_10,
+          option_name: cleanOrder.field_11,
+          quantity: cleanOrder.field_12,
+          market_check: cleanOrder.field_13,
+          confirmation: cleanOrder.field_14,
+          special_request: cleanOrder.field_15,
+          shipping_request_date: cleanOrder.field_16,
+          seller_name: cleanOrder.field_17,
+          seller_supply_price: cleanOrder.field_18,
+          shipping_source: cleanOrder.field_19,
+          invoice_issuer: cleanOrder.field_20,
+          vendor_name: cleanOrder.field_21,
+          shipping_location_name: cleanOrder.field_22,
+          shipping_location_address: cleanOrder.field_23,
+          shipping_location_contact: cleanOrder.field_24,
+          shipping_cost: cleanOrder.field_25,
+          settlement_amount: cleanOrder.field_26,
+          settlement_target_amount: cleanOrder.field_27,
+          product_amount: cleanOrder.field_28,
+          final_payment_amount: cleanOrder.field_29,
+          discount_amount: cleanOrder.field_30,
+          platform_discount: cleanOrder.field_31,
+          seller_discount: cleanOrder.field_32,
+          buyer_coupon_discount: cleanOrder.field_33,
+          coupon_discount: cleanOrder.field_34,
+          other_support_discount: cleanOrder.field_35,
+          commission_1: cleanOrder.field_36,
+          commission_2: cleanOrder.field_37,
+          seller_id: cleanOrder.field_38,
+          separate_shipping: cleanOrder.field_39,
+          delivery_fee: cleanOrder.field_40,
+          shipped_date: cleanOrder.field_41,
+          courier_company: cleanOrder.field_42,
+          tracking_number: cleanOrder.field_43,
+          sheet_date: new Date().toISOString().split('T')[0],
+        };
+      });
 
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'POST',
