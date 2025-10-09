@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileSpreadsheet, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import * as XLSX from 'xlsx';
+import toast, { Toaster } from 'react-hot-toast';
 
 interface UploadedOrder {
   id?: number;
@@ -61,8 +62,10 @@ interface OptionProduct {
   option_code: string;
   option_name: string;
   seller_supply_price: number | null;
-  shipping_vendor_id: string | null;
+  shipping_entity: string | null;
   invoice_entity: string | null;
+  shipping_vendor_id: string | null;
+  shipping_vendor?: { name: string } | null;
   shipping_location_name: string | null;
   shipping_location_address: string | null;
   shipping_location_contact: string | null;
@@ -111,6 +114,7 @@ export default function ExcelTab() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showResultModal, setShowResultModal] = useState(false);
   const [resultMessage, setResultMessage] = useState({ title: '', content: '' });
+  const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
 
   // 옵션상품, 마켓 템플릿, 표준 필드 로드
   useEffect(() => {
@@ -277,7 +281,12 @@ export default function ExcelTab() {
 
       const { data, error } = await supabase
         .from('option_products')
-        .select('id, option_code, option_name, seller_supply_price, shipping_vendor_id, invoice_entity, shipping_location_name, shipping_location_address, shipping_location_contact, shipping_cost')
+        .select(`
+          id, option_code, option_name, seller_supply_price, shipping_entity, invoice_entity,
+          shipping_vendor_id, shipping_location_name, shipping_location_address,
+          shipping_location_contact, shipping_cost,
+          shipping_vendor:partners!shipping_vendor_id(name)
+        `)
         .order('option_name');
 
       if (error) {
@@ -325,8 +334,9 @@ export default function ExcelTab() {
   // option_products 컬럼명 → 한글 레이블 매핑
   const OPTION_PRODUCT_LABELS: Record<string, string> = {
     seller_supply_price: '셀러공급가',
-    shipping_vendor_id: '출고처',
-    invoice_entity: '송장주체',
+    shipping_entity: '출고',
+    invoice_entity: '송장',
+    shipping_vendor_id: '벤더사',
     shipping_location_name: '발송지명',
     shipping_location_address: '발송지주소',
     shipping_location_contact: '발송지연락처',
@@ -339,6 +349,12 @@ export default function ExcelTab() {
 
     const mappedOrder = { ...order };
 
+    console.log('📦 옵션상품 매핑 시작:', product.option_name);
+    console.log('  - shipping_entity:', product.shipping_entity);
+    console.log('  - invoice_entity:', product.invoice_entity);
+    console.log('  - shipping_vendor_id:', product.shipping_vendor_id);
+    console.log('  - shipping_vendor name:', product.shipping_vendor?.name);
+
     // 표준필드(field_1~43)를 순회하면서 매칭
     for (let i = 1; i <= 43; i++) {
       const fieldKey = `field_${i}`;
@@ -350,10 +366,24 @@ export default function ExcelTab() {
       const optionProductColumn = Object.entries(OPTION_PRODUCT_LABELS)
         .find(([_, label]) => label === standardFieldName)?.[0];
 
-      if (optionProductColumn && product[optionProductColumn] !== undefined && product[optionProductColumn] !== null) {
-        // 기존 값이 없을 때만 매핑 (엑셀 데이터 우선)
-        if (!mappedOrder[fieldKey]) {
-          mappedOrder[fieldKey] = product[optionProductColumn];
+      if (optionProductColumn) {
+        let value = product[optionProductColumn];
+
+        // 벤더사는 이름을 사용
+        if (optionProductColumn === 'shipping_vendor_id' && product.shipping_vendor?.name) {
+          value = product.shipping_vendor.name;
+        }
+
+        if (value !== undefined && value !== null) {
+          // 기존 값이 없을 때만 매핑 (엑셀 데이터 우선)
+          if (!mappedOrder[fieldKey]) {
+            console.log(`  ✓ 매핑: ${standardFieldName} (${fieldKey}) = ${value} (from ${optionProductColumn})`);
+            mappedOrder[fieldKey] = value;
+          }
+        } else {
+          if (standardFieldName === '출고' || standardFieldName === '송장' || standardFieldName === '벤더사') {
+            console.log(`  ✗ 값 없음: ${standardFieldName} (${fieldKey}) - optionProductColumn: ${optionProductColumn}, value: ${value}`);
+          }
         }
       }
     }
@@ -705,6 +735,7 @@ export default function ExcelTab() {
     try {
       let allOrders: UploadedOrder[] = [];
       let globalSequence = 0; // 전체 주문의 연번 카운터
+      const marketSequences = new Map<string, number>(); // 마켓별 시퀀스 카운터
 
       // 모든 파일 처리
       for (const filePreview of uploadedFiles) {
@@ -736,10 +767,26 @@ export default function ExcelTab() {
             continue;
           }
 
+          // 마켓별 시퀀스 초기화
+          if (!marketSequences.has(template.market_name)) {
+            marketSequences.set(template.market_name, 0);
+          }
+
           // 템플릿 기반 매핑 (field_1~field_43 구조로)
           const mappedOrders = jsonData.map((row: any, index: number) => {
             globalSequence++; // 전체 연번 증가
+
+            // 마켓별 시퀀스 증가
+            const currentMarketSeq = (marketSequences.get(template.market_name) || 0) + 1;
+            marketSequences.set(template.market_name, currentMarketSeq);
+
             const mapped = mapFieldsUsingTemplate(row, template, marketMapping, globalSequence);
+
+            // field_13 (마켓) 값을 마켓별 시퀀스로 교체
+            if (template.initial) {
+              mapped.field_13 = `${template.initial}${currentMarketSeq}`;
+            }
+
             if (index === 0) {
               console.log('첫 번째 행 원본:', row);
               console.log('첫 번째 행 매핑 결과:', mapped);
@@ -909,34 +956,42 @@ export default function ExcelTab() {
   // 데이터 저장 (Supabase에 업로드)
   const handleSaveToDatabase = async () => {
     if (orders.length === 0) {
-      alert('저장할 데이터가 없습니다.');
+      toast.error('저장할 데이터가 없습니다.', {
+        duration: 3000,
+        position: 'top-center',
+        style: {
+          marginTop: '50vh',
+        },
+      });
       return;
     }
 
-    const unmatchedCount = orders.filter((o) => o.match_status === 'unmatched').length;
+    // 저장 확인 모달 표시
+    setShowSaveConfirmModal(true);
+  };
 
-    if (unmatchedCount > 0) {
-      if (
-        !confirm(
-          `${unmatchedCount}개 주문이 매칭되지 않았습니다.\n\n` +
-            `계속 진행하시겠습니까?`
-        )
-      ) {
-        return;
-      }
-    }
+  // 실제 저장 실행
+  const executeSaveToDatabase = async () => {
+    setShowSaveConfirmModal(false);
 
     setLoading(true);
     try {
       // field_X를 표준명으로 매핑
-      const ordersToSave = orders.map((order) => {
-        const { _optionNameModified, _optionNameInDB, match_status, id, ...cleanOrder } = order;
+      const ordersToSave = orders.map((order, index) => {
+        // UI 전용 필드 제거 (_로 시작하는 필드와 match_status, id 등)
+        const cleanOrder = Object.entries(order).reduce((acc, [key, value]) => {
+          // _로 시작하는 필드, match_status, id 제외
+          if (!key.startsWith('_') && key !== 'match_status' && key !== 'id') {
+            acc[key] = value;
+          }
+          return acc;
+        }, {} as any);
 
         return {
           market_name: cleanOrder.field_1,
           sequence_number: cleanOrder.field_2,
           payment_date: cleanOrder.field_3,
-          order_number: cleanOrder.field_4,
+          order_number: cleanOrder.field_4,  // NULL 허용 (DB에서 중복 검사)
           buyer_name: cleanOrder.field_5,
           buyer_phone: cleanOrder.field_6,
           recipient_name: cleanOrder.field_7,
@@ -980,24 +1035,69 @@ export default function ExcelTab() {
         };
       });
 
+      // UNIQUE 제약조건 기준으로 중복 제거 (마지막 항목 유지)
+      // market_name + order_number + buyer_name + recipient_name + option_name + quantity
+      const uniqueOrders = Array.from(
+        new Map(
+          ordersToSave.map(order => {
+            const key = `${order.market_name || ''}-${order.order_number || ''}-${order.buyer_name || ''}-${order.recipient_name || ''}-${order.option_name || ''}-${order.quantity || ''}`;
+            return [key, order];
+          })
+        ).values()
+      );
+
+      console.log('총 저장할 주문 수:', uniqueOrders.length);
+      console.log('첫 번째 주문 데이터:', uniqueOrders[0]);
+      console.log('첫 번째 주문의 모든 키:', Object.keys(uniqueOrders[0]));
+
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orders: ordersToSave }),
+        body: JSON.stringify({ orders: uniqueOrders }),
       });
 
       const result = await response.json();
 
       if (result.success) {
-        alert(`${result.count}개 주문이 저장되었습니다.`);
+        // 저장 결과 메시지 생성
+        const { total, newCount, duplicateCount } = result;
+        let message = '';
+
+        if (duplicateCount > 0) {
+          message = `신규 저장 ${newCount}건 / 중복 덮어쓰기 ${duplicateCount}건`;
+        } else {
+          message = `✓ ${newCount}개 주문이 저장되었습니다.`;
+        }
+
+        toast.success(message, {
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            marginTop: '50vh',
+          },
+        });
+
         setOrders([]); // 초기화
         setStats({ total: 0, matched: 0, unmatched: 0 });
+        setIntegrationStage('idle');
       } else {
-        alert('저장 실패: ' + result.error);
+        toast.error(`저장 실패: ${result.error}`, {
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            marginTop: '50vh',
+          },
+        });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('저장 오류:', error);
-      alert('저장 중 오류가 발생했습니다.');
+      toast.error('저장 중 오류가 발생했습니다.', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          marginTop: '50vh',
+        },
+      });
     } finally {
       setLoading(false);
     }
@@ -1057,6 +1157,7 @@ export default function ExcelTab() {
 
   return (
     <div className="space-y-4">
+      <Toaster />
       {/* 업로드 버튼 (중앙 배치) */}
       {integrationStage === 'idle' && (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -1273,7 +1374,7 @@ export default function ExcelTab() {
         </div>
       )}
 
-      {/* 결과 모달 */}
+      {/* 통합 결과 모달 (옵션명 매칭 안내) */}
       {showResultModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -1288,6 +1389,49 @@ export default function ExcelTab() {
           </div>
         </div>
       )}
+
+      {/* DB 저장 확인 모달 */}
+      {showSaveConfirmModal && (() => {
+        const unmatchedCount = orders.filter((o) => o.match_status === 'unmatched').length;
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">DB 저장 확인</h3>
+              <div className="text-gray-700 mb-6">
+                <p className="mb-3">
+                  총 <strong className="text-blue-600">{orders.length}개</strong> 주문을 저장하시겠습니까?
+                </p>
+                {unmatchedCount > 0 && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                    <p className="text-orange-800 text-sm flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>
+                        <strong>{unmatchedCount}개</strong> 주문이 옵션명 매칭되지 않았습니다.<br/>
+                        출고 정보가 자동으로 입력되지 않았습니다.
+                      </span>
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSaveConfirmModal(false)}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={executeSaveToDatabase}
+                  disabled={loading}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                >
+                  {loading ? '저장 중...' : '확인'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

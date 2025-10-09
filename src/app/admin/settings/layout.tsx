@@ -31,6 +31,16 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           title: '마켓 매핑 설정',
           description: '마켓별 엑셀 필드 매핑',
           href: '/admin/settings/mapping'
+        },
+        {
+          title: '택배사 설정',
+          description: '택배사별 헤더명 매핑',
+          href: '/admin/settings/courier-settings'
+        },
+        {
+          title: '벤더사 양식',
+          description: '벤더사별 엑셀 양식 헤더명 설정',
+          href: '/admin/settings/vendor-format-settings'
         }
       ]
     },

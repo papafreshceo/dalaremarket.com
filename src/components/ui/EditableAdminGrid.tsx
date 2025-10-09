@@ -27,11 +27,14 @@ interface EditableAdminGridProps<T = any> {
   onSave?: (modifiedRows?: T[]) => void
   onDeleteSelected?: (indices: number[]) => void
   onCopy?: (indices: number[]) => void
+  onSelectionChange?: (indices: number[]) => void  // 선택된 행이 변경될 때 호출
+  onModifiedChange?: (hasModifications: boolean) => void  // 수정 상태 변경 콜백
   // 엑셀 업로드 자동 저장 (이 옵션들이 있으면 모달에서 바로 DB 저장)
   tableName?: string  // Supabase 테이블 이름 (있으면 엑셀 업로드 시 자동 저장)
   onDataReload?: () => Promise<void>  // 저장 완료 후 데이터 재조회 함수
   validateRow?: (row: T) => boolean  // 행 유효성 검사 (false 반환 시 해당 행 스킵)
   excludeEmptyColumns?: string[]  // 모든 값이 비어있으면 스킵할 컬럼들 (예: ['category_1', 'category_2'])
+  transformBeforeSave?: (row: T) => T  // DB 저장 전 데이터 변환 함수 (예: 이름→ID 변환)
   height?: string
   rowHeight?: number
   showRowNumbers?: boolean
@@ -63,10 +66,13 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   onSave,
   onDeleteSelected,
   onCopy,
+  onSelectionChange,
+  onModifiedChange,
   tableName,
   onDataReload,
   validateRow,
   excludeEmptyColumns,
+  transformBeforeSave,
   height = '900px',
   rowHeight = 26,
   showRowNumbers = true,
@@ -128,27 +134,41 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       setHistoryIndex(0)
       prevDataRef.current = data
       isInitialMount.current = false
+      console.log('=== EditableAdminGrid 초기화 ===')
+      console.log('originalDataRef.current 설정됨, 길이:', originalDataRef.current.length)
     } else if (!isInitialMount.current) {
-      // 데이터 참조가 변경된 경우 업데이트 (길이 변경 조건 제거)
-      if (data !== prevDataRef.current) {
+      // 데이터 참조가 변경되고, 길이도 변경된 경우만 업데이트 (외부에서 새로 로드한 경우)
+      if (data !== prevDataRef.current && data.length !== gridData.length) {
+        console.log('=== 외부 데이터 변경 감지 (길이 변경) ===')
+        console.log('이전 데이터 길이:', prevDataRef.current.length)
+        console.log('새 데이터 길이:', data.length)
+
         // 원본 데이터 참조 업데이트 (새로 로드된 데이터)
         originalDataRef.current = JSON.parse(JSON.stringify(data))
+        console.log('originalDataRef.current 업데이트됨, 길이:', originalDataRef.current.length)
+
         setGridData(data)
         prevDataRef.current = data
 
-        // 길이가 변경된 경우에만 선택된 행 초기화 (삭제 후 재로딩 시)
-        if (data.length !== gridData.length) {
-          setSelectedRows(new Set())
-          setAddedRows(new Set())
-          setCopiedRows(new Set())
-          setModifiedCells(new Set())
-        } else {
-          // 데이터가 새로 로드되었으므로 수정 추적 초기화
-          setModifiedCells(new Set())
-        }
+        // 선택된 행 초기화 (삭제 후 재로딩 시)
+        setSelectedRows(new Set())
+        setAddedRows(new Set())
+        setCopiedRows(new Set())
+        setModifiedCells(new Set())
       }
     }
   }, [data, gridData.length])
+
+  // 수정 상태 변경 시 콜백 호출
+  useEffect(() => {
+    const hasModifications = modifiedCells.size > 0 || addedRows.size > 0 || copiedRows.size > 0
+    console.log('=== EditableAdminGrid 수정 상태 ===')
+    console.log('modifiedCells:', modifiedCells.size)
+    console.log('addedRows:', addedRows.size)
+    console.log('copiedRows:', copiedRows.size)
+    console.log('hasModifications:', hasModifications)
+    onModifiedChange?.(hasModifications)
+  }, [modifiedCells.size, addedRows.size, copiedRows.size])
 
   useEffect(() => {
     if (editingCell && inputRef.current) {
@@ -169,11 +189,17 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           }
         }, 50)
       } else {
-        // 즉시 포커스 (키보드 입력이 자연스럽게 input으로 전달되도록)
+        // 포커스 및 텍스트 선택
         inputRef.current.focus()
         if (inputRef.current instanceof HTMLInputElement) {
-          const length = inputRef.current.value.length
-          inputRef.current.setSelectionRange(length, length)
+          if (isKeyboardEdit) {
+            // 키보드로 시작한 경우 커서를 끝에 위치
+            const length = inputRef.current.value.length
+            inputRef.current.setSelectionRange(length, length)
+          } else {
+            // F2, Enter, 더블클릭으로 시작한 경우 전체 선택
+            inputRef.current.select()
+          }
         }
       }
     }
@@ -541,39 +567,52 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     }
 
     const oldValue = newData[editingCell.row][editingCell.col]
-    newData[editingCell.row] = {
-      ...newData[editingCell.row],
-      [editingCell.col]: processedValue
-    }
 
-    // 값이 변경된 경우 수정된 셀 추적
+    console.log('=== commitEdit Debug ===')
+    console.log('rowIndex:', editingCell.row)
+    console.log('columnKey:', editingCell.col)
+    console.log('oldValue:', oldValue)
+    console.log('processedValue:', processedValue)
+    console.log('originalDataRef.current:', originalDataRef.current)
+    console.log('originalDataRef.current[rowIndex]:', originalDataRef.current[editingCell.row])
+
+    // 값이 변경된 경우에만 처리
     if (oldValue !== processedValue) {
+      newData[editingCell.row] = {
+        ...newData[editingCell.row],
+        [editingCell.col]: processedValue
+      }
+
       const cellKey = `${editingCell.row}-${editingCell.col}`
       const newModifiedCells = new Set(modifiedCells)
       const rowIndex = editingCell.row
 
       // 추가되거나 복사된 행은 modifiedCells에서 제외
       const isAddedOrCopied = addedRows.has(rowIndex) || copiedRows.has(rowIndex)
+      console.log('isAddedOrCopied:', isAddedOrCopied)
 
       if (!isAddedOrCopied) {
         // 원본 데이터와 비교 (기존 데이터만)
         const originalValue = originalDataRef.current[rowIndex]?.[editingCell.col]
+        console.log('originalValue:', originalValue)
         if (processedValue === originalValue) {
           // 원래 값으로 돌아간 경우 modifiedCells에서 제거
+          console.log('삭제: 원래 값으로 돌아감')
           newModifiedCells.delete(cellKey)
         } else {
           // 원래 값과 다른 경우 modifiedCells에 추가
+          console.log('추가: modifiedCells에 추가')
           newModifiedCells.add(cellKey)
         }
       }
 
+      console.log('newModifiedCells size:', newModifiedCells.size)
       setModifiedCells(newModifiedCells)
       addToHistory(newData)
+      setGridData(newData)
+      onDataChange?.(newData)
+      onCellEdit?.(editingCell.row, editingCell.col, processedValue)
     }
-
-    setGridData(newData)
-    onDataChange?.(newData)
-    onCellEdit?.(editingCell.row, editingCell.col, processedValue)
 
     // Enter 키로 아래 셀로 이동
     const nextRow = editingCell.row + 1
@@ -617,12 +656,14 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       }
 
       const oldValue = newData[editingCell.row][editingCell.col]
-      newData[editingCell.row] = {
-        ...newData[editingCell.row],
-        [editingCell.col]: processedValue
-      }
 
+      // 값이 변경된 경우에만 처리
       if (oldValue !== processedValue) {
+        newData[editingCell.row] = {
+          ...newData[editingCell.row],
+          [editingCell.col]: processedValue
+        }
+
         const cellKey = `${editingCell.row}-${editingCell.col}`
         const newModifiedCells = new Set(modifiedCells)
         const rowIndex = editingCell.row
@@ -639,11 +680,10 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
         setModifiedCells(newModifiedCells)
         addToHistory(newData)
+        setGridData(newData)
+        onDataChange?.(newData)
+        onCellEdit?.(editingCell.row, editingCell.col, processedValue)
       }
-
-      setGridData(newData)
-      onDataChange?.(newData)
-      onCellEdit?.(editingCell.row, editingCell.col, processedValue)
 
       // 방향키에 따라 셀 이동
       let newRow = editingCell.row
@@ -907,7 +947,10 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
               // id 제거 (DB에서 자동 생성)
               const { id, ...rowWithoutId } = row as any
 
-              const { error } = await supabase.from(tableName).insert([rowWithoutId])
+              // transformBeforeSave가 있으면 데이터 변환 (예: 이름→ID 변환)
+              const transformedRow = transformBeforeSave ? transformBeforeSave(rowWithoutId as T) : rowWithoutId
+
+              const { error } = await supabase.from(tableName).insert([transformedRow])
 
               if (error) {
                 alert(`데이터 등록 실패: ${error.message}`)
@@ -958,7 +1001,10 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
               // id 제거 (DB에서 자동 생성)
               const { id, ...rowWithoutId } = row as any
 
-              const { error } = await supabase.from(tableName).insert([rowWithoutId])
+              // transformBeforeSave가 있으면 데이터 변환 (예: 이름→ID 변환)
+              const transformedRow = transformBeforeSave ? transformBeforeSave(rowWithoutId as T) : rowWithoutId
+
+              const { error } = await supabase.from(tableName).insert([transformedRow])
 
               if (error) {
                 alert(`데이터 등록 실패: ${error.message}`)
@@ -1291,7 +1337,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
               type="checkbox"
               checked={editValue === 'true' || editValue === true}
               onChange={(e) => setEditValue(String(e.target.checked))}
-              onBlur={commitEdit}
+              onBlur={() => commitEdit()}
               onKeyDown={handleKeyDown}
               className="w-4 h-4"
             />
@@ -1304,7 +1350,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
             type="text"
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
-            onBlur={commitEdit}
+            onBlur={() => commitEdit()}
             onKeyDown={handleKeyDown}
             onCompositionStart={(e) => {
               // IME 조합 시작 (한글 입력 시작)
@@ -1408,11 +1454,15 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   const modifiedCount = modifiedCells.size
 
   const handleToggleAll = () => {
+    let newSelected: Set<number>
     if (selectedRows.size === filteredData.length) {
-      setSelectedRows(new Set())
+      newSelected = new Set()
     } else {
-      setSelectedRows(new Set(filteredData.map((_, idx) => idx)))
+      newSelected = new Set(filteredData.map((_, idx) => idx))
     }
+    setSelectedRows(newSelected)
+    // 부모에게 선택 변경 알림
+    onSelectionChange?.(Array.from(newSelected))
   }
 
   const handleToggleRow = (rowIndex: number) => {
@@ -1423,6 +1473,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       newSelected.add(rowIndex)
     }
     setSelectedRows(newSelected)
+    // 부모에게 선택 변경 알림
+    onSelectionChange?.(Array.from(newSelected))
   }
 
   const handleSaveClick = () => {
@@ -1559,8 +1611,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
               </svg>
             </label>
           )}
-          <div className="flex-1"></div>
           {customActions}
+          <div className="flex-1"></div>
           {modifiedCount > 0 && (
             <span className="text-sm text-text-secondary">수정 {modifiedCount}건</span>
           )}

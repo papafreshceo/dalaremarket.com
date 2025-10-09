@@ -24,7 +24,9 @@
       "Bash(Get-Content \"database\\migrations\\008_restructure_mapping_fields.sql\")",
       "Bash(del fetch-market-colors.js)",
       "Bash(curl:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(Get-Content \"database\\migrations\\018_change_unique_constraint_for_null_orders.sql\")",
+      "Bash(Get-Content \"database\\migrations\\019_add_shipping_status_to_integrated_orders.sql\")"
     ],
     "deny": [],
     "ask": []

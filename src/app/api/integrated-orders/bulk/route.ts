@@ -25,13 +25,40 @@ export async function POST(request: NextRequest) {
       return order;
     });
 
-    // UPSERT 수행 (중복 주문 업데이트)
-    // market_name, order_number, option_name 기준
+    // 저장 전 기존 주문 수 확인
+    const { count: beforeCount } = await supabase
+      .from('integrated_orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_deleted', false);
+
+    // 중복 체크를 위해 기존 주문 조회
+    const { data: existingOrders } = await supabase
+      .from('integrated_orders')
+      .select('market_name, order_number, buyer_name, recipient_name, option_name, quantity')
+      .eq('is_deleted', false);
+
+    // 중복 카운트 계산
+    const existingSet = new Set(
+      (existingOrders || []).map(order =>
+        `${order.market_name || ''}-${order.order_number || ''}-${order.buyer_name || ''}-${order.recipient_name || ''}-${order.option_name || ''}-${order.quantity || ''}`
+      )
+    );
+
+    let duplicateCount = 0;
+    processedOrders.forEach(order => {
+      const key = `${order.market_name || ''}-${order.order_number || ''}-${order.buyer_name || ''}-${order.recipient_name || ''}-${order.option_name || ''}-${order.quantity || ''}`;
+      if (existingSet.has(key)) {
+        duplicateCount++;
+      }
+    });
+
+    // UPSERT 수행 (중복 주문 덮어쓰기)
+    // market_name, order_number, buyer_name, recipient_name, option_name, quantity 기준
     const { data, error} = await supabase
       .from('integrated_orders')
       .upsert(processedOrders, {
-        onConflict: 'market_name,order_number,option_name',
-        ignoreDuplicates: false,
+        onConflict: 'market_name,order_number,buyer_name,recipient_name,option_name,quantity',
+        ignoreDuplicates: false,  // 중복 시 덮어쓰기
       })
       .select();
 
@@ -43,9 +70,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 저장 후 주문 수 확인
+    const { count: afterCount } = await supabase
+      .from('integrated_orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_deleted', false);
+
+    const newCount = (afterCount || 0) - (beforeCount || 0);
+
     return NextResponse.json({
       success: true,
-      count: data?.length || 0,
+      total: processedOrders.length,
+      newCount: newCount,
+      duplicateCount: duplicateCount,
       data,
     });
   } catch (error: any) {

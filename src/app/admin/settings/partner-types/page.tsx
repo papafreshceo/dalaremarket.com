@@ -57,7 +57,7 @@ export default function PartnerTypesPage() {
     const newRow = {
       id: `temp_${Date.now()}`,
       partner_category: '공급자',
-      code_prefix: 'SUP',
+      code_prefix: 'GEN',
       type_name: '',
       description: '',
       is_active: true

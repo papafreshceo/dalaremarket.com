@@ -22,8 +22,11 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '100');
     const offset = (page - 1) * limit;
 
-    // 기본 쿼리
-    let query = supabase.from('integrated_orders').select('*', { count: 'exact' });
+    // 기본 쿼리 (삭제되지 않은 주문만 조회)
+    let query = supabase
+      .from('integrated_orders')
+      .select('*', { count: 'exact' })
+      .eq('is_deleted', false);
 
     // 날짜 필터
     if (startDate && endDate) {
@@ -53,11 +56,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 정렬 (최신순)
+    // 정렬 (최신순 - 마켓 순서는 클라이언트에서 정렬)
     query = query.order('created_at', { ascending: false });
-
-    // 페이지네이션
-    query = query.range(offset, offset + limit - 1);
 
     const { data, error, count } = await query;
 
@@ -69,9 +69,41 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // 마켓별 display_order 가져오기
+    const { data: marketSettings } = await supabase
+      .from('mapping_settings')
+      .select('market_name, display_order');
+
+    const marketOrderMap = new Map<string, number>();
+    (marketSettings || []).forEach((setting) => {
+      marketOrderMap.set(setting.market_name, setting.display_order || 999);
+    });
+
+    // 데이터를 마켓 순서 -> 최신순으로 정렬
+    const sortedData = (data || []).sort((a, b) => {
+      const orderA = marketOrderMap.get(a.market_name || '') || 999;
+      const orderB = marketOrderMap.get(b.market_name || '') || 999;
+
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+
+      // 같은 마켓이면 최신순
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    // shipping_status가 없거나 빈 값이면 '결제완료'로 기본 설정
+    const normalizedData = sortedData.map(order => ({
+      ...order,
+      shipping_status: order.shipping_status || '결제완료'
+    }));
+
+    // 페이지네이션 적용
+    const paginatedData = normalizedData.slice(offset, offset + limit);
+
     return NextResponse.json({
       success: true,
-      data: data || [],
+      data: paginatedData,
       pagination: {
         total: count || 0,
         page,

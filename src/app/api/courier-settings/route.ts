@@ -5,9 +5,9 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from('mapping_settings_standard_fields')
+    .from('courier_settings')
     .select('*')
-    .order('market_name', { ascending: true });
+    .order('courier_name', { ascending: true });
 
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -16,27 +16,38 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ success: true, data });
 }
 
+export async function POST(request: NextRequest) {
+  const supabase = await createClient();
+  const body = await request.json();
+
+  const { data, error } = await supabase
+    .from('courier_settings')
+    .insert(body)
+    .select();
+
+  if (error) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, data: data[0] });
+}
+
 export async function PUT(request: NextRequest) {
   const supabase = await createClient();
   const body = await request.json();
-  const { market_name, updates } = body;
-
-  console.log('API 받은 데이터:', { market_name, updates });
+  const { id, ...updates } = body;
 
   try {
-    const { data, error} = await supabase
-      .from('mapping_settings_standard_fields')
+    const { data, error } = await supabase
+      .from('courier_settings')
       .update(updates)
-      .eq('market_name', market_name)
+      .eq('id', id)
       .select();
-
-    console.log('Supabase 응답:', { data, error });
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data: data[0] });
   } catch (error: any) {
-    console.error('저장 오류:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
@@ -48,7 +59,7 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const { error } = await supabase
-      .from('mapping_settings_standard_fields')
+      .from('courier_settings')
       .delete()
       .in('id', ids);
 
@@ -58,20 +69,4 @@ export async function DELETE(request: NextRequest) {
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
-}
-
-export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const body = await request.json();
-
-  const { data, error } = await supabase
-    .from('mapping_settings_standard_fields')
-    .insert(body)
-    .select();
-
-  if (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ success: true, data: data[0] });
 }

@@ -213,7 +213,7 @@ export default function MappingSettingsPage() {
         key: `field_${index + 1}`,
         title: `표준필드${index + 1}`,
         width: 150,
-        readOnly: (row: any) => row.market_name === '표준필드', // 첫 행은 readOnly
+        readOnly: false, // 표준필드 행도 수정 가능하게 변경
       })),
     ]
     setFieldsColumns(newColumns)
@@ -297,9 +297,8 @@ export default function MappingSettingsPage() {
   // 필드 매핑 저장
   const handleSaveFields = async (modifiedRows?: MappingField[]) => {
     try {
-      // 수정된 행만 저장 (표준필드 행 제외)
+      // 수정된 행만 저장 (표준필드 행도 포함)
       let dataToSave = modifiedRows || transformedFieldsData
-      dataToSave = dataToSave.filter(row => row.market_name !== '표준필드')
 
       if (dataToSave.length === 0) {
         showToast('변경사항이 없습니다.', 'info')
@@ -309,13 +308,17 @@ export default function MappingSettingsPage() {
       const promises = dataToSave.map(async (row) => {
         const { market_name, id, created_at, updated_at, ...updates } = row
 
+        console.log('저장할 데이터:', { market_name, updates })
+
         const response = await fetch('/api/mapping-settings/fields', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ market_name, updates }),
         })
 
-        return response.json()
+        const result = await response.json()
+        console.log('저장 결과:', result)
+        return result
       })
 
       await Promise.all(promises)
@@ -409,9 +412,9 @@ export default function MappingSettingsPage() {
         />
       </div>
 
-      {/* 마켓 패핑 설정 */}
+      {/* 마켓 매핑 설정 */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">마켓 패핑 설정</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">마켓 매핑 설정</h2>
         {fieldsColumns.length > 0 && (
           <EditableAdminGrid
             columns={fieldsColumns}

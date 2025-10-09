@@ -22,7 +22,6 @@ interface Partner {
   bank_account: string | null
   account_holder: string | null
   partner_type: string | null
-  partner_category: string
   commission_type: string
   commission_rate: number
   is_active: boolean
@@ -34,8 +33,7 @@ export default function Page() {
   const { confirm } = useConfirm()
 
   const [partners, setPartners] = useState<Partner[]>([])
-  const [partnerTypes, setPartnerTypes] = useState<Array<{category: string, code_prefix: string, type_name: string}>>([])
-  const [partnerCategories, setPartnerCategories] = useState<string[]>([])
+  const [partnerTypes, setPartnerTypes] = useState<Array<{code_prefix: string, type_name: string}>>([])
   const [tableData, setTableData] = useState<Partner[]>([])
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -87,28 +85,27 @@ export default function Page() {
   }
 
   const fetchPartnerTypes = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('partner_types')
-      .select('partner_category, code_prefix, type_name')
+      .select('code_prefix, type_name')
       .eq('is_active', true)
       .order('type_name')
 
-    if (data) {
-      setPartnerTypes(data.map(t => ({
-        category: t.partner_category,
-        code_prefix: t.code_prefix,
-        type_name: t.type_name
-      })))
+    if (error) {
+      console.error('partner_types 로드 오류:', error)
+      return
+    }
 
-      // 고유한 구분 값들만 추출
-      const uniqueCategories = [...new Set(data.map(t => t.partner_category))]
-      setPartnerCategories(uniqueCategories)
+    if (data) {
+      console.log('partner_types 데이터:', data)
+      setPartnerTypes(data)
+      console.log('type_name 목록:', data.map(t => t.type_name))
     }
   }
 
-  const generatePartnerCode = async (category: string) => {
-    // 해당 구분의 이니셜 찾기
-    const partnerType = partnerTypes.find(t => t.category === category)
+  const generatePartnerCode = async (typeName: string) => {
+    // 해당 유형의 이니셜 찾기
+    const partnerType = partnerTypes.find(t => t.type_name === typeName)
     const prefix = partnerType?.code_prefix || 'GEN'  // 기본값 GEN (General)
 
     const { data } = await supabase
@@ -120,7 +117,14 @@ export default function Page() {
 
     if (data && data.length > 0) {
       const lastCode = data[0].code
-      const lastNumber = parseInt(lastCode.substring(prefix.length))
+      const numberPart = lastCode.substring(prefix.length)
+      const lastNumber = parseInt(numberPart, 10)
+
+      // NaN 체크
+      if (isNaN(lastNumber)) {
+        return `${prefix}0001`
+      }
+
       const newNumber = lastNumber + 1
       return `${prefix}${String(newNumber).padStart(4, '0')}`
     }
@@ -129,7 +133,8 @@ export default function Page() {
   }
 
   const handleAddRow = async () => {
-    const code = await generatePartnerCode('공급자')
+    const firstType = partnerTypes[0]?.type_name || ''
+    const code = await generatePartnerCode(firstType)
     const newRow = {
       id: `temp_${Date.now()}`,
       code: code,
@@ -144,8 +149,7 @@ export default function Page() {
       bank_name: '',
       bank_account: '',
       account_holder: '',
-      partner_type: '농가',
-      partner_category: '공급자',
+      partner_type: firstType,  // type_name 값이 들어감
       commission_type: '정액',
       commission_rate: 0,
       is_active: true,
@@ -165,7 +169,7 @@ export default function Page() {
 
         // 코드가 없거나 변경된 경우 새로 생성
         if (!row.code || row.code === '') {
-          row.code = await generatePartnerCode(row.partner_category || '공급자')
+          row.code = await generatePartnerCode(row.partner_type || partnerTypes[0]?.type_name || 'GEN')
         }
 
         if (row.id.startsWith('temp_')) {
@@ -182,8 +186,7 @@ export default function Page() {
             bank_name: row.bank_name || null,
             bank_account: row.bank_account || null,
             account_holder: row.account_holder || null,
-            partner_type: row.partner_type || '농가',
-            partner_category: row.partner_category || '공급자',
+            partner_type: row.partner_type,
             commission_type: row.commission_type || '정액',
             commission_rate: Number(row.commission_rate) || 0,
             is_active: true,
@@ -208,8 +211,7 @@ export default function Page() {
             bank_name: row.bank_name || null,
             bank_account: row.bank_account || null,
             account_holder: row.account_holder || null,
-            partner_type: row.partner_type || '농가',
-            partner_category: row.partner_category || '공급자',
+            partner_type: row.partner_type,
             commission_type: row.commission_type || '정액',
             commission_rate: Number(row.commission_rate) || 0,
             notes: row.notes || null
@@ -255,44 +257,6 @@ export default function Page() {
     }
   }
 
-  const getColumns = (rowData?: Partner) => {
-    // 현재 행의 구분에 맞는 유형들만 필터링
-    const filteredTypes = rowData?.partner_category
-      ? partnerTypes.filter(t => t.category === rowData.partner_category).map(t => t.type_name)
-      : partnerTypes.map(t => t.type_name)
-
-    return [
-      {
-        key: 'code',
-        title: '거래처코드',
-        width: 100,
-        className: 'text-center',
-        readOnly: true
-      },
-      {
-        key: 'name',
-        title: '거래처명',
-        width: 150,
-        className: 'text-center'
-      },
-      {
-        key: 'partner_category',
-        title: '구분',
-        type: 'dropdown' as const,
-        source: ['공급자', '고객', '벤더사'],
-        width: 80,
-        className: 'text-center'
-      },
-      {
-        key: 'partner_type',
-        title: '유형',
-        type: 'dropdown' as const,
-        source: filteredTypes,
-        width: 80,
-        className: 'text-center'
-      },
-    ]
-  }
 
   const columns = [
     {
@@ -309,16 +273,8 @@ export default function Page() {
       className: 'text-center'
     },
     {
-      key: 'partner_category',
-      title: '구분',
-      type: 'dropdown' as const,
-      source: partnerCategories,
-      width: 80,
-      className: 'text-center'
-    },
-    {
       key: 'partner_type',
-      title: '유형',
+      title: '구분',
       type: 'dropdown' as const,
       source: partnerTypes.map(t => t.type_name),
       width: 80,
@@ -448,22 +404,6 @@ export default function Page() {
           data={tableData}
           columns={columns}
           onDataChange={setTableData}
-          onCellEdit={async (rowIndex, columnKey, newValue) => {
-            // partner_category 변경 시 자동으로 코드 생성 및 유형 초기화
-            if (columnKey === 'partner_category') {
-              const newCode = await generatePartnerCode(newValue)
-              // 해당 구분에 맞는 첫 번째 유형 가져오기
-              const firstType = partnerTypes.find(t => t.category === newValue)?.type_name || ''
-              const newData = [...tableData]
-              newData[rowIndex] = {
-                ...newData[rowIndex],
-                partner_category: newValue,
-                code: newCode,
-                partner_type: firstType
-              }
-              setTableData(newData)
-            }
-          }}
           onDelete={handleDelete}
           onSave={handleSave}
           onDeleteSelected={(indices) => {

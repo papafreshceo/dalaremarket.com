@@ -47,6 +47,9 @@ interface OptionProduct {
   margin_calculation_type?: 'rate' | 'amount' | '마진율' | '마진액' | null
   average_material_price?: number | null  // 사용원물 평균가
   calculated_material_cost?: number | null  // 원물원가 (계산값)
+  raw_material_partner?: string | null  // 원물거래처 ID
+  shipping_entity?: string | null  // 출고 (출고처 ID)
+  shipping_vendor_id?: string | null  // 벤더사 ID
   created_at?: string
   [key: string]: any
 }
@@ -93,6 +96,10 @@ export default function OptionProductsManagementPage() {
     updated: string[]
     unchanged: string[]
   } | null>(null)
+
+  const [vendorPartners, setVendorPartners] = useState<Array<{id: string, name: string}>>([])
+  const [shippingVendors, setShippingVendors] = useState<Array<{id: string, name: string}>>([])
+  const [invoiceEntities, setInvoiceEntities] = useState<Array<{id: string, name: string}>>([])
 
   const supabase = createClient()
   const fmtInt = new Intl.NumberFormat('ko-KR')
@@ -244,9 +251,10 @@ export default function OptionProductsManagementPage() {
     fixed_material_cost: '고정원물가',
 
     // 거래처 및 출고 정보
-    supplier_id: '원물거래처',
-    shipping_vendor_id: '출고처',
-    invoice_entity: '송장주체',
+    raw_material_partner: '원물거래처',
+    shipping_entity: '출고',
+    shipping_vendor_id: '벤더사',
+    invoice_entity: '송장',
     shipping_location_name: '발송지명',
     shipping_location_address: '발송지주소',
     shipping_location_contact: '발송지연락처',
@@ -311,7 +319,7 @@ export default function OptionProductsManagementPage() {
     'raw_material_cost','total_material_cost','total_cost','material_cost_policy','fixed_material_cost',
 
     // 거래처 및 출고
-    'supplier_id','shipping_vendor_id','invoice_entity',
+    'raw_material_partner','shipping_entity','invoice_entity','shipping_vendor_id',
     'shipping_location_name','shipping_location_address','shipping_location_contact','shipping_deadline',
 
     // 택배비 및 부가
@@ -348,7 +356,7 @@ export default function OptionProductsManagementPage() {
       case 'direct_policy':
         return ['option_code','option_name','total_cost','seller_supply_price','margin_calculation_type','target_margin_rate','target_margin_amount','naver_price_mode','naver_paid_shipping_price','naver_free_shipping_price','naver_margin_display','coupang_price_mode','coupang_paid_shipping_price','coupang_free_shipping_price','coupang_margin_display']
       case 'shipping':
-        return ['option_code','option_name','supplier_id','shipping_vendor_id','invoice_entity','shipping_location_name','shipping_location_address','shipping_location_contact','shipping_deadline','total_cost','shipping_cost','shipping_fee','seller_supply_price','status']
+        return ['option_code','option_name','raw_material_partner','shipping_entity','shipping_vendor_id','invoice_entity','shipping_location_name','shipping_location_address','shipping_location_contact','shipping_deadline','total_cost','shipping_cost','shipping_fee','seller_supply_price','status']
       case 'full':
       default:
         return FIELD_ORDER
@@ -416,7 +424,8 @@ export default function OptionProductsManagementPage() {
       case 'has_detail_page':
       case 'has_images':
         return p[field] ? 'Y' : 'N'
-      case 'supplier_id':
+      case 'raw_material_partner':
+        return (p as any).raw_material_partner_name || '-'
       case 'shipping_vendor_id':
         return '-' // TODO: 거래처 정보 표시 필요 시 구현
       case 'status':
@@ -436,7 +445,43 @@ export default function OptionProductsManagementPage() {
   useEffect(() => { void fetchAll() }, [])
 
   const fetchAll = async () => {
-    await Promise.all([fetchProducts(), fetchSupplyStatuses()])
+    await Promise.all([fetchProducts(), fetchSupplyStatuses(), fetchVendorPartners(), fetchShippingVendors(), fetchInvoiceEntities()])
+  }
+
+  const fetchVendorPartners = async () => {
+    const { data, error } = await supabase
+      .from('partners')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name')
+
+    if (!error && data) {
+      setVendorPartners(data)
+    }
+  }
+
+  const fetchShippingVendors = async () => {
+    const { data, error } = await supabase
+      .from('shipping_vendors')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('display_order')
+
+    if (!error && data) {
+      setShippingVendors(data)
+    }
+  }
+
+  const fetchInvoiceEntities = async () => {
+    const { data, error } = await supabase
+      .from('invoice_entities')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('display_order')
+
+    if (!error && data) {
+      setInvoiceEntities(data)
+    }
   }
 
 
@@ -471,7 +516,7 @@ export default function OptionProductsManagementPage() {
               materials.map(async (m) => {
                 const { data: rawMaterial } = await supabase
                   .from('raw_materials')
-                  .select('*')
+                  .select('*, supplier:partners!main_supplier_id(id, name)')
                   .eq('id', m.raw_material_id)
                   .single()
 
@@ -494,7 +539,9 @@ export default function OptionProductsManagementPage() {
                   season_start_date: rawMaterial?.season_start_date,
                   season_peak_date: rawMaterial?.season_peak_date,
                   season_end_date: rawMaterial?.season_end_date,
-                  supply_status: rawMaterial?.supply_status
+                  supply_status: rawMaterial?.supply_status,
+                  main_supplier_id: rawMaterial?.main_supplier_id,
+                  supplier: rawMaterial?.supplier
                 }
               })
             )
@@ -551,7 +598,10 @@ export default function OptionProductsManagementPage() {
             // 사용원물 평균가
             average_material_price: averageMaterialPrice,
             // 원물원가 (계산값)
-            calculated_material_cost: calculatedMaterialCost > 0 ? Math.round(calculatedMaterialCost) : null
+            calculated_material_cost: calculatedMaterialCost > 0 ? Math.round(calculatedMaterialCost) : null,
+            // 원물거래처 (사용량이 가장 많은 원물의 거래처)
+            raw_material_partner: primaryMaterial?.main_supplier_id || null,
+            raw_material_partner_name: primaryMaterial?.supplier?.name || null
           }
         })
       )
@@ -761,6 +811,15 @@ export default function OptionProductsManagementPage() {
         const naverPriceMode = (p as any).naver_price_mode || '자동'
         const coupangPriceMode = (p as any).coupang_price_mode || '자동'
 
+        // 벤더사 이름을 ID로 변환
+        let shippingVendorId = p.shipping_vendor_id
+        if (shippingVendorId && typeof shippingVendorId === 'string') {
+          const vendor = vendorPartners.find(v => v.name === shippingVendorId)
+          if (vendor) {
+            shippingVendorId = vendor.id
+          }
+        }
+
         return {
           id: p.id,
           option_code: p.option_code || null,
@@ -770,6 +829,15 @@ export default function OptionProductsManagementPage() {
           specification_3: p.specification_3 || null,
           standard_quantity: p.standard_quantity != null ? Number(p.standard_quantity) : null,
           standard_unit: p.standard_unit || null,
+          raw_material_partner: p.raw_material_partner || null,
+          shipping_entity: p.shipping_entity || null,
+          shipping_vendor_id: shippingVendorId || null,
+          invoice_entity: p.invoice_entity || null,
+          shipping_location_name: p.shipping_location_name || null,
+          shipping_location_address: p.shipping_location_address || null,
+          shipping_location_contact: p.shipping_location_contact || null,
+          shipping_deadline: p.shipping_deadline != null ? Number(p.shipping_deadline) : null,
+          shipping_cost: p.shipping_cost != null ? Number(p.shipping_cost) : null,
           packaging_box_price: p.packaging_box_price != null ? Number(p.packaging_box_price) : null,
           pack_price: p.pack_price != null ? Number(p.pack_price) : null,
           bag_vinyl_price: p.bag_vinyl_price != null ? Number(p.bag_vinyl_price) : null,
@@ -1039,7 +1107,7 @@ export default function OptionProductsManagementPage() {
                 'used_materials', 'category_1', 'category_2', 'category_3', 'category_4', 'category_5',
                 'average_material_price', 'calculated_material_cost', 'seller_margin_rate',
                 'seller_margin_amount', 'target_margin_amount', 'margin_calculation_type',
-                'total_material_cost', 'total_cost', 'vendor'
+                'total_material_cost', 'total_cost', 'vendor', 'raw_material_partner_name'
               ]
 
               // 추가 필드 매핑 (FIELD_LABELS에 없는 DB 필드들)
@@ -1354,14 +1422,17 @@ export default function OptionProductsManagementPage() {
                      'raw_material_cost', 'labor_cost', 'misc_cost', 'shipping_fee', 'total_material_cost', 'fixed_material_cost', 'additional_quantity',
                      'seller_supply_price', 'naver_paid_shipping_price', 'naver_free_shipping_price', 'coupang_paid_shipping_price',
                      'coupang_free_shipping_price', 'standard_quantity', 'seller_margin_rate', 'target_seller_margin_rate', 'target_margin_rate', 'target_margin_amount'].includes(field) ? 'number' as const
-                : ['material_cost_policy', 'margin_calculation_type', 'status', 'standard_unit'].includes(field) ? 'dropdown' as const
+                : ['material_cost_policy', 'margin_calculation_type', 'status', 'standard_unit', 'shipping_entity', 'invoice_entity', 'shipping_vendor_id'].includes(field) ? 'dropdown' as const
                 : 'text' as const,
               source: field === 'material_cost_policy' ? ['자동', '고정']
                 : field === 'margin_calculation_type' ? ['마진율', '마진액']
                 : field === 'status' ? supplyStatuses.map(s => s.name)
                 : field === 'standard_unit' ? ['kg', 'g', 'box', '개', 'L', 'ml']
+                : field === 'shipping_entity' ? shippingVendors.map(v => v.name)
+                : field === 'invoice_entity' ? invoiceEntities.map(e => e.name)
+                : field === 'shipping_vendor_id' ? vendorPartners.map(p => p.name)
                 : undefined,
-              readOnly: ['thumbnail_url', 'option_code', 'used_material_1', 'used_material_2', 'used_material_3', 'total_cost', 'average_material_price', 'calculated_material_cost', 'seller_margin_rate', 'seller_margin_amount', 'category_1', 'category_2', 'category_3', 'category_4', 'category_5', 'naver_margin_display', 'coupang_margin_display'].includes(field)
+              readOnly: ['thumbnail_url', 'option_code', 'used_material_1', 'used_material_2', 'used_material_3', 'total_cost', 'average_material_price', 'calculated_material_cost', 'seller_margin_rate', 'seller_margin_amount', 'category_1', 'category_2', 'category_3', 'category_4', 'category_5', 'naver_margin_display', 'coupang_margin_display', 'raw_material_partner'].includes(field)
                 ? true
                 : field === 'target_seller_margin_rate' ? (row: OptionProduct) => {
                     const mode = (row as any).seller_supply_price_mode
@@ -1426,6 +1497,9 @@ export default function OptionProductsManagementPage() {
                     {st?.name || row.status}
                   </span>
                 )
+              } : field === 'shipping_vendor_id' ? (_value: any, row: OptionProduct) => {
+                const vendor = vendorPartners.find(p => p.id === row.shipping_vendor_id)
+                return <span style={{ fontSize: '13px' }}>{vendor?.name || '-'}</span>
               } : field === 'option_name' ? (value: any, row: OptionProduct) => {
                   const policyBadge = row.material_cost_policy === 'fixed' ? ' 🔒' : ''
                   return <span style={{ fontSize: '13px' }}>{(row.option_name || '-') + policyBadge}</span>
@@ -1613,8 +1687,20 @@ export default function OptionProductsManagementPage() {
             }))
           })()}
           onDataChange={(newData) => {
+            // 벤더사 이름을 ID로 변환
+            const dataWithVendorId = newData.map(item => {
+              // shipping_vendor_id가 이름(문자열)인 경우 ID로 변환
+              if (item.shipping_vendor_id && typeof item.shipping_vendor_id === 'string') {
+                const vendor = vendorPartners.find(p => p.name === item.shipping_vendor_id)
+                if (vendor) {
+                  return { ...item, shipping_vendor_id: vendor.id }
+                }
+              }
+              return item
+            })
+
             // 가격 계산 함수 사용
-            const dataWithCalculations = newData.map(item => ({
+            const dataWithCalculations = dataWithVendorId.map(item => ({
               ...item,
               ...calculatePrices(item)
             }))
@@ -1915,7 +2001,20 @@ export default function OptionProductsManagementPage() {
                   })
 
                   // 1. upsert로 데이터 업데이트/추가
-                  const dataToUpsert = excelUploadModal.data
+                  // 벤더사 이름을 ID로 변환
+                  const dataToUpsert = excelUploadModal.data.map((row: any) => {
+                    let shippingVendorId = row.shipping_vendor_id
+                    if (shippingVendorId && typeof shippingVendorId === 'string') {
+                      const vendor = vendorPartners.find(v => v.name === shippingVendorId)
+                      if (vendor) {
+                        shippingVendorId = vendor.id
+                      }
+                    }
+                    return {
+                      ...row,
+                      shipping_vendor_id: shippingVendorId || null
+                    }
+                  })
                   const { error: upsertError } = await supabase.from('option_products').upsert(dataToUpsert, { onConflict: 'id' })
                   if (upsertError) {
                     console.error(upsertError)
@@ -2028,7 +2127,20 @@ export default function OptionProductsManagementPage() {
                   })
 
                   // upsert
-                  const dataToUpsert = excelUploadModal.data
+                  // 벤더사 이름을 ID로 변환
+                  const dataToUpsert = excelUploadModal.data.map((row: any) => {
+                    let shippingVendorId = row.shipping_vendor_id
+                    if (shippingVendorId && typeof shippingVendorId === 'string') {
+                      const vendor = vendorPartners.find(v => v.name === shippingVendorId)
+                      if (vendor) {
+                        shippingVendorId = vendor.id
+                      }
+                    }
+                    return {
+                      ...row,
+                      shipping_vendor_id: shippingVendorId || null
+                    }
+                  })
                   const { error } = await supabase
                     .from('option_products')
                     .upsert(dataToUpsert, {
