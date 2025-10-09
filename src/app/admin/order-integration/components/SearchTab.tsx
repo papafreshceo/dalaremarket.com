@@ -134,8 +134,8 @@ export default function SearchTab() {
   // 마켓 템플릿 먼저 로드한 후 표준 필드와 택배사 로드
   useEffect(() => {
     const loadInitialData = async () => {
-      await loadMarketTemplates();
-      await loadStandardFields();
+      const templates = await loadMarketTemplates();
+      await loadStandardFields(templates);
       await loadCouriers();
     };
     loadInitialData();
@@ -152,10 +152,12 @@ export default function SearchTab() {
           templateMap.set(template.market_name.toLowerCase(), template);
         });
         setMarketTemplates(templateMap);
+        return templateMap;
       }
     } catch (error) {
       console.error('마켓 템플릿 로드 실패:', error);
     }
+    return new Map();
   };
 
   const loadCouriers = async () => {
@@ -199,13 +201,14 @@ export default function SearchTab() {
     );
   };
 
-  const loadStandardFields = async () => {
+  const loadStandardFields = async (templates?: Map<string, any>) => {
     try {
       const response = await fetch('/api/mapping-settings/fields');
       const result = await response.json();
 
       if (result.success && result.data) {
         const standardRow = result.data.find((row: any) => row.market_name === '표준필드');
+        const templateMap = templates || marketTemplates;
 
         if (standardRow) {
           // field_N을 실제 DB 컬럼명으로 매핑 (migration 008 기준)
@@ -352,7 +355,7 @@ export default function SearchTab() {
               if (i === 10) column.width = 120; // 배송메시지
 
               // field_1 (마켓명) - 마켓 배지 렌더러
-              if (i === 1 && marketTemplates.size > 0) {
+              if (i === 1 && templateMap.size > 0) {
                 column.renderer = (value: any, row: any) => renderMarketBadge(value, row);
               }
 
