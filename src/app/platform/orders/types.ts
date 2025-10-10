@@ -15,6 +15,18 @@ export interface Order {
   trackingNo?: string;
   expectedDelivery?: string;
   cancelReason?: string;
+  // 발주서 업로드 추가 필드
+  orderer?: string;
+  ordererPhone?: string;
+  recipient?: string;
+  recipientPhone?: string;
+  address?: string;
+  deliveryMessage?: string;
+  optionName?: string;
+  optionCode?: string;
+  specialRequest?: string;
+  unitPrice?: number; // 공급단가
+  supplyPrice?: number; // 공급가 (정산예정금액)
 }
 
 export interface StatusConfig {

@@ -118,6 +118,10 @@ function RegisterForm() {
 
       if (authData.user) {
         // 2. users 테이블에 추가 정보 저장
+        const roleToInsert = inviteData ? inviteData.role : 'seller';
+        console.log('🔍 회원가입 - 설정될 role:', roleToInsert);
+        console.log('🔍 inviteData:', inviteData);
+
         const { error: profileError } = await supabase
           .from('users')
           .insert({
@@ -125,8 +129,8 @@ function RegisterForm() {
             email: formData.email,
             name: formData.name,
             phone: formData.phone,
-            role: inviteData ? inviteData.role : 'customer',
-            approved: inviteData ? false : true, // 초대 링크는 승인 대기, 일반 고객은 자동 승인
+            role: roleToInsert, // 일반 회원가입 = 셀러
+            approved: inviteData ? false : true, // 초대 링크는 승인 대기, 일반 셀러는 자동 승인
           })
 
         if (profileError) {

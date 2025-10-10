@@ -27,33 +27,34 @@ interface UploadedOrder {
   field_14?: string; // 확인
   field_15?: string; // 특이/요청사항
   field_16?: string; // 발송요청일
-  field_17?: string; // 셀러
-  field_18?: string; // 셀러공급가
-  field_19?: string; // 출고처
-  field_20?: string; // 송장주체
-  field_21?: string; // 벤더사
-  field_22?: string; // 발송지명
-  field_23?: string; // 발송지주소
-  field_24?: string; // 발송지연락처
-  field_25?: string; // 출고비용
-  field_26?: string; // 정산예정금액
-  field_27?: string; // 정산대상금액
-  field_28?: string; // 상품금액
-  field_29?: string; // 최종결제금액
-  field_30?: string; // 할인금액
-  field_31?: string; // 마켓부담할인금액
-  field_32?: string; // 판매자할인쿠폰할인
-  field_33?: string; // 구매쿠폰적용금액
-  field_34?: string; // 쿠폰할인금액
-  field_35?: string; // 기타지원금할인금
-  field_36?: string; // 수수료1
-  field_37?: string; // 수수료2
-  field_38?: string; // 판매아이디
-  field_39?: string; // 분리배송 Y/N
-  field_40?: string; // 택배비
-  field_41?: string; // 발송일(송장입력일)
-  field_42?: string; // 택배사
-  field_43?: string; // 송장번호
+  field_17?: string; // 옵션코드
+  field_18?: string; // 셀러
+  field_19?: string; // 셀러공급가
+  field_20?: string; // 출고처
+  field_21?: string; // 송장주체
+  field_22?: string; // 벤더사
+  field_23?: string; // 발송지명
+  field_24?: string; // 발송지주소
+  field_25?: string; // 발송지연락처
+  field_26?: string; // 출고비용
+  field_27?: string; // 정산예정금액
+  field_28?: string; // 정산대상금액
+  field_29?: string; // 상품금액
+  field_30?: string; // 최종결제금액
+  field_31?: string; // 할인금액
+  field_32?: string; // 마켓부담할인금액
+  field_33?: string; // 판매자할인쿠폰할인
+  field_34?: string; // 구매쿠폰적용금액
+  field_35?: string; // 쿠폰할인금액
+  field_36?: string; // 기타지원금할인금
+  field_37?: string; // 수수료1
+  field_38?: string; // 수수료2
+  field_39?: string; // 판매아이디
+  field_40?: string; // 분리배송 Y/N
+  field_41?: string; // 택배비
+  field_42?: string; // 발송일(송장입력일)
+  field_43?: string; // 택배사
+  field_44?: string; // 송장번호
   [key: string]: any; // 동적 필드 지원
 }
 
@@ -1004,33 +1005,34 @@ export default function ExcelTab() {
           confirmation: cleanOrder.field_14,
           special_request: cleanOrder.field_15,
           shipping_request_date: cleanOrder.field_16,
-          seller_name: cleanOrder.field_17,
-          seller_supply_price: cleanOrder.field_18,
-          shipping_source: cleanOrder.field_19,
-          invoice_issuer: cleanOrder.field_20,
-          vendor_name: cleanOrder.field_21,
-          shipping_location_name: cleanOrder.field_22,
-          shipping_location_address: cleanOrder.field_23,
-          shipping_location_contact: cleanOrder.field_24,
-          shipping_cost: cleanOrder.field_25,
-          settlement_amount: cleanOrder.field_26,
-          settlement_target_amount: cleanOrder.field_27,
-          product_amount: cleanOrder.field_28,
-          final_payment_amount: cleanOrder.field_29,
-          discount_amount: cleanOrder.field_30,
-          platform_discount: cleanOrder.field_31,
-          seller_discount: cleanOrder.field_32,
-          buyer_coupon_discount: cleanOrder.field_33,
-          coupon_discount: cleanOrder.field_34,
-          other_support_discount: cleanOrder.field_35,
-          commission_1: cleanOrder.field_36,
-          commission_2: cleanOrder.field_37,
-          seller_id: cleanOrder.field_38,
-          separate_shipping: cleanOrder.field_39,
-          delivery_fee: cleanOrder.field_40,
-          shipped_date: cleanOrder.field_41,
-          courier_company: cleanOrder.field_42,
-          tracking_number: cleanOrder.field_43,
+          option_code: cleanOrder.field_17,
+          seller_name: cleanOrder.field_18,
+          seller_supply_price: cleanOrder.field_19,
+          shipping_source: cleanOrder.field_20,
+          invoice_issuer: cleanOrder.field_21,
+          vendor_name: cleanOrder.field_22,
+          shipping_location_name: cleanOrder.field_23,
+          shipping_location_address: cleanOrder.field_24,
+          shipping_location_contact: cleanOrder.field_25,
+          shipping_cost: cleanOrder.field_26,
+          settlement_amount: cleanOrder.field_27,
+          settlement_target_amount: cleanOrder.field_28,
+          product_amount: cleanOrder.field_29,
+          final_payment_amount: cleanOrder.field_30,
+          discount_amount: cleanOrder.field_31,
+          platform_discount: cleanOrder.field_32,
+          seller_discount: cleanOrder.field_33,
+          buyer_coupon_discount: cleanOrder.field_34,
+          coupon_discount: cleanOrder.field_35,
+          other_support_discount: cleanOrder.field_36,
+          commission_1: cleanOrder.field_37,
+          commission_2: cleanOrder.field_38,
+          sell_id: cleanOrder.field_39,
+          separate_shipping: cleanOrder.field_40,
+          delivery_fee: cleanOrder.field_41,
+          shipped_date: cleanOrder.field_42,
+          courier_company: cleanOrder.field_43,
+          tracking_number: cleanOrder.field_44,
           sheet_date: new Date().toISOString().split('T')[0],
         };
       });

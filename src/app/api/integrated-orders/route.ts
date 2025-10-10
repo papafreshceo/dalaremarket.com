@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 /**
  * GET /api/integrated-orders
  * 주문 조회 (검색, 필터링, 페이지네이션)
+ * Updated: seller_name fallback to name/email when company_name is null
  */
 export async function GET(request: NextRequest) {
   try {
@@ -61,6 +62,12 @@ export async function GET(request: NextRequest) {
 
     const { data, error, count } = await query;
 
+    if (data) {
+      const marketNames = [...new Set(data.map((o: any) => o.market_name))];
+      console.log('📊 DB에서 가져온 마켓명:', marketNames);
+      console.log('📊 전체 주문 수:', data.length);
+    }
+
     if (error) {
       console.error('주문 조회 실패:', error);
       return NextResponse.json(
@@ -92,10 +99,30 @@ export async function GET(request: NextRequest) {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
+    // seller_id로 users 정보 가져오기
+    const sellerIds = [...new Set(sortedData.map(order => order.seller_id).filter(Boolean))];
+    const sellersMap = new Map<string, string>();
+
+    if (sellerIds.length > 0) {
+      const { data: sellers } = await supabase
+        .from('users')
+        .select('id, company_name, name, email')
+        .in('id', sellerIds);
+
+      (sellers || []).forEach((seller) => {
+        // company_name이 없으면 name, 그것도 없으면 email 사용
+        const displayName = seller.company_name || seller.name || seller.email || '미지정';
+        sellersMap.set(seller.id, displayName);
+        console.log(`Seller mapping: ${seller.id} => ${displayName}`);
+      });
+    }
+
     // shipping_status가 없거나 빈 값이면 '결제완료'로 기본 설정
+    // seller_id를 통해 company_name을 seller_name에 매핑
     const normalizedData = sortedData.map(order => ({
       ...order,
-      shipping_status: order.shipping_status || '결제완료'
+      shipping_status: order.shipping_status || '결제완료',
+      seller_name: order.seller_id ? sellersMap.get(order.seller_id) || null : null
     }));
 
     // 페이지네이션 적용

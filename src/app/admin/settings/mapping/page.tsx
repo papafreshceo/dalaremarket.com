@@ -62,6 +62,7 @@ interface MappingField {
   field_41?: string;
   field_42?: string;
   field_43?: string;
+  field_44?: string;
   [key: string]: any;
 }
 
@@ -80,7 +81,7 @@ export default function MappingSettingsPage() {
   const [transformedFieldsData, setTransformedFieldsData] = useState<any[]>([])
   const [fieldsColumns, setFieldsColumns] = useState<any[]>([])
 
-  // 표준필드 고정 순서 (43개)
+  // 표준필드 고정 순서 (44개)
   const standardFieldsOrder = [
     'market_name',
     'sequence_number',
@@ -125,6 +126,7 @@ export default function MappingSettingsPage() {
     'shipping_date',
     'courier_company',
     'tracking_number',
+    'option_code',
   ]
 
   // 표준필드 한글 매핑
@@ -173,6 +175,7 @@ export default function MappingSettingsPage() {
     shipping_date: '발송일(송장입력일)',
     courier_company: '택배사',
     tracking_number: '송장번호',
+    option_code: '옵션코드',
     product_name: '상품명',
     seller_product_code: '판매자상품코드',
     settlement_base_amount: '정산기준금액',
@@ -206,10 +209,10 @@ export default function MappingSettingsPage() {
       return
     }
 
-    // 컬럼 정의: 플랫폼 + 표준필드1~표준필드43 (고정)
+    // 컬럼 정의: 플랫폼 + 표준필드1~표준필드44 (고정)
     const newColumns = [
       { key: 'market_name', title: '플랫폼', width: 120, readOnly: true },
-      ...Array.from({ length: 43 }, (_, index) => ({
+      ...Array.from({ length: 44 }, (_, index) => ({
         key: `field_${index + 1}`,
         title: `표준필드${index + 1}`,
         width: 150,

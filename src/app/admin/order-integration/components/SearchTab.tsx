@@ -26,7 +26,6 @@ interface Order {
   confirmation?: string;
   special_request?: string;
   shipping_request_date?: string;
-  seller_name?: string;
   seller_supply_price?: string;
   shipping_source?: string;
   invoice_issuer?: string;
@@ -47,12 +46,14 @@ interface Order {
   other_support_discount?: string;
   commission_1?: string;
   commission_2?: string;
+  sell_id?: string;
   seller_id?: string;
   separate_shipping?: string;
   delivery_fee?: string;
   shipped_date?: string;
   courier_company?: string;
   tracking_number?: string;
+  option_code?: string;
   shipping_status?: string;
   cs_status?: string;
   memo?: string;
@@ -86,11 +87,26 @@ interface VendorStats {
   취소완료_수량: number;
 }
 
+interface SellerStats {
+  seller_id: string;
+  결제완료_건수: number;
+  결제완료_수량: number;
+  상품준비중_건수: number;
+  상품준비중_수량: number;
+  발송완료_건수: number;
+  발송완료_수량: number;
+  취소요청_건수: number;
+  취소요청_수량: number;
+  취소완료_건수: number;
+  취소완료_수량: number;
+}
+
 export default function SearchTab() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
+    접수: 0,
     결제완료: 0,
     상품준비중: 0,
     발송완료: 0,
@@ -98,7 +114,9 @@ export default function SearchTab() {
     취소완료: 0,
   });
   const [vendorStats, setVendorStats] = useState<VendorStats[]>([]);
-  const [vendorStatsExpanded, setVendorStatsExpanded] = useState(true);
+  const [vendorStatsExpanded, setVendorStatsExpanded] = useState(false);
+  const [sellerStats, setSellerStats] = useState<SellerStats[]>([]);
+  const [sellerStatsExpanded, setSellerStatsExpanded] = useState(false);
   const [columns, setColumns] = useState<any[]>([]);
   const [marketTemplates, setMarketTemplates] = useState<Map<string, any>>(new Map());
   const [courierList, setCourierList] = useState<string[]>([]);
@@ -118,14 +136,24 @@ export default function SearchTab() {
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
 
   // 검색 필터 상태
-  const [filters, setFilters] = useState<SearchFilters>({
-    startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7일 전
-    endDate: new Date().toISOString().split('T')[0], // 오늘
-    dateType: 'sheet',
-    marketName: '',
-    searchKeyword: '',
-    shippingStatus: '',
-    vendorName: '',
+  const [filters, setFilters] = useState<SearchFilters>(() => {
+    // 한국 시간 기준으로 날짜 계산 (UTC+9)
+    const now = new Date();
+    const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+    const endDate = koreaTime.toISOString().split('T')[0];
+
+    const sevenDaysAgo = new Date(koreaTime.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const startDate = sevenDaysAgo.toISOString().split('T')[0];
+
+    return {
+      startDate,
+      endDate,
+      dateType: 'sheet',
+      marketName: '',
+      searchKeyword: '',
+      shippingStatus: '',
+      vendorName: '',
+    };
   });
 
   // 일괄적용 택배사 선택값 상태
@@ -134,23 +162,74 @@ export default function SearchTab() {
   // 마켓 템플릿 먼저 로드한 후 표준 필드와 택배사 로드
   useEffect(() => {
     const loadInitialData = async () => {
-      const templates = await loadMarketTemplates();
-      await loadStandardFields(templates);
+      await loadMarketTemplates();
+      await loadStandardFields();
       await loadCouriers();
     };
     loadInitialData();
   }, []);
+
+  // marketTemplates와 columns가 로드되면 마켓 컬럼에 렌더러 추가
+  useEffect(() => {
+    if (marketTemplates.size > 0 && columns.length > 0) {
+      // 이미 렌더러가 있는지 확인 (무한 루프 방지)
+      const marketColumn = columns.find(c => c.key === 'market_name' || c.isMarketColumn);
+      if (marketColumn && !marketColumn.renderer) {
+        console.log('🎨 마켓 컬럼 렌더러 추가 시작, marketTemplates:', marketTemplates.size);
+        const updatedColumns = columns.map((column) => {
+          if (column.key === 'market_name' || column.isMarketColumn) {
+            console.log('  - 마켓 컬럼 발견:', column.key, column.title);
+            return {
+              ...column,
+              renderer: (value: any, row: any) => {
+                const marketName = value || row.market_name;
+                if (!marketName) return '';
+
+                const template = marketTemplates.get(String(marketName).toLowerCase());
+                let marketColor = '#6B7280';
+
+                if (template?.color_rgb) {
+                  if (template.color_rgb.includes(',')) {
+                    marketColor = `rgb(${template.color_rgb})`;
+                  } else {
+                    marketColor = template.color_rgb;
+                  }
+                }
+
+                return (
+                  <span
+                    className="px-2 py-0.5 rounded text-white text-xs font-medium"
+                    style={{ backgroundColor: marketColor }}
+                  >
+                    {marketName}
+                  </span>
+                );
+              }
+            };
+          }
+          return column;
+        });
+
+        setColumns(updatedColumns);
+        console.log('✓ 마켓 렌더러 추가 완료');
+      }
+    }
+  }, [marketTemplates.size, columns.length]);
 
   const loadMarketTemplates = async () => {
     try {
       const response = await fetch('/api/market-templates');
       const result = await response.json();
 
+      console.log('🎯 마켓 템플릿 API 응답:', result);
+
       if (result.success) {
         const templateMap = new Map<string, any>();
         result.data.forEach((template: any) => {
           templateMap.set(template.market_name.toLowerCase(), template);
         });
+        console.log('✅ 마켓 템플릿 로드 완료:', templateMap.size, '개');
+        console.log('템플릿 샘플:', Array.from(templateMap.entries()).slice(0, 3));
         setMarketTemplates(templateMap);
         return templateMap;
       }
@@ -174,41 +253,13 @@ export default function SearchTab() {
     }
   };
 
-  // 마켓명 배지 렌더러
-  const renderMarketBadge = (value: any, row: any) => {
-    const marketName = value || row.market_name;
-    if (!marketName) return '';
-
-    // 마켓 템플릿에서 색상 가져오기
-    const template = marketTemplates.get(marketName.toLowerCase());
-    let marketColor = '#6B7280'; // 기본 회색
-
-    if (template?.color_rgb) {
-      if (template.color_rgb.includes(',')) {
-        marketColor = `rgb(${template.color_rgb})`;
-      } else {
-        marketColor = template.color_rgb;
-      }
-    }
-
-    return (
-      <span
-        className="px-2 py-0.5 rounded text-white text-xs font-medium"
-        style={{ backgroundColor: marketColor }}
-      >
-        {marketName}
-      </span>
-    );
-  };
-
-  const loadStandardFields = async (templates?: Map<string, any>) => {
+  const loadStandardFields = async () => {
     try {
       const response = await fetch('/api/mapping-settings/fields');
       const result = await response.json();
 
       if (result.success && result.data) {
         const standardRow = result.data.find((row: any) => row.market_name === '표준필드');
-        const templateMap = templates || marketTemplates;
 
         if (standardRow) {
           // field_N을 실제 DB 컬럼명으로 매핑 (migration 008 기준)
@@ -230,33 +281,34 @@ export default function SearchTab() {
             'confirmation',             // field_14 - 확인
             'special_request',          // field_15 - 특이/요청사항
             'shipping_request_date',    // field_16 - 발송요청일
-            'seller_name',              // field_17 - 셀러
-            'seller_supply_price',      // field_18 - 셀러공급가
-            'shipping_source',          // field_19 - 출고처
-            'invoice_issuer',           // field_20 - 송장주체
-            'vendor_name',              // field_21 - 벤더사
-            'shipping_location_name',   // field_22 - 발송지명
-            'shipping_location_address', // field_23 - 발송지주소
-            'shipping_location_contact', // field_24 - 발송지연락처
-            'shipping_cost',            // field_25 - 출고비용
-            'settlement_amount',        // field_26 - 정산예정금액
-            'settlement_target_amount', // field_27 - 정산대상금액
-            'product_amount',           // field_28 - 상품금액
-            'final_payment_amount',     // field_29 - 최종결제금액
-            'discount_amount',          // field_30 - 할인금액
-            'platform_discount',        // field_31 - 마켓부담할인금액
-            'seller_discount',          // field_32 - 판매자할인쿠폰할인
-            'buyer_coupon_discount',    // field_33 - 구매쿠폰적용금액
-            'coupon_discount',          // field_34 - 쿠폰할인금액
-            'other_support_discount',   // field_35 - 기타지원금할인금
-            'commission_1',             // field_36 - 수수료1
-            'commission_2',             // field_37 - 수수료2
-            'seller_id',                // field_38 - 판매아이디
-            'separate_shipping',        // field_39 - 분리배송 Y/N
-            'delivery_fee',             // field_40 - 택배비
-            'shipped_date',             // field_41 - 발송일(송장입력일)
-            'courier_company',          // field_42 - 택배사
-            'tracking_number',          // field_43 - 송장번호
+            'option_code',              // field_17 - 옵션코드 (새로 추가)
+            'seller_id',                // field_18 - 셀러ID (이전 field_17)
+            'seller_supply_price',      // field_19 - 셀러공급가 (이전 field_18)
+            'shipping_source',          // field_20 - 출고처 (이전 field_19)
+            'invoice_issuer',           // field_21 - 송장주체 (이전 field_20)
+            'vendor_name',              // field_22 - 벤더사 (이전 field_21)
+            'shipping_location_name',   // field_23 - 발송지명 (이전 field_22)
+            'shipping_location_address', // field_24 - 발송지주소 (이전 field_23)
+            'shipping_location_contact', // field_25 - 발송지연락처 (이전 field_24)
+            'shipping_cost',            // field_26 - 출고비용 (이전 field_25)
+            'settlement_amount',        // field_27 - 정산예정금액 (이전 field_26)
+            'settlement_target_amount', // field_28 - 정산대상금액 (이전 field_27)
+            'product_amount',           // field_29 - 상품금액 (이전 field_28)
+            'final_payment_amount',     // field_30 - 최종결제금액 (이전 field_29)
+            'discount_amount',          // field_31 - 할인금액 (이전 field_30)
+            'platform_discount',        // field_32 - 마켓부담할인금액 (이전 field_31)
+            'seller_discount',          // field_33 - 판매자할인쿠폰할인 (이전 field_32)
+            'buyer_coupon_discount',    // field_34 - 구매쿠폰적용금액 (이전 field_33)
+            'coupon_discount',          // field_35 - 쿠폰할인금액 (이전 field_34)
+            'other_support_discount',   // field_36 - 기타지원금할인금 (이전 field_35)
+            'commission_1',             // field_37 - 수수료1 (이전 field_36)
+            'commission_2',             // field_38 - 수수료2 (이전 field_37)
+            'sell_id',                  // field_39 - 판매아이디 (이전 field_38)
+            'separate_shipping',        // field_40 - 분리배송 Y/N (이전 field_39)
+            'delivery_fee',             // field_41 - 택배비 (이전 field_40)
+            'shipped_date',             // field_42 - 발송일(송장입력일) (이전 field_41)
+            'courier_company',          // field_43 - 택배사 (이전 field_42)
+            'tracking_number',          // field_44 - 송장번호 (이전 field_43)
           ];
 
           const dynamicColumns = [];
@@ -269,6 +321,7 @@ export default function SearchTab() {
             renderer: (value: any, row: any) => {
               const status = value || '결제완료';
               const statusColors: Record<string, string> = {
+                '접수': 'bg-purple-100 text-purple-800',
                 '결제완료': 'bg-blue-100 text-blue-800',
                 '상품준비중': 'bg-yellow-100 text-yellow-800',
                 '발송완료': 'bg-green-100 text-green-800',
@@ -304,13 +357,13 @@ export default function SearchTab() {
             }
           });
 
-          // field_1 ~ field_43 표준 필드 순회
-          for (let i = 1; i <= 43; i++) {
-            // field_4(주문번호) 차례가 되면 먼저 택배사(42), 송장번호(43) 삽입
+          // field_1 ~ field_44 표준 필드 순회
+          for (let i = 1; i <= 44; i++) {
+            // field_4(주문번호) 차례가 되면 먼저 택배사(43), 송장번호(44) 삽입
             if (i === 4) {
-              // 택배사(field_42)
-              const courierFieldValue = standardRow['field_42'];
-              const courierDbColumn = fieldToColumnMap[42];
+              // 택배사(field_43)
+              const courierFieldValue = standardRow['field_43'];
+              const courierDbColumn = fieldToColumnMap[43];
               if (courierFieldValue && courierFieldValue.trim() && courierDbColumn) {
                 dynamicColumns.push({
                   key: courierDbColumn,
@@ -319,9 +372,9 @@ export default function SearchTab() {
                 });
               }
 
-              // 송장번호(field_43)
-              const trackingFieldValue = standardRow['field_43'];
-              const trackingDbColumn = fieldToColumnMap[43];
+              // 송장번호(field_44)
+              const trackingFieldValue = standardRow['field_44'];
+              const trackingDbColumn = fieldToColumnMap[44];
               if (trackingFieldValue && trackingFieldValue.trim() && trackingDbColumn) {
                 dynamicColumns.push({
                   key: trackingDbColumn,
@@ -331,8 +384,8 @@ export default function SearchTab() {
               }
             }
 
-            // 42, 43은 이미 주문번호 앞에 추가했으므로 스킵
-            if (i === 42 || i === 43) {
+            // 43, 44는 이미 주문번호 앞에 추가했으므로 스킵
+            if (i === 43 || i === 44) {
               continue;
             }
 
@@ -354,9 +407,9 @@ export default function SearchTab() {
               if (i === 9) column.width = 250; // 주소
               if (i === 10) column.width = 120; // 배송메시지
 
-              // field_1 (마켓명) - 마켓 배지 렌더러
-              if (i === 1 && templateMap.size > 0) {
-                column.renderer = (value: any, row: any) => renderMarketBadge(value, row);
+              // field_1 (마켓명) - 마켓 배지 렌더러는 제거 (useEffect에서 처리)
+              if (i === 1) {
+                column.isMarketColumn = true; // 마커 추가
               }
 
               dynamicColumns.push(column);
@@ -364,6 +417,7 @@ export default function SearchTab() {
           }
 
           console.log('Generated columns:', dynamicColumns.length, dynamicColumns);
+          console.log('마켓 컬럼 확인:', dynamicColumns.find(c => c.key === 'market_name' || c.isMarketColumn));
           setColumns(dynamicColumns);
         }
       }
@@ -422,6 +476,55 @@ export default function SearchTab() {
     setVendorStats(statsArray);
   };
 
+  // 셀러별 집계
+  const calculateSellerStats = (orderData: Order[]) => {
+    const statsMap = new Map<string, SellerStats>();
+
+    orderData.forEach((order) => {
+      const sellerId = order.seller_id || '미지정';
+      if (!statsMap.has(sellerId)) {
+        statsMap.set(sellerId, {
+          seller_id: sellerId,
+          결제완료_건수: 0,
+          결제완료_수량: 0,
+          상품준비중_건수: 0,
+          상품준비중_수량: 0,
+          발송완료_건수: 0,
+          발송완료_수량: 0,
+          취소요청_건수: 0,
+          취소요청_수량: 0,
+          취소완료_건수: 0,
+          취소완료_수량: 0,
+        });
+      }
+
+      const stats = statsMap.get(sellerId)!;
+      const status = order.shipping_status || '결제완료';
+      const quantity = Number(order.quantity) || 0;
+
+      if (status === '결제완료') {
+        stats.결제완료_건수 += 1;
+        stats.결제완료_수량 += quantity;
+      } else if (status === '상품준비중') {
+        stats.상품준비중_건수 += 1;
+        stats.상품준비중_수량 += quantity;
+      } else if (status === '발송완료') {
+        stats.발송완료_건수 += 1;
+        stats.발송완료_수량 += quantity;
+      } else if (status === '취소요청') {
+        stats.취소요청_건수 += 1;
+        stats.취소요청_수량 += quantity;
+      } else if (status === '취소완료') {
+        stats.취소완료_건수 += 1;
+        stats.취소완료_수량 += quantity;
+      }
+    });
+
+    const statsArray = Array.from(statsMap.values());
+    statsArray.sort((a, b) => (b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수) - (a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수));
+    setSellerStats(statsArray);
+  };
+
   const fetchOrders = async () => {
     setLoading(true);
     try {
@@ -438,8 +541,16 @@ export default function SearchTab() {
       const response = await fetch(`/api/integrated-orders?${params}`);
       const result = await response.json();
 
+      console.log('🔍 API Response:', {
+        success: result.success,
+        totalOrders: result.data?.length,
+        markets: [...new Set(result.data?.map((o: Order) => o.market_name))],
+        platformOrders: result.data?.filter((o: Order) => o.market_name === '플랫폼').length,
+      });
+
       if (result.success) {
         setOrders(result.data || []);
+        console.log('✅ Orders state updated:', result.data?.length);
 
         // 통계 계산
         const statusCounts = (result.data || []).reduce((acc: any, order: Order) => {
@@ -450,6 +561,7 @@ export default function SearchTab() {
 
         setStats({
           total: result.data?.length || 0,
+          접수: statusCounts['접수'] || 0,
           결제완료: statusCounts['결제완료'] || 0,
           상품준비중: statusCounts['상품준비중'] || 0,
           발송완료: statusCounts['발송완료'] || 0,
@@ -459,6 +571,8 @@ export default function SearchTab() {
 
         // 벤더사별 집계 계산
         calculateVendorStats(result.data || []);
+        // 셀러별 집계 계산
+        calculateSellerStats(result.data || []);
       } else {
         console.error('주문 조회 실패:', result.error);
         alert('주문 조회에 실패했습니다: ' + result.error);
@@ -583,12 +697,20 @@ export default function SearchTab() {
     console.log('일괄적용 완료');
   };
 
-  // 발주확인 핸들러 - 결제완료 상태 주문을 상품준비중으로 변경
+  // 발주확인 핸들러 - 선택된 결제완료 상태 주문을 상품준비중으로 변경
   const handleOrderConfirm = async () => {
-    const confirmOrders = orders.filter(order => order.shipping_status === '결제완료');
+    // 선택된 주문만 필터링
+    if (selectedOrders.length === 0) {
+      alert('발주확인할 주문을 선택해주세요.');
+      return;
+    }
+
+    const confirmOrders = selectedOrders
+      .map(index => orders[index])
+      .filter(order => order && order.shipping_status === '결제완료');
 
     if (confirmOrders.length === 0) {
-      alert('발주확인할 주문이 없습니다. (결제완료 상태만 가능)');
+      alert('선택한 주문 중 결제완료 상태인 주문이 없습니다.');
       return;
     }
 
@@ -597,8 +719,9 @@ export default function SearchTab() {
     }
 
     try {
+      // shipping_status만 업데이트 (id와 함께)
       const updates = confirmOrders.map(order => ({
-        ...order,
+        id: order.id,
         shipping_status: '상품준비중',
       }));
 
@@ -612,6 +735,7 @@ export default function SearchTab() {
 
       if (result.success) {
         alert(`${result.count}개 주문이 발주확인 처리되었습니다.`);
+        setSelectedOrders([]); // 선택 초기화
         fetchOrders();
       } else {
         alert('발주확인 실패: ' + result.error);
@@ -670,6 +794,36 @@ export default function SearchTab() {
     XLSX.utils.book_append_sheet(wb, ws, vendorName);
 
     const fileName = `${vendorName}_발송목록_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
+  // 셀러별 엑셀 다운로드
+  const handleSellerExcelDownload = (sellerId: string) => {
+    const sellerOrders = orders.filter((o) => (o.seller_id || '미지정') === sellerId);
+
+    if (sellerOrders.length === 0) {
+      alert('다운로드할 주문이 없습니다.');
+      return;
+    }
+
+    const exportData = sellerOrders.map((order) => ({
+      주문번호: order.order_number,
+      수취인: order.recipient_name,
+      전화번호: order.recipient_phone || '',
+      주소: order.recipient_address || '',
+      옵션명: order.option_name,
+      수량: order.quantity,
+      발송상태: order.shipping_status,
+      택배사: order.courier_company || '',
+      송장번호: order.tracking_number || '',
+      발송일: order.shipped_date || '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sellerId);
+
+    const fileName = `${sellerId}_발송목록_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(wb, fileName);
   };
 
@@ -768,9 +922,53 @@ export default function SearchTab() {
     }
   };
 
-  // 취소승인 핸들러
-  const handleCancelApprove = () => {
-    alert('취소승인 기능은 개발 예정입니다.');
+  // 취소승인 핸들러 - 선택된 취소요청 주문을 취소완료로 변경
+  const handleCancelApprove = async () => {
+    // 선택된 주문만 필터링
+    if (selectedOrders.length === 0) {
+      alert('취소승인할 주문을 선택해주세요.');
+      return;
+    }
+
+    const cancelOrders = selectedOrders
+      .map(index => orders[index])
+      .filter(order => order && order.shipping_status === '취소요청');
+
+    if (cancelOrders.length === 0) {
+      alert('선택한 주문 중 취소요청 상태인 주문이 없습니다.');
+      return;
+    }
+
+    if (!confirm(`${cancelOrders.length}개의 주문을 취소승인 하시겠습니까?\n취소완료 상태로 변경됩니다.`)) {
+      return;
+    }
+
+    try {
+      const updates = cancelOrders.map(order => ({
+        id: order.id,
+        shipping_status: '취소완료',
+        canceled_at: new Date().toISOString(),
+      }));
+
+      const response = await fetch('/api/integrated-orders/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: updates }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`${result.count}개 주문이 취소승인 처리되었습니다.`);
+        setSelectedOrders([]); // 선택 초기화
+        fetchOrders();
+      } else {
+        alert('취소승인 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('취소승인 오류:', error);
+      alert('취소승인 중 오류가 발생했습니다.');
+    }
   };
 
   // 행 삭제 핸들러 (소프트 삭제)
@@ -812,106 +1010,155 @@ export default function SearchTab() {
   return (
     <div className="space-y-4">
       {/* 통계 카드 */}
-      <div className="grid grid-cols-6 gap-4">
+      <div className="grid grid-cols-7 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">전체</div>
           <div className="text-2xl font-semibold text-gray-900">{stats.total.toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-sm text-gray-600 mb-1">접수</div>
+          <div className="text-2xl font-semibold text-purple-600">{(stats.접수 || 0).toLocaleString()}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">결제완료</div>
-          <div className="text-2xl font-semibold text-blue-600">{stats.결제완료.toLocaleString()}</div>
+          <div className="text-2xl font-semibold text-blue-600">{(stats.결제완료 || 0).toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">상품준비중</div>
-          <div className="text-2xl font-semibold text-yellow-600">{stats.상품준비중.toLocaleString()}</div>
+          <div className="text-2xl font-semibold text-yellow-600">{(stats.상품준비중 || 0).toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">발송완료</div>
-          <div className="text-2xl font-semibold text-green-600">{stats.발송완료.toLocaleString()}</div>
+          <div className="text-2xl font-semibold text-green-600">{(stats.발송완료 || 0).toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">취소요청</div>
-          <div className="text-2xl font-semibold text-orange-600">{stats.취소요청.toLocaleString()}</div>
+          <div className="text-2xl font-semibold text-orange-600">{(stats.취소요청 || 0).toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">취소완료</div>
-          <div className="text-2xl font-semibold text-red-600">{stats.취소완료.toLocaleString()}</div>
+          <div className="text-2xl font-semibold text-red-600">{(stats.취소완료 || 0).toLocaleString()}</div>
         </div>
       </div>
 
-      {/* 벤더사별 집계 테이블 */}
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-200">
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold text-gray-900">벤더사별 집계</h3>
-            <button
-              onClick={() => setVendorStatsExpanded(!vendorStatsExpanded)}
-              className="p-1 hover:bg-blue-100 rounded bg-blue-50"
-            >
-              {vendorStatsExpanded ? (
-                <ChevronUp className="w-4 h-4 text-blue-600" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-blue-600" />
-              )}
-            </button>
-          </div>
+      {/* 벤더사별/셀러별 집계 테이블 */}
+      <div className="bg-white rounded-lg">
+        <div className="px-4 py-3 flex items-center gap-4">
+          <button
+            onClick={() => {
+              setVendorStatsExpanded(!vendorStatsExpanded);
+              if (!vendorStatsExpanded) setSellerStatsExpanded(false);
+            }}
+            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+              vendorStatsExpanded
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            벤더사별 집계
+          </button>
+          <button
+            onClick={() => {
+              setSellerStatsExpanded(!sellerStatsExpanded);
+              if (!sellerStatsExpanded) setVendorStatsExpanded(false);
+            }}
+            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+              sellerStatsExpanded
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            셀러별 집계
+          </button>
         </div>
+
         {vendorStatsExpanded && (
-          <div className="overflow-x-auto" style={{ fontSize: '14px !important' }}>
-            <table className="w-full" style={{ fontSize: '14px !important' }}>
-              <thead className="bg-gray-50">
-                <tr>
-                  <th rowSpan={2} className="px-4 py-3 text-left font-medium text-gray-600 border-r border-gray-200">벤더사</th>
-                  <th colSpan={2} className="px-4 py-2 text-center font-medium text-blue-600 border-r border-gray-200">결제완료</th>
-                  <th colSpan={2} className="px-4 py-2 text-center font-medium text-yellow-600 border-r border-gray-200">상품준비중</th>
-                  <th colSpan={2} className="px-4 py-2 text-center font-medium text-green-600 border-r border-gray-200">발송완료</th>
-                  <th colSpan={2} className="px-4 py-2 text-center font-medium text-orange-600 border-r border-gray-200">취소요청</th>
-                  <th colSpan={2} className="px-4 py-2 text-center font-medium text-red-600 border-r border-gray-200">취소완료</th>
-                  <th rowSpan={2} className="px-4 py-3 text-center font-medium text-gray-600">전송파일</th>
-                </tr>
-                <tr>
-                  <th className="px-2 py-2 text-center font-medium text-gray-600 border-r border-gray-200">건수</th>
-                  <th className="px-2 py-2 text-center font-medium text-gray-600 border-r border-gray-200">수량</th>
-                  <th className="px-2 py-2 text-center font-medium text-gray-600 border-r border-gray-200">건수</th>
-                  <th className="px-2 py-2 text-center font-medium text-gray-600 border-r border-gray-200">수량</th>
-                  <th className="px-2 py-2 text-center font-medium text-gray-600 border-r border-gray-200">건수</th>
-                  <th className="px-2 py-2 text-center font-medium text-gray-600 border-r border-gray-200">수량</th>
-                  <th className="px-2 py-2 text-center font-medium text-gray-600 border-r border-gray-200">건수</th>
-                  <th className="px-2 py-2 text-center font-medium text-gray-600 border-r border-gray-200">수량</th>
-                  <th className="px-2 py-2 text-center font-medium text-gray-600 border-r border-gray-200">건수</th>
-                  <th className="px-2 py-2 text-center font-medium text-gray-600 border-r border-gray-200">수량</th>
+          <div className="overflow-x-auto pb-4">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'left', fontWeight: 500, color: '#4B5563' }}>벤더사</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#2563EB' }}>결제완료</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#CA8A04' }}>상품준비중</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#16A34A' }}>발송완료</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#EA580C' }}>취소요청</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#DC2626' }}>취소완료</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#4B5563' }}>전송파일</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {vendorStats.map((stat) => (
-                  <tr key={stat.shipping_source} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900 border-r border-gray-200">{stat.shipping_source}</td>
-                    <td className="px-2 py-3 text-center text-blue-700 border-r border-gray-200">{(stat.결제완료_건수 || 0) > 0 ? stat.결제완료_건수.toLocaleString() : ''}</td>
-                    <td className="px-2 py-3 text-center text-blue-700 border-r border-gray-200">{(stat.결제완료_수량 || 0) > 0 ? stat.결제완료_수량.toLocaleString() : ''}</td>
-                    <td className="px-2 py-3 text-center text-yellow-700 border-r border-gray-200">{(stat.상품준비중_건수 || 0) > 0 ? stat.상품준비중_건수.toLocaleString() : ''}</td>
-                    <td className="px-2 py-3 text-center text-yellow-700 border-r border-gray-200">{(stat.상품준비중_수량 || 0) > 0 ? stat.상품준비중_수량.toLocaleString() : ''}</td>
-                    <td className="px-2 py-3 text-center text-green-700 border-r border-gray-200">{(stat.발송완료_건수 || 0) > 0 ? stat.발송완료_건수.toLocaleString() : ''}</td>
-                    <td className="px-2 py-3 text-center text-green-700 border-r border-gray-200">{(stat.발송완료_수량 || 0) > 0 ? stat.발송완료_수량.toLocaleString() : ''}</td>
-                    <td className="px-2 py-3 text-center text-orange-700 border-r border-gray-200">{(stat.취소요청_건수 || 0) > 0 ? stat.취소요청_건수.toLocaleString() : ''}</td>
-                    <td className="px-2 py-3 text-center text-orange-700 border-r border-gray-200">{(stat.취소요청_수량 || 0) > 0 ? stat.취소요청_수량.toLocaleString() : ''}</td>
-                    <td className="px-2 py-3 text-center text-red-700 border-r border-gray-200">{(stat.취소완료_건수 || 0) > 0 ? stat.취소완료_건수.toLocaleString() : ''}</td>
-                    <td className="px-2 py-3 text-center text-red-700 border-r border-gray-200">{(stat.취소완료_수량 || 0) > 0 ? stat.취소완료_수량.toLocaleString() : ''}</td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={() => handleVendorExcelDownload(stat.shipping_source)}
-                          className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
-                        >
-                          <Download className="w-3 h-3" />
-                          엑셀
-                        </button>
-                      </div>
+              <tbody>
+                {vendorStats.map((stat, idx) => (
+                  <tr key={stat.shipping_source} style={{ borderTop: idx === 0 ? 'none' : '1px solid #E5E7EB' }} className="hover:bg-gray-50">
+                    <td style={{ fontSize: '16px', padding: '6px 16px', fontWeight: 500, color: '#111827' }}>{stat.shipping_source}</td>
+                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#1D4ED8', fontWeight: 600 }}>{(stat.결제완료_건수 || 0) > 0 ? stat.결제완료_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#A16207', fontWeight: 600 }}>{(stat.상품준비중_건수 || 0) > 0 ? stat.상품준비중_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#15803D', fontWeight: 600 }}>{(stat.발송완료_건수 || 0) > 0 ? stat.발송완료_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#C2410C', fontWeight: 600 }}>{(stat.취소요청_건수 || 0) > 0 ? stat.취소요청_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#B91C1C', fontWeight: 600 }}>{(stat.취소완료_건수 || 0) > 0 ? stat.취소완료_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => handleVendorExcelDownload(stat.shipping_source)}
+                        style={{ fontSize: '14px', padding: '4px 12px', backgroundColor: '#16A34A', color: 'white', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', border: 'none', cursor: 'pointer' }}
+                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#15803D'}
+                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#16A34A'}
+                      >
+                        <Download className="w-3 h-3" />
+                        엑셀
+                      </button>
                     </td>
                   </tr>
                 ))}
                 {vendorStats.length === 0 && (
                   <tr>
-                    <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={7} style={{ fontSize: '16px', padding: '24px 16px', textAlign: 'center', color: '#6B7280' }}>
+                      데이터가 없습니다.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {sellerStatsExpanded && (
+          <div className="overflow-x-auto pb-4">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'left', fontWeight: 500, color: '#4B5563' }}>셀러</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#2563EB' }}>결제완료</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#CA8A04' }}>상품준비중</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#16A34A' }}>발송완료</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#EA580C' }}>취소요청</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#DC2626' }}>취소완료</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#4B5563' }}>전송파일</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sellerStats.map((stat, idx) => (
+                  <tr key={stat.seller_id} style={{ borderTop: idx === 0 ? 'none' : '1px solid #E5E7EB' }} className="hover:bg-gray-50">
+                    <td style={{ fontSize: '16px', padding: '6px 16px', fontWeight: 500, color: '#111827' }}>{stat.seller_id}</td>
+                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#1D4ED8', fontWeight: 600 }}>{(stat.결제완료_건수 || 0) > 0 ? stat.결제완료_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#A16207', fontWeight: 600 }}>{(stat.상품준비중_건수 || 0) > 0 ? stat.상품준비중_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#15803D', fontWeight: 600 }}>{(stat.발송완료_건수 || 0) > 0 ? stat.발송완료_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#C2410C', fontWeight: 600 }}>{(stat.취소요청_건수 || 0) > 0 ? stat.취소요청_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#B91C1C', fontWeight: 600 }}>{(stat.취소완료_건수 || 0) > 0 ? stat.취소완료_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => handleSellerExcelDownload(stat.seller_id)}
+                        style={{ fontSize: '14px', padding: '4px 12px', backgroundColor: '#16A34A', color: 'white', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', border: 'none', cursor: 'pointer' }}
+                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#15803D'}
+                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#16A34A'}
+                      >
+                        <Download className="w-3 h-3" />
+                        엑셀
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {sellerStats.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ fontSize: '16px', padding: '24px 16px', textAlign: 'center', color: '#6B7280' }}>
                       데이터가 없습니다.
                     </td>
                   </tr>
@@ -1002,6 +1249,7 @@ export default function SearchTab() {
               <option value="11번가">11번가</option>
               <option value="토스">토스</option>
               <option value="전화주문">전화주문</option>
+              <option value="플랫폼">플랫폼</option>
             </select>
           </div>
 
@@ -1014,6 +1262,7 @@ export default function SearchTab() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
             >
               <option value="">전체</option>
+              <option value="접수">접수</option>
               <option value="결제완료">결제완료</option>
               <option value="상품준비중">상품준비중</option>
               <option value="발송완료">발송완료</option>

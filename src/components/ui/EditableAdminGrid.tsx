@@ -92,6 +92,10 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   const [gridData, setGridData] = useState<T[]>([])
   const [editingCell, setEditingCell] = useState<CellPosition | null>(null)
   const [selectedCell, setSelectedCell] = useState<CellPosition | null>(null)
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+  const [resizingColumn, setResizingColumn] = useState<string | null>(null)
+  const [resizeStartX, setResizeStartX] = useState<number>(0)
+  const [resizeStartWidth, setResizeStartWidth] = useState<number>(0)
 
   // readOnly 체크 헬퍼 함수
   const isReadOnly = (column: Column<T>, row: T): boolean => {
@@ -123,6 +127,28 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
   // data prop 변경 추적을 위한 ref
   const prevDataRef = useRef<T[]>([])
+
+  // 컬럼 너비 초기화 (컨텐츠 기반 자동 계산)
+  useEffect(() => {
+    const initialWidths: Record<string, number> = {}
+    columns.forEach(column => {
+      if (column.width) {
+        initialWidths[column.key] = column.width
+      } else {
+        // 컨텐츠 기반 자동 계산
+        const headerWidth = column.title.length * 10 + 40
+        const maxContentWidth = Math.max(
+          ...data.slice(0, 100).map(row => {
+            const value = String(row[column.key] || '')
+            return value.length * 8 + 40
+          }),
+          0
+        )
+        initialWidths[column.key] = Math.max(Math.min(maxContentWidth, 400), headerWidth, 100)
+      }
+    })
+    setColumnWidths(initialWidths)
+  }, [columns, data])
 
   useEffect(() => {
     // 초기 마운트 시에만 데이터 초기화
@@ -481,6 +507,40 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       }
     }
   }
+
+  // 컬럼 리사이징 핸들러
+  const handleResizeStart = (e: React.MouseEvent, columnKey: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setResizingColumn(columnKey)
+    setResizeStartX(e.clientX)
+    setResizeStartWidth(columnWidths[columnKey] || 100)
+  }
+
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!resizingColumn) return
+    const diff = e.clientX - resizeStartX
+    const newWidth = Math.max(50, resizeStartWidth + diff)
+    setColumnWidths(prev => ({
+      ...prev,
+      [resizingColumn]: newWidth
+    }))
+  }, [resizingColumn, resizeStartX, resizeStartWidth])
+
+  const handleResizeEnd = useCallback(() => {
+    setResizingColumn(null)
+  }, [])
+
+  useEffect(() => {
+    if (resizingColumn) {
+      document.addEventListener('mousemove', handleResizeMove)
+      document.addEventListener('mouseup', handleResizeEnd)
+      return () => {
+        document.removeEventListener('mousemove', handleResizeMove)
+        document.removeEventListener('mouseup', handleResizeEnd)
+      }
+    }
+  }, [resizingColumn, handleResizeMove, handleResizeEnd])
 
   const addToHistory = (newData: T[]) => {
     const newHistory = history.slice(0, historyIndex + 1)
@@ -1694,9 +1754,10 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                     key={column.key || `col-${colIdx}`}
                     className="border border-gray-200 px-2 py-1 font-semibold text-text whitespace-nowrap bg-gray-50 sticky top-0"
                     style={{
-                      width: column.width,
+                      width: columnWidths[column.key] || column.width || 100,
                       fontSize: '13px',
-                      zIndex: 31
+                      zIndex: 31,
+                      position: 'relative'
                     }}
                   >
                     <div
@@ -1710,6 +1771,30 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                         </span>
                       )}
                     </div>
+                    {/* 리사이징 핸들 */}
+                    <div
+                      onMouseDown={(e) => handleResizeStart(e, column.key)}
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: '4px',
+                        cursor: 'col-resize',
+                        backgroundColor: resizingColumn === column.key ? '#2563eb' : 'transparent',
+                        zIndex: 32
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!resizingColumn) {
+                          e.currentTarget.style.backgroundColor = '#d1d5db'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!resizingColumn) {
+                          e.currentTarget.style.backgroundColor = 'transparent'
+                        }
+                      }}
+                    />
                   </th>
                 )
               })}
@@ -1746,17 +1831,16 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   const cellValue = row[column.key];
                   const customStyle = column.cellStyle ? column.cellStyle(cellValue, row, rowIndex) : {};
 
+                  const width = columnWidths[column.key] || column.width || 100
                   return (
                     <td
                       key={column.key || `col-${colIdx}`}
                       className={getCellClassName(rowIndex, column.key, column, row, false)}
                       style={{
                         height: rowHeight,
-                        ...(column.width ? {
-                          width: column.width,
-                          minWidth: column.width,
-                          maxWidth: column.width
-                        } : {}),
+                        width: width,
+                        minWidth: width,
+                        maxWidth: width,
                         userSelect: 'text',
                         ...customStyle
                       }}

@@ -105,7 +105,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
             email,
             name,
             phone,
-            role: 'customer',
+            role: 'seller',
             approved: true,
           })
 

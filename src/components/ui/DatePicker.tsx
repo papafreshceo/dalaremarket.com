@@ -13,7 +13,7 @@ interface DatePickerProps extends Omit<ReactDatePickerProps, 'onChange'> {
   className?: string
 }
 
-const CustomInput = forwardRef<HTMLInputElement, any>(({ value, onClick, placeholder, className }, ref) => (
+const CustomInput = forwardRef<HTMLInputElement, any>(({ value, onClick, placeholder, className, style }, ref) => (
   <input
     type="text"
     value={value}
@@ -21,7 +21,20 @@ const CustomInput = forwardRef<HTMLInputElement, any>(({ value, onClick, placeho
     ref={ref}
     placeholder={placeholder}
     readOnly
-    className={className || "w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"}
+    className={className || "filter-input"}
+    style={{
+      width: '100px',
+      padding: '4px 8px',
+      borderRadius: '6px',
+      fontSize: '12px',
+      height: '28px',
+      border: '1px solid #d1d5db',
+      cursor: 'pointer',
+      backgroundColor: '#fff',
+      boxSizing: 'border-box',
+      display: 'inline-block',
+      ...style
+    }}
   />
 ))
 

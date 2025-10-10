@@ -26,7 +26,14 @@
       "Bash(curl:*)",
       "Bash(npm run build:*)",
       "Bash(Get-Content \"database\\migrations\\018_change_unique_constraint_for_null_orders.sql\")",
-      "Bash(Get-Content \"database\\migrations\\019_add_shipping_status_to_integrated_orders.sql\")"
+      "Bash(Get-Content \"database\\migrations\\019_add_shipping_status_to_integrated_orders.sql\")",
+      "Bash(cp:*)",
+      "Bash(Get-Content \"database\\migrations\\009_change_status_to_korean.sql\")",
+      "Bash(Select-Object -First 100)",
+      "Bash(time:*)",
+      "Bash(powershell:*)",
+      "Bash(\"https://ketdnqhxwqcgyltinjih.supabase.co/rest/v1/rpc/exec_sql\" )",
+      "Bash(Select-Object -First 50)"
     ],
     "deny": [],
     "ask": []

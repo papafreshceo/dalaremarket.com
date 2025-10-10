@@ -9,18 +9,16 @@ import OrderRegistrationTab from './components/OrderRegistrationTab';
 import SettlementTab from './components/SettlementTab';
 import UploadModal from './modals/UploadModal';
 import OrderDetailModal from './modals/OrderDetailModal';
-import ValidationErrorModal from './modals/ValidationErrorModal';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import * as XLSX from 'xlsx';
-import { validateRequiredColumns } from './utils/validation';
 
 export default function OrdersPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('대시보드');
+  const [activeTab, setActiveTab] = useState<Tab>('발주서등록');
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string>('');
   const [orders, setOrders] = useState<Order[]>([]);
 
-  const [filterStatus, setFilterStatus] = useState<'all' | Order['status']>('registered');
+  const [filterStatus, setFilterStatus] = useState<'all' | Order['status']>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
   const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
@@ -31,8 +29,6 @@ export default function OrdersPage() {
   const [startDate, setStartDate] = useState<Date | null>(new Date());
   const [endDate, setEndDate] = useState<Date | null>(new Date());
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [showValidationModal, setShowValidationModal] = useState<boolean>(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -64,15 +60,7 @@ export default function OrdersPage() {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    console.log('🔍 fetchOrders 호출됨');
-    console.log('👤 현재 사용자:', user);
-
-    if (!user) {
-      console.log('❌ 사용자가 로그인되지 않음');
-      return;
-    }
-
-    console.log('📋 사용자 ID로 주문 조회 중:', user.id);
+    if (!user) return;
 
     // 현재 로그인한 셀러의 주문만 조회
     const { data, error } = await supabase
@@ -82,45 +70,21 @@ export default function OrdersPage() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('❌ 주문 조회 오류:', error);
+      console.error('주문 조회 오류:', error);
       return;
     }
-
-    console.log('✅ 조회된 주문 개수:', data?.length || 0);
-    console.log('📦 조회된 데이터:', data);
-
-    // shipping_status를 Order status로 매핑
-    const mapShippingStatus = (shippingStatus: string | null): Order['status'] => {
-      if (!shippingStatus) return 'registered';
-
-      const statusMap: Record<string, Order['status']> = {
-        '접수': 'registered',
-        '발주서등록': 'registered',
-        '결제완료': 'confirmed',
-        '상품준비중': 'preparing',
-        '배송중': 'shipped',
-        '배송완료': 'shipped',
-        '취소요청': 'cancelRequested',
-        '취소완료': 'cancelled'
-      };
-
-      return statusMap[shippingStatus] || 'registered';
-    };
 
     // integrated_orders 데이터를 Order 타입으로 변환
     const convertedOrders: Order[] = (data || []).map((order: any, index: number) => ({
       id: order.id,
-      orderNo: order.order_no || `TEMP${order.id}`, // DB에 저장된 발주번호 사용
+      orderNo: `ORD-${order.id}`, // 발주번호
       orderNumber: order.order_number, // 주문번호
       products: order.option_name,
       amount: 0,
       quantity: parseInt(order.quantity) || 0,
-      status: mapShippingStatus(order.shipping_status),
+      status: 'registered' as const, // TODO: shipping_status 매핑 필요
       date: order.created_at,
       registeredAt: order.created_at,
-      cancelRequestedAt: order.cancel_requested_at,
-      cancelledAt: order.canceled_at,
-      cancelReason: order.cancel_reason,
       orderer: order.buyer_name,
       ordererPhone: order.buyer_phone,
       recipient: order.recipient_name,
@@ -128,13 +92,10 @@ export default function OrdersPage() {
       address: order.recipient_address,
       deliveryMessage: order.delivery_message,
       optionName: order.option_name,
-      optionCode: order.option_code || '',
-      specialRequest: order.special_request,
-      unitPrice: order.seller_supply_price ? parseFloat(order.seller_supply_price) : undefined,
-      supplyPrice: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined
+      optionCode: '', // integrated_orders에는 없음
+      specialRequest: order.special_request
     }));
 
-    console.log('🔄 변환된 주문 데이터:', convertedOrders);
     setOrders(convertedOrders);
   };
 
@@ -143,10 +104,6 @@ export default function OrdersPage() {
     const savedTab = localStorage.getItem('ordersActiveTab');
     if (savedTab) {
       setActiveTab(savedTab as Tab);
-    } else {
-      // 저장된 탭이 없으면 기본값으로 '대시보드' 설정
-      setActiveTab('대시보드');
-      localStorage.setItem('ordersActiveTab', '대시보드');
     }
   }, []);
 
@@ -206,17 +163,7 @@ export default function OrdersPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-
         console.log('업로드된 데이터:', jsonData);
-
-        // 필수 칼럼 검증
-        const errors = validateRequiredColumns(jsonData);
-        if (errors.length > 0) {
-          setValidationErrors(errors);
-          setShowValidationModal(true);
-          setShowUploadModal(false);
-          return;
-        }
 
         // 현재 로그인한 사용자 정보 가져오기
         const supabase = createClient();
@@ -231,115 +178,36 @@ export default function OrdersPage() {
         const now = new Date();
         const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
 
-        // 모든 옵션명과 옵션코드 수집 (중복 제거)
-        const uniqueOptionNames = [...new Set(jsonData.map((row: any) => String(row['옵션명'] || '')).filter(Boolean))];
-        const uniqueOptionCodes = [...new Set(jsonData.map((row: any) => String(row['옵션코드'] || '')).filter(Boolean))];
-
-        console.log('📋 수집된 옵션명:', uniqueOptionNames);
-        console.log('📋 수집된 옵션코드:', uniqueOptionCodes);
-
-        // option_products에서 공급단가 조회
-        let optionProducts: any[] = [];
-
-        // 옵션명으로 조회
-        if (uniqueOptionNames.length > 0) {
-          const { data: nameData, error: nameError } = await supabase
-            .from('option_products')
-            .select('option_name, option_code, seller_supply_price')
-            .in('option_name', uniqueOptionNames);
-
-          if (nameError) {
-            console.error('❌ 옵션명 조회 오류:', nameError);
-          } else {
-            console.log('✅ 옵션명으로 조회된 데이터:', nameData);
-            if (nameData) {
-              optionProducts = [...optionProducts, ...nameData];
-            }
-          }
-        }
-
-        // 옵션코드로 조회
-        if (uniqueOptionCodes.length > 0) {
-          const { data: codeData, error: codeError } = await supabase
-            .from('option_products')
-            .select('option_name, option_code, seller_supply_price')
-            .in('option_code', uniqueOptionCodes);
-
-          if (codeError) {
-            console.error('❌ 옵션코드 조회 오류:', codeError);
-          } else {
-            console.log('✅ 옵션코드로 조회된 데이터:', codeData);
-            if (codeData) {
-              optionProducts = [...optionProducts, ...codeData];
-            }
-          }
-        }
-
-        console.log('💰 최종 조회된 옵션상품:', optionProducts);
-
-        // 옵션명/옵션코드별 공급단가 맵 생성
-        const priceMap = new Map<string, number>();
-        optionProducts.forEach((product: any) => {
-          if (product.option_name) {
-            priceMap.set(product.option_name, product.seller_supply_price || 0);
-            console.log(`✓ 옵션명 "${product.option_name}" → 공급단가: ${product.seller_supply_price}`);
-          }
-          if (product.option_code) {
-            priceMap.set(product.option_code, product.seller_supply_price || 0);
-            console.log(`✓ 옵션코드 "${product.option_code}" → 공급단가: ${product.seller_supply_price}`);
-          }
-        });
-
-        console.log('🗺️ 생성된 가격 맵:', priceMap);
-
         // integrated_orders에 저장할 데이터 준비
-        const ordersToInsert = jsonData.map((row: any) => {
-          const optionName = String(row['옵션명'] || '');
-          const optionCode = String(row['옵션코드'] || '');
-          const quantity = parseInt(String(row['수량'] || '1'));
+        const ordersToInsert = jsonData.map((row: any) => ({
+          // 메타데이터
+          sheet_date: koreaTime.toISOString().split('T')[0],
+          seller_id: user.id, // 업로드한 셀러의 ID
+          created_by: user.id,
 
-          // 옵션코드 우선, 없으면 옵션명으로 공급단가 조회
-          const supplyPrice = priceMap.get(optionCode) || priceMap.get(optionName) || 0;
-          const settlementAmount = supplyPrice * quantity;
+          // 주문 기본 정보
+          market_name: '플랫폼', // 플랫폼 주문 구분용
+          order_number: String(row['주문번호'] || ''),
+          payment_date: koreaTime.toISOString().split('T')[0],
 
-          return {
-            // 메타데이터
-            sheet_date: koreaTime.toISOString().split('T')[0],
-            seller_id: user.id, // 업로드한 셀러의 UUID
-            created_by: user.id,
-            // order_no는 발주확정 시점에 생성
+          // 주문자 정보
+          buyer_name: String(row['주문자'] || ''),
+          buyer_phone: String(row['주문자전화번호'] || ''),
 
-            // 주문 기본 정보
-            market_name: '플랫폼', // 플랫폼 주문 구분용
-            order_number: String(row['주문번호'] || ''),
-            payment_date: koreaTime.toISOString().split('T')[0],
+          // 수령인 정보
+          recipient_name: String(row['수령인'] || ''),
+          recipient_phone: String(row['수령인전화번호'] || ''),
+          recipient_address: String(row['주소'] || ''),
+          delivery_message: String(row['배송메세지'] || ''),
 
-            // 주문자 정보
-            buyer_name: String(row['주문자'] || ''),
-            buyer_phone: String(row['주문자전화번호'] || ''),
+          // 상품 정보
+          option_name: String(row['옵션명'] || ''),
+          quantity: String(row['수량'] || '1'),
+          special_request: String(row['특이/요청사항'] || ''),
 
-            // 수령인 정보
-            recipient_name: String(row['수령인'] || ''),
-            recipient_phone: String(row['수령인전화번호'] || ''),
-            recipient_address: String(row['주소'] || ''),
-            delivery_message: String(row['배송메세지'] || ''),
-
-            // 상품 정보
-            option_name: optionName,
-            option_code: optionCode,
-            quantity: String(quantity),
-            special_request: String(row['특이/요청사항'] || ''),
-
-            // 가격 정보
-            seller_supply_price: supplyPrice > 0 ? String(supplyPrice) : null,
-            settlement_amount: settlementAmount > 0 ? String(settlementAmount) : null,
-
-            // 배송 상태
-            shipping_status: '접수'
-          };
-        });
-
-        console.log('저장할 데이터 샘플:', ordersToInsert[0]);
+          // 배송 상태
+          shipping_status: '접수'
+        }));
 
         // DB에 저장
         const { data: insertedData, error: insertError } = await supabase
@@ -349,10 +217,7 @@ export default function OrdersPage() {
 
         if (insertError) {
           console.error('DB 저장 오류:', insertError);
-          console.error('에러 상세:', JSON.stringify(insertError, null, 2));
-          console.error('저장하려던 데이터 개수:', ordersToInsert.length);
-          console.error('첫 번째 데이터:', ordersToInsert[0]);
-          alert(`주문 저장 중 오류가 발생했습니다:\n${insertError.message || JSON.stringify(insertError)}`);
+          alert(`주문 저장 중 오류가 발생했습니다: ${insertError.message}`);
           return;
         }
 
@@ -391,29 +256,17 @@ export default function OrdersPage() {
     // 상태 필터
     const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
 
-    // 날짜 필터 (한국 시간 기준)
+    // 날짜 필터
     let matchesDate = true;
     if (startDate || endDate) {
-      // UTC 시간을 한국 시간(UTC+9)으로 변환
       const orderDate = new Date(order.date);
-      const koreaOrderDate = new Date(orderDate.getTime() + (9 * 60 * 60 * 1000));
-
-      // 한국 시간 기준 날짜만 추출 (시간 제거)
-      const orderDateOnly = new Date(
-        koreaOrderDate.getUTCFullYear(),
-        koreaOrderDate.getUTCMonth(),
-        koreaOrderDate.getUTCDate()
-      );
-
-      if (startDate) {
-        const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-        if (orderDateOnly < startDateOnly) {
-          matchesDate = false;
-        }
+      if (startDate && orderDate < startDate) {
+        matchesDate = false;
       }
       if (endDate) {
-        const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-        if (orderDateOnly > endDateOnly) {
+        const endOfDay = new Date(endDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        if (orderDate > endOfDay) {
           matchesDate = false;
         }
       }
@@ -438,9 +291,6 @@ export default function OrdersPage() {
 
     return matchesStatus && matchesDate && matchesSearch;
   });
-
-  console.log('🔍 필터 상태:', { filterStatus, startDate, endDate, searchTerm });
-  console.log('📊 전체 주문:', orders.length, '/ 필터된 주문:', filteredOrders.length);
 
   return (
     <div className="platform-orders-page bg-background" style={{ minHeight: '100vh' }}>
@@ -699,7 +549,6 @@ export default function OrdersPage() {
               endDate={endDate}
               setEndDate={setEndDate}
               onRefresh={fetchOrders}
-              userEmail={userEmail}
             />
           </div>
         )}
@@ -726,18 +575,11 @@ export default function OrdersPage() {
           handleFiles={handleFiles}
         />
 
-
         <OrderDetailModal
           showDetailModal={showDetailModal}
           setShowDetailModal={setShowDetailModal}
           selectedOrder={selectedOrder}
           statusConfig={statusConfig}
-        />
-
-        <ValidationErrorModal
-          show={showValidationModal}
-          onClose={() => setShowValidationModal(false)}
-          errors={validationErrors}
         />
       </div>
     </div>
