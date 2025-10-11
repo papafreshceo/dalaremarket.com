@@ -1,5 +1,5 @@
 // app/layout.tsx
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ToastProvider } from '@/components/ui/Toast';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -7,6 +7,14 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 export const metadata: Metadata = {
   title: "달래마켓",
   description: "B2B 통합 비즈니스 플랫폼",
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
 };
 
 // Pretendard 폰트 CDN으로 사용

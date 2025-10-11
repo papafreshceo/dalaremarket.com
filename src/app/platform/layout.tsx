@@ -1,6 +1,7 @@
 'use client'
 
 import UserHeader from '@/components/layout/UserHeader'
+import MobileBottomNav from '@/components/layout/MobileBottomNav'
 
 export default function PlatformLayout({
   children,
@@ -11,6 +12,7 @@ export default function PlatformLayout({
     <>
       <UserHeader />
       {children}
+      <MobileBottomNav />
     </>
   )
 }

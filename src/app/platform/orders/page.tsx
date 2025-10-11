@@ -29,6 +29,7 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [dragActive, setDragActive] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [startDate, setStartDate] = useState<Date | null>(new Date());
   const [endDate, setEndDate] = useState<Date | null>(new Date());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -157,6 +158,10 @@ export default function OrdersPage() {
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
     localStorage.setItem('ordersActiveTab', tab);
+    // 모바일에서 탭 변경 시 사이드바 닫기
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
   };
 
   const statusConfig: Record<Order['status'], StatusConfig> = {
@@ -460,10 +465,37 @@ export default function OrdersPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 24px'
+        padding: isMobile ? '0 16px' : '0 24px'
       }}>
-        {/* 왼쪽: 나가기 버튼 & 로그인 정보 */}
+        {/* 왼쪽: 햄버거 메뉴(모바일) + 나가기 버튼 & 로그인 정보 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* 햄버거 메뉴 버튼 (모바일만) */}
+          {isMobile && (
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '40px',
+                height: '40px',
+                background: 'white',
+                border: '1px solid #e0e0e0',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1f2937" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+          )}
+
           {/* 나가기 버튼 */}
           <button
             onClick={() => { router.push('/'); }}
@@ -515,16 +547,35 @@ export default function OrdersPage() {
         <ThemeToggle />
       </div>
 
+      {/* Overlay (모바일에서 사이드바 열릴 때) */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 1050,
+            transition: 'opacity 0.3s'
+          }}
+        />
+      )}
+
       {/* Sidebar */}
       <div className="bg-background-secondary border-border" style={{
         position: 'fixed',
         top: '70px',
-        left: 0,
-        width: isMobile ? '42px' : '175px',
+        left: isMobile ? (sidebarOpen ? 0 : '-250px') : 0,
+        width: isMobile ? '250px' : '175px',
         height: 'calc(100vh - 70px)',
         background: '#f5f5f5',
         borderRight: '1px solid #e0e0e0',
-        zIndex: 100
+        zIndex: 1100,
+        transition: 'left 0.3s ease',
+        overflowY: 'auto'
       }}>
         <div style={{
           paddingTop: '16px',
@@ -568,7 +619,7 @@ export default function OrdersPage() {
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
               <polyline points="9 22 9 12 15 12 15 22"></polyline>
             </svg>
-            {!isMobile && '대시보드'}
+            대시보드
           </button>
 
           {/* 발주서등록 탭 */}
@@ -609,7 +660,7 @@ export default function OrdersPage() {
               <line x1="16" y1="17" x2="8" y2="17"></line>
               <polyline points="10 9 9 9 8 9"></polyline>
             </svg>
-            {!isMobile && '발주서등록'}
+            발주서등록
           </button>
 
           {/* 모바일등록 탭 */}
@@ -647,7 +698,7 @@ export default function OrdersPage() {
               <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
               <line x1="12" y1="18" x2="12.01" y2="18"></line>
             </svg>
-            {!isMobile && '모바일등록'}
+            모바일등록
           </button>
 
           {/* 정산관리 탭 */}
@@ -687,14 +738,14 @@ export default function OrdersPage() {
               <rect x="14" y="14" width="7" height="7"></rect>
               <rect x="3" y="14" width="7" height="7"></rect>
             </svg>
-            {!isMobile && '정산관리'}
+            정산관리
           </button>
         </div>
       </div>
 
       {/* Main content area */}
       <div className="bg-background" style={{
-        marginLeft: isMobile ? '42px' : '175px',
+        marginLeft: isMobile ? '0' : '175px',
         padding: isMobile ? '16px' : '24px',
         paddingTop: '90px',
         background: '#f5f5f5',

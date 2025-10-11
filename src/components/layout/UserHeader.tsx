@@ -24,8 +24,42 @@ export default function UserHeader() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [expandedSubmenu, setExpandedSubmenu] = useState<string | null>(null);
+  const [headerVisible, setHeaderVisible] = useState<boolean>(true);
+  const [lastScrollY, setLastScrollY] = useState<number>(0);
   const supabase = createClient();
   const { showToast } = useToast();
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      if (currentScrollY > lastScrollY && currentScrollY > 50) {
+        // 스크롤 다운 - 헤더 숨김
+        setHeaderVisible(false);
+      } else {
+        // 스크롤 업 - 헤더 표시
+        setHeaderVisible(true);
+      }
+
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [lastScrollY]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -114,35 +148,80 @@ export default function UserHeader() {
 
   return (
     <>
-      <div style={{ height: '70px' }} />
+      <div style={{ height: isMobile ? '35px' : '70px' }} />
+
+      {/* Overlay */}
+      {isMobile && mobileMenuOpen && (
+        <div
+          onClick={() => setMobileMenuOpen(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 999,
+            transition: 'opacity 0.3s'
+          }}
+        />
+      )}
+
       <header style={{
         position: 'fixed',
         top: 0,
-        left: 0,
+        left: headerVisible ? 0 : '-100%',
         right: 0,
-        height: '70px',
-        background: 'white',
-        borderBottom: '1px solid #e0e0e0',
-        zIndex: 1000
+        height: isMobile ? '35px' : '70px',
+        background: isMobile ? 'transparent' : 'white',
+        borderBottom: isMobile ? 'none' : '1px solid #e0e0e0',
+        zIndex: 1000,
+        transition: 'left 0.3s ease'
       }}>
         <div style={{
           width: '100%',
           height: '100%',
-          padding: '0 40px',
+          padding: isMobile ? '0 16px' : '0 40px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '40px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '40px' }}>
+            {/* 햄버거 메뉴 (모바일) */}
+            {isMobile && (
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '40px',
+                  height: '40px',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1f2937" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="3" y1="12" x2="21" y2="12"></line>
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+              </button>
+            )}
+
             <Link href="/">
               <img
                 src="https://res.cloudinary.com/dde1hpbrp/image/upload/v1753148563/05_etc/dalraemarket_papafarmers.com/DalraeMarket_loge_trans.png"
                 alt="달래마켓"
-                style={{ height: '24px' }}
+                style={{ height: isMobile ? '20px' : '24px' }}
               />
             </Link>
 
-            <nav style={{ display: 'flex', gap: '24px' }}>
+            {/* 데스크톱 네비게이션 */}
+            {!isMobile && (
+              <nav style={{ display: 'flex', gap: '24px' }}>
               {navItems.map(item => (
                 <div
                   key={item.path}
@@ -275,9 +354,12 @@ export default function UserHeader() {
                 </div>
               ))}
             </nav>
+            )}
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {/* 우측 버튼들 (데스크톱) */}
+          {!isMobile && (
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             {user ? (
               <>
                 <span style={{ fontSize: '14px', color: '#495057' }}>
@@ -348,8 +430,188 @@ export default function UserHeader() {
               </>
             )}
           </div>
+          )}
         </div>
       </header>
+
+      {/* 모바일 슬라이드 메뉴 */}
+      {isMobile && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: mobileMenuOpen ? 0 : '-100%',
+          width: '50%',
+          maxWidth: '280px',
+          height: '125vh',
+          background: 'linear-gradient(180deg, #3b82f6 0%, #60a5fa 60px, #93c5fd 120px, #bfdbfe 180px, #dbeafe 240px, #f0f9ff 300px, #ffffff 360px, #ffffff 100%)',
+          zIndex: 1001,
+          transition: 'left 0.3s ease',
+          overflowY: 'auto',
+          boxShadow: '2px 0 10px rgba(0,0,0,0.1)',
+          paddingTop: '35px'
+        }}>
+          <nav style={{ padding: '16px' }}>
+            {navItems.map(item => (
+              <div key={item.path} style={{ marginBottom: '2px' }}>
+                <div
+                  onClick={(e) => {
+                    if (item.hasSubmenu) {
+                      e.preventDefault();
+                      setExpandedSubmenu(expandedSubmenu === item.path ? null : item.path);
+                    } else {
+                      setMobileMenuOpen(false);
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '6px 4px',
+                    fontSize: '15px',
+                    color: isActive(item.path) ? '#2563eb' : '#1f2937',
+                    fontWeight: isActive(item.path) ? '600' : '400',
+                    textDecoration: 'none',
+                    cursor: 'pointer',
+                    transition: 'color 0.2s'
+                  }}
+                >
+                  {item.hasSubmenu ? (
+                    <>
+                      <span>{item.text}</span>
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        style={{
+                          transform: expandedSubmenu === item.path ? 'rotate(180deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.2s'
+                        }}
+                      >
+                        <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </>
+                  ) : (
+                    <Link
+                      href={item.path}
+                      onClick={() => setMobileMenuOpen(false)}
+                      style={{
+                        width: '100%',
+                        textDecoration: 'none',
+                        color: 'inherit'
+                      }}
+                    >
+                      {item.isImage ? (
+                        <div style={{ marginLeft: '-10px' }}>
+                          <img
+                            src={item.imageUrl}
+                            alt={item.text}
+                            style={{ height: '16px', width: 'auto' }}
+                          />
+                        </div>
+                      ) : (
+                        item.text
+                      )}
+                    </Link>
+                  )}
+                </div>
+
+                {/* 서브메뉴 (토글) */}
+                {item.hasSubmenu && item.submenu && expandedSubmenu === item.path && (
+                  <div style={{
+                    paddingLeft: '12px',
+                    marginTop: '2px',
+                    marginBottom: '2px'
+                  }}>
+                    {item.submenu.map(subItem => (
+                      <Link
+                        key={subItem.path}
+                        href={subItem.path}
+                        onClick={() => setMobileMenuOpen(false)}
+                        style={{
+                          display: 'block',
+                          padding: '4px 4px',
+                          fontSize: '14px',
+                          color: '#4b5563',
+                          textDecoration: 'none',
+                          marginBottom: '1px',
+                          transition: 'color 0.2s'
+                        }}
+                      >
+                        {subItem.text}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* 모바일 하단 메뉴 */}
+            <div style={{ marginTop: '24px', padding: '16px 4px', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+              {user ? (
+                <>
+                  <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px' }}>
+                    {user.email}
+                  </div>
+                  {(userRole === 'admin' || userRole === 'employee' || userRole === 'super_admin') && (
+                    <div
+                      onClick={() => { window.open('/admin/dashboard', '_blank'); setMobileMenuOpen(false); }}
+                      style={{
+                        padding: '8px 0',
+                        fontSize: '15px',
+                        color: '#10b981',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      관리자 화면
+                    </div>
+                  )}
+                  <div
+                    onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                    style={{
+                      padding: '8px 0',
+                      fontSize: '15px',
+                      color: '#1f2937',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    로그아웃
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div
+                    onClick={() => { setAuthModalMode('login'); setAuthModalOpen(true); setMobileMenuOpen(false); }}
+                    style={{
+                      padding: '8px 0',
+                      fontSize: '15px',
+                      color: '#1f2937',
+                      cursor: 'pointer',
+                      marginBottom: '8px'
+                    }}
+                  >
+                    로그인
+                  </div>
+                  <div
+                    onClick={() => { setAuthModalMode('register'); setAuthModalOpen(true); setMobileMenuOpen(false); }}
+                    style={{
+                      padding: '8px 0',
+                      fontSize: '15px',
+                      color: '#2563eb',
+                      cursor: 'pointer',
+                      fontWeight: '500'
+                    }}
+                  >
+                    회원가입
+                  </div>
+                </>
+              )}
+            </div>
+          </nav>
+        </div>
+      )}
+
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}

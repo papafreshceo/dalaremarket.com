@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import UserHeader from '@/components/layout/UserHeader'
+import MobileBottomNav from '@/components/layout/MobileBottomNav'
 import Link from 'next/link'
 
 export default function PlatformHome() {
@@ -21,13 +22,14 @@ export default function PlatformHome() {
   return (
     <>
       <UserHeader />
+      <MobileBottomNav />
       <div style={{
         position: 'relative',
         width: '100%',
         paddingTop: '70px',
         paddingLeft: isMobile ? '20px' : '40px',
         paddingRight: isMobile ? '20px' : '40px',
-        paddingBottom: isMobile ? '20px' : '40px',
+        paddingBottom: isMobile ? '80px' : '40px',
         minHeight: '100vh',
         overflow: 'hidden'
       }}>
