@@ -726,7 +726,10 @@
 
     <!-- Handsontable JS -->
     <script src="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.js"></script>
-    
+
+    <!-- Modal System -->
+    <script src="../../components/modal.js"></script>
+
     <script>
         const PurchaseManager = {
             hot: null,
@@ -2252,10 +2255,12 @@ dataToLoad = Array(10).fill(null).map(() => {
                 
                 const [startRow, , endRow] = selected[0];
                 const count = endRow - startRow + 1;
-                
-                if (confirm(`선택한 ${count}개 행을 삭제하시겠습니까?`)) {
-                    this.hot.alter('remove_row', startRow, count);
-                }
+
+                modal.confirmDelete(`선택한 ${count}개 행을 삭제하시겠습니까?`, '행 삭제').then(result => {
+                    if (result) {
+                        this.hot.alter('remove_row', startRow, count);
+                    }
+                });
             },
             
             openVendorModal(vendorName = '') {

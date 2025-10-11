@@ -2505,10 +2505,29 @@ export default function RawMaterialsManagementPage() {
                   })
 
                   // 1. 먼저 upsert로 데이터 업데이트/추가
-                  const { error: upsertError } = await supabase.from('raw_materials').upsert(excelUploadModal.data, { onConflict: 'id' })
+                  // raw_materials 테이블 필드만 포함하도록 정제
+                  const allowedFields = [
+                    'id', 'material_code', 'material_name', 'standard_unit', 'supply_status',
+                    'season', 'is_active', 'created_at', 'updated_at', 'created_by', 'updated_by',
+                    'category_1', 'category_2', 'category_3', 'category_4', 'category_5',
+                    'last_trade_date', 'latest_price', 'standard_quantity',
+                    'season_start_date', 'season_peak_date', 'season_end_date',
+                    'main_supplier_id', 'notes', 'metadata', 'color_code', 'unit_quantity'
+                  ]
+                  const cleanedData = excelUploadModal.data.map((row: any) => {
+                    const cleaned: any = {}
+                    allowedFields.forEach(field => {
+                      if (field in row) {
+                        cleaned[field] = row[field]
+                      }
+                    })
+                    return cleaned
+                  })
+
+                  const { error: upsertError } = await supabase.from('raw_materials').upsert(cleanedData, { onConflict: 'id' })
                   if (upsertError) {
                     showToast('업로드 중 오류가 발생했습니다.', 'error')
-                    console.error(upsertError)
+                    console.error('Upsert error:', upsertError)
                     return
                   }
 
@@ -2585,15 +2604,34 @@ export default function RawMaterialsManagementPage() {
                     }
                   })
 
+                  // raw_materials 테이블 필드만 포함하도록 정제
+                  const allowedFields = [
+                    'id', 'material_code', 'material_name', 'standard_unit', 'supply_status',
+                    'season', 'is_active', 'created_at', 'updated_at', 'created_by', 'updated_by',
+                    'category_1', 'category_2', 'category_3', 'category_4', 'category_5',
+                    'last_trade_date', 'latest_price', 'standard_quantity',
+                    'season_start_date', 'season_peak_date', 'season_end_date',
+                    'main_supplier_id', 'notes', 'metadata', 'color_code', 'unit_quantity'
+                  ]
+                  const cleanedData = excelUploadModal.data.map((row: any) => {
+                    const cleaned: any = {}
+                    allowedFields.forEach(field => {
+                      if (field in row) {
+                        cleaned[field] = row[field]
+                      }
+                    })
+                    return cleaned
+                  })
+
                   const { error } = await supabase
                     .from('raw_materials')
-                    .upsert(excelUploadModal.data, {
+                    .upsert(cleanedData, {
                       onConflict: 'id',
                       ignoreDuplicates: false
                     })
                   if (error) {
                     showToast('업로드 중 오류가 발생했습니다.', 'error')
-                    console.error(error)
+                    console.error('Merge upsert error:', error)
                   } else {
                     showToast('병합 완료!', 'success')
                     await fetchMaterials()

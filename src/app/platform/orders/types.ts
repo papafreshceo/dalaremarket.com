@@ -11,6 +11,9 @@ export interface Order {
   shippedAt?: string;
   cancelRequestedAt?: string;
   cancelledAt?: string;
+  cancelApprovedAt?: string; // 취소승인일시
+  orderConfirmedAt?: string; // 주문확정일시
+  refundAmount?: number; // 환불액
   paymentMethod?: string;
   trackingNo?: string;
   expectedDelivery?: string;
@@ -41,4 +44,4 @@ export interface StatsData {
   bgGradient: string;
 }
 
-export type Tab = '대시보드' | '발주서등록' | '정산관리';
+export type Tab = '대시보드' | '발주서등록' | '모바일등록' | '정산관리';

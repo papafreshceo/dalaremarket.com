@@ -3261,9 +3261,10 @@ processedMessage += '</div></div>';
 
 
 
-resetResults() {
-    if (!confirm('결과를 초기화하시겠습니까?')) return;
-    
+async resetResults() {
+    const confirmed = await modal.confirm('결과를 초기화하시겠습니까?', '초기화');
+    if (!confirmed) return;
+
     this.processedData = null;
     document.getElementById('resultSection').style.display = 'none';
     this.showSuccess('초기화 완료');

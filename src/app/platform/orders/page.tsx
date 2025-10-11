@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Order, StatusConfig, StatsData, Tab } from './types';
 import DashboardTab from './components/DashboardTab';
 import OrderRegistrationTab from './components/OrderRegistrationTab';
+import MobileRegistrationTab from './components/MobileRegistrationTab';
 import SettlementTab from './components/SettlementTab';
 import UploadModal from './modals/UploadModal';
 import OrderDetailModal from './modals/OrderDetailModal';
@@ -118,6 +119,7 @@ export default function OrdersPage() {
       status: mapShippingStatus(order.shipping_status),
       date: order.created_at,
       registeredAt: order.created_at,
+      confirmedAt: order.confirmed_at, // 발주확정일시
       cancelRequestedAt: order.cancel_requested_at,
       cancelledAt: order.canceled_at,
       cancelReason: order.cancel_reason,
@@ -131,7 +133,8 @@ export default function OrdersPage() {
       optionCode: order.option_code || '',
       specialRequest: order.special_request,
       unitPrice: order.seller_supply_price ? parseFloat(order.seller_supply_price) : undefined,
-      supplyPrice: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined
+      supplyPrice: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined,
+      refundAmount: order.refund_amount ? parseFloat(order.refund_amount) : undefined // 환불액
     }));
 
     console.log('🔄 변환된 주문 데이터:', convertedOrders);
@@ -609,6 +612,44 @@ export default function OrdersPage() {
             {!isMobile && '발주서등록'}
           </button>
 
+          {/* 모바일등록 탭 */}
+          <button
+            onClick={() => handleTabChange('모바일등록')}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: isMobile ? '10px 8px' : '10px 16px',
+              margin: isMobile ? '4px 6px' : '2px 8px',
+              background: activeTab === '모바일등록' ? '#e8e8e8' : 'transparent',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: isMobile ? '12px' : '14px',
+              fontWeight: activeTab === '모바일등록' ? '700' : '400',
+              color: '#1f2937',
+              textAlign: 'left',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              if (activeTab !== '모바일등록') {
+                e.currentTarget.style.background = '#f3f4f6';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== '모바일등록') {
+                e.currentTarget.style.background = 'transparent';
+              }
+            }}
+          >
+            <svg width={isMobile ? '16' : '20'} height={isMobile ? '16' : '20'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+              <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
+            {!isMobile && '모바일등록'}
+          </button>
+
           {/* 정산관리 탭 */}
           <button
             onClick={() => handleTabChange('정산관리')}
@@ -702,6 +743,13 @@ export default function OrdersPage() {
               userEmail={userEmail}
             />
           </div>
+        )}
+        {activeTab === '모바일등록' && (
+          <MobileRegistrationTab
+            isMobile={isMobile}
+            onRefresh={fetchOrders}
+            userEmail={userEmail}
+          />
         )}
         {activeTab === '정산관리' && (
           <div style={{

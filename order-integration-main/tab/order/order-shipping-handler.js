@@ -1363,7 +1363,7 @@ const today = koreaDate.getFullYear() +
         
         let proceedWithOverwrites = true;
         if (overwrites.length > 0) {
-            const message = `${overwrites.length}건의 기존 정보를 변경하시겠습니까?\n\n` + 
+            const message = `${overwrites.length}건의 기존 정보를 변경하시겠습니까?\n\n` +
                 overwrites.slice(0, 5).map(o => {
                     let changeInfo = `주문번호: ${o.orderNumber}\n`;
                     if (o.oldCarrier !== o.carrier) {
@@ -1375,10 +1375,10 @@ const today = koreaDate.getFullYear() +
                     return changeInfo;
                 }).join('\n\n') +
                 (overwrites.length > 5 ? `\n\n... 외 ${overwrites.length - 5}건` : '');
-                
-            proceedWithOverwrites = confirm(message);
+
+            proceedWithOverwrites = await modal.confirm(message, '송장번호 변경 확인');
         }
-        
+
         if (!proceedWithOverwrites) {
             this.showMessage('송장번호 변경이 취소되었습니다.', 'info');
             return;

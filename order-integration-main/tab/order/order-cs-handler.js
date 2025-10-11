@@ -948,9 +948,10 @@ search() {
         
         const record = this.csRecords[index];
         if (!record || record.처리상태 === '완료') return;
-        
-        if (!confirm('이 CS 건을 완료 처리하시겠습니까?')) return;
-        
+
+        const confirmed = await modal.confirm('이 CS 건을 완료 처리하시겠습니까?', 'CS 완료 처리');
+        if (!confirmed) return;
+
         try {
             // CS기록 시트 업데이트
             const response = await fetch('/api/sheets', {
@@ -962,19 +963,19 @@ search() {
                     status: '완료'
                 })
             });
-            
+
             const result = await response.json();
             if (result.success) {
                 // 로컬 데이터 업데이트
                 record.처리상태 = '완료';
                 this.displayRecords();
-                alert('완료 처리되었습니다.');
+                await modal.alert('완료 처리되었습니다.');
             } else {
-                alert('처리 중 오류가 발생했습니다.');
+                await modal.alert('처리 중 오류가 발생했습니다.', '오류');
             }
         } catch (error) {
             console.error('CS 완료 처리 실패:', error);
-            alert('처리 중 오류가 발생했습니다.');
+            await modal.alert('처리 중 오류가 발생했습니다.', '오류');
         }
     },
 

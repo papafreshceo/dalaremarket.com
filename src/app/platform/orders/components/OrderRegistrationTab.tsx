@@ -482,16 +482,8 @@ export default function OrderRegistrationTab({
     } else if (filterStatus === 'cancelRequested' || filterStatus === 'cancelled') {
       const cols = [
         {
-          key: 'orderNo',
-          title: '발주번호',
-          width: 180,
-          readOnly: true,
-          align: 'center' as const
-        },
-        ...baseColumns,
-        {
-          key: 'cancelRequestedAt',
-          title: '취소요청일시',
+          key: 'cancelledAt',
+          title: '취소승인일시',
           width: 160,
           readOnly: true,
           align: 'center' as const,
@@ -514,8 +506,40 @@ export default function OrderRegistrationTab({
           }
         },
         {
-          key: 'depositAmount',
-          title: '입금액',
+          key: 'orderNo',
+          title: '발주번호',
+          width: 180,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'confirmedAt',
+          title: '발주확정일시',
+          width: 160,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any) => {
+            if (!value) return '';
+            const date = new Date(value);
+            return (
+              <span style={{ fontSize: '13px' }}>
+                {date.toLocaleString('ko-KR', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false
+                })}
+              </span>
+            );
+          }
+        },
+        ...baseColumns,
+        {
+          key: 'refundAmount',
+          title: '환불액',
           width: 100,
           type: 'number' as const,
           readOnly: true,
@@ -525,33 +549,6 @@ export default function OrderRegistrationTab({
           )
         }
       ];
-
-      if (filterStatus === 'cancelled') {
-        cols.push({
-          key: 'cancelledAt',
-          title: '취소완료일시',
-          width: 160,
-          readOnly: true,
-          align: 'center' as const,
-          renderer: (value: any) => {
-            if (!value) return '';
-            const date = new Date(value);
-            return (
-              <span style={{ fontSize: '13px' }}>
-                {date.toLocaleString('ko-KR', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false
-                })}
-              </span>
-            );
-          }
-        });
-      }
 
       return cols;
     }

@@ -486,13 +486,17 @@ export default function OptionProductsManagementPage() {
 
 
   const fetchProducts = async () => {
+    console.log('🔵 fetchProducts 시작')
     const { data, error } = await supabase
       .from('option_products')
       .select('*')
       .order('created_at', { ascending: false })
 
+    console.log('🔵 option_products 데이터:', data?.length, '개')
+
     if (error) {
       console.error('Fetch error:', error)
+      return
     }
 
     if (data) {
@@ -514,11 +518,15 @@ export default function OptionProductsManagementPage() {
             // 각 material에 대해 raw_materials 정보를 가져오기
             enrichedMaterials = await Promise.all(
               materials.map(async (m) => {
-                const { data: rawMaterial } = await supabase
+                const { data: rawMaterial, error: rawMaterialError } = await supabase
                   .from('raw_materials')
                   .select('*, supplier:partners!main_supplier_id(id, name)')
                   .eq('id', m.raw_material_id)
                   .single()
+
+                if (rawMaterialError) {
+                  console.error('Raw material fetch error for material', m.raw_material_id, rawMaterialError)
+                }
 
                 return {
                   material_id: rawMaterial?.id,
@@ -612,8 +620,11 @@ export default function OptionProductsManagementPage() {
         ...calculatePrices(product)
       }))
 
+      console.log('🔵 최종 productsWithCalculations:', productsWithCalculations.length, '개')
       setProducts(productsWithCalculations)
       setFilteredProducts(productsWithCalculations)
+    } else {
+      console.log('🔴 data가 없음')
     }
   }
 

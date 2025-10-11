@@ -33,7 +33,9 @@
       "Bash(time:*)",
       "Bash(powershell:*)",
       "Bash(\"https://ketdnqhxwqcgyltinjih.supabase.co/rest/v1/rpc/exec_sql\" )",
-      "Bash(Select-Object -First 50)"
+      "Bash(Select-Object -First 50)",
+      "Bash(Select-Object -First 20)",
+      "Read(//c//**)"
     ],
     "deny": [],
     "ask": []

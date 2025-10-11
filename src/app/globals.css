@@ -956,9 +956,9 @@ table textarea {
 /* 원물매칭 페이지 테이블 */
 .material-matching-table th,
 .material-matching-table td {
-  font-size: 14px !important;
+  font-size: 13px !important;
   line-height: 1.5 !important;
-  height: 30px !important;
+  padding: 12px !important;
 }
 
 /* 매칭 지도 색상 */
