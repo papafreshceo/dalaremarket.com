@@ -223,7 +223,7 @@ async function handleAIQuery(message) {
 
 // Gemini Flash API 호출
 async function callGeminiAPI(message) {
-    const GEMINI_API_KEY = 'AIzaSyAtwTxasiD7u0vuzbfKSzbaVGb5BpkGfHY';
+    const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
     if (!GEMINI_API_KEY) {
         console.warn('⚠️ Gemini API 키가 설정되지 않았습니다.');
