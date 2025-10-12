@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const searchKeyword = searchParams.get('searchKeyword');
     const shippingStatus = searchParams.get('shippingStatus');
     const vendorName = searchParams.get('vendorName');
+    const onlyWithSeller = searchParams.get('onlyWithSeller') === 'true'; // seller_id가 있는 주문만
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '100');
     const offset = (page - 1) * limit;
@@ -28,6 +29,11 @@ export async function GET(request: NextRequest) {
       .from('integrated_orders')
       .select('*', { count: 'exact' })
       .eq('is_deleted', false);
+
+    // seller_id가 있는 주문만 필터링
+    if (onlyWithSeller) {
+      query = query.not('seller_id', 'is', null);
+    }
 
     // 날짜 필터
     if (startDate && endDate) {

@@ -11,6 +11,7 @@ import SettlementTab from './components/SettlementTab';
 import UploadModal from './modals/UploadModal';
 import OrderDetailModal from './modals/OrderDetailModal';
 import ValidationErrorModal from './modals/ValidationErrorModal';
+import OptionValidationModal from './modals/OptionValidationModal';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import * as XLSX from 'xlsx';
 import { validateRequiredColumns } from './utils/validation';
@@ -35,6 +36,9 @@ export default function OrdersPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [showValidationModal, setShowValidationModal] = useState<boolean>(false);
+  const [showOptionValidationModal, setShowOptionValidationModal] = useState<boolean>(false);
+  const [uploadedOrders, setUploadedOrders] = useState<any[]>([]);
+  const [optionProductsMap, setOptionProductsMap] = useState<Map<string, any>>(new Map());
 
   useEffect(() => {
     const checkMobile = () => {
@@ -285,91 +289,45 @@ export default function OrdersPage() {
 
         console.log('💰 최종 조회된 옵션상품:', optionProducts);
 
-        // 옵션명/옵션코드별 공급단가 맵 생성
-        const priceMap = new Map<string, number>();
+        // 옵션상품 Map 저장 (옵션명 소문자 키로 저장)
+        const productMap = new Map<string, any>();
         optionProducts.forEach((product: any) => {
           if (product.option_name) {
-            priceMap.set(product.option_name, product.seller_supply_price || 0);
-            console.log(`✓ 옵션명 "${product.option_name}" → 공급단가: ${product.seller_supply_price}`);
-          }
-          if (product.option_code) {
-            priceMap.set(product.option_code, product.seller_supply_price || 0);
-            console.log(`✓ 옵션코드 "${product.option_code}" → 공급단가: ${product.seller_supply_price}`);
+            const key = product.option_name.trim().toLowerCase();
+            productMap.set(key, product);
           }
         });
+        setOptionProductsMap(productMap);
 
-        console.log('🗺️ 생성된 가격 맵:', priceMap);
-
-        // integrated_orders에 저장할 데이터 준비
-        const ordersToInsert = jsonData.map((row: any) => {
-          const optionName = String(row['옵션명'] || '');
-          const optionCode = String(row['옵션코드'] || '');
-          const quantity = parseInt(String(row['수량'] || '1'));
-
-          // 옵션코드 우선, 없으면 옵션명으로 공급단가 조회
-          const supplyPrice = priceMap.get(optionCode) || priceMap.get(optionName) || 0;
-          const settlementAmount = supplyPrice * quantity;
-
-          return {
-            // 메타데이터
+        // 검증 모달용 주문 데이터 준비
+        const ordersForValidation = jsonData.map((row: any, index: number) => ({
+          index,
+          orderNumber: String(row['주문번호'] || ''),
+          orderer: String(row['주문자'] || ''),
+          ordererPhone: String(row['주문자전화번호'] || ''),
+          recipient: String(row['수령인'] || ''),
+          recipientPhone: String(row['수령인전화번호'] || ''),
+          address: String(row['주소'] || ''),
+          deliveryMessage: String(row['배송메세지'] || ''),
+          optionName: String(row['옵션명'] || ''),
+          optionCode: String(row['옵션코드'] || ''),
+          quantity: String(row['수량'] || '1'),
+          specialRequest: String(row['특이/요청사항'] || ''),
+          // DB 저장용 메타데이터 (검증 후 사용)
+          _metadata: {
             sheet_date: koreaTime.toISOString().split('T')[0],
-            seller_id: user.id, // 업로드한 셀러의 UUID
+            seller_id: user.id,
             created_by: user.id,
-            // order_no는 발주확정 시점에 생성
-
-            // 주문 기본 정보
-            market_name: '플랫폼', // 플랫폼 주문 구분용
-            order_number: String(row['주문번호'] || ''),
+            market_name: '플랫폼',
             payment_date: koreaTime.toISOString().split('T')[0],
-
-            // 주문자 정보
-            buyer_name: String(row['주문자'] || ''),
-            buyer_phone: String(row['주문자전화번호'] || ''),
-
-            // 수령인 정보
-            recipient_name: String(row['수령인'] || ''),
-            recipient_phone: String(row['수령인전화번호'] || ''),
-            recipient_address: String(row['주소'] || ''),
-            delivery_message: String(row['배송메세지'] || ''),
-
-            // 상품 정보
-            option_name: optionName,
-            option_code: optionCode,
-            quantity: String(quantity),
-            special_request: String(row['특이/요청사항'] || ''),
-
-            // 가격 정보
-            seller_supply_price: supplyPrice > 0 ? String(supplyPrice) : null,
-            settlement_amount: settlementAmount > 0 ? String(settlementAmount) : null,
-
-            // 배송 상태
             shipping_status: '접수'
-          };
-        });
+          }
+        }));
 
-        console.log('저장할 데이터 샘플:', ordersToInsert[0]);
-
-        // DB에 저장
-        const { data: insertedData, error: insertError } = await supabase
-          .from('integrated_orders')
-          .insert(ordersToInsert)
-          .select();
-
-        if (insertError) {
-          console.error('DB 저장 오류:', insertError);
-          console.error('에러 상세:', JSON.stringify(insertError, null, 2));
-          console.error('저장하려던 데이터 개수:', ordersToInsert.length);
-          console.error('첫 번째 데이터:', ordersToInsert[0]);
-          alert(`주문 저장 중 오류가 발생했습니다:\n${insertError.message || JSON.stringify(insertError)}`);
-          return;
-        }
-
-        console.log('DB에 저장된 주문:', insertedData);
-        alert(`${ordersToInsert.length}건의 주문이 등록되었습니다.`);
+        // 검증 모달 표시
+        setUploadedOrders(ordersForValidation);
         setShowUploadModal(false);
-
-        // 주문 목록 새로고침
-        fetchOrders();
+        setShowOptionValidationModal(true);
 
       } catch (error) {
         console.error('엑셀 파일 읽기 오류:', error);
@@ -377,6 +335,77 @@ export default function OrdersPage() {
       }
     };
     reader.readAsBinaryString(file);
+  };
+
+  const handleSaveValidatedOrders = async (validatedOrders: any[]) => {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert('로그인이 필요합니다.');
+        return;
+      }
+
+      // 검증된 주문 데이터를 DB 형식으로 변환
+      const ordersToInsert = validatedOrders.map((order) => {
+        const quantity = parseInt(order.quantity) || 1;
+        const unitPrice = order.unitPrice || 0;
+        const supplyPrice = order.supplyPrice || (unitPrice * quantity);
+
+        return {
+          market_name: order._metadata.market_name,
+          order_number: order.orderNumber,
+          buyer_name: order.orderer,
+          buyer_phone: order.ordererPhone,
+          recipient_name: order.recipient,
+          recipient_phone: order.recipientPhone,
+          recipient_address: order.address,
+          delivery_message: order.deliveryMessage,
+          option_name: order.optionName,
+          option_code: order.optionCode,
+          quantity: String(quantity),
+          special_request: order.specialRequest,
+          seller_supply_price: unitPrice,
+          settlement_amount: supplyPrice,
+          sheet_date: order._metadata.sheet_date,
+          payment_date: order._metadata.payment_date,
+          shipping_status: order._metadata.shipping_status,
+          seller_id: order._metadata.seller_id,
+          created_by: order._metadata.created_by,
+          is_deleted: false
+        };
+      });
+
+      console.log('💾 DB에 저장할 주문 데이터:', ordersToInsert);
+
+      // DB에 주문 일괄 저장
+      const { data, error } = await supabase
+        .from('integrated_orders')
+        .insert(ordersToInsert)
+        .select();
+
+      if (error) {
+        console.error('❌ 주문 저장 실패:', error);
+        alert(`주문 저장에 실패했습니다: ${error.message}`);
+        return;
+      }
+
+      console.log('✅ 주문 저장 성공:', data);
+      alert(`${data.length}건의 주문이 성공적으로 등록되었습니다.`);
+
+      // 모달 닫기 및 상태 초기화
+      setShowOptionValidationModal(false);
+      setUploadedOrders([]);
+      setOptionProductsMap(new Map());
+
+      // 주문 목록 새로고침
+      await fetchOrders();
+
+    } catch (error) {
+      console.error('❌ 주문 저장 중 오류:', error);
+      alert('주문 저장 중 오류가 발생했습니다.');
+    }
   };
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -837,6 +866,14 @@ export default function OrdersPage() {
           show={showValidationModal}
           onClose={() => setShowValidationModal(false)}
           errors={validationErrors}
+        />
+
+        <OptionValidationModal
+          show={showOptionValidationModal}
+          onClose={() => setShowOptionValidationModal(false)}
+          orders={uploadedOrders}
+          onSave={handleSaveValidatedOrders}
+          optionProducts={optionProductsMap}
         />
       </div>
     </div>

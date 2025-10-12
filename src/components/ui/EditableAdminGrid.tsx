@@ -1567,6 +1567,14 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
       // 수정된 행이 있으면 전달, 없으면 undefined
       onSave(modifiedRows.length > 0 ? modifiedRows : undefined)
+
+      // 저장 후 상태 초기화 (수정 카운트 리셋)
+      setModifiedCells(new Set())
+      setAddedRows(new Set())
+      setCopiedRows(new Set())
+
+      // 원본 데이터를 현재 데이터로 업데이트 (저장된 상태가 새로운 기준점)
+      originalDataRef.current = JSON.parse(JSON.stringify(gridData))
     }
   }
 

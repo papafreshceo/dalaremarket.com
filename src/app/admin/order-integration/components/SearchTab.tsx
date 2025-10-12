@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, Download, Filter, Calendar, RefreshCw, Upload, ChevronDown, ChevronUp } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import * as XLSX from 'xlsx';
@@ -61,6 +61,8 @@ interface Order {
   is_canceled?: boolean;
   order_confirmed?: boolean;
   invoice_registered?: boolean;
+  payment_confirmed_at?: string;
+  refund_processed_at?: string;
 }
 
 interface SearchFilters {
@@ -75,6 +77,8 @@ interface SearchFilters {
 
 interface VendorStats {
   shipping_source: string;
+  접수_건수: number;
+  접수_수량: number;
   결제완료_건수: number;
   결제완료_수량: number;
   상품준비중_건수: number;
@@ -89,6 +93,28 @@ interface VendorStats {
 
 interface SellerStats {
   seller_id: string;
+  총금액: number;
+  입금확인: boolean;
+  접수_건수: number;
+  접수_수량: number;
+  결제완료_건수: number;
+  결제완료_수량: number;
+  상품준비중_건수: number;
+  상품준비중_수량: number;
+  발송완료_건수: number;
+  발송완료_수량: number;
+  취소요청_건수: number;
+  취소요청_수량: number;
+  환불예정액: number;
+  환불처리일시: string | null;
+  취소완료_건수: number;
+  취소완료_수량: number;
+}
+
+interface OptionStats {
+  option_name: string;
+  접수_건수: number;
+  접수_수량: number;
   결제완료_건수: number;
   결제완료_수량: number;
   상품준비중_건수: number;
@@ -117,6 +143,7 @@ export default function SearchTab() {
   const [vendorStatsExpanded, setVendorStatsExpanded] = useState(false);
   const [sellerStats, setSellerStats] = useState<SellerStats[]>([]);
   const [sellerStatsExpanded, setSellerStatsExpanded] = useState(false);
+  const [optionStats, setOptionStats] = useState<OptionStats[]>([]);
   const [columns, setColumns] = useState<any[]>([]);
   const [marketTemplates, setMarketTemplates] = useState<Map<string, any>>(new Map());
   const [courierList, setCourierList] = useState<string[]>([]);
@@ -134,6 +161,9 @@ export default function SearchTab() {
 
   // 선택된 주문 상태
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
+
+  // 상태 카드 필터
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   // 검색 필터 상태
   const [filters, setFilters] = useState<SearchFilters>(() => {
@@ -211,7 +241,7 @@ export default function SearchTab() {
         console.log('✓ 마켓 렌더러 추가 완료');
       }
     }
-  }, [marketTemplates.size, columns.length]);
+  }, [marketTemplates, columns]);
 
   const loadMarketTemplates = async () => {
     try {
@@ -433,6 +463,8 @@ export default function SearchTab() {
       if (!statsMap.has(vendorName)) {
         statsMap.set(vendorName, {
           shipping_source: vendorName,
+          접수_건수: 0,
+          접수_수량: 0,
           결제완료_건수: 0,
           결제완료_수량: 0,
           상품준비중_건수: 0,
@@ -450,7 +482,10 @@ export default function SearchTab() {
       const status = order.shipping_status || '결제완료';
       const quantity = Number(order.quantity) || 0;
 
-      if (status === '결제완료') {
+      if (status === '접수') {
+        stats.접수_건수 += 1;
+        stats.접수_수량 += quantity;
+      } else if (status === '결제완료') {
         stats.결제완료_건수 += 1;
         stats.결제완료_수량 += quantity;
       } else if (status === '상품준비중') {
@@ -469,7 +504,7 @@ export default function SearchTab() {
     });
 
     const statsArray = Array.from(statsMap.values());
-    statsArray.sort((a, b) => (b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수) - (a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수));
+    statsArray.sort((a, b) => (b.접수_건수 + b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수) - (a.접수_건수 + a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수));
     setVendorStats(statsArray);
   };
 
@@ -482,6 +517,82 @@ export default function SearchTab() {
       if (!statsMap.has(sellerId)) {
         statsMap.set(sellerId, {
           seller_id: sellerId,
+          총금액: 0,
+          입금확인: false,
+          접수_건수: 0,
+          접수_수량: 0,
+          결제완료_건수: 0,
+          결제완료_수량: 0,
+          상품준비중_건수: 0,
+          상품준비중_수량: 0,
+          발송완료_건수: 0,
+          발송완료_수량: 0,
+          취소요청_건수: 0,
+          취소요청_수량: 0,
+          환불예정액: 0,
+          환불처리일시: null,
+          취소완료_건수: 0,
+          취소완료_수량: 0,
+        });
+      }
+
+      const stats = statsMap.get(sellerId)!;
+      const status = order.shipping_status || '결제완료';
+      const quantity = Number(order.quantity) || 0;
+      const supplyPrice = Number(order.seller_supply_price) || 0;
+
+      // payment_confirmed_at이 있으면 입금확인 토글 ON
+      if (order.payment_confirmed_at) {
+        stats.입금확인 = true;
+      }
+
+      // refund_processed_at이 있고 환불처리일시가 설정되지 않았으면 설정
+      if (order.refund_processed_at && !stats.환불처리일시) {
+        const date = new Date(order.refund_processed_at);
+        stats.환불처리일시 = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+      }
+
+      // 총금액: 접수 상태인 주문의 공급가 합계
+      if (status === '접수') {
+        stats.총금액 += supplyPrice;
+        stats.접수_건수 += 1;
+        stats.접수_수량 += quantity;
+      } else if (status === '결제완료') {
+        stats.결제완료_건수 += 1;
+        stats.결제완료_수량 += quantity;
+      } else if (status === '상품준비중') {
+        stats.상품준비중_건수 += 1;
+        stats.상품준비중_수량 += quantity;
+      } else if (status === '발송완료') {
+        stats.발송완료_건수 += 1;
+        stats.발송완료_수량 += quantity;
+      } else if (status === '취소요청') {
+        stats.취소요청_건수 += 1;
+        stats.취소요청_수량 += quantity;
+        // 환불예정액: 취소요청 상태 주문의 공급가 합계
+        stats.환불예정액 += supplyPrice;
+      } else if (status === '취소완료') {
+        stats.취소완료_건수 += 1;
+        stats.취소완료_수량 += quantity;
+      }
+    });
+
+    const statsArray = Array.from(statsMap.values());
+    statsArray.sort((a, b) => (b.접수_건수 + b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수) - (a.접수_건수 + a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수));
+    setSellerStats(statsArray);
+  };
+
+  // 옵션별 집계
+  const calculateOptionStats = (orderData: Order[]) => {
+    const statsMap = new Map<string, OptionStats>();
+
+    orderData.forEach((order) => {
+      const optionName = order.option_name || '미지정';
+      if (!statsMap.has(optionName)) {
+        statsMap.set(optionName, {
+          option_name: optionName,
+          접수_건수: 0,
+          접수_수량: 0,
           결제완료_건수: 0,
           결제완료_수량: 0,
           상품준비중_건수: 0,
@@ -495,11 +606,14 @@ export default function SearchTab() {
         });
       }
 
-      const stats = statsMap.get(sellerId)!;
+      const stats = statsMap.get(optionName)!;
       const status = order.shipping_status || '결제완료';
       const quantity = Number(order.quantity) || 0;
 
-      if (status === '결제완료') {
+      if (status === '접수') {
+        stats.접수_건수 += 1;
+        stats.접수_수량 += quantity;
+      } else if (status === '결제완료') {
         stats.결제완료_건수 += 1;
         stats.결제완료_수량 += quantity;
       } else if (status === '상품준비중') {
@@ -518,8 +632,9 @@ export default function SearchTab() {
     });
 
     const statsArray = Array.from(statsMap.values());
-    statsArray.sort((a, b) => (b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수) - (a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수));
-    setSellerStats(statsArray);
+    // 옵션명 가나다순 정렬
+    statsArray.sort((a, b) => a.option_name.localeCompare(b.option_name, 'ko'));
+    setOptionStats(statsArray);
   };
 
   const fetchOrders = async () => {
@@ -570,6 +685,8 @@ export default function SearchTab() {
         calculateVendorStats(result.data || []);
         // 셀러별 집계 계산
         calculateSellerStats(result.data || []);
+        // 옵션별 집계 계산
+        calculateOptionStats(result.data || []);
       } else {
         console.error('주문 조회 실패:', result.error);
         alert('주문 조회에 실패했습니다: ' + result.error);
@@ -743,6 +860,57 @@ export default function SearchTab() {
     }
   };
 
+  // 입금확인 핸들러 - 선택된 접수 상태 주문을 결제완료로 변경
+  const handlePaymentConfirm = async () => {
+    // 선택된 주문만 필터링
+    if (selectedOrders.length === 0) {
+      alert('입금확인할 주문을 선택해주세요.');
+      return;
+    }
+
+    // 접수 상태인 주문만 필터링
+    const confirmOrders = selectedOrders.filter(order => {
+      const status = order.shipping_status || '결제완료';
+      return status === '접수';
+    });
+
+    if (confirmOrders.length === 0) {
+      alert('접수 상태인 주문만 입금확인할 수 있습니다.');
+      return;
+    }
+
+    if (!confirm(`${confirmOrders.length}개의 주문을 입금확인 하시겠습니까?\n결제완료 상태로 변경됩니다.`)) {
+      return;
+    }
+
+    try {
+      // 상태를 결제완료로 변경한 주문 데이터 생성
+      const updatedOrders = confirmOrders.map(order => ({
+        ...order,
+        shipping_status: '결제완료'
+      }));
+
+      const response = await fetch('/api/integrated-orders/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: updatedOrders }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`${result.count}개 주문이 입금확인 처리되었습니다.`);
+        setSelectedOrders([]); // 선택 초기화
+        fetchOrders();
+      } else {
+        alert('입금확인 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('입금확인 오류:', error);
+      alert('입금확인 중 오류가 발생했습니다.');
+    }
+  };
+
   // 송장등록 핸들러 - 현재 화면의 모든 주문을 DB에 저장
   const handleTrackingRegister = async () => {
     if (orders.length === 0) return;
@@ -840,7 +1008,7 @@ export default function SearchTab() {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
+        const workbook = XLSX.read(data, { type: 'binary', cellDates: true, WTF: false });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
@@ -968,10 +1136,203 @@ export default function SearchTab() {
     }
   };
 
+  // 셀러별 입금확인 토글 핸들러
+  const handlePaymentCheckToggle = async (sellerId: string) => {
+    const currentStat = sellerStats.find(s => s.seller_id === sellerId);
+    if (!currentStat) return;
+
+    const newCheckState = !currentStat.입금확인;
+
+    // ON으로 전환할 때만 주문 상태 변경
+    if (newCheckState) {
+      // 해당 셀러의 접수 상태 주문들을 필터링
+      const sellerOrders = orders.filter(order => {
+        const orderSellerId = order.seller_id || '미지정';
+        const status = order.shipping_status || '결제완료';
+        return orderSellerId === sellerId && status === '접수';
+      });
+
+      if (sellerOrders.length === 0) {
+        alert('해당 셀러의 접수 상태 주문이 없습니다.');
+        return;
+      }
+
+      if (!confirm(`${sellerId}의 접수 상태 주문 ${sellerOrders.length}건을 결제완료로 변경하시겠습니까?`)) {
+        return;
+      }
+
+      try {
+        // 현재 시각 타임스탬프 생성
+        const now = new Date().toISOString();
+
+        // 상태를 결제완료로 변경하고 payment_confirmed_at 타임스탬프 저장
+        const updatedOrders = sellerOrders.map(order => ({
+          ...order,
+          shipping_status: '결제완료',
+          payment_confirmed_at: now
+        }));
+
+        const response = await fetch('/api/integrated-orders/bulk', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orders: updatedOrders }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          // 토글 상태 변경
+          setSellerStats(prev =>
+            prev.map(stat =>
+              stat.seller_id === sellerId
+                ? { ...stat, 입금확인: true }
+                : stat
+            )
+          );
+          alert(`${result.count}건의 주문이 결제완료로 변경되었습니다.`);
+          fetchOrders(); // 주문 목록 새로고침
+        } else {
+          alert('상태 변경 실패: ' + result.error);
+        }
+      } catch (error) {
+        console.error('입금확인 처리 오류:', error);
+        alert('입금확인 처리 중 오류가 발생했습니다.');
+      }
+    } else {
+      // ON -> OFF: 결제완료 상태 주문들을 접수로 되돌림
+      const sellerOrders = orders.filter(order => {
+        const orderSellerId = order.seller_id || '미지정';
+        const status = order.shipping_status || '결제완료';
+        return orderSellerId === sellerId && status === '결제완료';
+      });
+
+      if (sellerOrders.length === 0) {
+        alert('해당 셀러의 결제완료 상태 주문이 없습니다.');
+        return;
+      }
+
+      if (!confirm(`${sellerId}의 결제완료 상태 주문 ${sellerOrders.length}건을 접수로 되돌리시겠습니까?`)) {
+        return;
+      }
+
+      try {
+        // 상태를 접수로 변경하고 payment_confirmed_at 타임스탬프 제거
+        const updatedOrders = sellerOrders.map(order => ({
+          ...order,
+          shipping_status: '접수',
+          payment_confirmed_at: null
+        }));
+
+        const response = await fetch('/api/integrated-orders/bulk', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orders: updatedOrders }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          // 토글 상태 변경
+          setSellerStats(prev =>
+            prev.map(stat =>
+              stat.seller_id === sellerId
+                ? { ...stat, 입금확인: false }
+                : stat
+            )
+          );
+          alert(`${result.count}건의 주문이 접수로 변경되었습니다.`);
+          fetchOrders(); // 주문 목록 새로고침
+        } else {
+          alert('상태 변경 실패: ' + result.error);
+        }
+      } catch (error) {
+        console.error('입금확인 취소 처리 오류:', error);
+        alert('입금확인 취소 처리 중 오류가 발생했습니다.');
+      }
+    }
+  };
+
+  // 환불완료 버튼 클릭 핸들러
+  const handleRefundComplete = async (sellerId: string) => {
+    // 해당 셀러의 취소요청 상태 주문들 필터링
+    const sellerRefundOrders = orders.filter(order => {
+      const orderSellerId = order.seller_id || '미지정';
+      const status = order.shipping_status || '결제완료';
+      return orderSellerId === sellerId && status === '취소요청';
+    });
+
+    if (sellerRefundOrders.length === 0) {
+      alert('해당 셀러의 취소요청 상태 주문이 없습니다.');
+      return;
+    }
+
+    if (!confirm(`${sellerId}의 취소요청 주문 ${sellerRefundOrders.length}건에 대해 환불처리를 완료하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      const now = new Date().toISOString();
+      const formattedDateTime = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')} ${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
+
+      // refund_processed_at 타임스탬프 저장
+      const updatedOrders = sellerRefundOrders.map(order => ({
+        ...order,
+        refund_processed_at: now
+      }));
+
+      const response = await fetch('/api/integrated-orders/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: updatedOrders }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // UI 상태 업데이트
+        setSellerStats(prev =>
+          prev.map(stat =>
+            stat.seller_id === sellerId
+              ? { ...stat, 환불처리일시: formattedDateTime }
+              : stat
+          )
+        );
+        alert(`${result.count}건의 주문에 대해 환불처리가 완료되었습니다.`);
+        fetchOrders(); // 주문 목록 새로고침
+      } else {
+        alert('환불처리 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('환불처리 오류:', error);
+      alert('환불처리 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 상태 카드 클릭 핸들러
+  const handleStatusCardClick = (status: string | null) => {
+    if (statusFilter === status) {
+      // 이미 선택된 카드를 다시 클릭하면 필터 해제
+      setStatusFilter(null);
+    } else {
+      setStatusFilter(status);
+    }
+  };
+
+  // 필터링된 주문 데이터
+  const filteredOrders = useMemo(() => {
+    if (!statusFilter) {
+      return orders;
+    }
+    return orders.filter(order => {
+      const orderStatus = order.shipping_status || '결제완료';
+      return orderStatus === statusFilter;
+    });
+  }, [orders, statusFilter]);
+
   // 행 삭제 핸들러 (소프트 삭제)
   const handleDeleteRows = (indices: number[]) => {
     // 인덱스로 실제 주문 데이터 가져오기
-    const rowsToDelete = indices.map(index => orders[index]);
+    const rowsToDelete = indices.map(index => filteredOrders[index]);
     setOrdersToDelete(rowsToDelete);
     setShowDeleteConfirmModal(true);
   };
@@ -1008,65 +1369,114 @@ export default function SearchTab() {
     <div className="space-y-4">
       {/* 통계 카드 */}
       <div className="grid grid-cols-7 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div
+          onClick={() => handleStatusCardClick(null)}
+          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+            statusFilter === null
+              ? 'border-gray-900 border-2 shadow-md'
+              : 'border-gray-200 hover:border-gray-400'
+          }`}
+        >
           <div className="text-sm text-gray-600 mb-1">전체</div>
           <div className="text-2xl font-semibold text-gray-900">{stats.total.toLocaleString()}</div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div
+          onClick={() => handleStatusCardClick('접수')}
+          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+            statusFilter === '접수'
+              ? 'border-purple-600 border-2 shadow-md'
+              : 'border-gray-200 hover:border-purple-400'
+          }`}
+        >
           <div className="text-sm text-gray-600 mb-1">접수</div>
           <div className="text-2xl font-semibold text-purple-600">{(stats.접수 || 0).toLocaleString()}</div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div
+          onClick={() => handleStatusCardClick('결제완료')}
+          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+            statusFilter === '결제완료'
+              ? 'border-blue-600 border-2 shadow-md'
+              : 'border-gray-200 hover:border-blue-400'
+          }`}
+        >
           <div className="text-sm text-gray-600 mb-1">결제완료</div>
           <div className="text-2xl font-semibold text-blue-600">{(stats.결제완료 || 0).toLocaleString()}</div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div
+          onClick={() => handleStatusCardClick('상품준비중')}
+          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+            statusFilter === '상품준비중'
+              ? 'border-yellow-600 border-2 shadow-md'
+              : 'border-gray-200 hover:border-yellow-400'
+          }`}
+        >
           <div className="text-sm text-gray-600 mb-1">상품준비중</div>
           <div className="text-2xl font-semibold text-yellow-600">{(stats.상품준비중 || 0).toLocaleString()}</div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div
+          onClick={() => handleStatusCardClick('발송완료')}
+          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+            statusFilter === '발송완료'
+              ? 'border-green-600 border-2 shadow-md'
+              : 'border-gray-200 hover:border-green-400'
+          }`}
+        >
           <div className="text-sm text-gray-600 mb-1">발송완료</div>
           <div className="text-2xl font-semibold text-green-600">{(stats.발송완료 || 0).toLocaleString()}</div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div
+          onClick={() => handleStatusCardClick('취소요청')}
+          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+            statusFilter === '취소요청'
+              ? 'border-orange-600 border-2 shadow-md'
+              : 'border-gray-200 hover:border-orange-400'
+          }`}
+        >
           <div className="text-sm text-gray-600 mb-1">취소요청</div>
           <div className="text-2xl font-semibold text-orange-600">{(stats.취소요청 || 0).toLocaleString()}</div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div
+          onClick={() => handleStatusCardClick('취소완료')}
+          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+            statusFilter === '취소완료'
+              ? 'border-red-600 border-2 shadow-md'
+              : 'border-gray-200 hover:border-red-400'
+          }`}
+        >
           <div className="text-sm text-gray-600 mb-1">취소완료</div>
           <div className="text-2xl font-semibold text-red-600">{(stats.취소완료 || 0).toLocaleString()}</div>
         </div>
       </div>
 
-      {/* 벤더사별/셀러별 집계 테이블 */}
+      {/* 벤더사별/셀러별 테이블 */}
       <div className="bg-white rounded-lg">
         <div className="px-4 py-3 flex items-center gap-4">
-          <button
+          <span
             onClick={() => {
               setVendorStatsExpanded(!vendorStatsExpanded);
               if (!vendorStatsExpanded) setSellerStatsExpanded(false);
             }}
-            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+            className={`text-lg font-semibold cursor-pointer transition-colors ${
               vendorStatsExpanded
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'text-blue-600'
+                : 'text-gray-700 hover:text-gray-900'
             }`}
           >
-            벤더사별 집계
-          </button>
-          <button
+            벤더사별
+          </span>
+          <span
             onClick={() => {
               setSellerStatsExpanded(!sellerStatsExpanded);
               if (!sellerStatsExpanded) setVendorStatsExpanded(false);
             }}
-            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+            className={`text-lg font-semibold cursor-pointer transition-colors ${
               sellerStatsExpanded
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'text-blue-600'
+                : 'text-gray-700 hover:text-gray-900'
             }`}
           >
-            셀러별 집계
-          </button>
+            셀러별
+          </span>
         </div>
 
         {vendorStatsExpanded && (
@@ -1075,11 +1485,12 @@ export default function SearchTab() {
               <thead>
                 <tr className="bg-gray-50">
                   <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'left', fontWeight: 500, color: '#4B5563' }}>벤더사</th>
-                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#2563EB' }}>결제완료</th>
-                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#CA8A04' }}>상품준비중</th>
-                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#16A34A' }}>발송완료</th>
-                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#EA580C' }}>취소요청</th>
-                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#DC2626' }}>취소완료</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#4B5563' }}>접수</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#4B5563' }}>결제완료</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#4B5563' }}>상품준비중</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#4B5563' }}>발송완료</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#4B5563' }}>취소요청</th>
+                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#4B5563' }}>취소완료</th>
                   <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#4B5563' }}>전송파일</th>
                 </tr>
               </thead>
@@ -1087,6 +1498,7 @@ export default function SearchTab() {
                 {vendorStats.map((stat, idx) => (
                   <tr key={stat.shipping_source} style={{ borderTop: idx === 0 ? 'none' : '1px solid #E5E7EB' }} className="hover:bg-gray-50">
                     <td style={{ fontSize: '16px', padding: '6px 16px', fontWeight: 500, color: '#111827' }}>{stat.shipping_source}</td>
+                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#7E22CE', fontWeight: 600 }}>{(stat.접수_건수 || 0) > 0 ? stat.접수_건수.toLocaleString() : ''}</td>
                     <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#1D4ED8', fontWeight: 600 }}>{(stat.결제완료_건수 || 0) > 0 ? stat.결제완료_건수.toLocaleString() : ''}</td>
                     <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#A16207', fontWeight: 600 }}>{(stat.상품준비중_건수 || 0) > 0 ? stat.상품준비중_건수.toLocaleString() : ''}</td>
                     <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#15803D', fontWeight: 600 }}>{(stat.발송완료_건수 || 0) > 0 ? stat.발송완료_건수.toLocaleString() : ''}</td>
@@ -1107,7 +1519,7 @@ export default function SearchTab() {
                 ))}
                 {vendorStats.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ fontSize: '16px', padding: '24px 16px', textAlign: 'center', color: '#6B7280' }}>
+                    <td colSpan={8} style={{ fontSize: '16px', padding: '24px 16px', textAlign: 'center', color: '#6B7280' }}>
                       데이터가 없습니다.
                     </td>
                   </tr>
@@ -1122,40 +1534,92 @@ export default function SearchTab() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-50">
-                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'left', fontWeight: 500, color: '#4B5563' }}>셀러</th>
-                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#2563EB' }}>결제완료</th>
-                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#CA8A04' }}>상품준비중</th>
-                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#16A34A' }}>발송완료</th>
-                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#EA580C' }}>취소요청</th>
-                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#DC2626' }}>취소완료</th>
-                  <th style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#4B5563' }}>전송파일</th>
+                  <th rowSpan={2} style={{ fontSize: '16px', padding: '6px 8px', width: '120px', textAlign: 'left', fontWeight: 500, color: '#4B5563', borderBottom: '1px solid #E5E7EB' }}>셀러</th>
+                  <th colSpan={3} style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', fontWeight: 500, color: '#4B5563', borderBottom: '1px solid #E5E7EB' }}>발주</th>
+                  <th rowSpan={2} style={{ fontSize: '16px', padding: '6px 8px', width: '80px', textAlign: 'center', fontWeight: 500, color: '#4B5563', borderBottom: '1px solid #E5E7EB' }}>결제완료</th>
+                  <th rowSpan={2} style={{ fontSize: '16px', padding: '6px 8px', width: '80px', textAlign: 'center', fontWeight: 500, color: '#4B5563', borderBottom: '1px solid #E5E7EB' }}>상품준비중</th>
+                  <th rowSpan={2} style={{ fontSize: '16px', padding: '6px 8px', width: '80px', textAlign: 'center', fontWeight: 500, color: '#4B5563', borderBottom: '1px solid #E5E7EB' }}>발송완료</th>
+                  <th colSpan={3} style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', fontWeight: 500, color: '#4B5563', borderBottom: '1px solid #E5E7EB' }}>환불</th>
+                  <th rowSpan={2} style={{ fontSize: '16px', padding: '6px 8px', width: '80px', textAlign: 'center', fontWeight: 500, color: '#4B5563', borderBottom: '1px solid #E5E7EB' }}>취소완료</th>
+                </tr>
+                <tr className="bg-gray-50">
+                  <th style={{ fontSize: '14px', padding: '4px 8px', width: '80px', textAlign: 'center', fontWeight: 500, color: '#4B5563', borderBottom: '1px solid #E5E7EB' }}>접수</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', width: '100px', textAlign: 'center', fontWeight: 500, color: '#4B5563', borderBottom: '1px solid #E5E7EB' }}>금액</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', width: '80px', textAlign: 'center', fontWeight: 500, color: '#4B5563', borderBottom: '1px solid #E5E7EB' }}>입금확인</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', width: '80px', textAlign: 'center', fontWeight: 500, color: '#4B5563', borderBottom: '1px solid #E5E7EB' }}>취소요청</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', width: '100px', textAlign: 'center', fontWeight: 500, color: '#4B5563', borderBottom: '1px solid #E5E7EB' }}>환불예정액</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', width: '140px', textAlign: 'center', fontWeight: 500, color: '#4B5563', borderBottom: '1px solid #E5E7EB' }}>환불처리</th>
                 </tr>
               </thead>
               <tbody>
                 {sellerStats.map((stat, idx) => (
                   <tr key={stat.seller_id} style={{ borderTop: idx === 0 ? 'none' : '1px solid #E5E7EB' }} className="hover:bg-gray-50">
                     <td style={{ fontSize: '16px', padding: '6px 16px', fontWeight: 500, color: '#111827' }}>{stat.seller_id}</td>
+                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#7E22CE', fontWeight: 600 }}>{(stat.접수_건수 || 0) > 0 ? stat.접수_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'right', color: '#047857', fontWeight: 600 }}>{stat.총금액 > 0 ? stat.총금액.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center' }}>
+                      <div
+                        onClick={() => handlePaymentCheckToggle(stat.seller_id)}
+                        style={{
+                          width: '44px',
+                          height: '24px',
+                          borderRadius: '12px',
+                          backgroundColor: stat.입금확인 ? '#0891B2' : '#D1D5DB',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          transition: 'background-color 0.3s',
+                          display: 'inline-block'
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '50%',
+                            backgroundColor: 'white',
+                            position: 'absolute',
+                            top: '3px',
+                            left: stat.입금확인 ? '23px' : '3px',
+                            transition: 'left 0.3s',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                          }}
+                        />
+                      </div>
+                    </td>
                     <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#1D4ED8', fontWeight: 600 }}>{(stat.결제완료_건수 || 0) > 0 ? stat.결제완료_건수.toLocaleString() : ''}</td>
                     <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#A16207', fontWeight: 600 }}>{(stat.상품준비중_건수 || 0) > 0 ? stat.상품준비중_건수.toLocaleString() : ''}</td>
                     <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#15803D', fontWeight: 600 }}>{(stat.발송완료_건수 || 0) > 0 ? stat.발송완료_건수.toLocaleString() : ''}</td>
                     <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#C2410C', fontWeight: 600 }}>{(stat.취소요청_건수 || 0) > 0 ? stat.취소요청_건수.toLocaleString() : ''}</td>
-                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#B91C1C', fontWeight: 600 }}>{(stat.취소완료_건수 || 0) > 0 ? stat.취소완료_건수.toLocaleString() : ''}</td>
-                    <td style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center' }}>
-                      <button
-                        onClick={() => handleSellerExcelDownload(stat.seller_id)}
-                        style={{ fontSize: '14px', padding: '4px 12px', backgroundColor: '#16A34A', color: 'white', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', border: 'none', cursor: 'pointer' }}
-                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#15803D'}
-                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#16A34A'}
-                      >
-                        <Download className="w-3 h-3" />
-                        엑셀
-                      </button>
+                    <td style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'right', color: '#DC2626', fontWeight: 600 }}>{stat.환불예정액 > 0 ? stat.환불예정액.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '14px', padding: '6px 16px', textAlign: 'center' }}>
+                      {stat.환불처리일시 ? (
+                        <span style={{ color: '#059669', fontWeight: 500 }}>{stat.환불처리일시}</span>
+                      ) : (
+                        <button
+                          onClick={() => handleRefundComplete(stat.seller_id)}
+                          style={{
+                            fontSize: '13px',
+                            padding: '4px 10px',
+                            backgroundColor: '#DC2626',
+                            color: 'white',
+                            borderRadius: '4px',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontWeight: 500
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#B91C1C'}
+                          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#DC2626'}
+                        >
+                          환불완료
+                        </button>
+                      )}
                     </td>
+                    <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#B91C1C', fontWeight: 600 }}>{(stat.취소완료_건수 || 0) > 0 ? stat.취소완료_건수.toLocaleString() : ''}</td>
                   </tr>
                 ))}
                 {sellerStats.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ fontSize: '16px', padding: '24px 16px', textAlign: 'center', color: '#6B7280' }}>
+                    <td colSpan={11} style={{ fontSize: '16px', padding: '24px 16px', textAlign: 'center', color: '#6B7280' }}>
                       데이터가 없습니다.
                     </td>
                   </tr>
@@ -1328,7 +1792,7 @@ export default function SearchTab() {
         ) : (
           <EditableAdminGrid
             columns={columns}
-            data={orders}
+            data={filteredOrders}
             onDataChange={(newData) => setOrders(newData)}
             onSave={handleSaveData}
             onDeleteSelected={handleDeleteRows}
@@ -1337,8 +1801,16 @@ export default function SearchTab() {
             enableCSVExport={true}
             enableCSVImport={false}
             customActions={
-              <>
-                <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-50">
+              <div className="flex items-center gap-12">
+                <div className="flex items-center gap-1">
+                  {statusFilter === '접수' && (
+                    <button
+                      onClick={handlePaymentConfirm}
+                      className="px-2 py-1 bg-purple-600 text-white rounded text-xs font-medium hover:bg-purple-700"
+                    >
+                      입금확인
+                    </button>
+                  )}
                   <button
                     onClick={handleOrderConfirm}
                     className="px-2 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700"
@@ -1352,7 +1824,7 @@ export default function SearchTab() {
                     취소승인
                   </button>
                 </div>
-                <div className="flex items-center gap-1 px-2 py-0.5 bg-indigo-50">
+                <div className="flex items-center gap-1">
                   <select
                     value={bulkApplyValue}
                     onChange={(e) => setBulkApplyValue(e.target.value)}
@@ -1384,7 +1856,7 @@ export default function SearchTab() {
                     송장일괄등록
                   </button>
                 </div>
-                <div className="flex items-center gap-1 px-2 py-0.5 bg-gray-50">
+                <div className="flex items-center gap-1">
                   <button
                     onClick={handleExcelDownload}
                     disabled={orders.length === 0}
@@ -1394,11 +1866,111 @@ export default function SearchTab() {
                     마켓송장파일
                   </button>
                 </div>
-              </>
+              </div>
             }
           />
         )}
       </div>
+
+      {/* 옵션별 집계 테이블 */}
+      {optionStats.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200">
+          <div className="px-4 py-3 flex items-center gap-4">
+            <span className="text-lg font-semibold text-gray-700">
+              옵션별 집계
+            </span>
+          </div>
+
+          <div className="overflow-x-auto pb-4">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th rowSpan={2} style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'left', fontWeight: 500, color: '#4B5563', verticalAlign: 'middle', borderRight: '1px solid #E5E7EB' }}>옵션명</th>
+                  <th colSpan={2} style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#9333EA', borderRight: '1px solid #E5E7EB' }}>접수</th>
+                  <th colSpan={2} style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#2563EB', borderRight: '1px solid #E5E7EB' }}>결제완료</th>
+                  <th colSpan={2} style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#CA8A04', borderRight: '1px solid #E5E7EB' }}>상품준비중</th>
+                  <th colSpan={2} style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#16A34A', borderRight: '1px solid #E5E7EB' }}>발송완료</th>
+                  <th colSpan={2} style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#EA580C', borderRight: '1px solid #E5E7EB' }}>취소요청</th>
+                  <th colSpan={2} style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#DC2626' }}>취소완료</th>
+                </tr>
+                <tr className="bg-gray-50">
+                  <th style={{ fontSize: '14px', padding: '4px 8px', textAlign: 'center', fontWeight: 400, color: '#6B7280' }}>건수</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', textAlign: 'center', fontWeight: 400, color: '#6B7280', borderRight: '1px solid #E5E7EB' }}>수량</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', textAlign: 'center', fontWeight: 400, color: '#6B7280' }}>건수</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', textAlign: 'center', fontWeight: 400, color: '#6B7280', borderRight: '1px solid #E5E7EB' }}>수량</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', textAlign: 'center', fontWeight: 400, color: '#6B7280' }}>건수</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', textAlign: 'center', fontWeight: 400, color: '#6B7280', borderRight: '1px solid #E5E7EB' }}>수량</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', textAlign: 'center', fontWeight: 400, color: '#6B7280' }}>건수</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', textAlign: 'center', fontWeight: 400, color: '#6B7280', borderRight: '1px solid #E5E7EB' }}>수량</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', textAlign: 'center', fontWeight: 400, color: '#6B7280' }}>건수</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', textAlign: 'center', fontWeight: 400, color: '#6B7280', borderRight: '1px solid #E5E7EB' }}>수량</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', textAlign: 'center', fontWeight: 400, color: '#6B7280' }}>건수</th>
+                  <th style={{ fontSize: '14px', padding: '4px 8px', textAlign: 'center', fontWeight: 400, color: '#6B7280' }}>수량</th>
+                </tr>
+              </thead>
+              <tbody>
+                {optionStats.map((stat, idx) => (
+                  <tr key={stat.option_name} style={{ borderTop: idx === 0 ? 'none' : '1px solid #E5E7EB' }} className="hover:bg-gray-50">
+                    <td style={{ fontSize: '16px', padding: '6px 16px', fontWeight: 500, color: '#111827', borderRight: '1px solid #E5E7EB' }}>{stat.option_name}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#7C3AED', fontWeight: 600 }}>{(stat.접수_건수 || 0) > 0 ? stat.접수_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#7C3AED', fontWeight: 500, borderRight: '1px solid #E5E7EB' }}>{(stat.접수_수량 || 0) > 0 ? stat.접수_수량.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#1D4ED8', fontWeight: 600 }}>{(stat.결제완료_건수 || 0) > 0 ? stat.결제완료_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#1D4ED8', fontWeight: 500, borderRight: '1px solid #E5E7EB' }}>{(stat.결제완료_수량 || 0) > 0 ? stat.결제완료_수량.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#A16207', fontWeight: 600 }}>{(stat.상품준비중_건수 || 0) > 0 ? stat.상품준비중_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#A16207', fontWeight: 500, borderRight: '1px solid #E5E7EB' }}>{(stat.상품준비중_수량 || 0) > 0 ? stat.상품준비중_수량.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#15803D', fontWeight: 600 }}>{(stat.발송완료_건수 || 0) > 0 ? stat.발송완료_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#15803D', fontWeight: 500, borderRight: '1px solid #E5E7EB' }}>{(stat.발송완료_수량 || 0) > 0 ? stat.발송완료_수량.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#C2410C', fontWeight: 600 }}>{(stat.취소요청_건수 || 0) > 0 ? stat.취소요청_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#C2410C', fontWeight: 500, borderRight: '1px solid #E5E7EB' }}>{(stat.취소요청_수량 || 0) > 0 ? stat.취소요청_수량.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#B91C1C', fontWeight: 600 }}>{(stat.취소완료_건수 || 0) > 0 ? stat.취소완료_건수.toLocaleString() : ''}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#B91C1C', fontWeight: 500 }}>{(stat.취소완료_수량 || 0) > 0 ? stat.취소완료_수량.toLocaleString() : ''}</td>
+                  </tr>
+                ))}
+                {/* 합계 행 */}
+                <tr style={{ borderTop: '2px solid #374151', backgroundColor: '#F9FAFB' }}>
+                  <td style={{ fontSize: '16px', padding: '6px 16px', fontWeight: 700, color: '#111827', borderRight: '1px solid #E5E7EB' }}>합계</td>
+                  <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#7C3AED', fontWeight: 700 }}>
+                    {optionStats.reduce((sum, stat) => sum + (stat.접수_건수 || 0), 0).toLocaleString()}
+                  </td>
+                  <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#7C3AED', fontWeight: 600, borderRight: '1px solid #E5E7EB' }}>
+                    {optionStats.reduce((sum, stat) => sum + (stat.접수_수량 || 0), 0).toLocaleString()}
+                  </td>
+                  <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#1D4ED8', fontWeight: 700 }}>
+                    {optionStats.reduce((sum, stat) => sum + (stat.결제완료_건수 || 0), 0).toLocaleString()}
+                  </td>
+                  <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#1D4ED8', fontWeight: 600, borderRight: '1px solid #E5E7EB' }}>
+                    {optionStats.reduce((sum, stat) => sum + (stat.결제완료_수량 || 0), 0).toLocaleString()}
+                  </td>
+                  <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#A16207', fontWeight: 700 }}>
+                    {optionStats.reduce((sum, stat) => sum + (stat.상품준비중_건수 || 0), 0).toLocaleString()}
+                  </td>
+                  <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#A16207', fontWeight: 600, borderRight: '1px solid #E5E7EB' }}>
+                    {optionStats.reduce((sum, stat) => sum + (stat.상품준비중_수량 || 0), 0).toLocaleString()}
+                  </td>
+                  <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#15803D', fontWeight: 700 }}>
+                    {optionStats.reduce((sum, stat) => sum + (stat.발송완료_건수 || 0), 0).toLocaleString()}
+                  </td>
+                  <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#15803D', fontWeight: 600, borderRight: '1px solid #E5E7EB' }}>
+                    {optionStats.reduce((sum, stat) => sum + (stat.발송완료_수량 || 0), 0).toLocaleString()}
+                  </td>
+                  <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#C2410C', fontWeight: 700 }}>
+                    {optionStats.reduce((sum, stat) => sum + (stat.취소요청_건수 || 0), 0).toLocaleString()}
+                  </td>
+                  <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#C2410C', fontWeight: 600, borderRight: '1px solid #E5E7EB' }}>
+                    {optionStats.reduce((sum, stat) => sum + (stat.취소요청_수량 || 0), 0).toLocaleString()}
+                  </td>
+                  <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#B91C1C', fontWeight: 700 }}>
+                    {optionStats.reduce((sum, stat) => sum + (stat.취소완료_건수 || 0), 0).toLocaleString()}
+                  </td>
+                  <td style={{ fontSize: '16px', padding: '6px 8px', textAlign: 'center', color: '#B91C1C', fontWeight: 600 }}>
+                    {optionStats.reduce((sum, stat) => sum + (stat.취소완료_수량 || 0), 0).toLocaleString()}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* 삭제 확인 모달 */}
       {showDeleteConfirmModal && (

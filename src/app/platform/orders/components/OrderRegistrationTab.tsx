@@ -972,7 +972,7 @@ export default function OrderRegistrationTab({
                 const { error } = await supabase
                   .from('integrated_orders')
                   .update({
-                    shipping_status: '결제완료',
+                    shipping_status: '입금확인전',
                     order_no: orderNo
                   })
                   .eq('id', order.id);

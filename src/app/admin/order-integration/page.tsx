@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Script from 'next/script';
 import { FileText, Search, Plus, FileSpreadsheet, MessageSquare, MoreHorizontal, RefreshCw } from 'lucide-react';
 import SearchTab from './components/SearchTab';
 import InputTab from './components/InputTab';
@@ -28,9 +29,16 @@ export default function OrderIntegrationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* 헤더 - sticky */}
-      <header className="sticky top-0 bg-white dark:bg-[#2d2d30] border-b border-gray-200 dark:border-gray-700" style={{ zIndex: 40 }}>
+    <>
+      {/* Daum Postcode API */}
+      <Script
+        src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"
+        strategy="beforeInteractive"
+      />
+
+      <div className="min-h-screen bg-background">
+        {/* 헤더 - sticky */}
+        <header className="sticky top-0 bg-white dark:bg-[#2d2d30] border-b border-gray-200 dark:border-gray-700" style={{ zIndex: 40 }}>
         <div className="px-6 py-4">
           {/* 타이틀 */}
           <div className="flex items-center gap-3 mb-4">
@@ -111,6 +119,7 @@ export default function OrderIntegrationPage() {
           <div className="text-white/80 text-sm">잠시만 기다려주세요</div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

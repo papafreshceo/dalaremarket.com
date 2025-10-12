@@ -38,7 +38,10 @@
       "Read(//c//**)",
       "Bash(dir:*)",
       "Bash(copy:*)",
-      "Bash(del \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-integration\\components\\ShippingTab.tsx\")"
+      "Bash(del \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-integration\\components\\ShippingTab.tsx\")",
+      "Bash(move \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\orders\" \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-platform\")",
+      "Bash(del \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-platform\\page.tsx\")",
+      "Bash(del nul)"
     ],
     "deny": [],
     "ask": []

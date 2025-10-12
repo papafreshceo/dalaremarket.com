@@ -207,7 +207,17 @@ export default function ExcelTab() {
               if (i === 7) column.width = 100; // 수령인
               if (i === 9) column.width = 250; // 주소
               if (i === 10) column.width = 120; // 배송메시지
-              if (i === 12) column.width = 40; // 수량
+              if (i === 12) {
+                column.width = 40; // 수량
+                // 수량이 2 이상이면 배경색 추가
+                column.cellStyle = (value: any, row: any) => {
+                  const quantity = parseInt(String(value || '0'), 10);
+                  if (!isNaN(quantity) && quantity >= 2) {
+                    return { backgroundColor: '#FEF3C7' }; // 노란색 배경
+                  }
+                  return {};
+                };
+              }
 
               // field_1 (마켓명) - 마켓 배지 렌더러는 제거 (아래에서 처리)
               if (i === 1) {
@@ -669,7 +679,7 @@ export default function ExcelTab() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data);
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true, WTF: false });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
 
         // 헤더 행 감지를 위해 먼저 읽기
@@ -754,7 +764,7 @@ export default function ExcelTab() {
         const template = filePreview.detectedTemplate;
 
         const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data);
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true, WTF: false });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
 
         let jsonData: any[];
@@ -1076,7 +1086,7 @@ export default function ExcelTab() {
           shipped_date: cleanOrder.field_42,
           courier_company: cleanOrder.field_43,
           tracking_number: cleanOrder.field_44,
-          sheet_date: new Date().toISOString().split('T')[0],
+          sheet_date: new Date(new Date().getTime() + (9 * 60 * 60 * 1000)).toISOString().split('T')[0],
         };
       });
 
@@ -1573,6 +1583,7 @@ export default function ExcelTab() {
             data={orders}
             onDataChange={handleDataChange}
             onDeleteSelected={handleDeleteRows}
+            onSave={() => {}}
             height="calc(100vh - 450px)"
             enableFilter={true}
             enableCSVExport={true}
@@ -1580,6 +1591,7 @@ export default function ExcelTab() {
             enableCheckbox={false}
             enableDelete={false}
             enableCopy={false}
+            enableAddRow={false}
             customActions={
               <div className="flex items-center gap-1.5 ml-auto">
                 <button
