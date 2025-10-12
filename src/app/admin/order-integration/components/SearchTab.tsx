@@ -140,14 +140,11 @@ export default function SearchTab() {
     // 한국 시간 기준으로 날짜 계산 (UTC+9)
     const now = new Date();
     const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-    const endDate = koreaTime.toISOString().split('T')[0];
-
-    const sevenDaysAgo = new Date(koreaTime.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const startDate = sevenDaysAgo.toISOString().split('T')[0];
+    const todayDate = koreaTime.toISOString().split('T')[0];
 
     return {
-      startDate,
-      endDate,
+      startDate: todayDate,
+      endDate: todayDate,
       dateType: 'sheet',
       marketName: '',
       searchKeyword: '',
@@ -1405,7 +1402,7 @@ export default function SearchTab() {
 
       {/* 삭제 확인 모달 */}
       {showDeleteConfirmModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }} className="fixed inset-0 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-auto">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               삭제 확인 ({ordersToDelete.length}건)
@@ -1456,7 +1453,7 @@ export default function SearchTab() {
 
       {/* 송장일괄등록 모달 */}
       {showBulkInvoiceModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }} className="fixed inset-0 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">송장일괄등록</h3>
             <p className="text-sm text-gray-600 mb-4">
@@ -1507,7 +1504,7 @@ export default function SearchTab() {
 
       {/* 삭제 결과 모달 */}
       {showDeleteResultModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }} className="fixed inset-0 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">삭제 완료</h3>
             <p className="text-gray-700 mb-6">

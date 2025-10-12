@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ToastProvider } from '@/components/ui/Toast';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import AgriChatbot from '@/components/chatbot/AgriChatbot';
 
 export const metadata: Metadata = {
   title: "달래마켓",
@@ -39,6 +40,7 @@ export default function RootLayout({
         <ThemeProvider>
           <ToastProvider>
             {children}
+            <AgriChatbot />
           </ToastProvider>
         </ThemeProvider>
       </body>

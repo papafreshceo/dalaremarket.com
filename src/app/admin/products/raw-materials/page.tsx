@@ -133,9 +133,12 @@ export default function RawMaterialsManagementPage() {
   // 엑셀 업로드 결과 모달
   const [uploadResultModal, setUploadResultModal] = useState<{
     type: 'replace' | 'merge'
-    added: string[]
-    updated: string[]
-    unchanged: string[]
+    originalCount: number  // 기존 원물 수
+    uploadCount: number    // 업로드한 파일의 원물 수
+    added: string[]        // 추가된 원물 목록
+    updated: string[]      // 변경된 원물 목록
+    deleted: string[]      // 삭제된 원물 목록
+    unchanged: string[]    // 변경없는 원물 목록
   } | null>(null)
 
   // 엑셀 업로드 프리뷰 모달 (덮어쓰기 전)
@@ -1258,7 +1261,21 @@ export default function RawMaterialsManagementPage() {
                   const workbook = XLSX.read(data, { type: 'binary', cellDates: true })
                   const sheetName = workbook.SheetNames[0]
                   const worksheet = workbook.Sheets[sheetName]
-                  const jsonData = XLSX.utils.sheet_to_json(worksheet)
+
+                  // 엑셀 시트의 범위 확인
+                  const range = worksheet['!ref']
+                  console.log('📄 엑셀 시트 범위:', range)
+
+                  const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: null })
+
+                  console.log('📊 엑셀 원본 데이터 개수:', jsonData.length)
+
+                  // 빈 행이나 모든 셀이 비어있는 행 확인
+                  const emptyRows = jsonData.filter((row: any) => {
+                    const values = Object.values(row)
+                    return values.every(v => v === null || v === undefined || v === '')
+                  })
+                  console.log('⚠️ 완전히 빈 행 개수:', emptyRows.length)
 
                   // 한글 헤더를 영문으로 매핑
                   const reverseFieldMapping: Record<string, string> = {
@@ -2375,34 +2392,49 @@ export default function RawMaterialsManagementPage() {
           size="lg"
         >
           <div className="space-y-4">
+            {/* 기본 통계 */}
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">기존 원물:</span>
+                  <span className="ml-2 font-semibold text-gray-900 dark:text-gray-100">{uploadResultModal.originalCount}개</span>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">업로드 파일:</span>
+                  <span className="ml-2 font-semibold text-gray-900 dark:text-gray-100">{uploadResultModal.uploadCount}개</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Mode-specific message */}
             {uploadResultModal.type === 'replace' && (
-              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 mb-4">
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
                 <p className="text-xs text-orange-600 dark:text-orange-400">
                   <strong>교체 모드:</strong> 엑셀 파일의 데이터로 완전히 교체했습니다. 엑셀에 없는 원물은 삭제되었습니다.
                 </p>
               </div>
             )}
-            {uploadResultModal.type === 'merge' && (
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
-                <p className="text-xs text-blue-600 dark:text-blue-400">
-                  <strong>병합 모드:</strong> 기존 데이터를 유지하면서 엑셀 데이터를 추가/수정했습니다.
-                </p>
-              </div>
-            )}
 
-            <div className={`grid ${uploadResultModal.type === 'merge' ? 'grid-cols-3' : 'grid-cols-2'} gap-4 text-center`}>
-              <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg">
+            {/* 변경 통계 */}
+            <div className={`grid ${uploadResultModal.type === 'merge' ? 'grid-cols-4' : 'grid-cols-3'} gap-3 text-center`}>
+              <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
                 <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{uploadResultModal.added.length}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">추가</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">추가</div>
               </div>
-              <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-lg">
+              <div className="bg-green-500/10 border border-green-500/20 p-3 rounded-lg">
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">{uploadResultModal.updated.length}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">수정</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">수정</div>
               </div>
+              {uploadResultModal.type === 'replace' && (
+                <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg">
+                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">{uploadResultModal.deleted.length}</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">삭제</div>
+                </div>
+              )}
               {uploadResultModal.type === 'merge' && (
-                <div className="bg-gray-500/10 border border-gray-500/20 p-4 rounded-lg">
+                <div className="bg-gray-500/10 border border-gray-500/20 p-3 rounded-lg">
                   <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{uploadResultModal.unchanged.length}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">변경없음</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">변경없음</div>
                 </div>
               )}
             </div>
@@ -2446,6 +2478,19 @@ export default function RawMaterialsManagementPage() {
               </div>
             )}
 
+            {uploadResultModal.deleted.length > 0 && uploadResultModal.type === 'replace' && (
+              <div>
+                <div className="font-semibold text-red-600 dark:text-red-400 mb-2">삭제된 원물 ({uploadResultModal.deleted.length}개)</div>
+                <div className="max-h-40 overflow-auto bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                  <ul className="text-xs space-y-1 text-gray-700 dark:text-gray-300">
+                    {uploadResultModal.deleted.map((code, idx) => (
+                      <li key={idx}>• {code}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end">
               <Button variant="primary" onClick={() => setUploadResultModal(null)}>확인</Button>
             </div>
@@ -2476,70 +2521,121 @@ export default function RawMaterialsManagementPage() {
                   // 교체: 엑셀에 있는 material_code만 남기고 나머지는 삭제
                   const uploadCodes = excelUploadModal.data.map((row: any) => row.material_code).filter(Boolean)
 
-                  // 기존 DB 데이터 조회 (전체 필드)
-                  const { data: existingData } = await supabase.from('raw_materials').select('*')
-                  const existingDataMap = new Map(existingData?.map(d => [d.material_code, d]) || [])
+                  // 기존 DB 데이터 조회 (전체 필드 및 id)
+                  const { data: existingProducts } = await supabase.from('raw_materials').select('id, material_code, material_name')
+                  const existingMap = new Map(existingProducts?.map(p => [String(p.material_code).trim(), p.id]) || [])
+                  const existingIdSet = new Set(existingProducts?.map(p => p.id) || [])  // 기존 id 목록
+
+                  console.log('기존 데이터 수:', existingProducts?.length)
+                  console.log('업로드할 데이터 수:', excelUploadModal.data.length)
+                  console.log('기존 material_code 샘플:', Array.from(existingMap.keys()).slice(0, 5))
+                  console.log('기존 id 개수:', existingIdSet.size)
+
+                  const dataToUpsert = excelUploadModal.data
+
+                  // material_code 중복 검사 (중복이 있으면 업로드 중단)
+                  const materialCodeCount = new Map<string, { count: number, items: any[] }>()
+
+                  // 중복 체크
+                  dataToUpsert.forEach((item: any, index: number) => {
+                    const code = item.material_code
+                    if (!materialCodeCount.has(code)) {
+                      materialCodeCount.set(code, { count: 0, items: [] })
+                    }
+                    const entry = materialCodeCount.get(code)!
+                    entry.count++
+                    entry.items.push({ ...item, rowIndex: index + 2 }) // 엑셀 행 번호 (헤더 포함)
+                  })
+
+                  // 중복된 항목 찾기
+                  const duplicates: string[] = []
+                  materialCodeCount.forEach((entry, code) => {
+                    if (entry.count > 1) {
+                      const itemInfo = entry.items.map(item =>
+                        `  행 ${item.rowIndex}: ${item.material_name} (id: ${item.id || '없음'})`
+                      ).join('\n')
+                      duplicates.push(`원물코드 "${code}" - ${entry.count}개 중복:\n${itemInfo}`)
+                    }
+                  })
+
+                  if (duplicates.length > 0) {
+                    console.error('❌ 중복된 material_code 발견:', duplicates)
+                    showToast(`엑셀 파일에 중복된 원물코드가 ${duplicates.length}개 있습니다. 수정 후 다시 업로드하세요.`, 'error')
+                    alert(`❌ 중복된 원물코드 발견\n\n${duplicates.join('\n\n')}\n\n엑셀 파일을 수정한 후 다시 업로드하세요.`)
+                    return
+                  }
+
+                  // id가 DB에 실제로 존재하는지 확인하여 분리
+                  const dataWithId = dataToUpsert.filter((item: any) => item.id && existingIdSet.has(item.id))
+                  const dataWithoutId = dataToUpsert.filter((item: any) => !item.id || !existingIdSet.has(item.id))
+                    .map((item: any) => {
+                      // id가 없거나, DB에 없는 id면 제거
+                      const { id: _removed, ...itemWithoutId } = item
+                      return itemWithoutId
+                    })
+
+                  console.log('📦 DB에 존재하는 id (업데이트):', dataWithId.length)
+                  console.log('📦 DB에 없는 데이터 (신규 추가):', dataWithoutId.length)
+
+                  // 새로운 id가 포함된 항목 로그
+                  const newIdsInExcel = dataToUpsert.filter((item: any) => item.id && !existingIdSet.has(item.id))
+                  if (newIdsInExcel.length > 0) {
+                    console.log(`ℹ️ 엑셀에 있지만 DB에 없는 id: ${newIdsInExcel.length}개 (신규 추가로 처리)`)
+                    console.log('샘플:', newIdsInExcel.slice(0, 3).map(d => ({ name: d.material_name, code: d.material_code, id: d.id })))
+                  }
 
                   // 추가/수정 분류
                   const added: string[] = []
                   const updated: string[] = []
 
-                  excelUploadModal.data.forEach((row: any) => {
-                    if (existingDataMap.has(row.material_code)) {
-                      const existing = existingDataMap.get(row.material_code)
-                      // 실제로 값이 변경되었는지 비교
-                      let hasChanges = false
-                      for (const key in row) {
-                        if (key === 'updated_at' || key === 'created_at') continue // 날짜 필드는 제외
-                        if (JSON.stringify(row[key]) !== JSON.stringify(existing[key])) {
-                          hasChanges = true
-                          break
-                        }
-                      }
-                      if (hasChanges) {
-                        updated.push(`${row.material_name} (${row.material_code})`)
-                      }
-                    } else {
-                      added.push(`${row.material_name} (${row.material_code})`)
+                  dataWithoutId.forEach((row: any) => {
+                    added.push(`${row.material_name} (${row.material_code})`)
+                  })
+
+                  dataWithId.forEach((row: any) => {
+                    updated.push(`${row.material_name} (${row.material_code})`)
+                  })
+
+                  // 1. id가 있는 데이터 업데이트
+                  if (dataWithId.length > 0) {
+                    const { error: updateError } = await supabase
+                      .from('raw_materials')
+                      .upsert(dataWithId, { onConflict: 'id' })
+
+                    if (updateError) {
+                      console.error('기존 데이터 업데이트 실패:', updateError)
+                      showToast('업로드 중 오류가 발생했습니다.', 'error')
+                      return
                     }
-                  })
-
-                  // 1. 먼저 upsert로 데이터 업데이트/추가
-                  // raw_materials 테이블 필드만 포함하도록 정제
-                  const allowedFields = [
-                    'id', 'material_code', 'material_name', 'standard_unit', 'supply_status',
-                    'season', 'is_active', 'created_at', 'updated_at', 'created_by', 'updated_by',
-                    'category_1', 'category_2', 'category_3', 'category_4', 'category_5',
-                    'last_trade_date', 'latest_price', 'standard_quantity',
-                    'season_start_date', 'season_peak_date', 'season_end_date',
-                    'main_supplier_id', 'notes', 'metadata', 'color_code', 'unit_quantity'
-                  ]
-                  const cleanedData = excelUploadModal.data.map((row: any) => {
-                    const cleaned: any = {}
-                    allowedFields.forEach(field => {
-                      if (field in row) {
-                        cleaned[field] = row[field]
-                      }
-                    })
-                    return cleaned
-                  })
-
-                  const { error: upsertError } = await supabase.from('raw_materials').upsert(cleanedData, { onConflict: 'id' })
-                  if (upsertError) {
-                    showToast('업로드 중 오류가 발생했습니다.', 'error')
-                    console.error('Upsert error:', upsertError)
-                    return
+                    console.log('✅ 기존 데이터 업데이트 완료:', dataWithId.length)
                   }
 
-                  // 2. 엑셀에 없는 데이터만 삭제 (외래키 제약 조건 때문에 참조되는 데이터는 자동으로 삭제 실패하고 넘어감)
+                  // 2. id가 없는 데이터 신규 추가
+                  if (dataWithoutId.length > 0) {
+                    const { error: insertError } = await supabase
+                      .from('raw_materials')
+                      .insert(dataWithoutId)
+
+                    if (insertError) {
+                      console.error('신규 데이터 추가 실패:', insertError)
+                      showToast('업로드 중 오류가 발생했습니다.', 'error')
+                      return
+                    }
+                    console.log('✅ 신규 데이터 추가 완료:', dataWithoutId.length)
+                  }
+
+                  // 3. 엑셀에 없는 데이터 확인 및 삭제
+                  const uploadedCodes = new Set(dataToUpsert.map(d => d.material_code))
+                  const deletedProducts = existingProducts?.filter(p => !uploadedCodes.has(p.material_code)) || []
+
+                  console.log(`🗑️ 삭제 대상: ${deletedProducts.length}개`)
+
                   const { error: deleteError } = await supabase
                     .from('raw_materials')
                     .delete()
                     .not('material_code', 'in', `(${uploadCodes.map(c => `"${c}"`).join(',')})`)
 
                   if (deleteError && deleteError.code !== '23503') {
-                    // 외래키 오류가 아닌 다른 오류만 표시
-                    showToast('일부 데이터 삭제 중 오류가 발생했습니다.', 'warning')
                     console.warn(deleteError)
                   }
 
@@ -2548,10 +2644,17 @@ export default function RawMaterialsManagementPage() {
                   setExcelUploadModal(null)
 
                   // 결과 모달 표시
+                  const addedList = dataWithoutId.map((d: any) => `${d.material_name} (${d.material_code})`)
+                  const updatedList = dataWithId.map((d: any) => `${d.material_name} (${d.material_code})`)
+                  const deletedList = deletedProducts.map(d => `${d.material_code}`)
+
                   setUploadResultModal({
                     type: 'replace',
-                    added,
-                    updated,
+                    originalCount: existingProducts?.length || 0,
+                    uploadCount: excelUploadModal.data.length,
+                    added: addedList,
+                    updated: updatedList,
+                    deleted: deletedList,
                     unchanged: []
                   })
                 }}
@@ -2564,22 +2667,73 @@ export default function RawMaterialsManagementPage() {
                 onClick={async () => {
                   // 병합: upsert로 기존 데이터 유지하면서 업데이트/추가
 
-                  // 기존 DB 데이터 조회 (전체 필드)
+                  // 기존 DB 데이터 조회 (전체 필드 및 id)
                   const { data: existingData } = await supabase.from('raw_materials').select('*')
+                  const existingMap = new Map(existingData?.map(p => [String(p.material_code).trim(), p.id]) || [])
+                  const existingIdSet = new Set(existingData?.map(p => p.id) || [])  // 기존 id 목록
                   const existingDataMap = new Map(existingData?.map(d => [d.material_code, d]) || [])
+
+                  console.log('기존 데이터 수:', existingData?.length)
+                  console.log('업로드할 데이터 수:', excelUploadModal.data.length)
+
+                  const dataToUpsert = excelUploadModal.data
+
+                  // material_code 중복 검사 (중복이 있으면 업로드 중단)
+                  const materialCodeCount = new Map<string, { count: number, items: any[] }>()
+
+                  dataToUpsert.forEach((item: any, index: number) => {
+                    const code = item.material_code
+                    if (!materialCodeCount.has(code)) {
+                      materialCodeCount.set(code, { count: 0, items: [] })
+                    }
+                    const entry = materialCodeCount.get(code)!
+                    entry.count++
+                    entry.items.push({ ...item, rowIndex: index + 2 })
+                  })
+
+                  const duplicates: string[] = []
+                  materialCodeCount.forEach((entry, code) => {
+                    if (entry.count > 1) {
+                      const itemInfo = entry.items.map(item =>
+                        `  행 ${item.rowIndex}: ${item.material_name} (id: ${item.id || '없음'})`
+                      ).join('\n')
+                      duplicates.push(`원물코드 "${code}" - ${entry.count}개 중복:\n${itemInfo}`)
+                    }
+                  })
+
+                  if (duplicates.length > 0) {
+                    console.error('❌ 중복된 material_code 발견:', duplicates)
+                    showToast(`엑셀 파일에 중복된 원물코드가 ${duplicates.length}개 있습니다. 수정 후 다시 업로드하세요.`, 'error')
+                    alert(`❌ 중복된 원물코드 발견\n\n${duplicates.join('\n\n')}\n\n엑셀 파일을 수정한 후 다시 업로드하세요.`)
+                    return
+                  }
+
+                  // id가 DB에 실제로 존재하는지 확인하여 분리
+                  const dataWithId = dataToUpsert.filter((item: any) => item.id && existingIdSet.has(item.id))
+                  const dataWithoutId = dataToUpsert.filter((item: any) => !item.id || !existingIdSet.has(item.id))
+                    .map((item: any) => {
+                      const { id: _removed, ...itemWithoutId } = item
+                      return itemWithoutId
+                    })
+
+                  console.log('📦 DB에 존재하는 id (업데이트):', dataWithId.length)
+                  console.log('📦 DB에 없는 데이터 (신규 추가):', dataWithoutId.length)
 
                   // 추가/수정/변경없음 분류
                   const added: string[] = []
                   const updated: string[] = []
                   const unchanged: string[] = []
 
-                  excelUploadModal.data.forEach((row: any) => {
-                    if (existingDataMap.has(row.material_code)) {
-                      const existing = existingDataMap.get(row.material_code)
-                      // 실제로 값이 변경되었는지 비교
+                  dataWithoutId.forEach((row: any) => {
+                    added.push(`${row.material_name} (${row.material_code})`)
+                  })
+
+                  dataWithId.forEach((row: any) => {
+                    const existing = existingDataMap.get(row.material_code)
+                    if (existing) {
                       let hasChanges = false
                       for (const key in row) {
-                        if (key === 'updated_at' || key === 'created_at') continue // 날짜 필드는 제외
+                        if (key === 'updated_at' || key === 'created_at') continue
                         if (JSON.stringify(row[key]) !== JSON.stringify(existing[key])) {
                           hasChanges = true
                           break
@@ -2588,63 +2742,59 @@ export default function RawMaterialsManagementPage() {
                       if (hasChanges) {
                         updated.push(`${row.material_name} (${row.material_code})`)
                       } else {
-                        // 엑셀에 있지만 변경되지 않은 데이터
                         unchanged.push(`${row.material_name} (${row.material_code})`)
                       }
-                    } else {
-                      added.push(`${row.material_name} (${row.material_code})`)
                     }
                   })
 
                   // 엑셀에 없는 기존 데이터도 변경없음에 추가
-                  const uploadCodesSet = new Set(excelUploadModal.data.map((row: any) => row.material_code))
+                  const uploadCodesSet = new Set(dataToUpsert.map((row: any) => row.material_code))
                   existingData?.forEach(d => {
                     if (!uploadCodesSet.has(d.material_code)) {
                       unchanged.push(`${d.material_name} (${d.material_code})`)
                     }
                   })
 
-                  // raw_materials 테이블 필드만 포함하도록 정제
-                  const allowedFields = [
-                    'id', 'material_code', 'material_name', 'standard_unit', 'supply_status',
-                    'season', 'is_active', 'created_at', 'updated_at', 'created_by', 'updated_by',
-                    'category_1', 'category_2', 'category_3', 'category_4', 'category_5',
-                    'last_trade_date', 'latest_price', 'standard_quantity',
-                    'season_start_date', 'season_peak_date', 'season_end_date',
-                    'main_supplier_id', 'notes', 'metadata', 'color_code', 'unit_quantity'
-                  ]
-                  const cleanedData = excelUploadModal.data.map((row: any) => {
-                    const cleaned: any = {}
-                    allowedFields.forEach(field => {
-                      if (field in row) {
-                        cleaned[field] = row[field]
-                      }
-                    })
-                    return cleaned
-                  })
+                  // 1. id가 있는 데이터 업데이트
+                  if (dataWithId.length > 0) {
+                    const { error: updateError } = await supabase
+                      .from('raw_materials')
+                      .upsert(dataWithId, { onConflict: 'id' })
 
-                  const { error } = await supabase
-                    .from('raw_materials')
-                    .upsert(cleanedData, {
-                      onConflict: 'id',
-                      ignoreDuplicates: false
-                    })
-                  if (error) {
-                    showToast('업로드 중 오류가 발생했습니다.', 'error')
-                    console.error('Merge upsert error:', error)
-                  } else {
-                    showToast('병합 완료!', 'success')
-                    await fetchMaterials()
-                    setExcelUploadModal(null)
-
-                    // 결과 모달 표시
-                    setUploadResultModal({
-                      type: 'merge',
-                      added,
-                      updated,
-                      unchanged
-                    })
+                    if (updateError) {
+                      console.error('기존 데이터 업데이트 실패:', updateError)
+                      showToast('업로드 중 오류가 발생했습니다.', 'error')
+                      return
+                    }
                   }
+
+                  // 2. id가 없는 데이터 신규 추가
+                  if (dataWithoutId.length > 0) {
+                    const { error: insertError } = await supabase
+                      .from('raw_materials')
+                      .insert(dataWithoutId)
+
+                    if (insertError) {
+                      console.error('신규 데이터 추가 실패:', insertError)
+                      showToast('업로드 중 오류가 발생했습니다.', 'error')
+                      return
+                    }
+                  }
+
+                  showToast('병합 완료!', 'success')
+                  await fetchMaterials()
+                  setExcelUploadModal(null)
+
+                  // 결과 모달 표시
+                  setUploadResultModal({
+                    type: 'merge',
+                    originalCount: existingData?.length || 0,
+                    uploadCount: excelUploadModal.data.length,
+                    added,
+                    updated,
+                    deleted: [],  // 병합 모드는 삭제 없음
+                    unchanged
+                  })
                 }}
                 className="w-full px-4 py-3 text-left border-2 border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
               >

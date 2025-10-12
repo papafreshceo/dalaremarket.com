@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Card, Button } from '@/components/ui'
+import { Card, Button, Modal } from '@/components/ui'
 import { useToast } from '@/components/ui/Toast'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
+import * as XLSX from 'xlsx'
 
 interface CategorySetting {
   id: string
@@ -28,6 +29,20 @@ export default function CategorySettingsPage() {
   const [filteredTableData, setFilteredTableData] = useState<CategorySetting[]>([])
   const [loading, setLoading] = useState(false)
   const [filterExpenseType, setFilterExpenseType] = useState<'전체' | '사입' | '지출' | '가'>('전체')
+
+  // 엑셀 업로드 모달
+  const [excelUploadModal, setExcelUploadModal] = useState<{ data: any[], mode: 'replace' | 'merge' | null } | null>(null)
+
+  // 엑셀 업로드 결과 모달
+  const [uploadResultModal, setUploadResultModal] = useState<{
+    type: 'replace' | 'merge'
+    originalCount: number
+    uploadCount: number
+    added: string[]
+    updated: string[]
+    deleted: string[]
+    unchanged: string[]
+  } | null>(null)
 
   const supabase = createClient()
 
@@ -349,6 +364,128 @@ export default function CategorySettingsPage() {
       <div className="flex justify-between items-center">
         <div className="text-[16px] font-bold">카테고리 설정</div>
         <div className="flex gap-2">
+          {/* 엑셀 다운로드 버튼 */}
+          <button
+            onClick={() => {
+              // 데이터를 엑셀 형식으로 변환
+              const excelData = categories.map(cat => ({
+                'ID': cat.id,
+                '지출유형': cat.expense_type || '',
+                '대분류': cat.category_1 || '',
+                '중분류': cat.category_2 || '',
+                '소분류': cat.category_3 || '',
+                '품목': cat.category_4 || '',
+                '품종': cat.category_5 || '',
+                '비고': cat.notes || '',
+                '활성화': cat.is_active ? 'Y' : 'N'
+              }))
+
+              const worksheet = XLSX.utils.json_to_sheet(excelData)
+              const workbook = XLSX.utils.book_new()
+              XLSX.utils.book_append_sheet(workbook, worksheet, '카테고리설정')
+              XLSX.writeFile(workbook, `카테고리설정_${new Date().toISOString().split('T')[0]}.xlsx`)
+              showToast('엑셀 다운로드 완료', 'success')
+            }}
+            className="p-2 text-sm border border-blue-500 text-blue-600 rounded hover:bg-blue-50 transition-colors"
+            title="엑셀 다운로드"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </button>
+
+          {/* 엑셀 업로드 버튼 */}
+          <button
+            onClick={() => {
+              const input = document.createElement('input')
+              input.type = 'file'
+              input.accept = '.xlsx,.xls'
+              input.onchange = async (e: any) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+
+                const reader = new FileReader()
+                reader.onload = async (e) => {
+                  const data = e.target?.result
+                  const workbook = XLSX.read(data, { type: 'binary', cellDates: true })
+                  const sheetName = workbook.SheetNames[0]
+                  const worksheet = workbook.Sheets[sheetName]
+
+                  // 엑셀 시트의 범위 확인
+                  const range = worksheet['!ref']
+                  console.log('📄 엑셀 시트 범위:', range)
+
+                  const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: null })
+
+                  console.log('📊 엑셀 원본 데이터 개수:', jsonData.length)
+
+                  // 빈 행이나 모든 셀이 비어있는 행 확인
+                  const emptyRows = jsonData.filter((row: any) => {
+                    const values = Object.values(row)
+                    return values.every(v => v === null || v === undefined || v === '')
+                  })
+                  console.log('⚠️ 완전히 빈 행 개수:', emptyRows.length)
+
+                  // 한글 헤더를 영문으로 매핑
+                  const reverseFieldMapping: Record<string, string> = {
+                    'ID': 'id',
+                    '지출유형': 'expense_type',
+                    '대분류': 'category_1',
+                    '중분류': 'category_2',
+                    '소분류': 'category_3',
+                    '품목': 'category_4',
+                    '품종': 'category_5',
+                    '비고': 'notes',
+                    '활성화': 'is_active'
+                  }
+
+                  // 한글 헤더를 영문으로 변환
+                  const convertedData = jsonData.map((row: any) => {
+                    const englishRow: any = {}
+                    Object.keys(row).forEach(key => {
+                      const englishKey = reverseFieldMapping[key] || key
+                      let value = row[key]
+
+                      // is_active 필드 처리 (Y/N -> boolean)
+                      if (englishKey === 'is_active') {
+                        value = value === 'Y' || value === true || value === 1
+                      }
+
+                      englishRow[englishKey] = value
+                    })
+                    return englishRow
+                  })
+
+                  // 빈 문자열을 null로 변환
+                  const cleanData = convertedData.map((row: any) => {
+                    const cleaned: any = {}
+                    Object.keys(row).forEach(key => {
+                      if (row[key] === '' || row[key] === 'undefined' || row[key] === 'null') {
+                        cleaned[key] = null
+                      } else {
+                        cleaned[key] = row[key]
+                      }
+                    })
+                    return cleaned
+                  })
+
+                  console.log('✅ 최종 cleanData 개수:', cleanData.length)
+
+                  // 모달 열기 (교체/병합 선택)
+                  setExcelUploadModal({ data: cleanData, mode: null })
+                }
+                reader.readAsBinaryString(file)
+              }
+              input.click()
+            }}
+            className="p-2 text-sm border border-green-500 text-green-600 rounded hover:bg-green-50 transition-colors"
+            title="엑셀 업로드"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+          </button>
+
           <Button onClick={handleRemoveDuplicates} variant="ghost" className="text-orange-600">
             중복 제거
           </Button>
@@ -402,10 +539,433 @@ export default function CategorySettingsPage() {
         height="600px"
         globalSearchPlaceholder="지출유형, 대분류, 중분류, 소분류, 품목, 품종, 비고 검색"
         exportFilePrefix="카테고리설정"
+        enableCSVExport={false}
+        enableCSVImport={false}
         mergeKeyGetter={(row) =>
           `${row.expense_type || ''}|${row.category_1 || ''}|${row.category_2 || ''}|${row.category_3 || ''}|${row.category_4 || ''}|${row.category_5 || ''}`
         }
       />
+
+      {/* 엑셀 업로드 결과 모달 */}
+      {uploadResultModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => setUploadResultModal(null)}
+          title={uploadResultModal.type === 'replace' ? '교체 완료' : '병합 완료'}
+          size="lg"
+        >
+          <div className="space-y-4">
+            {/* 기본 통계 */}
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">기존 카테고리:</span>
+                  <span className="ml-2 font-semibold text-gray-900 dark:text-gray-100">{uploadResultModal.originalCount}개</span>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">업로드 파일:</span>
+                  <span className="ml-2 font-semibold text-gray-900 dark:text-gray-100">{uploadResultModal.uploadCount}개</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Mode-specific message */}
+            {uploadResultModal.type === 'replace' && (
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+                <p className="text-xs text-orange-600 dark:text-orange-400">
+                  <strong>교체 모드:</strong> 엑셀 파일의 데이터로 완전히 교체했습니다. 엑셀에 없는 카테고리는 삭제되었습니다.
+                </p>
+              </div>
+            )}
+
+            {/* 변경 통계 */}
+            <div className={`grid ${uploadResultModal.type === 'merge' ? 'grid-cols-4' : 'grid-cols-3'} gap-3 text-center`}>
+              <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{uploadResultModal.added.length}</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">추가</div>
+              </div>
+              <div className="bg-green-500/10 border border-green-500/20 p-3 rounded-lg">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{uploadResultModal.updated.length}</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">수정</div>
+              </div>
+              {uploadResultModal.type === 'replace' && (
+                <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg">
+                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">{uploadResultModal.deleted.length}</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">삭제</div>
+                </div>
+              )}
+              {uploadResultModal.type === 'merge' && (
+                <div className="bg-gray-500/10 border border-gray-500/20 p-3 rounded-lg">
+                  <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{uploadResultModal.unchanged.length}</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">변경없음</div>
+                </div>
+              )}
+            </div>
+
+            {uploadResultModal.added.length > 0 && (
+              <div>
+                <div className="font-semibold text-blue-600 dark:text-blue-400 mb-2">추가된 카테고리 ({uploadResultModal.added.length}개)</div>
+                <div className="max-h-40 overflow-auto bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <ul className="text-xs space-y-1 text-gray-700 dark:text-gray-300">
+                    {uploadResultModal.added.map((name, idx) => (
+                      <li key={idx}>• {name}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {uploadResultModal.updated.length > 0 && (
+              <div>
+                <div className="font-semibold text-green-600 dark:text-green-400 mb-2">수정된 카테고리 ({uploadResultModal.updated.length}개)</div>
+                <div className="max-h-40 overflow-auto bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                  <ul className="text-xs space-y-1 text-gray-700 dark:text-gray-300">
+                    {uploadResultModal.updated.map((name, idx) => (
+                      <li key={idx}>• {name}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {uploadResultModal.unchanged.length > 0 && (
+              <div>
+                <div className="font-semibold text-gray-600 dark:text-gray-400 mb-2">변경없는 카테고리 ({uploadResultModal.unchanged.length}개)</div>
+                <div className="max-h-40 overflow-auto bg-gray-500/10 border border-gray-500/20 rounded-lg p-3">
+                  <ul className="text-xs space-y-1 text-gray-700 dark:text-gray-300">
+                    {uploadResultModal.unchanged.map((name, idx) => (
+                      <li key={idx}>• {name}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {uploadResultModal.deleted.length > 0 && uploadResultModal.type === 'replace' && (
+              <div>
+                <div className="font-semibold text-red-600 dark:text-red-400 mb-2">삭제된 카테고리 ({uploadResultModal.deleted.length}개)</div>
+                <div className="max-h-40 overflow-auto bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                  <ul className="text-xs space-y-1 text-gray-700 dark:text-gray-300">
+                    {uploadResultModal.deleted.map((code, idx) => (
+                      <li key={idx}>• {code}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button variant="primary" onClick={() => setUploadResultModal(null)}>확인</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 엑셀 업로드 모달 (교체/병합 선택) */}
+      {excelUploadModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => setExcelUploadModal(null)}
+          title="엑셀 업로드"
+          size="md"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              총 <strong className="text-blue-600 dark:text-blue-400">{excelUploadModal.data.length}개</strong>의 데이터를 업로드합니다.
+            </p>
+            <div className="bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/30 rounded-lg p-3">
+              <p className="text-xs text-yellow-800 dark:text-yellow-400">
+                <strong>⚠️ 중요:</strong> 엑셀 파일의 <strong>id</strong> 컬럼을 삭제하지 마세요.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={async () => {
+                  // 교체: 엑셀의 데이터로 완전히 교체
+
+                  // 기존 DB 데이터 조회
+                  const { data: existingCategories } = await supabase.from('category_settings').select('*')
+                  const existingIdSet = new Set(existingCategories?.map(c => c.id) || [])
+
+                  console.log('기존 데이터 수:', existingCategories?.length)
+                  console.log('업로드할 데이터 수:', excelUploadModal.data.length)
+
+                  const dataToUpsert = excelUploadModal.data
+
+                  // 중복 검사 (카테고리 조합 기준)
+                  const categoryKeyCount = new Map<string, { count: number, items: any[] }>()
+
+                  dataToUpsert.forEach((item: any, index: number) => {
+                    const key = `${item.expense_type || ''}|${item.category_1 || ''}|${item.category_2 || ''}|${item.category_3 || ''}|${item.category_4 || ''}|${item.category_5 || ''}`
+                    if (!categoryKeyCount.has(key)) {
+                      categoryKeyCount.set(key, { count: 0, items: [] })
+                    }
+                    const entry = categoryKeyCount.get(key)!
+                    entry.count++
+                    entry.items.push({ ...item, rowIndex: index + 2 })
+                  })
+
+                  const duplicates: string[] = []
+                  categoryKeyCount.forEach((entry, key) => {
+                    if (entry.count > 1) {
+                      const itemInfo = entry.items.map(item =>
+                        `  행 ${item.rowIndex}: ${item.category_1 || ''}-${item.category_2 || ''} (id: ${item.id || '없음'})`
+                      ).join('\n')
+                      duplicates.push(`카테고리 "${key}" - ${entry.count}개 중복:\n${itemInfo}`)
+                    }
+                  })
+
+                  if (duplicates.length > 0) {
+                    console.error('❌ 중복된 카테고리 발견:', duplicates)
+                    showToast(`엑셀 파일에 중복된 카테고리가 ${duplicates.length}개 있습니다. 수정 후 다시 업로드하세요.`, 'error')
+                    alert(`❌ 중복된 카테고리 발견\n\n${duplicates.join('\n\n')}\n\n엑셀 파일을 수정한 후 다시 업로드하세요.`)
+                    return
+                  }
+
+                  // id가 DB에 실제로 존재하는지 확인하여 분리
+                  const dataWithId = dataToUpsert.filter((item: any) => item.id && existingIdSet.has(item.id))
+                  const dataWithoutId = dataToUpsert.filter((item: any) => !item.id || !existingIdSet.has(item.id))
+                    .map((item: any) => {
+                      const { id: _removed, ...itemWithoutId} = item
+                      return itemWithoutId
+                    })
+
+                  console.log('📦 DB에 존재하는 id (업데이트):', dataWithId.length)
+                  console.log('📦 DB에 없는 데이터 (신규 추가):', dataWithoutId.length)
+
+                  const added: string[] = []
+                  const updated: string[] = []
+
+                  dataWithoutId.forEach((row: any) => {
+                    const label = `${row.expense_type || ''} > ${row.category_1 || ''} > ${row.category_2 || ''}`
+                    added.push(label)
+                  })
+
+                  dataWithId.forEach((row: any) => {
+                    const label = `${row.expense_type || ''} > ${row.category_1 || ''} > ${row.category_2 || ''}`
+                    updated.push(label)
+                  })
+
+                  // 1. id가 있는 데이터 업데이트
+                  if (dataWithId.length > 0) {
+                    const { error: updateError } = await supabase
+                      .from('category_settings')
+                      .upsert(dataWithId, { onConflict: 'id' })
+
+                    if (updateError) {
+                      console.error('기존 데이터 업데이트 실패:', updateError)
+                      showToast('업로드 중 오류가 발생했습니다.', 'error')
+                      return
+                    }
+                    console.log('✅ 기존 데이터 업데이트 완료:', dataWithId.length)
+                  }
+
+                  // 2. id가 없는 데이터 신규 추가
+                  if (dataWithoutId.length > 0) {
+                    const { error: insertError } = await supabase
+                      .from('category_settings')
+                      .insert(dataWithoutId)
+
+                    if (insertError) {
+                      console.error('신규 데이터 추가 실패:', insertError)
+                      showToast('업로드 중 오류가 발생했습니다.', 'error')
+                      return
+                    }
+                    console.log('✅ 신규 데이터 추가 완료:', dataWithoutId.length)
+                  }
+
+                  // 3. 엑셀에 없는 데이터 확인 및 삭제
+                  const uploadedKeys = new Set(dataToUpsert.map((d: any) => `${d.expense_type || ''}|${d.category_1 || ''}|${d.category_2 || ''}|${d.category_3 || ''}|${d.category_4 || ''}|${d.category_5 || ''}`))
+                  const deletedCategories = existingCategories?.filter(c => {
+                    const key = `${c.expense_type || ''}|${c.category_1 || ''}|${c.category_2 || ''}|${c.category_3 || ''}|${c.category_4 || ''}|${c.category_5 || ''}`
+                    return !uploadedKeys.has(key)
+                  }) || []
+
+                  console.log(`🗑️ 삭제 대상: ${deletedCategories.length}개`)
+
+                  if (deletedCategories.length > 0) {
+                    const { error: deleteError } = await supabase
+                      .from('category_settings')
+                      .delete()
+                      .in('id', deletedCategories.map(c => c.id))
+
+                    if (deleteError) {
+                      console.warn(deleteError)
+                    }
+                  }
+
+                  showToast('교체 완료!', 'success')
+                  await fetchCategories()
+                  setExcelUploadModal(null)
+
+                  // 결과 모달 표시
+                  const deletedList = deletedCategories.map(d => `${d.expense_type || ''} > ${d.category_1 || ''} > ${d.category_2 || ''}`)
+
+                  setUploadResultModal({
+                    type: 'replace',
+                    originalCount: existingCategories?.length || 0,
+                    uploadCount: excelUploadModal.data.length,
+                    added,
+                    updated,
+                    deleted: deletedList,
+                    unchanged: []
+                  })
+                }}
+                className="w-full px-4 py-3 text-left border-2 border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+              >
+                <div className="font-semibold text-red-600">교체</div>
+                <div className="text-xs text-gray-600 mt-1">엑셀 파일의 데이터로 교체합니다.</div>
+              </button>
+              <button
+                onClick={async () => {
+                  // 병합: 기존 데이터 유지하면서 업데이트/추가
+
+                  // 기존 DB 데이터 조회
+                  const { data: existingData } = await supabase.from('category_settings').select('*')
+                  const existingIdSet = new Set(existingData?.map(c => c.id) || [])
+                  const existingDataMap = new Map(existingData?.map(d => {
+                    const key = `${d.expense_type || ''}|${d.category_1 || ''}|${d.category_2 || ''}|${d.category_3 || ''}|${d.category_4 || ''}|${d.category_5 || ''}`
+                    return [key, d]
+                  }) || [])
+
+                  console.log('기존 데이터 수:', existingData?.length)
+                  console.log('업로드할 데이터 수:', excelUploadModal.data.length)
+
+                  const dataToUpsert = excelUploadModal.data
+
+                  // 중복 검사
+                  const categoryKeyCount = new Map<string, { count: number, items: any[] }>()
+
+                  dataToUpsert.forEach((item: any, index: number) => {
+                    const key = `${item.expense_type || ''}|${item.category_1 || ''}|${item.category_2 || ''}|${item.category_3 || ''}|${item.category_4 || ''}|${item.category_5 || ''}`
+                    if (!categoryKeyCount.has(key)) {
+                      categoryKeyCount.set(key, { count: 0, items: [] })
+                    }
+                    const entry = categoryKeyCount.get(key)!
+                    entry.count++
+                    entry.items.push({ ...item, rowIndex: index + 2 })
+                  })
+
+                  const duplicates: string[] = []
+                  categoryKeyCount.forEach((entry, key) => {
+                    if (entry.count > 1) {
+                      const itemInfo = entry.items.map(item =>
+                        `  행 ${item.rowIndex}: ${item.category_1 || ''}-${item.category_2 || ''} (id: ${item.id || '없음'})`
+                      ).join('\n')
+                      duplicates.push(`카테고리 "${key}" - ${entry.count}개 중복:\n${itemInfo}`)
+                    }
+                  })
+
+                  if (duplicates.length > 0) {
+                    console.error('❌ 중복된 카테고리 발견:', duplicates)
+                    showToast(`엑셀 파일에 중복된 카테고리가 ${duplicates.length}개 있습니다. 수정 후 다시 업로드하세요.`, 'error')
+                    alert(`❌ 중복된 카테고리 발견\n\n${duplicates.join('\n\n')}\n\n엑셀 파일을 수정한 후 다시 업로드하세요.`)
+                    return
+                  }
+
+                  // id가 DB에 실제로 존재하는지 확인하여 분리
+                  const dataWithId = dataToUpsert.filter((item: any) => item.id && existingIdSet.has(item.id))
+                  const dataWithoutId = dataToUpsert.filter((item: any) => !item.id || !existingIdSet.has(item.id))
+                    .map((item: any) => {
+                      const { id: _removed, ...itemWithoutId } = item
+                      return itemWithoutId
+                    })
+
+                  console.log('📦 DB에 존재하는 id (업데이트):', dataWithId.length)
+                  console.log('📦 DB에 없는 데이터 (신규 추가):', dataWithoutId.length)
+
+                  // 추가/수정/변경없음 분류
+                  const added: string[] = []
+                  const updated: string[] = []
+                  const unchanged: string[] = []
+
+                  dataWithoutId.forEach((row: any) => {
+                    const label = `${row.expense_type || ''} > ${row.category_1 || ''} > ${row.category_2 || ''}`
+                    added.push(label)
+                  })
+
+                  dataWithId.forEach((row: any) => {
+                    const key = `${row.expense_type || ''}|${row.category_1 || ''}|${row.category_2 || ''}|${row.category_3 || ''}|${row.category_4 || ''}|${row.category_5 || ''}`
+                    const existing = existingDataMap.get(key)
+                    const label = `${row.expense_type || ''} > ${row.category_1 || ''} > ${row.category_2 || ''}`
+
+                    if (existing) {
+                      let hasChanges = false
+                      for (const k in row) {
+                        if (k === 'updated_at' || k === 'created_at') continue
+                        if (JSON.stringify(row[k]) !== JSON.stringify(existing[k])) {
+                          hasChanges = true
+                          break
+                        }
+                      }
+                      if (hasChanges) {
+                        updated.push(label)
+                      } else {
+                        unchanged.push(label)
+                      }
+                    }
+                  })
+
+                  // 엑셀에 없는 기존 데이터도 변경없음에 추가
+                  const uploadKeys = new Set(dataToUpsert.map((row: any) => `${row.expense_type || ''}|${row.category_1 || ''}|${row.category_2 || ''}|${row.category_3 || ''}|${row.category_4 || ''}|${row.category_5 || ''}`))
+                  existingData?.forEach(d => {
+                    const key = `${d.expense_type || ''}|${d.category_1 || ''}|${d.category_2 || ''}|${d.category_3 || ''}|${d.category_4 || ''}|${d.category_5 || ''}`
+                    if (!uploadKeys.has(key)) {
+                      const label = `${d.expense_type || ''} > ${d.category_1 || ''} > ${d.category_2 || ''}`
+                      unchanged.push(label)
+                    }
+                  })
+
+                  // 1. id가 있는 데이터 업데이트
+                  if (dataWithId.length > 0) {
+                    const { error: updateError } = await supabase
+                      .from('category_settings')
+                      .upsert(dataWithId, { onConflict: 'id' })
+
+                    if (updateError) {
+                      console.error('기존 데이터 업데이트 실패:', updateError)
+                      showToast('업로드 중 오류가 발생했습니다.', 'error')
+                      return
+                    }
+                  }
+
+                  // 2. id가 없는 데이터 신규 추가
+                  if (dataWithoutId.length > 0) {
+                    const { error: insertError } = await supabase
+                      .from('category_settings')
+                      .insert(dataWithoutId)
+
+                    if (insertError) {
+                      console.error('신규 데이터 추가 실패:', insertError)
+                      showToast('업로드 중 오류가 발생했습니다.', 'error')
+                      return
+                    }
+                  }
+
+                  showToast('병합 완료!', 'success')
+                  await fetchCategories()
+                  setExcelUploadModal(null)
+
+                  // 결과 모달 표시
+                  setUploadResultModal({
+                    type: 'merge',
+                    originalCount: existingData?.length || 0,
+                    uploadCount: excelUploadModal.data.length,
+                    added,
+                    updated,
+                    deleted: [],
+                    unchanged
+                  })
+                }}
+                className="w-full px-4 py-3 text-left border-2 border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                <div className="font-semibold text-blue-600">병합</div>
+                <div className="text-xs text-gray-600 mt-1">기존 데이터를 유지하면서 업데이트하거나 새 데이터를 추가합니다.</div>
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

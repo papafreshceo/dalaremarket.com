@@ -1,25 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText, Search, Plus, FileSpreadsheet, Truck, MessageSquare, MoreHorizontal, RefreshCw } from 'lucide-react';
+import { FileText, Search, Plus, FileSpreadsheet, MessageSquare, MoreHorizontal, RefreshCw } from 'lucide-react';
 import SearchTab from './components/SearchTab';
 import InputTab from './components/InputTab';
 import ExcelTab from './components/ExcelTab';
-import ShippingTab from './components/ShippingTab';
 import CSTab from './components/CSTab';
 import EtcTab from './components/EtcTab';
 
-type Tab = 'search' | 'input' | 'excel' | 'shipping' | 'cs' | 'etc';
+type Tab = 'search' | 'input' | 'excel' | 'cs' | 'etc';
 
 export default function OrderIntegrationPage() {
   const [activeTab, setActiveTab] = useState<Tab>('search');
   const [tabKey, setTabKey] = useState(0);
 
   const tabs = [
-    { id: 'search' as Tab, label: '주문조회', icon: Search, color: '#2563eb' },
-    { id: 'input' as Tab, label: '주문입력', icon: Plus, color: '#10b981' },
+    { id: 'search' as Tab, label: '주문통합관리', icon: Search, color: '#2563eb' },
+    { id: 'input' as Tab, label: '주문접수', icon: Plus, color: '#10b981' },
     { id: 'excel' as Tab, label: '주문통합(Excel)', icon: FileSpreadsheet, color: '#f59e0b' },
-    { id: 'shipping' as Tab, label: '발송관리', icon: Truck, color: '#8b5cf6' },
     { id: 'cs' as Tab, label: 'CS', icon: MessageSquare, color: '#ef4444' },
     { id: 'etc' as Tab, label: '기타', icon: MoreHorizontal, color: '#6b7280' },
   ];
@@ -32,7 +30,7 @@ export default function OrderIntegrationPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* 헤더 - sticky */}
-      <header className="sticky top-0 bg-white dark:bg-[#2d2d30] border-b border-gray-200 dark:border-gray-700" style={{ zIndex: 100 }}>
+      <header className="sticky top-0 bg-white dark:bg-[#2d2d30] border-b border-gray-200 dark:border-gray-700" style={{ zIndex: 40 }}>
         <div className="px-6 py-4">
           {/* 타이틀 */}
           <div className="flex items-center gap-3 mb-4">
@@ -101,7 +99,6 @@ export default function OrderIntegrationPage() {
         {activeTab === 'search' && <SearchTab key={`search-${tabKey}`} />}
         {activeTab === 'input' && <InputTab key={`input-${tabKey}`} />}
         {activeTab === 'excel' && <ExcelTab key={`excel-${tabKey}`} />}
-        {activeTab === 'shipping' && <ShippingTab key={`shipping-${tabKey}`} />}
         {activeTab === 'cs' && <CSTab key={`cs-${tabKey}`} />}
         {activeTab === 'etc' && <EtcTab key={`etc-${tabKey}`} />}
       </main>

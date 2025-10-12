@@ -92,9 +92,12 @@ export default function OptionProductsManagementPage() {
   // 엑셀 업로드 결과 모달
   const [uploadResultModal, setUploadResultModal] = useState<{
     type: 'replace' | 'merge'
-    added: string[]
-    updated: string[]
-    unchanged: string[]
+    originalCount: number  // 기존 옵션상품 수
+    uploadCount: number    // 업로드한 파일의 옵션상품 수
+    added: string[]        // 추가된 상품 목록
+    updated: string[]      // 변경된 상품 목록
+    deleted: string[]      // 삭제된 상품 목록
+    unchanged: string[]    // 변경없는 상품 목록
   } | null>(null)
 
   const [vendorPartners, setVendorPartners] = useState<Array<{id: string, name: string}>>([])
@@ -1204,7 +1207,21 @@ export default function OptionProductsManagementPage() {
                   const workbook = XLSX.read(data, { type: 'binary', cellDates: true })
                   const sheetName = workbook.SheetNames[0]
                   const worksheet = workbook.Sheets[sheetName]
-                  const jsonData = XLSX.utils.sheet_to_json(worksheet)
+
+                  // 엑셀 시트의 범위 확인
+                  const range = worksheet['!ref']
+                  console.log('📄 엑셀 시트 범위:', range)
+
+                  const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: null })
+
+                  console.log('📊 엑셀 원본 데이터 개수:', jsonData.length)
+
+                  // 빈 행이나 모든 셀이 비어있는 행 확인
+                  const emptyRows = jsonData.filter((row: any) => {
+                    const values = Object.values(row)
+                    return values.every(v => v === null || v === undefined || v === '')
+                  })
+                  console.log('⚠️ 완전히 빈 행 개수:', emptyRows.length)
 
                   // 추가 필드 역매핑 (FIELD_LABELS에 없는 필드들)
                   const additionalReverseMapping: Record<string, string> = {
@@ -1262,6 +1279,8 @@ export default function OptionProductsManagementPage() {
                   // (다운로드 시 이미 가상 필드를 제거했으므로 추가 필터링 불필요)
                   const dbFields = Object.keys(convertedData[0] || {})
 
+                  console.log('🔄 한글→영문 변환 후 데이터 개수:', convertedData.length)
+
                   // vendor_name 필드 제거 및 데이터 정제
                   const cleanData = convertedData.map((row: any) => {
                     const { vendor_name, ...rest } = row
@@ -1317,6 +1336,8 @@ export default function OptionProductsManagementPage() {
 
                     return normalizedRow
                   })
+
+                  console.log('✅ 최종 cleanData 개수:', cleanData.length)
 
                   // 모달 열기 (교체/병합 선택)
                   setExcelUploadModal({ data: cleanData, mode: null })
@@ -1843,34 +1864,55 @@ export default function OptionProductsManagementPage() {
           size="lg"
         >
           <div className="space-y-4">
+            {/* 기본 통계 */}
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">기존 옵션상품:</span>
+                  <span className="ml-2 font-semibold text-gray-900 dark:text-gray-100">{uploadResultModal.originalCount}개</span>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">업로드 파일:</span>
+                  <span className="ml-2 font-semibold text-gray-900 dark:text-gray-100">{uploadResultModal.uploadCount}개</span>
+                </div>
+              </div>
+            </div>
+
             {uploadResultModal.type === 'replace' && (
-              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 mb-4">
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
                 <p className="text-xs text-orange-600 dark:text-orange-400">
                   <strong>교체 모드:</strong> 엑셀 파일의 데이터로 완전히 교체했습니다. 엑셀에 없는 옵션상품은 삭제되었습니다.
                 </p>
               </div>
             )}
             {uploadResultModal.type === 'merge' && (
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
                 <p className="text-xs text-blue-600 dark:text-blue-400">
                   <strong>병합 모드:</strong> 기존 데이터를 유지하면서 엑셀 데이터를 추가/수정했습니다.
                 </p>
               </div>
             )}
 
-            <div className={`grid ${uploadResultModal.type === 'merge' ? 'grid-cols-3' : 'grid-cols-2'} gap-4 text-center`}>
-              <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg">
+            {/* 변경 통계 */}
+            <div className={`grid ${uploadResultModal.type === 'merge' ? 'grid-cols-4' : 'grid-cols-3'} gap-3 text-center`}>
+              <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
                 <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{uploadResultModal.added.length}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">추가</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">추가</div>
               </div>
-              <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-lg">
+              <div className="bg-green-500/10 border border-green-500/20 p-3 rounded-lg">
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">{uploadResultModal.updated.length}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">수정</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">수정</div>
               </div>
+              {uploadResultModal.type === 'replace' && (
+                <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg">
+                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">{uploadResultModal.deleted.length}</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">삭제</div>
+                </div>
+              )}
               {uploadResultModal.type === 'merge' && (
-                <div className="bg-gray-500/10 border border-gray-500/20 p-4 rounded-lg">
+                <div className="bg-gray-500/10 border border-gray-500/20 p-3 rounded-lg">
                   <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{uploadResultModal.unchanged.length}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">변경없음</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">변경없음</div>
                 </div>
               )}
             </div>
@@ -1908,6 +1950,19 @@ export default function OptionProductsManagementPage() {
                   <ul className="text-xs space-y-1 text-gray-700 dark:text-gray-300">
                     {uploadResultModal.unchanged.map((name, idx) => (
                       <li key={idx}>• {name}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {uploadResultModal.deleted.length > 0 && uploadResultModal.type === 'replace' && (
+              <div>
+                <div className="font-semibold text-red-600 dark:text-red-400 mb-2">삭제된 옵션상품 ({uploadResultModal.deleted.length}개)</div>
+                <div className="max-h-40 overflow-auto bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                  <ul className="text-xs space-y-1 text-gray-700 dark:text-gray-300">
+                    {uploadResultModal.deleted.map((code, idx) => (
+                      <li key={idx}>• {code}</li>
                     ))}
                   </ul>
                 </div>
@@ -2012,27 +2067,195 @@ export default function OptionProductsManagementPage() {
                   })
 
                   // 1. upsert로 데이터 업데이트/추가
+                  // 기존 데이터 조회하여 id 매핑
+                  const { data: existingProducts } = await supabase.from('option_products').select('id, option_code')
+                  const existingMap = new Map(existingProducts?.map(p => [String(p.option_code).trim(), p.id]) || [])
+                  const existingIdSet = new Set(existingProducts?.map(p => p.id) || [])  // 기존 id 목록
+
+                  console.log('기존 데이터 수:', existingProducts?.length)
+                  console.log('업로드할 데이터 수:', excelUploadModal.data.length)
+                  console.log('기존 option_code 샘플:', Array.from(existingMap.keys()).slice(0, 5))
+                  console.log('기존 id 개수:', existingIdSet.size)
+
                   // 벤더사 이름을 ID로 변환
-                  const dataToUpsert = excelUploadModal.data.map((row: any) => {
-                    let shippingVendorId = row.shipping_vendor_id
-                    if (shippingVendorId && typeof shippingVendorId === 'string') {
-                      const vendor = vendorPartners.find(v => v.name === shippingVendorId)
-                      if (vendor) {
-                        shippingVendorId = vendor.id
+                  const dataToUpsert = excelUploadModal.data
+                    .filter((row: any) => {
+                      // option_code가 없는 행은 제외
+                      if (!row.option_code || String(row.option_code).trim() === '') {
+                        console.warn('option_code가 없는 행 제외:', row.option_name)
+                        return false
                       }
-                    }
-                    return {
-                      ...row,
-                      shipping_vendor_id: shippingVendorId || null
-                    }
-                  })
-                  const { error: upsertError } = await supabase.from('option_products').upsert(dataToUpsert, { onConflict: 'id' })
-                  if (upsertError) {
-                    console.error(upsertError)
+                      return true
+                    })
+                    .map((row: any) => {
+                      let shippingVendorId = row.shipping_vendor_id
+                      if (shippingVendorId && typeof shippingVendorId === 'string') {
+                        const vendor = vendorPartners.find(v => v.name === shippingVendorId)
+                        if (vendor) {
+                          shippingVendorId = vendor.id
+                        }
+                      }
+
+                      // option_code로 기존 데이터의 id를 찾아서 사용
+                      const optionCode = String(row.option_code).trim()
+                      const excelId = row.id // 엑셀의 원본 id
+
+                      // id 제외하고 데이터 복사
+                      const { id: _ignoredId, ...rowWithoutId } = row
+                      const result: any = {
+                        ...rowWithoutId,
+                        option_code: optionCode, // 정규화된 option_code 사용
+                        shipping_vendor_id: shippingVendorId || null
+                      }
+
+                      // 1. 엑셀의 id가 유효하면 사용
+                      if (excelId && String(excelId).trim() !== '' && excelId !== 'null' && excelId !== 'undefined') {
+                        result.id = excelId
+                        console.log(`✅ 엑셀 id 사용: ${optionCode} → id:${excelId}`)
+                      }
+                      // 2. 엑셀 id가 없으면 DB에서 option_code로 찾기
+                      else if (existingMap.has(optionCode)) {
+                        result.id = existingMap.get(optionCode)
+                        console.log(`🔄 DB 매핑: ${optionCode} → id:${result.id} (엑셀id: ${excelId})`)
+                      }
+                      // 3. 둘 다 없으면 신규
+                      else {
+                        console.log(`🆕 신규 데이터: ${optionCode} (엑셀id: ${excelId})`)
+                      }
+
+                      return result
+                    })
+
+                  console.log('처리할 데이터 수:', dataToUpsert.length)
+
+                  if (dataToUpsert.length === 0) {
+                    showToast('업로드할 유효한 데이터가 없습니다. option_code를 확인하세요.', 'error')
                     return
                   }
 
-                  // 2. 엑셀에 없는 데이터만 삭제
+                  // 최종 검증: id가 명시적으로 null이거나 빈 문자열인지 확인 (undefined는 OK - 신규 데이터)
+                  const dataWithInvalidId = dataToUpsert.filter((item: any) => {
+                    // id 속성이 존재하고, 값이 null이거나 빈 문자열인 경우만 에러
+                    if (item.hasOwnProperty('id') && (item.id === null || item.id === '')) {
+                      console.error('❌ id가 null/빈값:', item.option_code, item.option_name, 'id:', item.id)
+                      return true
+                    }
+                    return false
+                  })
+
+                  if (dataWithInvalidId.length > 0) {
+                    showToast(`id가 null/빈값인 데이터 ${dataWithInvalidId.length}개 발견. 콘솔을 확인하세요.`, 'error')
+                    console.error('❌ invalid id 데이터:', dataWithInvalidId)
+                    return
+                  }
+
+                  // 신규와 기존 데이터 분리
+                  const dataWithIds = dataToUpsert.filter((item: any) => item.id)
+                  const dataWithoutIds = dataToUpsert.filter((item: any) => !item.id)
+
+                  console.log('✅ 기존 데이터:', dataWithIds.length, '신규 데이터:', dataWithoutIds.length)
+                  console.log('샘플 - 기존:', dataWithIds.slice(0, 3).map(d => ({ name: d.option_name, code: d.option_code, id: d.id })))
+                  console.log('샘플 - 신규:', dataWithoutIds.slice(0, 3).map(d => ({ name: d.option_name, code: d.option_code })))
+
+                  // option_code 중복 검사 (중복이 있으면 업로드 중단)
+                  const optionCodeCount = new Map<string, { count: number, items: any[] }>()
+
+                  // 중복 체크
+                  dataToUpsert.forEach((item: any, index: number) => {
+                    const code = item.option_code
+                    if (!optionCodeCount.has(code)) {
+                      optionCodeCount.set(code, { count: 0, items: [] })
+                    }
+                    const entry = optionCodeCount.get(code)!
+                    entry.count++
+                    entry.items.push({ ...item, rowIndex: index + 2 }) // 엑셀 행 번호 (헤더 포함)
+                  })
+
+                  // 중복된 항목 찾기
+                  const duplicates: string[] = []
+                  optionCodeCount.forEach((entry, code) => {
+                    if (entry.count > 1) {
+                      const itemInfo = entry.items.map(item =>
+                        `  행 ${item.rowIndex}: ${item.option_name} (id: ${item.id || '없음'})`
+                      ).join('\n')
+                      duplicates.push(`옵션코드 "${code}" - ${entry.count}개 중복:\n${itemInfo}`)
+                    }
+                  })
+
+                  if (duplicates.length > 0) {
+                    console.error('❌ 중복된 option_code 발견:', duplicates)
+                    showToast(`엑셀 파일에 중복된 옵션코드가 ${duplicates.length}개 있습니다. 수정 후 다시 업로드하세요.`, 'error')
+
+                    // 중복 상세 정보를 모달로 표시
+                    const duplicateDetails = duplicates.map(d => d.split('\n')[0]).join('\n')
+                    alert(`❌ 중복된 옵션코드 발견\n\n${duplicates.join('\n\n')}\n\n엑셀 파일을 수정한 후 다시 업로드하세요.`)
+                    return
+                  }
+
+                  console.log(`📤 전체 ${dataToUpsert.length}개 데이터를 업로드...`)
+
+                  // id가 DB에 실제로 존재하는지 확인하여 분리
+                  const dataWithId = dataToUpsert.filter((item: any) => item.id && existingIdSet.has(item.id))
+                  const dataWithoutId = dataToUpsert.filter((item: any) => !item.id || !existingIdSet.has(item.id))
+                    .map((item: any) => {
+                      // id가 없거나, DB에 없는 id면 제거
+                      const { id: _removed, ...itemWithoutId } = item
+                      return itemWithoutId
+                    })
+
+                  console.log('📦 DB에 존재하는 id (업데이트):', dataWithId.length)
+                  console.log('📦 DB에 없는 데이터 (신규 추가):', dataWithoutId.length)
+
+                  // 새로운 id가 포함된 항목 로그
+                  const newIdsInExcel = dataToUpsert.filter((item: any) => item.id && !existingIdSet.has(item.id))
+                  if (newIdsInExcel.length > 0) {
+                    console.log(`ℹ️ 엑셀에 있지만 DB에 없는 id: ${newIdsInExcel.length}개 (신규 추가로 처리)`)
+                    console.log('샘플:', newIdsInExcel.slice(0, 3).map(d => ({ name: d.option_name, code: d.option_code, id: d.id })))
+                  }
+
+                  // 1. id 있는 데이터 업데이트 (id 기준으로 upsert)
+                  let updateCount = 0
+                  let addCount = 0
+
+                  if (dataWithId.length > 0) {
+                    const { error: updateError } = await supabase
+                      .from('option_products')
+                      .upsert(dataWithId, {
+                        onConflict: 'id',
+                        ignoreDuplicates: false
+                      })
+
+                    if (updateError) {
+                      console.error('❌ 업데이트 실패:', JSON.stringify(updateError, null, 2))
+                      showToast('업데이트 실패: ' + updateError.message, 'error')
+                      return
+                    }
+                    updateCount = dataWithId.length
+                    console.log(`✅ ${dataWithId.length}개 업데이트 완료`)
+                  }
+
+                  // 2. id 없는 데이터 신규 추가 (insert)
+                  if (dataWithoutId.length > 0) {
+                    const { error: insertError } = await supabase
+                      .from('option_products')
+                      .insert(dataWithoutId)
+
+                    if (insertError) {
+                      console.error('❌ 신규 추가 실패:', JSON.stringify(insertError, null, 2))
+                      showToast('신규 추가 실패: ' + insertError.message, 'error')
+                      return
+                    }
+                    addCount = dataWithoutId.length
+                    console.log(`✅ ${dataWithoutId.length}개 신규 추가 완료`)
+                  }
+
+
+                  // 3. 엑셀에 없는 데이터 확인 및 삭제
+                  const uploadedCodes = new Set(dataToUpsert.map(d => d.option_code))
+                  const deletedProducts = existingProducts?.filter(p => !uploadedCodes.has(p.option_code)) || []
+
+                  console.log(`🗑️ 삭제 대상: ${deletedProducts.length}개`)
+
                   const { error: deleteError } = await supabase
                     .from('option_products')
                     .delete()
@@ -2046,10 +2269,17 @@ export default function OptionProductsManagementPage() {
                   setExcelUploadModal(null)
 
                   // 결과 모달 표시
+                  const addedList = dataWithoutId.map((d: any) => `${d.option_name} (${d.option_code})`)
+                  const updatedList = dataWithId.map((d: any) => `${d.option_name} (${d.option_code})`)
+                  const deletedList = deletedProducts.map(d => `${d.option_code}`)
+
                   setUploadResultModal({
                     type: 'replace',
-                    added,
-                    updated,
+                    originalCount: existingProducts?.length || 0,
+                    uploadCount: excelUploadModal.data.length,
+                    added: addedList,
+                    updated: updatedList,
+                    deleted: deletedList,
                     unchanged: []
                   })
                 }}
@@ -2138,28 +2368,122 @@ export default function OptionProductsManagementPage() {
                   })
 
                   // upsert
+                  // 기존 데이터에서 id 매핑
+                  const existingMap2 = new Map(existingData?.map(d => [d.option_code, d.id]) || [])
+
+                  console.log('기존 데이터 수:', existingData?.length)
+                  console.log('업로드할 데이터 수:', excelUploadModal.data.length)
+
                   // 벤더사 이름을 ID로 변환
-                  const dataToUpsert = excelUploadModal.data.map((row: any) => {
-                    let shippingVendorId = row.shipping_vendor_id
-                    if (shippingVendorId && typeof shippingVendorId === 'string') {
-                      const vendor = vendorPartners.find(v => v.name === shippingVendorId)
-                      if (vendor) {
-                        shippingVendorId = vendor.id
+                  const dataToUpsert = excelUploadModal.data
+                    .filter((row: any) => {
+                      // option_code가 없는 행은 제외
+                      if (!row.option_code || String(row.option_code).trim() === '') {
+                        console.warn('option_code가 없는 행 제외:', row.option_name)
+                        return false
                       }
+                      return true
+                    })
+                    .map((row: any) => {
+                      let shippingVendorId = row.shipping_vendor_id
+                      if (shippingVendorId && typeof shippingVendorId === 'string') {
+                        const vendor = vendorPartners.find(v => v.name === shippingVendorId)
+                        if (vendor) {
+                          shippingVendorId = vendor.id
+                        }
+                      }
+
+                      // option_code로 기존 데이터의 id를 찾아서 사용
+                      const optionCode = String(row.option_code).trim()
+
+                      // id 제외하고 데이터 복사
+                      const { id: _ignoredId, ...rowWithoutId } = row
+                      const result: any = {
+                        ...rowWithoutId,
+                        shipping_vendor_id: shippingVendorId || null
+                      }
+
+                      // 기존 데이터면 id 설정
+                      if (existingMap2.has(optionCode)) {
+                        result.id = existingMap2.get(optionCode)
+                      }
+                      // 신규 데이터는 id 없음 (DB가 자동 생성)
+
+                      return result
+                    })
+
+                  console.log('처리할 데이터 수:', dataToUpsert.length)
+
+                  if (dataToUpsert.length === 0) {
+                    showToast('업로드할 유효한 데이터가 없습니다. option_code를 확인하세요.', 'error')
+                    return
+                  }
+
+                  // 최종 검증: id가 명시적으로 null이거나 빈 문자열인지 확인 (undefined는 OK - 신규 데이터)
+                  const dataWithInvalidId = dataToUpsert.filter((item: any) => {
+                    // id 속성이 존재하고, 값이 null이거나 빈 문자열인 경우만 에러
+                    if (item.hasOwnProperty('id') && (item.id === null || item.id === '')) {
+                      console.error('❌ id가 null/빈값:', item.option_code, item.option_name, 'id:', item.id)
+                      return true
                     }
-                    return {
-                      ...row,
-                      shipping_vendor_id: shippingVendorId || null
+                    return false
+                  })
+
+                  if (dataWithInvalidId.length > 0) {
+                    showToast(`id가 null/빈값인 데이터 ${dataWithInvalidId.length}개 발견. 콘솔을 확인하세요.`, 'error')
+                    console.error('❌ invalid id 데이터:', dataWithInvalidId)
+                    return
+                  }
+
+                  // option_code 중복 검사 (중복이 있으면 업로드 중단)
+                  const optionCodeCount = new Map<string, { count: number, items: any[] }>()
+
+                  // 중복 체크
+                  dataToUpsert.forEach((item: any, index: number) => {
+                    const code = item.option_code
+                    if (!optionCodeCount.has(code)) {
+                      optionCodeCount.set(code, { count: 0, items: [] })
+                    }
+                    const entry = optionCodeCount.get(code)!
+                    entry.count++
+                    entry.items.push({ ...item, rowIndex: index + 2 }) // 엑셀 행 번호 (헤더 포함)
+                  })
+
+                  // 중복된 항목 찾기
+                  const duplicates: string[] = []
+                  optionCodeCount.forEach((entry, code) => {
+                    if (entry.count > 1) {
+                      const itemInfo = entry.items.map(item =>
+                        `  행 ${item.rowIndex}: ${item.option_name} (id: ${item.id || '없음'})`
+                      ).join('\n')
+                      duplicates.push(`옵션코드 "${code}" - ${entry.count}개 중복:\n${itemInfo}`)
                     }
                   })
+
+                  if (duplicates.length > 0) {
+                    console.error('❌ 중복된 option_code 발견:', duplicates)
+                    showToast(`엑셀 파일에 중복된 옵션코드가 ${duplicates.length}개 있습니다. 수정 후 다시 업로드하세요.`, 'error')
+
+                    // 중복 상세 정보를 모달로 표시
+                    alert(`❌ 중복된 옵션코드 발견\n\n${duplicates.join('\n\n')}\n\n엑셀 파일을 수정한 후 다시 업로드하세요.`)
+                    return
+                  }
+
+                  console.log('✅ 업로드 직전 데이터 샘플:', dataToUpsert.slice(0, 3).map(d => ({
+                    option_code: d.option_code,
+                    option_name: d.option_name,
+                    id: d.id,
+                    hasId: d.hasOwnProperty('id')
+                  })))
+
                   const { error } = await supabase
                     .from('option_products')
                     .upsert(dataToUpsert, {
-                      onConflict: 'id',
                       ignoreDuplicates: false
                     })
                   if (error) {
                     console.error(error)
+                    showToast('업로드 중 오류가 발생했습니다: ' + error.message, 'error')
                   } else {
                     await fetchProducts()
                     setExcelUploadModal(null)
@@ -2167,8 +2491,11 @@ export default function OptionProductsManagementPage() {
                     // 결과 모달 표시
                     setUploadResultModal({
                       type: 'merge',
+                      originalCount: existingData?.length || 0,
+                      uploadCount: excelUploadModal.data.length,
                       added,
                       updated,
+                      deleted: [],  // 병합 모드는 삭제 없음
                       unchanged
                     })
                   }

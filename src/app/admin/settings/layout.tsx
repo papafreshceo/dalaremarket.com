@@ -76,6 +76,11 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           title: '알림 설정',
           description: '이메일 및 SMS 알림',
           href: '/admin/settings/notifications'
+        },
+        {
+          title: '챗봇 설정',
+          description: 'AI 챗봇 관리 및 설정',
+          href: '/admin/settings/chatbot'
         }
       ]
     },

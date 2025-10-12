@@ -10,6 +10,7 @@ interface UploadedOrder {
   id?: number;
   _optionNameModified?: boolean;  // 옵션명 수정 여부
   _optionNameInDB?: boolean;      // DB에 옵션명 존재 여부
+  _optionNameVerified?: boolean;  // 옵션명 검증 완료 여부
   match_status?: 'matched' | 'unmatched';
   field_1?: string;  // 마켓명
   field_2?: string;  // 연번
@@ -116,6 +117,9 @@ export default function ExcelTab() {
   const [showResultModal, setShowResultModal] = useState(false);
   const [resultMessage, setResultMessage] = useState({ title: '', content: '' });
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
+  const [showBatchEditModal, setShowBatchEditModal] = useState(false);
+  const [batchEditData, setBatchEditData] = useState<Record<string, string>>({});
+  const [recommendedOptions, setRecommendedOptions] = useState<Record<string, string[]>>({});
 
   // 옵션상품, 마켓 템플릿, 표준 필드 로드
   useEffect(() => {
@@ -213,22 +217,24 @@ export default function ExcelTab() {
                 column.renderer = (value: any, row: any, rowIndex: number, _dropdownHandler?: any) => {
                   const isModified = row?._optionNameModified;
                   const isInDB = row?._optionNameInDB;
+                  const isVerified = row?._optionNameVerified; // 검증 통과 여부
                   const displayValue = value ?? '';
 
                   return (
                     <div className="relative flex items-center" style={{ fontSize: '13px' }}>
                       <span>{String(displayValue)}</span>
-                      {!isInDB && !isModified && <span className="ml-1">⚠️</span>}
-                      {isModified && <span className="ml-1">✏️</span>}
+                      {!isInDB && !isModified && !isVerified && <span className="ml-1">⚠️</span>}
+                      {isModified && !isVerified && <span className="ml-1" style={{ color: '#16a34a' }}>✏️</span>}
+                      {isVerified && <span className="ml-1" style={{ color: '#16a34a' }}>✓</span>}
                     </div>
                   );
                 };
 
                 column.cellStyle = (value: any, row: any) => {
-                  if (!row?._optionNameInDB && !row?._optionNameModified) {
+                  if (!row?._optionNameInDB && !row?._optionNameModified && !row?._optionNameVerified) {
                     return { backgroundColor: '#FED7AA' }; // 주황색 배경
                   }
-                  if (row?._optionNameModified) {
+                  if (row?._optionNameModified || row?._optionNameVerified) {
                     return { backgroundColor: '#BBF7D0' }; // 초록색 배경
                   }
                   return {};
@@ -882,47 +888,52 @@ export default function ExcelTab() {
     return '전화주문';
   };
 
-  // 옵션명 매칭 실행
+  // 옵션명 검증 실행
   const handleApplyProductMatching = async () => {
     if (orders.length === 0) {
-      alert('매칭할 주문 데이터가 없습니다.\n\n먼저 엑셀 파일을 업로드하세요.');
+      toast.error('검증할 주문 데이터가 없습니다.', {
+        duration: 3000,
+        position: 'top-center',
+      });
       return;
     }
 
     setLoading(true);
     try {
-      // 옵션상품 데이터 로드 (캐시가 없는 경우)
-      let productMap = optionProducts;
-      if (productMap.size === 0) {
-        await loadOptionProducts();
-        productMap = optionProducts;
-      }
+      console.log('검증 시작 - 주문 수:', orders.length, '옵션상품 수:', optionProducts.size);
 
-      console.log('매칭 시작 - 주문 수:', orders.length, '옵션상품 수:', productMap.size);
+      // field_11이 옵션명
+      const ordersWithMapping = orders.map((order) => {
+        const optionName = order.field_11;
 
-      // 옵션상품 매칭 적용
-      const ordersWithMapping = orders.map((order, index) => {
-        if (!order.option_name) {
-          console.log(`[${index}] 옵션명 없음`);
-          return { ...order, match_status: 'unmatched' as const };
-        }
-
-        const trimmedOption = order.option_name.trim().toLowerCase();
-        const product = productMap.get(trimmedOption);
-
-        if (product) {
-          console.log(`[${index}] 매칭 성공: "${order.option_name}" → ${product.vendor_name}`);
+        if (!optionName || optionName.trim() === '') {
           return {
             ...order,
-            vendor_name: order.vendor_name || product.vendor_name,
-            seller_supply_price:
-              order.seller_supply_price ||
-              (product.seller_supply_price ? product.seller_supply_price * order.quantity : undefined),
+            match_status: 'unmatched' as const,
+            _optionNameInDB: false,
+            _optionNameVerified: false
+          };
+        }
+
+        const trimmedOption = optionName.trim().toLowerCase();
+        const product = optionProducts.get(trimmedOption);
+
+        if (product) {
+          // 옵션상품 매핑 적용
+          const mappedOrder = mapOptionProductToOrder(order, product);
+          return {
+            ...mappedOrder,
             match_status: 'matched' as const,
+            _optionNameInDB: true,
+            _optionNameVerified: true  // 검증 통과 시 verified 플래그 설정
           };
         } else {
-          console.log(`[${index}] 매칭 실패: "${order.option_name}" (검색키: "${trimmedOption}")`);
-          return { ...order, match_status: 'unmatched' as const };
+          return {
+            ...order,
+            match_status: 'unmatched' as const,
+            _optionNameInDB: false,
+            _optionNameVerified: false
+          };
         }
       });
 
@@ -932,23 +943,51 @@ export default function ExcelTab() {
       const matchedCount = ordersWithMapping.filter((o) => o.match_status === 'matched').length;
       const unmatchedCount = ordersWithMapping.filter((o) => o.match_status === 'unmatched').length;
 
+      // 수정된 항목 중 매칭 성공/실패 카운트
+      const modifiedMatched = ordersWithMapping.filter((o) => o._optionNameModified && o.match_status === 'matched').length;
+      const modifiedUnmatched = ordersWithMapping.filter((o) => o._optionNameModified && o.match_status === 'unmatched').length;
+
       setStats({
         total: ordersWithMapping.length,
         matched: matchedCount,
         unmatched: unmatchedCount,
       });
 
-      alert(
-        `옵션명 검증 완료\n\n` +
-          `✓ 검증 성공: ${matchedCount}개\n` +
-          `✗ 검증 실패: ${unmatchedCount}개\n\n` +
-          (unmatchedCount > 0
-            ? `검증 실패한 옵션명은 출고 정보가 자동으로 입력되지 않았습니다.`
-            : `모든 주문의 출고 정보가 자동으로 입력되었습니다!`)
-      );
+      // 검증 결과 모달 표시
+      let content = `총 ${ordersWithMapping.length}개 주문\n\n`;
+      content += `✓ 매칭 성공: ${matchedCount}개\n`;
+      content += `✗ 매칭 실패: ${unmatchedCount}개\n`;
+
+      if (modifiedMatched > 0 || modifiedUnmatched > 0) {
+        content += `\n📝 수정된 옵션명:\n`;
+        if (modifiedMatched > 0) {
+          content += `  ✓ 매칭 성공: ${modifiedMatched}개\n`;
+        }
+        if (modifiedUnmatched > 0) {
+          content += `  ✗ 여전히 매칭 실패: ${modifiedUnmatched}개\n`;
+        }
+      }
+
+      content += `\n`;
+      if (unmatchedCount > 0) {
+        content += `매칭 실패한 옵션명은 출고 정보가 자동으로 입력되지 않았습니다.\n`;
+        content += `"옵션명 일괄수정" 버튼을 사용하여 수정하세요.`;
+      } else {
+        content += `✅ 모든 주문의 출고 정보가 자동으로 입력되었습니다!`;
+      }
+
+      setResultMessage({
+        title: '옵션명 검증 완료',
+        content
+      });
+      setShowResultModal(true);
+
     } catch (error) {
-      console.error('옵션명 매칭 오류:', error);
-      alert('옵션명 매칭 중 오류가 발생했습니다.');
+      console.error('옵션명 검증 오류:', error);
+      toast.error('옵션명 검증 중 오류가 발생했습니다.', {
+        duration: 3000,
+        position: 'top-center',
+      });
     } finally {
       setLoading(false);
     }
@@ -1121,6 +1160,7 @@ export default function ExcelTab() {
           ...row,
           _optionNameModified: true,
           _optionNameInDB: isInDB,
+          _optionNameVerified: false,  // 검증 전 상태
           match_status: isInDB ? 'matched' : 'unmatched'
         };
       }
@@ -1141,6 +1181,69 @@ export default function ExcelTab() {
     });
   };
 
+  // 문자열 유사도 계산 (Levenshtein Distance 기반)
+  const calculateSimilarity = (str1: string, str2: string): number => {
+    const s1 = str1.toLowerCase().trim();
+    const s2 = str2.toLowerCase().trim();
+
+    // 완전 일치
+    if (s1 === s2) return 1;
+
+    // 포함 관계 체크 (높은 점수)
+    if (s1.includes(s2) || s2.includes(s1)) {
+      return 0.8 + (Math.min(s1.length, s2.length) / Math.max(s1.length, s2.length)) * 0.2;
+    }
+
+    // Levenshtein Distance 계산
+    const matrix: number[][] = [];
+
+    for (let i = 0; i <= s2.length; i++) {
+      matrix[i] = [i];
+    }
+
+    for (let j = 0; j <= s1.length; j++) {
+      matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= s2.length; i++) {
+      for (let j = 1; j <= s1.length; j++) {
+        if (s2.charAt(i - 1) === s1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+
+    const distance = matrix[s2.length][s1.length];
+    const maxLength = Math.max(s1.length, s2.length);
+    return 1 - distance / maxLength;
+  };
+
+  // 가장 유사한 옵션명 찾기
+  const findSimilarOptions = (targetOption: string, topN: number = 5): string[] => {
+    if (!targetOption || optionProducts.size === 0) return [];
+
+    const allOptions = Array.from(optionProducts.keys());
+
+    // 각 옵션과의 유사도 계산
+    const similarities = allOptions.map(option => ({
+      option: optionProducts.get(option)!.option_name, // 원본 옵션명 (대소문자 유지)
+      score: calculateSimilarity(targetOption, option)
+    }));
+
+    // 유사도 내림차순 정렬 후 상위 N개 반환
+    return similarities
+      .sort((a, b) => b.score - a.score)
+      .slice(0, topN)
+      .filter(item => item.score > 0.3) // 유사도 30% 이상만
+      .map(item => item.option);
+  };
+
   // 행 삭제 핸들러
   const handleDeleteRows = (indices: number[]) => {
     const remainingOrders = orders.filter((_, index) => !indices.includes(index));
@@ -1155,6 +1258,141 @@ export default function ExcelTab() {
       matched: matchedCount,
       unmatched: unmatchedCount,
     });
+  };
+
+  // 옵션명 일괄수정 모달 열기
+  const handleOpenBatchEdit = () => {
+    if (orders.length === 0) {
+      toast.error('수정할 주문 데이터가 없습니다.', {
+        duration: 3000,
+        position: 'top-center',
+      });
+      return;
+    }
+
+    // 매칭 실패한 옵션명 수집 (동일한 옵션명별로 그룹화)
+    const unmatchedOptions: Record<string, number> = {};
+
+    orders.forEach(order => {
+      if (order.match_status === 'unmatched' && order.field_11) {
+        const optionName = order.field_11;
+        unmatchedOptions[optionName] = (unmatchedOptions[optionName] || 0) + 1;
+      }
+    });
+
+    if (Object.keys(unmatchedOptions).length === 0) {
+      toast.error('매칭 실패한 옵션명이 없습니다.', {
+        duration: 3000,
+        position: 'top-center',
+      });
+      return;
+    }
+
+    // batchEditData 초기화
+    const initialData: Record<string, string> = {};
+    Object.keys(unmatchedOptions).forEach(optionName => {
+      initialData[optionName] = '';
+    });
+    setBatchEditData(initialData);
+
+    // 추천 옵션명 계산
+    const recommendations: Record<string, string[]> = {};
+    Object.keys(unmatchedOptions).forEach(optionName => {
+      recommendations[optionName] = findSimilarOptions(optionName, 5);
+    });
+    setRecommendedOptions(recommendations);
+
+    setShowBatchEditModal(true);
+  };
+
+  // 옵션명 일괄수정 적용
+  const handleApplyBatchEdit = () => {
+    // 입력된 대체 옵션명이 있는지 확인
+    const hasReplacements = Object.values(batchEditData).some(v => v.trim() !== '');
+
+    if (!hasReplacements) {
+      toast.error('대체할 옵션명을 입력하세요.', {
+        duration: 3000,
+        position: 'top-center',
+      });
+      return;
+    }
+
+    console.log('🔄 일괄수정 시작, batchEditData:', batchEditData);
+
+    let modifiedCount = 0;
+
+    // 동일한 옵션명을 가진 모든 주문에 일괄 적용
+    const updatedOrders = orders.map((order, index) => {
+      const currentOption = order.field_11;
+
+      if (currentOption && batchEditData[currentOption] && batchEditData[currentOption].trim() !== '') {
+        const newOptionName = batchEditData[currentOption].trim();
+
+        console.log(`✏️ [${index}] 수정: "${currentOption}" → "${newOptionName}"`);
+
+        // 새 옵션명이 DB에 있는지 확인
+        const product = optionProducts.get(newOptionName.toLowerCase());
+
+        modifiedCount++;
+
+        const updatedOrder = {
+          ...order,
+          field_11: newOptionName,  // 먼저 field_11 업데이트
+          _optionNameModified: true,
+          _optionNameVerified: false,
+        };
+
+        if (product) {
+          // 옵션상품 매핑 적용 (검증은 하지 않음)
+          const mappedOrder = mapOptionProductToOrder(updatedOrder, product);
+          const finalOrder = {
+            ...mappedOrder,
+            field_11: newOptionName,  // 매핑 후에도 field_11 유지
+            _optionNameModified: true,
+            _optionNameInDB: true,
+            _optionNameVerified: false,
+            match_status: 'matched' as const
+          };
+          console.log(`✓ [${index}] 매핑 완료:`, finalOrder.field_11);
+          return finalOrder;
+        } else {
+          const finalOrder = {
+            ...updatedOrder,
+            _optionNameInDB: false,
+            match_status: 'unmatched' as const
+          };
+          console.log(`⚠ [${index}] 매핑 실패 (DB에 없음):`, finalOrder.field_11);
+          return finalOrder;
+        }
+      }
+
+      // 수정되지 않은 항목도 새 객체로 복사 (얕은 비교 문제 해결)
+      return { ...order };
+    });
+
+    console.log('✅ 일괄수정 완료, 수정된 주문 수:', modifiedCount);
+    console.log('📊 updatedOrders 샘플 (처음 3개):', updatedOrders.slice(0, 3).map(o => o.field_11));
+
+    setOrders(updatedOrders);
+
+    // 통계 재계산
+    const matchedCount = updatedOrders.filter((o) => o.match_status === 'matched').length;
+    const unmatchedCount = updatedOrders.filter((o) => o.match_status === 'unmatched').length;
+
+    setStats({
+      total: updatedOrders.length,
+      matched: matchedCount,
+      unmatched: unmatchedCount,
+    });
+
+    toast.success(`${modifiedCount}개 주문의 옵션명을 수정했습니다.`, {
+      duration: 3000,
+      position: 'top-center',
+    });
+
+    setShowBatchEditModal(false);
+    setBatchEditData({});
   };
 
   return (
@@ -1339,6 +1577,15 @@ export default function ExcelTab() {
                 초기화
               </button>
               <button
+                onClick={handleOpenBatchEdit}
+                disabled={loading || stats.unmatched === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400"
+                title={stats.unmatched === 0 ? '매칭 실패한 옵션명이 없습니다' : ''}
+              >
+                <AlertCircle className="w-4 h-4" />
+                옵션명 일괄수정
+              </button>
+              <button
                 onClick={handleApplyProductMatching}
                 disabled={loading}
                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400"
@@ -1352,11 +1599,12 @@ export default function ExcelTab() {
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
               >
                 <Save className="w-4 h-4" />
-                {loading ? '저장 중...' : 'DB 저장'}
+                {loading ? '등록 중...' : '주문접수등록'}
               </button>
             </div>
           </div>
           <EditableAdminGrid
+            key={orders.length + '-' + orders.filter(o => o._optionNameModified).length + '-' + orders.filter(o => o._optionNameVerified).length}
             columns={columns}
             data={orders}
             onDataChange={handleDataChange}
@@ -1378,7 +1626,7 @@ export default function ExcelTab() {
 
       {/* 통합 결과 모달 (옵션명 매칭 안내) */}
       {showResultModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">{resultMessage.title}</h3>
             <p className="text-gray-700 whitespace-pre-line mb-6">{resultMessage.content}</p>
@@ -1392,16 +1640,16 @@ export default function ExcelTab() {
         </div>
       )}
 
-      {/* DB 저장 확인 모달 */}
+      {/* 주문접수등록 확인 모달 */}
       {showSaveConfirmModal && (() => {
         const unmatchedCount = orders.filter((o) => o.match_status === 'unmatched').length;
         return (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">DB 저장 확인</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">주문접수등록 확인</h3>
               <div className="text-gray-700 mb-6">
                 <p className="mb-3">
-                  총 <strong className="text-blue-600">{orders.length}개</strong> 주문을 저장하시겠습니까?
+                  총 <strong className="text-blue-600">{orders.length}개</strong> 주문을 등록하시겠습니까?
                 </p>
                 {unmatchedCount > 0 && (
                   <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
@@ -1425,9 +1673,112 @@ export default function ExcelTab() {
                 <button
                   onClick={executeSaveToDatabase}
                   disabled={loading}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors"
                 >
-                  {loading ? '저장 중...' : '확인'}
+                  {loading ? '등록 중...' : '등록'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 옵션명 일괄수정 모달 */}
+      {showBatchEditModal && (() => {
+        // 매칭 실패한 옵션명별 카운트
+        const unmatchedOptions: Record<string, number> = {};
+        orders.forEach(order => {
+          if (order.match_status === 'unmatched' && order.field_11) {
+            const optionName = order.field_11;
+            unmatchedOptions[optionName] = (unmatchedOptions[optionName] || 0) + 1;
+          }
+        });
+
+        return (
+          <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
+            <div className="bg-white rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">옵션명 일괄수정</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                매칭 실패한 옵션명을 일괄 수정합니다. <strong className="text-orange-600">동일한 옵션명은 모두 일괄 변경됩니다.</strong>
+              </p>
+
+              <div className="flex-1 overflow-y-auto mb-6 space-y-3">
+                {Object.entries(unmatchedOptions).map(([optionName, count]) => {
+                  const recommendations = recommendedOptions[optionName] || [];
+
+                  return (
+                    <div key={optionName} className="p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">{optionName}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">{count}개 주문</div>
+                        </div>
+                        <div className="text-gray-400 text-lg">→</div>
+                        <input
+                          type="text"
+                          placeholder="대체할 옵션명"
+                          value={batchEditData[optionName] || ''}
+                          onChange={(e) => {
+                            setBatchEditData({
+                              ...batchEditData,
+                              [optionName]: e.target.value
+                            });
+                          }}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                      </div>
+
+                      {/* 추천 옵션명 */}
+                      {recommendations.length > 0 && (
+                        <div className="ml-auto pl-12">
+                          <div className="text-xs text-gray-500 mb-1.5">추천 옵션명:</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {recommendations.map((recommendation, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  setBatchEditData({
+                                    ...batchEditData,
+                                    [optionName]: recommendation
+                                  });
+                                }}
+                                className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-xs border border-blue-200 transition-colors"
+                                title="클릭하여 선택"
+                              >
+                                {recommendation}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 추천 옵션이 없는 경우 */}
+                      {recommendations.length === 0 && (
+                        <div className="ml-auto pl-12">
+                          <div className="text-xs text-gray-400 italic">유사한 옵션명이 없습니다</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowBatchEditModal(false);
+                    setBatchEditData({});
+                    setRecommendedOptions({});
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleApplyBatchEdit}
+                  className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                >
+                  일괄 수정 적용
                 </button>
               </div>
             </div>

@@ -36,7 +36,9 @@
       "Bash(Select-Object -First 50)",
       "Bash(Select-Object -First 20)",
       "Read(//c//**)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(copy:*)",
+      "Bash(del \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-integration\\components\\ShippingTab.tsx\")"
     ],
     "deny": [],
     "ask": []

@@ -484,7 +484,7 @@ export default function PlanningPage() {
 
         {/* 계획 추가 모달 */}
         {showAddPlan && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
             <div className="bg-white rounded-lg p-6 w-96">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">새 계획 추가</h3>
               <div className="space-y-3">
