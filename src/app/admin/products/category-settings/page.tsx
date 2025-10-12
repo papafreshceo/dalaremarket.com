@@ -685,7 +685,14 @@ export default function CategorySettingsPage() {
 
                   // 기존 DB 데이터 조회
                   const { data: existingCategories } = await supabase.from('category_settings').select('*')
-                  const existingIdSet = new Set(existingCategories?.map(c => c.id) || [])
+
+                  // ID로 기존 데이터를 Map에 저장
+                  const existingIdMap = new Map(existingCategories?.map(c => [c.id, c]) || [])
+                  // 카테고리 조합 키로도 기존 데이터를 Map에 저장
+                  const existingCategoryMap = new Map(existingCategories?.map(c => {
+                    const key = `${c.expense_type || ''}|${c.category_1 || ''}|${c.category_2 || ''}|${c.category_3 || ''}|${c.category_4 || ''}|${c.category_5 || ''}`
+                    return [key, c]
+                  }) || [])
 
                   console.log('기존 데이터 수:', existingCategories?.length)
                   console.log('업로드할 데이터 수:', excelUploadModal.data.length)
@@ -722,66 +729,93 @@ export default function CategorySettingsPage() {
                     return
                   }
 
-                  // id가 DB에 실제로 존재하는지 확인하여 분리
-                  const dataWithId = dataToUpsert.filter((item: any) => item.id && existingIdSet.has(item.id))
-                  const dataWithoutId = dataToUpsert.filter((item: any) => !item.id || !existingIdSet.has(item.id))
-                    .map((item: any) => {
-                      const { id: _removed, ...itemWithoutId} = item
-                      return itemWithoutId
-                    })
+                  // 데이터 분류: ID 우선, 그 다음 카테고리 조합
+                  const dataToUpdate: any[] = []
+                  const dataToInsert: any[] = []
 
-                  console.log('📦 DB에 존재하는 id (업데이트):', dataWithId.length)
-                  console.log('📦 DB에 없는 데이터 (신규 추가):', dataWithoutId.length)
+                  dataToUpsert.forEach((item: any) => {
+                    // 1순위: ID가 있고 DB에 존재하면 → ID로 업데이트 (카테고리 변경 허용)
+                    if (item.id && existingIdMap.has(item.id)) {
+                      dataToUpdate.push(item)
+                    } else {
+                      // 2순위: ID가 없거나 DB에 없으면 → 카테고리 조합으로 확인
+                      const key = `${item.expense_type || ''}|${item.category_1 || ''}|${item.category_2 || ''}|${item.category_3 || ''}|${item.category_4 || ''}|${item.category_5 || ''}`
+                      const existing = existingCategoryMap.get(key)
+
+                      if (existing) {
+                        // 카테고리 조합이 이미 있으면 해당 id로 업데이트
+                        dataToUpdate.push({ ...item, id: existing.id })
+                      } else {
+                        // 완전히 새로운 카테고리면 신규 추가 (id 제거)
+                        const { id: _removed, ...itemWithoutId } = item
+                        dataToInsert.push(itemWithoutId)
+                      }
+                    }
+                  })
+
+                  console.log('📦 업데이트할 데이터:', dataToUpdate.length)
+                  console.log('📦 신규 추가할 데이터:', dataToInsert.length)
 
                   const added: string[] = []
                   const updated: string[] = []
 
-                  dataWithoutId.forEach((row: any) => {
+                  dataToInsert.forEach((row: any) => {
                     const label = `${row.expense_type || ''} > ${row.category_1 || ''} > ${row.category_2 || ''}`
                     added.push(label)
                   })
 
-                  dataWithId.forEach((row: any) => {
+                  dataToUpdate.forEach((row: any) => {
                     const label = `${row.expense_type || ''} > ${row.category_1 || ''} > ${row.category_2 || ''}`
                     updated.push(label)
                   })
 
-                  // 1. id가 있는 데이터 업데이트
-                  if (dataWithId.length > 0) {
+                  // 1. 기존 카테고리 업데이트
+                  if (dataToUpdate.length > 0) {
                     const { error: updateError } = await supabase
                       .from('category_settings')
-                      .upsert(dataWithId, { onConflict: 'id' })
+                      .upsert(dataToUpdate, { onConflict: 'id' })
 
                     if (updateError) {
                       console.error('기존 데이터 업데이트 실패:', updateError)
                       showToast('업로드 중 오류가 발생했습니다.', 'error')
                       return
                     }
-                    console.log('✅ 기존 데이터 업데이트 완료:', dataWithId.length)
+                    console.log('✅ 기존 데이터 업데이트 완료:', dataToUpdate.length)
                   }
 
-                  // 2. id가 없는 데이터 신규 추가
-                  if (dataWithoutId.length > 0) {
+                  // 2. 신규 카테고리 추가
+                  if (dataToInsert.length > 0) {
                     const { error: insertError } = await supabase
                       .from('category_settings')
-                      .insert(dataWithoutId)
+                      .insert(dataToInsert)
 
                     if (insertError) {
                       console.error('신규 데이터 추가 실패:', insertError)
                       showToast('업로드 중 오류가 발생했습니다.', 'error')
                       return
                     }
-                    console.log('✅ 신규 데이터 추가 완료:', dataWithoutId.length)
+                    console.log('✅ 신규 데이터 추가 완료:', dataToInsert.length)
                   }
 
-                  // 3. 엑셀에 없는 데이터 확인 및 삭제
-                  const uploadedKeys = new Set(dataToUpsert.map((d: any) => `${d.expense_type || ''}|${d.category_1 || ''}|${d.category_2 || ''}|${d.category_3 || ''}|${d.category_4 || ''}|${d.category_5 || ''}`))
-                  const deletedCategories = existingCategories?.filter(c => {
-                    const key = `${c.expense_type || ''}|${c.category_1 || ''}|${c.category_2 || ''}|${c.category_3 || ''}|${c.category_4 || ''}|${c.category_5 || ''}`
-                    return !uploadedKeys.has(key)
-                  }) || []
+                  // 3. 엑셀에 없는 데이터 확인 및 삭제 (ID 기준)
+                  // 엑셀에 있는 모든 유효한 ID 수집 (원본 dataToUpsert에서)
+                  const uploadedIds = new Set(
+                    dataToUpsert
+                      .map((d: any) => d.id)
+                      .filter((id: any) => id && existingIdMap.has(id))
+                  )
+
+                  console.log('📋 엑셀의 유효한 ID 개수:', uploadedIds.size)
+                  console.log('📋 엑셀의 유효한 ID 목록:', Array.from(uploadedIds))
+
+                  // 교체 모드: 엑셀에 ID가 없는 기존 DB 데이터는 삭제
+                  const deletedCategories = existingCategories?.filter(c => !uploadedIds.has(c.id)) || []
 
                   console.log(`🗑️ 삭제 대상: ${deletedCategories.length}개`)
+                  if (deletedCategories.length > 0) {
+                    console.log('🗑️ 삭제 대상 ID:', deletedCategories.map(c => c.id))
+                    console.log('🗑️ 삭제 대상 카테고리:', deletedCategories.map(c => `${c.expense_type} > ${c.category_1} > ${c.category_2}`))
+                  }
 
                   if (deletedCategories.length > 0) {
                     const { error: deleteError } = await supabase
@@ -822,7 +856,10 @@ export default function CategorySettingsPage() {
 
                   // 기존 DB 데이터 조회
                   const { data: existingData } = await supabase.from('category_settings').select('*')
-                  const existingIdSet = new Set(existingData?.map(c => c.id) || [])
+
+                  // ID로 기존 데이터를 Map에 저장
+                  const existingIdMap = new Map(existingData?.map(d => [d.id, d]) || [])
+                  // 카테고리 조합 키로도 기존 데이터를 Map에 저장
                   const existingDataMap = new Map(existingData?.map(d => {
                     const key = `${d.expense_type || ''}|${d.category_1 || ''}|${d.category_2 || ''}|${d.category_3 || ''}|${d.category_4 || ''}|${d.category_5 || ''}`
                     return [key, d]
@@ -863,28 +900,44 @@ export default function CategorySettingsPage() {
                     return
                   }
 
-                  // id가 DB에 실제로 존재하는지 확인하여 분리
-                  const dataWithId = dataToUpsert.filter((item: any) => item.id && existingIdSet.has(item.id))
-                  const dataWithoutId = dataToUpsert.filter((item: any) => !item.id || !existingIdSet.has(item.id))
-                    .map((item: any) => {
-                      const { id: _removed, ...itemWithoutId } = item
-                      return itemWithoutId
-                    })
+                  // 데이터 분류: ID 우선, 그 다음 카테고리 조합
+                  const dataToUpdate: any[] = []
+                  const dataToInsert: any[] = []
 
-                  console.log('📦 DB에 존재하는 id (업데이트):', dataWithId.length)
-                  console.log('📦 DB에 없는 데이터 (신규 추가):', dataWithoutId.length)
+                  dataToUpsert.forEach((item: any) => {
+                    // 1순위: ID가 있고 DB에 존재하면 → ID로 업데이트 (카테고리 변경 허용)
+                    if (item.id && existingIdMap.has(item.id)) {
+                      dataToUpdate.push(item)
+                    } else {
+                      // 2순위: ID가 없거나 DB에 없으면 → 카테고리 조합으로 확인
+                      const key = `${item.expense_type || ''}|${item.category_1 || ''}|${item.category_2 || ''}|${item.category_3 || ''}|${item.category_4 || ''}|${item.category_5 || ''}`
+                      const existing = existingDataMap.get(key)
+
+                      if (existing) {
+                        // 카테고리 조합이 이미 있으면 해당 id로 업데이트
+                        dataToUpdate.push({ ...item, id: existing.id })
+                      } else {
+                        // 완전히 새로운 카테고리면 신규 추가 (id 제거)
+                        const { id: _removed, ...itemWithoutId } = item
+                        dataToInsert.push(itemWithoutId)
+                      }
+                    }
+                  })
+
+                  console.log('📦 업데이트할 데이터:', dataToUpdate.length)
+                  console.log('📦 신규 추가할 데이터:', dataToInsert.length)
 
                   // 추가/수정/변경없음 분류
                   const added: string[] = []
                   const updated: string[] = []
                   const unchanged: string[] = []
 
-                  dataWithoutId.forEach((row: any) => {
+                  dataToInsert.forEach((row: any) => {
                     const label = `${row.expense_type || ''} > ${row.category_1 || ''} > ${row.category_2 || ''}`
                     added.push(label)
                   })
 
-                  dataWithId.forEach((row: any) => {
+                  dataToUpdate.forEach((row: any) => {
                     const key = `${row.expense_type || ''}|${row.category_1 || ''}|${row.category_2 || ''}|${row.category_3 || ''}|${row.category_4 || ''}|${row.category_5 || ''}`
                     const existing = existingDataMap.get(key)
                     const label = `${row.expense_type || ''} > ${row.category_1 || ''} > ${row.category_2 || ''}`
@@ -892,7 +945,7 @@ export default function CategorySettingsPage() {
                     if (existing) {
                       let hasChanges = false
                       for (const k in row) {
-                        if (k === 'updated_at' || k === 'created_at') continue
+                        if (k === 'updated_at' || k === 'created_at' || k === 'id') continue
                         if (JSON.stringify(row[k]) !== JSON.stringify(existing[k])) {
                           hasChanges = true
                           break
@@ -916,11 +969,11 @@ export default function CategorySettingsPage() {
                     }
                   })
 
-                  // 1. id가 있는 데이터 업데이트
-                  if (dataWithId.length > 0) {
+                  // 1. 기존 카테고리 업데이트
+                  if (dataToUpdate.length > 0) {
                     const { error: updateError } = await supabase
                       .from('category_settings')
-                      .upsert(dataWithId, { onConflict: 'id' })
+                      .upsert(dataToUpdate, { onConflict: 'id' })
 
                     if (updateError) {
                       console.error('기존 데이터 업데이트 실패:', updateError)
@@ -929,11 +982,11 @@ export default function CategorySettingsPage() {
                     }
                   }
 
-                  // 2. id가 없는 데이터 신규 추가
-                  if (dataWithoutId.length > 0) {
+                  // 2. 신규 카테고리 추가
+                  if (dataToInsert.length > 0) {
                     const { error: insertError } = await supabase
                       .from('category_settings')
-                      .insert(dataWithoutId)
+                      .insert(dataToInsert)
 
                     if (insertError) {
                       console.error('신규 데이터 추가 실패:', insertError)

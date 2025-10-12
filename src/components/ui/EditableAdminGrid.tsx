@@ -803,11 +803,28 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     }
   }
 
+  // 한글 자모 필터링 함수 (완성된 글자만 추출)
+  const filterCompleteKoreanChars = (text: string): string => {
+    return text.split('').filter(char => {
+      const code = char.charCodeAt(0)
+      // 완성된 한글 음절 범위 (가-힣)
+      const isCompleteKorean = code >= 0xAC00 && code <= 0xD7A3
+      // 한글 자모 범위 (ㄱ-ㅎ, ㅏ-ㅣ)
+      const isJamo = (code >= 0x3131 && code <= 0x314E) || (code >= 0x314F && code <= 0x3163)
+
+      // 완성된 한글이거나 한글이 아닌 문자(영어, 숫자 등)는 포함
+      return isCompleteKorean || !isJamo
+    }).join('')
+  }
+
   // 전역 검색 필터링 (메모이제이션)
   const filteredData = useMemo(() => {
     if (!globalSearchTerm) return gridData
 
-    const searchLower = globalSearchTerm.toLowerCase()
+    // 완성된 글자만 추출하여 검색
+    const cleanedSearchTerm = filterCompleteKoreanChars(globalSearchTerm)
+    const searchLower = cleanedSearchTerm.toLowerCase()
+
     return gridData.filter(row => {
       // 검색어와 매칭되는 셀이 있으면 표시
       return columns.some(col => {

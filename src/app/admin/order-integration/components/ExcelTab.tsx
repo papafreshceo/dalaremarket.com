@@ -155,8 +155,8 @@ export default function ExcelTab() {
 
                 return (
                   <span
-                    className="px-2 py-0.5 rounded text-white text-xs font-medium"
-                    style={{ backgroundColor: marketColor }}
+                    className="px-2 py-0.5 rounded text-white font-medium"
+                    style={{ backgroundColor: marketColor, fontSize: '12px' }}
                   >
                     {String(marketName)}
                   </span>
@@ -201,11 +201,13 @@ export default function ExcelTab() {
               };
 
               // 특정 필드만 너비 고정
+              if (i === 2) column.width = 50; // 연번
               if (i === 4) column.width = 150; // 주문번호
               if (i === 5) column.width = 100; // 주문자
               if (i === 7) column.width = 100; // 수령인
               if (i === 9) column.width = 250; // 주소
               if (i === 10) column.width = 120; // 배송메시지
+              if (i === 12) column.width = 40; // 수량
 
               // field_1 (마켓명) - 마켓 배지 렌더러는 제거 (아래에서 처리)
               if (i === 1) {
@@ -640,10 +642,12 @@ export default function ExcelTab() {
       mappedData.field_13 = `${template.initial}${sequenceNumber}`;
     }
 
-    // 정산예정금액 계산 (field_26)
-    const settlement = calculateSettlement(row, template.settlement_formula, marketFieldMappings);
-    if (settlement !== null) {
-      mappedData.field_26 = settlement;
+    // 정산예정금액 계산 (field_27) - 엑셀에 값이 없을 때만
+    if (!mappedData.field_27) {
+      const settlement = calculateSettlement(row, template.settlement_formula, marketFieldMappings);
+      if (settlement !== null) {
+        mappedData.field_27 = settlement;
+      }
     }
 
     return mappedData;
@@ -1225,7 +1229,7 @@ export default function ExcelTab() {
   };
 
   // 가장 유사한 옵션명 찾기
-  const findSimilarOptions = (targetOption: string, topN: number = 5): string[] => {
+  const findSimilarOptions = (targetOption: string, topN: number = 1): string[] => {
     if (!targetOption || optionProducts.size === 0) return [];
 
     const allOptions = Array.from(optionProducts.keys());
@@ -1288,19 +1292,20 @@ export default function ExcelTab() {
       return;
     }
 
-    // batchEditData 초기화
-    const initialData: Record<string, string> = {};
-    Object.keys(unmatchedOptions).forEach(optionName => {
-      initialData[optionName] = '';
-    });
-    setBatchEditData(initialData);
-
     // 추천 옵션명 계산
     const recommendations: Record<string, string[]> = {};
     Object.keys(unmatchedOptions).forEach(optionName => {
-      recommendations[optionName] = findSimilarOptions(optionName, 5);
+      recommendations[optionName] = findSimilarOptions(optionName, 1);
     });
     setRecommendedOptions(recommendations);
+
+    // batchEditData 초기화 (첫 번째 추천 옵션명을 기본값으로)
+    const initialData: Record<string, string> = {};
+    Object.keys(unmatchedOptions).forEach(optionName => {
+      const firstRecommendation = recommendations[optionName]?.[0] || '';
+      initialData[optionName] = firstRecommendation;
+    });
+    setBatchEditData(initialData);
 
     setShowBatchEditModal(true);
   };
@@ -1561,48 +1566,7 @@ export default function ExcelTab() {
 
       {/* EditableAdminGrid */}
       {integrationStage === 'integrated' && orders.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">업로드된 주문 ({orders.length}건)</h3>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setOrders([]);
-                  setUploadedFiles([]);
-                  setIntegrationStage('idle');
-                  setStats({ total: 0, matched: 0, unmatched: 0 });
-                }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-              >
-                초기화
-              </button>
-              <button
-                onClick={handleOpenBatchEdit}
-                disabled={loading || stats.unmatched === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400"
-                title={stats.unmatched === 0 ? '매칭 실패한 옵션명이 없습니다' : ''}
-              >
-                <AlertCircle className="w-4 h-4" />
-                옵션명 일괄수정
-              </button>
-              <button
-                onClick={handleApplyProductMatching}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400"
-              >
-                <CheckCircle className="w-4 h-4" />
-                {loading ? '검증 중...' : '옵션명 검증'}
-              </button>
-              <button
-                onClick={handleSaveToDatabase}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
-              >
-                <Save className="w-4 h-4" />
-                {loading ? '등록 중...' : '주문접수등록'}
-              </button>
-            </div>
-          </div>
+        <div>
           <EditableAdminGrid
             key={orders.length + '-' + orders.filter(o => o._optionNameModified).length + '-' + orders.filter(o => o._optionNameVerified).length}
             columns={columns}
@@ -1610,8 +1574,52 @@ export default function ExcelTab() {
             onDataChange={handleDataChange}
             onDeleteSelected={handleDeleteRows}
             height="calc(100vh - 450px)"
+            enableFilter={true}
             enableCSVExport={true}
             enableCSVImport={false}
+            enableCheckbox={false}
+            enableDelete={false}
+            enableCopy={false}
+            customActions={
+              <div className="flex items-center gap-1.5 ml-auto">
+                <button
+                  onClick={() => {
+                    setOrders([]);
+                    setUploadedFiles([]);
+                    setIntegrationStage('idle');
+                    setStats({ total: 0, matched: 0, unmatched: 0 });
+                  }}
+                  className="px-2.5 py-1.5 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-xs"
+                >
+                  초기화
+                </button>
+                <button
+                  onClick={handleOpenBatchEdit}
+                  disabled={loading || stats.unmatched === 0}
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:bg-gray-400 text-xs"
+                  title={stats.unmatched === 0 ? '매칭 실패한 옵션명이 없습니다' : ''}
+                >
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  옵션명 일괄수정
+                </button>
+                <button
+                  onClick={handleApplyProductMatching}
+                  disabled={loading}
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-400 text-xs"
+                >
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  {loading ? '검증 중...' : '옵션명 검증'}
+                </button>
+                <button
+                  onClick={handleSaveToDatabase}
+                  disabled={loading}
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 text-xs"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  {loading ? '등록 중...' : '주문접수등록'}
+                </button>
+              </div>
+            }
           />
         </div>
       )}
@@ -1696,7 +1704,7 @@ export default function ExcelTab() {
 
         return (
           <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-            <div className="bg-white rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="bg-white rounded-lg p-6 w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col" style={{ maxWidth: '770px' }}>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">옵션명 일괄수정</h3>
               <p className="text-sm text-gray-600 mb-4">
                 매칭 실패한 옵션명을 일괄 수정합니다. <strong className="text-orange-600">동일한 옵션명은 모두 일괄 변경됩니다.</strong>
@@ -1708,10 +1716,10 @@ export default function ExcelTab() {
 
                   return (
                     <div key={optionName} className="p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2" style={{ minWidth: '200px' }}>
                           <div className="text-sm font-medium text-gray-900">{optionName}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">{count}개 주문</div>
+                          <div className="text-xs text-red-600 font-normal">{count}개 주문</div>
                         </div>
                         <div className="text-gray-400 text-lg">→</div>
                         <input
@@ -1724,15 +1732,14 @@ export default function ExcelTab() {
                               [optionName]: e.target.value
                             });
                           }}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          style={{ color: '#dc2626', fontWeight: 'bold', width: '180px' }}
+                          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder-red-400"
                         />
-                      </div>
 
-                      {/* 추천 옵션명 */}
-                      {recommendations.length > 0 && (
-                        <div className="ml-auto pl-12">
-                          <div className="text-xs text-gray-500 mb-1.5">추천 옵션명:</div>
-                          <div className="flex flex-wrap gap-1.5">
+                        {/* 추천 옵션명 - 같은 줄에 배치 */}
+                        {recommendations.length > 0 && (
+                          <div className="flex items-center gap-2 flex-1">
+                            <div className="text-xs text-gray-500">추천 옵션명</div>
                             {recommendations.map((recommendation, idx) => (
                               <button
                                 key={idx}
@@ -1749,15 +1756,15 @@ export default function ExcelTab() {
                               </button>
                             ))}
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* 추천 옵션이 없는 경우 */}
-                      {recommendations.length === 0 && (
-                        <div className="ml-auto pl-12">
-                          <div className="text-xs text-gray-400 italic">유사한 옵션명이 없습니다</div>
-                        </div>
-                      )}
+                        {/* 추천 옵션이 없는 경우 */}
+                        {recommendations.length === 0 && (
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-400 italic">유사한 옵션명이 없습니다</div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
