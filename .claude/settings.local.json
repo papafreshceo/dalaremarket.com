@@ -41,7 +41,8 @@
       "Bash(del \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-integration\\components\\ShippingTab.tsx\")",
       "Bash(move \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\orders\" \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-platform\")",
       "Bash(del \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-platform\\page.tsx\")",
-      "Bash(del nul)"
+      "Bash(del nul)",
+      "Bash(npm view:*)"
     ],
     "deny": [],
     "ask": []

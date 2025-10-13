@@ -445,7 +445,7 @@ export default function RawMaterialsManagementPage() {
     reader.onload = async (evt) => {
       try {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer)
-        const workbook = XLSX.read(data, { type: 'array' })
+        const workbook = XLSX.read(data, { type: 'array', WTF: true })
         const sheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[sheetName]
         const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[]
@@ -1258,7 +1258,7 @@ export default function RawMaterialsManagementPage() {
                 const reader = new FileReader()
                 reader.onload = async (e) => {
                   const data = e.target?.result
-                  const workbook = XLSX.read(data, { type: 'binary', cellDates: true })
+                  const workbook = XLSX.read(data, { type: 'binary', cellDates: true, WTF: true })
                   const sheetName = workbook.SheetNames[0]
                   const worksheet = workbook.Sheets[sheetName]
 

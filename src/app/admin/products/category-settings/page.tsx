@@ -407,7 +407,7 @@ export default function CategorySettingsPage() {
                 const reader = new FileReader()
                 reader.onload = async (e) => {
                   const data = e.target?.result
-                  const workbook = XLSX.read(data, { type: 'binary', cellDates: true })
+                  const workbook = XLSX.read(data, { type: 'binary', cellDates: true, WTF: true })
                   const sheetName = workbook.SheetNames[0]
                   const worksheet = workbook.Sheets[sheetName]
 

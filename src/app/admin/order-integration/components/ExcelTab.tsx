@@ -608,8 +608,19 @@ export default function ExcelTab() {
 
   // 엑셀 날짜를 YYYY-MM-DD HH:MM:SS 형식으로 변환
   const convertExcelDate = (value: any): string => {
+    // Date 객체인 경우 (cellDates: true로 읽은 경우)
+    if (value instanceof Date) {
+      const year = value.getFullYear();
+      const month = String(value.getMonth() + 1).padStart(2, '0');
+      const day = String(value.getDate()).padStart(2, '0');
+      const hours = String(value.getHours()).padStart(2, '0');
+      const minutes = String(value.getMinutes()).padStart(2, '0');
+      const seconds = String(value.getSeconds()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
+
+    // 숫자인 경우 (엑셀 시리얼 날짜)
     if (typeof value === 'number') {
-      // 엑셀 날짜는 1900-01-01부터의 일 수
       const date = new Date((value - 25569) * 86400 * 1000);
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -619,7 +630,8 @@ export default function ExcelTab() {
       const seconds = String(date.getSeconds()).padStart(2, '0');
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     }
-    return value;
+
+    return String(value || '');
   };
 
   // 템플릿 기반 필드 매핑 (field_1~field_43 구조로 변환)
@@ -631,6 +643,9 @@ export default function ExcelTab() {
 
     // marketFieldMappings는 mapping_settings_standard_fields에서 해당 마켓의 매핑 정보
     // { field_3: "결제일", field_4: "주문번호", ... }
+    // 날짜 필드 목록 (field_3: 결제일, field_16: 발송요청일, field_42: 발송일)
+    const dateFields = [3, 16, 42];
+
     for (let i = 1; i <= 43; i++) {
       const fieldKey = `field_${i}`;
       const marketFieldName = marketFieldMappings[fieldKey]; // 예: "결제일"
@@ -638,9 +653,17 @@ export default function ExcelTab() {
       if (marketFieldName && row[marketFieldName] !== undefined) {
         let value = row[marketFieldName];
 
-        // field_3 (결제일)은 날짜 변환
-        if (i === 3 && typeof value === 'number') {
+        // Date 객체는 항상 문자열로 변환
+        if (value instanceof Date) {
           value = convertExcelDate(value);
+        }
+        // 날짜 필드이면서 숫자인 경우에만 날짜로 변환
+        else if (dateFields.includes(i) && typeof value === 'number') {
+          value = convertExcelDate(value);
+        }
+        // 다른 값들은 그대로 유지하거나 문자열로 변환
+        else if (value !== null && value !== undefined) {
+          value = String(value);
         }
 
         mappedData[fieldKey] = value;
@@ -678,8 +701,22 @@ export default function ExcelTab() {
       // 모든 파일의 마켓명 감지
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+
+        // xlsx 라이브러리의 console.error를 임시로 무시
+        const originalError = console.error;
+        console.error = (...args: any[]) => {
+          // "Bad uncompressed size" 에러만 무시
+          if (args[0]?.toString().includes('Bad uncompressed size')) {
+            return;
+          }
+          originalError(...args);
+        };
+
         const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true, WTF: false });
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true, WTF: true });
+
+        // console.error 복원
+        console.error = originalError;
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
 
         // 헤더 행 감지를 위해 먼저 읽기
@@ -763,8 +800,21 @@ export default function ExcelTab() {
         const file = filePreview.file;
         const template = filePreview.detectedTemplate;
 
+        // xlsx 라이브러리의 console.error를 임시로 무시
+        const originalError = console.error;
+        console.error = (...args: any[]) => {
+          // "Bad uncompressed size" 에러만 무시
+          if (args[0]?.toString().includes('Bad uncompressed size')) {
+            return;
+          }
+          originalError(...args);
+        };
+
         const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true, WTF: false });
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true, WTF: true });
+
+        // console.error 복원
+        console.error = originalError;
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
 
         let jsonData: any[];
