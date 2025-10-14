@@ -100,14 +100,15 @@ export default function OrdersPage() {
       if (!shippingStatus) return 'registered';
 
       const statusMap: Record<string, Order['status']> = {
-        '접수': 'registered',
         '발주서등록': 'registered',
+        '발주서확정': 'confirmed',
         '결제완료': 'confirmed',
         '상품준비중': 'preparing',
         '배송중': 'shipped',
         '배송완료': 'shipped',
         '취소요청': 'cancelRequested',
-        '취소완료': 'cancelled'
+        '취소완료': 'cancelled',
+        'refunded': 'refunded'
       };
 
       return statusMap[shippingStatus] || 'registered';
@@ -139,7 +140,8 @@ export default function OrdersPage() {
       specialRequest: order.special_request,
       unitPrice: order.seller_supply_price ? parseFloat(order.seller_supply_price) : undefined,
       supplyPrice: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined,
-      refundAmount: order.refund_amount ? parseFloat(order.refund_amount) : undefined // 환불액
+      refundAmount: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined, // 환불액 (정산금액과 동일)
+      refundedAt: order.refund_processed_at // 환불일
     }));
 
     console.log('🔄 변환된 주문 데이터:', convertedOrders);
@@ -168,13 +170,14 @@ export default function OrdersPage() {
     }
   };
 
-  const statusConfig: Record<Order['status'], StatusConfig> = {
+  const statusConfig: Record<Order['status'] | 'refunded', StatusConfig> = {
     registered: { label: '발주서등록', color: '#2563eb', bg: '#dbeafe' },
     confirmed: { label: '발주서확정', color: '#7c3aed', bg: '#ede9fe' },
     preparing: { label: '상품준비중', color: '#f59e0b', bg: '#fef3c7' },
     shipped: { label: '발송완료', color: '#10b981', bg: '#d1fae5' },
     cancelRequested: { label: '취소요청', color: '#ef4444', bg: '#fee2e2' },
-    cancelled: { label: '취소완료', color: '#6b7280', bg: '#f3f4f6' }
+    cancelled: { label: '취소완료', color: '#6b7280', bg: '#f3f4f6' },
+    refunded: { label: '환불완료', color: '#10b981', bg: '#d1fae5' }
   };
 
   const statsData: StatsData[] = [
@@ -183,7 +186,8 @@ export default function OrdersPage() {
     { status: 'preparing', count: orders.filter(o => o.status === 'preparing').length, bgGradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' },
     { status: 'shipped', count: orders.filter(o => o.status === 'shipped').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' },
     { status: 'cancelRequested', count: orders.filter(o => o.status === 'cancelRequested').length, bgGradient: 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)' },
-    { status: 'cancelled', count: orders.filter(o => o.status === 'cancelled').length, bgGradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' }
+    { status: 'cancelled', count: orders.filter(o => o.status === 'cancelled').length, bgGradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' },
+    { status: 'refunded', count: orders.filter(o => o.status === 'refunded').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' }
   ];
 
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
@@ -320,7 +324,7 @@ export default function OrdersPage() {
             created_by: user.id,
             market_name: '플랫폼',
             payment_date: koreaTime.toISOString().split('T')[0],
-            shipping_status: '접수'
+            shipping_status: '발주서등록'
           }
         }));
 

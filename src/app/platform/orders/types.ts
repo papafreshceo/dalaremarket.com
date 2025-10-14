@@ -4,7 +4,7 @@ export interface Order {
   products: string;
   amount: number;
   quantity: number;
-  status: 'registered' | 'confirmed' | 'preparing' | 'shipped' | 'cancelRequested' | 'cancelled';
+  status: 'registered' | 'confirmed' | 'preparing' | 'shipped' | 'cancelRequested' | 'cancelled' | 'refunded';
   date: string;
   registeredAt?: string;
   confirmedAt?: string;
@@ -14,6 +14,7 @@ export interface Order {
   cancelApprovedAt?: string; // 취소승인일시
   orderConfirmedAt?: string; // 주문확정일시
   refundAmount?: number; // 환불액
+  refundedAt?: string; // 환불일
   paymentMethod?: string;
   trackingNo?: string;
   expectedDelivery?: string;

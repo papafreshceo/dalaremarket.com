@@ -13,6 +13,11 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
       category: '기본 데이터 관리',
       items: [
         {
+          title: 'CS 유형 설정',
+          description: 'CS 유형 관리 (환불, 재발송 등)',
+          href: '/admin/settings/cs-types'
+        },
+        {
           title: '거래처 유형',
           description: '거래처 유형 추가 및 수정',
           href: '/admin/settings/partner-types'
@@ -39,8 +44,8 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
         },
         {
           title: '벤더사 양식',
-          description: '벤더사별 엑셀 양식 헤더명 설정',
-          href: '/admin/settings/vendor-format-settings'
+          description: '벤더사별 엑셀 양식 설정',
+          href: '/admin/settings/vendor-templates'
         }
       ]
     },

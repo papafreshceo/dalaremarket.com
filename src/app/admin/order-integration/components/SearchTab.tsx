@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Download, Filter, Calendar, RefreshCw, Upload, ChevronDown, ChevronUp } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
+import { Modal } from '@/components/ui/Modal';
 import * as XLSX from 'xlsx';
 
 interface Order {
@@ -138,6 +139,7 @@ export default function SearchTab() {
     발송완료: 0,
     취소요청: 0,
     취소완료: 0,
+    환불완료: 0,
   });
   const [vendorStats, setVendorStats] = useState<VendorStats[]>([]);
   const [vendorStatsExpanded, setVendorStatsExpanded] = useState(false);
@@ -161,6 +163,51 @@ export default function SearchTab() {
 
   // 선택된 주문 상태
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
+
+  // CS 모달 상태
+  const [showCSModal, setShowCSModal] = useState(false);
+  const [csTypes, setCSTypes] = useState<Array<{
+    id: number;
+    code: string;
+    name: string;
+    description: string | null;
+    is_active: boolean;
+    display_order: number;
+  }>>([]);
+  // CS 폼 초기 상태
+  const initialCSFormData = {
+    category: '',
+    content: '',
+    solution: '',
+    otherSolution: '', // 기타 해결방법
+    paymentAmount: 0,
+    refundPercent: 0,
+    refundAmount: 0,
+    bank: '', // 은행
+    accountHolder: '', // 예금주
+    accountNumber: '', // 계좌번호
+    resendOption: '',
+    resendQty: 1,
+    additionalAmount: 0,
+    resendNote: 'CS재발송, 싱싱하고 맛있는 것',
+    receiver: '',
+    phone: '',
+    address: '',
+    requestDate: ''
+  };
+
+  const [csFormData, setCSFormData] = useState(initialCSFormData);
+
+  // 주문 상세 모달 상태
+  const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState<Order | null>(null);
+
+  // 추가주문등록 모달 상태
+  const [showAdditionalOrderModal, setShowAdditionalOrderModal] = useState(false);
+  const [additionalOrderData, setAdditionalOrderData] = useState<any>({});
+
+  // 벤더사전송파일 모달 상태
+  const [showVendorFileModal, setShowVendorFileModal] = useState(false);
 
   // 상태 카드 필터
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -192,20 +239,40 @@ export default function SearchTab() {
       await loadMarketTemplates();
       await loadStandardFields();
       await loadCouriers();
+      await loadCSTypes();
     };
     loadInitialData();
   }, []);
 
-  // marketTemplates와 columns가 로드되면 마켓 컬럼에 렌더러 추가
+  // marketTemplates와 columns가 로드되면 마켓 컬럼과 주문번호 컬럼에 렌더러 추가
   useEffect(() => {
-    if (marketTemplates.size > 0 && columns.length > 0) {
-      // 이미 렌더러가 있는지 확인 (무한 루프 방지)
+    if (columns.length > 0) {
+      let needsUpdate = false;
+
+      // 마켓 컬럼 체크
       const marketColumn = columns.find(c => c.key === 'market_name' || c.isMarketColumn);
-      if (marketColumn && !marketColumn.renderer) {
-        console.log('🎨 마켓 컬럼 렌더러 추가 시작, marketTemplates:', marketTemplates.size);
+      const needsMarketRenderer = marketColumn && !marketColumn.renderer && marketTemplates.size > 0;
+
+      // 주문번호 컬럼 체크
+      const orderNumberColumn = columns.find(c => c.key === 'order_number');
+      const needsOrderNumberRenderer = orderNumberColumn && !orderNumberColumn.renderer;
+
+      // 수량 컬럼 체크
+      const quantityColumn = columns.find(c => c.isQuantityColumn);
+      const needsQuantityRenderer = quantityColumn && !quantityColumn.renderer;
+
+      // 결제일 컬럼 체크
+      const paymentDateColumn = columns.find(c => c.isPaymentDateColumn);
+      const needsPaymentDateRenderer = paymentDateColumn && !paymentDateColumn.renderer;
+
+      if (needsMarketRenderer || needsOrderNumberRenderer || needsQuantityRenderer || needsPaymentDateRenderer) {
+        needsUpdate = true;
+      }
+
+      if (needsUpdate) {
         const updatedColumns = columns.map((column) => {
-          if (column.key === 'market_name' || column.isMarketColumn) {
-            console.log('  - 마켓 컬럼 발견:', column.key, column.title);
+          // 마켓 컬럼 렌더러
+          if ((column.key === 'market_name' || column.isMarketColumn) && !column.renderer && marketTemplates.size > 0) {
             return {
               ...column,
               renderer: (value: any, row: any) => {
@@ -225,8 +292,8 @@ export default function SearchTab() {
 
                 return (
                   <span
-                    className="px-2 py-0.5 rounded text-white text-xs font-medium"
-                    style={{ backgroundColor: marketColor }}
+                    className="px-2 py-0.5 rounded text-white font-medium"
+                    style={{ backgroundColor: marketColor, fontSize: '13px' }}
                   >
                     {marketName}
                   </span>
@@ -234,11 +301,75 @@ export default function SearchTab() {
               }
             };
           }
+
+          // 주문번호 컬럼 렌더러
+          if (column.key === 'order_number' && !column.renderer) {
+            return {
+              ...column,
+              renderer: (value: any, row: any) => {
+                return (
+                  <button
+                    onClick={() => {
+                      setSelectedOrderDetail(row);
+                      setShowOrderDetailModal(true);
+                    }}
+                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+                  >
+                    {value || '-'}
+                  </button>
+                );
+              }
+            };
+          }
+
+          // 수량 컬럼 렌더러
+          if (column.isQuantityColumn && !column.renderer) {
+            return {
+              ...column,
+              renderer: (value: any, row: any) => {
+                const qty = Number(value) || 0;
+                if (qty >= 2) {
+                  return (
+                    <span className="inline-block px-2 py-0.5 bg-yellow-100 text-yellow-900 font-bold rounded">
+                      {value}
+                    </span>
+                  );
+                }
+                return <span>{value || '-'}</span>;
+              }
+            };
+          }
+
+          // 결제일 컬럼 렌더러 (시분초 표시)
+          if (column.isPaymentDateColumn && !column.renderer) {
+            return {
+              ...column,
+              renderer: (value: any, row: any) => {
+                if (!value) return '-';
+                try {
+                  const date = new Date(value);
+                  if (isNaN(date.getTime())) return value;
+
+                  // YYYY-MM-DD HH:mm:ss 형식으로 포맷
+                  const year = date.getFullYear();
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  const hours = String(date.getHours()).padStart(2, '0');
+                  const minutes = String(date.getMinutes()).padStart(2, '0');
+                  const seconds = String(date.getSeconds()).padStart(2, '0');
+
+                  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+                } catch (e) {
+                  return value;
+                }
+              }
+            };
+          }
+
           return column;
         });
 
         setColumns(updatedColumns);
-        console.log('✓ 마켓 렌더러 추가 완료');
       }
     }
   }, [marketTemplates, columns]);
@@ -277,6 +408,19 @@ export default function SearchTab() {
       }
     } catch (error) {
       console.error('택배사 목록 로드 실패:', error);
+    }
+  };
+
+  const loadCSTypes = async () => {
+    try {
+      const response = await fetch('/api/cs-types');
+      const result = await response.json();
+
+      if (result.success) {
+        setCSTypes(result.data.filter((type: any) => type.is_active));
+      }
+    } catch (error) {
+      console.error('CS 유형 목록 로드 실패:', error);
     }
   };
 
@@ -354,10 +498,11 @@ export default function SearchTab() {
                 '발송완료': 'bg-green-100 text-green-800',
                 '취소요청': 'bg-orange-100 text-orange-800',
                 '취소완료': 'bg-gray-100 text-gray-800',
+                '환불완료': 'bg-red-100 text-red-800',
               };
               const colorClass = statusColors[status] || 'bg-gray-100 text-gray-800';
               return (
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${colorClass}`}>
+                <span className={`px-2 py-0.5 rounded font-medium ${colorClass}`} style={{ fontSize: '13px' }}>
                   {status}
                 </span>
               );
@@ -427,16 +572,30 @@ export default function SearchTab() {
               };
 
               // 특정 필드 너비 설정
+              if (i === 3) column.width = 150; // 결제일
               if (i === 4) column.width = 150; // 주문번호
               if (i === 5) column.width = 100; // 주문자
-              if (i === 6) column.width = 100; // 주문자전화번호
+              if (i === 6) column.width = 120; // 주문자전화번호
               if (i === 7) column.width = 100; // 수령인
+              if (i === 8) column.width = 120; // 수령인전화번호
               if (i === 9) column.width = 250; // 주소
               if (i === 10) column.width = 120; // 배송메시지
+              if (i === 11) column.width = 200; // 옵션명
+              if (i === 12) column.width = 40; // 수량
 
               // field_1 (마켓명) - 마켓 배지 렌더러는 제거 (useEffect에서 처리)
               if (i === 1) {
                 column.isMarketColumn = true; // 마커 추가
+              }
+
+              // field_3 (결제일) - 시분초 표시 렌더러 (useEffect에서 처리)
+              if (i === 3) {
+                column.isPaymentDateColumn = true; // 마커 추가
+              }
+
+              // field_12 (수량) - 마커 추가 (렌더러는 useEffect에서 처리)
+              if (i === 12) {
+                column.isQuantityColumn = true; // 마커 추가
               }
 
               dynamicColumns.push(column);
@@ -671,6 +830,8 @@ export default function SearchTab() {
           return acc;
         }, {} as Record<string, number>);
 
+        console.log('📊 Status Counts:', statusCounts);
+
         setStats({
           total: result.data?.length || 0,
           접수: statusCounts['접수'] || 0,
@@ -679,6 +840,7 @@ export default function SearchTab() {
           발송완료: statusCounts['발송완료'] || 0,
           취소요청: statusCounts['취소요청'] || 0,
           취소완료: statusCounts['취소완료'] || 0,
+          환불완료: statusCounts['환불완료'] || 0,
         });
 
         // 벤더사별 집계 계산
@@ -704,17 +866,30 @@ export default function SearchTab() {
     fetchOrders();
   }, []);
 
-  // 빠른 날짜 필터
+  // 빠른 날짜 필터 (한국 시간 기준)
   const setQuickDateFilter = (days: number) => {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - days);
+    const now = new Date();
+    const koreaEndDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+    const koreaStartDate = new Date(koreaEndDate);
+    koreaStartDate.setDate(koreaStartDate.getDate() - days);
 
     setFilters({
       ...filters,
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
+      startDate: koreaStartDate.toISOString().split('T')[0],
+      endDate: koreaEndDate.toISOString().split('T')[0],
     });
+  };
+
+  // 선택된 빠른 날짜 필터 확인 (한국 시간 기준)
+  const isQuickDateFilterActive = (days: number) => {
+    const now = new Date();
+    const koreaToday = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+    const expectedEnd = koreaToday.toISOString().split('T')[0];
+    const koreaStart = new Date(koreaToday);
+    koreaStart.setDate(koreaStart.getDate() - days);
+    const expectedStartStr = koreaStart.toISOString().split('T')[0];
+
+    return filters.startDate === expectedStartStr && filters.endDate === expectedEnd;
   };
 
   // 엑셀 다운로드
@@ -786,7 +961,7 @@ export default function SearchTab() {
 
   // 일괄적용 핸들러 - 선택된 주문에 택배사 적용
   const handleBulkApply = () => {
-    console.log('일괄적용 시작:', { bulkApplyValue, selectedOrders, ordersLength: orders.length });
+    console.log('일괄적용 시작:', { bulkApplyValue, selectedOrders, filteredOrdersLength: filteredOrders.length });
 
     if (!bulkApplyValue.trim()) {
       alert('택배사를 선택해주세요.');
@@ -797,18 +972,35 @@ export default function SearchTab() {
       return;
     }
 
-    // 선택된 주문에 택배사 일괄 적용
-    const updatedOrders = [...orders];
-    selectedOrders.forEach(index => {
-      console.log(`  - 주문 ${index} 업데이트:`, updatedOrders[index]?.order_number);
-      updatedOrders[index] = {
-        ...updatedOrders[index],
-        courier_company: bulkApplyValue,
-      };
+    // 선택된 주문의 ID 가져오기
+    const selectedOrderIds = selectedOrders.map(index => filteredOrders[index]?.id).filter(id => id);
+    console.log('선택된 주문 IDs:', selectedOrderIds);
+
+    if (selectedOrderIds.length === 0) {
+      alert('유효한 주문이 선택되지 않았습니다.');
+      return;
+    }
+
+    // 전체 orders 배열 업데이트 - 완전히 새로운 배열 생성
+    const updatedOrders = orders.map(order => {
+      if (selectedOrderIds.includes(order.id)) {
+        console.log(`  - 주문 ${order.order_number} 택배사: ${order.courier_company} → ${bulkApplyValue}`);
+        // 완전히 새로운 객체 생성
+        return {
+          ...order,
+          courier_company: bulkApplyValue,
+        };
+      }
+      return order;
     });
 
-    setOrders(updatedOrders);
-    console.log('일괄적용 완료');
+    console.log('업데이트 완료, orders 배열 설정');
+    // 그리드가 데이터 변경을 감지하도록 임시 행 추가 후 즉시 제거
+    const tempOrder = { id: 'temp_refresh', order_number: '' } as any;
+    setOrders([...updatedOrders, tempOrder]);
+    setTimeout(() => {
+      setOrders(updatedOrders);
+    }, 10);
   };
 
   // 발주확인 핸들러 - 선택된 결제완료 상태 주문을 상품준비중으로 변경
@@ -820,7 +1012,7 @@ export default function SearchTab() {
     }
 
     const confirmOrders = selectedOrders
-      .map(index => orders[index])
+      .map(index => filteredOrders[index])
       .filter(order => order && order.shipping_status === '결제완료');
 
     if (confirmOrders.length === 0) {
@@ -933,7 +1125,7 @@ export default function SearchTab() {
   };
 
   // 벤더사별 엑셀 다운로드
-  const handleVendorExcelDownload = (vendorName: string) => {
+  const handleVendorExcelDownload = async (vendorName: string) => {
     const vendorOrders = orders.filter((o) => (o.vendor_name || '미지정') === vendorName);
 
     if (vendorOrders.length === 0) {
@@ -941,25 +1133,61 @@ export default function SearchTab() {
       return;
     }
 
-    const exportData = vendorOrders.map((order) => ({
-      주문번호: order.order_number,
-      수취인: order.recipient_name,
-      전화번호: order.recipient_phone || '',
-      주소: order.recipient_address || '',
-      옵션명: order.option_name,
-      수량: order.quantity,
-      발송상태: order.shipping_status,
-      택배사: order.courier_company || '',
-      송장번호: order.tracking_number || '',
-      발송일: order.shipped_date || '',
-    }));
+    try {
+      // 벤더사 템플릿 가져오기
+      const response = await fetch(`/api/vendor-templates/${encodeURIComponent(vendorName)}`);
+      const result = await response.json();
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, vendorName);
+      let exportData;
 
-    const fileName = `${vendorName}_발송목록_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(wb, fileName);
+      if (result.success && result.data && result.data.columns.length > 0) {
+        // 템플릿이 있는 경우: 템플릿에 맞게 데이터 변환
+        const template = result.data;
+        exportData = vendorOrders.map((order: any) => {
+          const row: any = {};
+          template.columns.forEach((col: any) => {
+            const fieldType = col.field_type || 'db';
+
+            if (fieldType === 'db') {
+              // DB 필드: 실제 값 가져오기
+              const value = order[col.db_field];
+              row[col.header_name] = value || '';
+            } else if (fieldType === 'fixed') {
+              // 고정값: 설정된 값 사용
+              row[col.header_name] = col.fixed_value || '';
+            } else if (fieldType === 'empty') {
+              // 빈칸: 빈 문자열
+              row[col.header_name] = '';
+            }
+          });
+          return row;
+        });
+      } else {
+        // 템플릿이 없는 경우: 기본 양식 사용
+        exportData = vendorOrders.map((order) => ({
+          주문번호: order.order_number,
+          수취인: order.recipient_name,
+          전화번호: order.recipient_phone || '',
+          주소: order.recipient_address || '',
+          옵션명: order.option_name,
+          수량: order.quantity,
+          발송상태: order.shipping_status,
+          택배사: order.courier_company || '',
+          송장번호: order.tracking_number || '',
+          발송일: order.shipped_date || '',
+        }));
+      }
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, vendorName);
+
+      const fileName = `${vendorName}_발송목록_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error('엑셀 다운로드 오류:', error);
+      alert('엑셀 다운로드 중 오류가 발생했습니다.');
+    }
   };
 
   // 셀러별 엑셀 다운로드
@@ -1095,8 +1323,9 @@ export default function SearchTab() {
       return;
     }
 
-    const cancelOrders = selectedOrders
-      .map(index => orders[index])
+    const selectedOrdersData = selectedOrders.map(index => filteredOrders[index]);
+
+    const cancelOrders = selectedOrdersData
       .filter(order => order && order.shipping_status === '취소요청');
 
     if (cancelOrders.length === 0) {
@@ -1133,6 +1362,333 @@ export default function SearchTab() {
     } catch (error) {
       console.error('취소승인 오류:', error);
       alert('취소승인 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 취소반려 핸들러 - 선택된 취소요청 주문을 상품준비중으로 변경
+  const handleCancelReject = async () => {
+    // 선택된 주문만 필터링
+    if (selectedOrders.length === 0) {
+      alert('취소반려할 주문을 선택해주세요.');
+      return;
+    }
+
+    const selectedOrdersData = selectedOrders.map(index => filteredOrders[index]);
+
+    const rejectOrders = selectedOrdersData
+      .filter(order => order && order.shipping_status === '취소요청');
+
+    if (rejectOrders.length === 0) {
+      alert('선택한 주문 중 취소요청 상태인 주문이 없습니다.');
+      return;
+    }
+
+    if (!confirm(`${rejectOrders.length}개의 주문을 취소반려 하시겠습니까?\n상품준비중 상태로 변경됩니다.`)) {
+      return;
+    }
+
+    try {
+      const updates = rejectOrders.map(order => ({
+        id: order.id,
+        shipping_status: '상품준비중',
+      }));
+
+      const response = await fetch('/api/integrated-orders/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: updates }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`${result.count}개 주문이 취소반려 처리되었습니다. 상품준비중 상태로 변경되었습니다.`);
+        setSelectedOrders([]); // 선택 초기화
+        fetchOrders();
+      } else {
+        alert('취소반려 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('취소반려 오류:', error);
+      alert('취소반려 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 옵션명으로 매핑 정보 가져오기
+  const fetchMappingByOptionName = async (optionName: string) => {
+    try {
+      const response = await fetch(`/api/option-products?option_name=${encodeURIComponent(optionName)}`);
+      const result = await response.json();
+
+      if (result.success && result.data && result.data.length > 0) {
+        const mapping = result.data[0];
+        return {
+          seller_supply_price: mapping.seller_supply_price || '',
+          shipping_source: mapping.shipping_source || '',
+          invoice_issuer: mapping.invoice_issuer || '',
+          vendor_name: mapping.vendor_name || '',
+          shipping_location_name: mapping.shipping_location_name || '',
+          shipping_location_address: mapping.shipping_location_address || '',
+          shipping_location_contact: mapping.shipping_location_contact || '',
+          shipping_cost: mapping.shipping_cost || '',
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('옵션명 매핑 조회 실패:', error);
+      return null;
+    }
+  };
+
+  // CS 접수 제출 핸들러
+  // CS 모달 엔터키 핸들러 (입력란에서 빠져나오기)
+  const handleCSKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      // 현재 input에서 blur 처리
+      const target = e.target as HTMLInputElement;
+      target.blur();
+    }
+  };
+
+  const handleCSSubmit = async () => {
+    // 필수 필드 확인
+    if (!csFormData.category) {
+      alert('CS구분을 선택해주세요.');
+      return;
+    }
+    if (!csFormData.content) {
+      alert('CS 내용을 입력해주세요.');
+      return;
+    }
+    if (!csFormData.solution) {
+      alert('해결방법을 선택해주세요.');
+      return;
+    }
+    if (csFormData.solution === 'other_action' && !csFormData.otherSolution) {
+      alert('기타 조치 내용을 입력해주세요.');
+      return;
+    }
+
+    const selectedOrder = filteredOrders[selectedOrders[0]];
+
+    try {
+      // 1. CS 기록 저장
+      const csRecordData = {
+        receipt_date: new Date().toISOString().split('T')[0], // 오늘 날짜
+        cs_type: csFormData.category,
+        resolution_method: csFormData.solution === 'other_action' ? csFormData.otherSolution : csFormData.solution,
+        order_number: selectedOrder.order_number || '',
+        market_name: selectedOrder.market_name || '',
+        orderer_name: selectedOrder.buyer_name || '',
+        recipient_name: selectedOrder.recipient_name || '',
+        recipient_phone: selectedOrder.recipient_phone || '',
+        recipient_address: selectedOrder.recipient_address || '',
+        option_name: selectedOrder.option_name || '',
+        quantity: selectedOrder.quantity || 0,
+        cs_reason: csFormData.category,
+        cs_content: csFormData.content,
+        status: '접수',
+        // 환불 정보 (부분환불일 경우)
+        refund_amount: csFormData.solution === 'partial_refund' ? csFormData.refundAmount : null,
+        // 재발송 정보 (재발송일 경우)
+        resend_option: (csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend') ? csFormData.resendOption : null,
+        resend_quantity: (csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend') ? csFormData.resendQty : null,
+        resend_receiver: (csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend') ? csFormData.receiver : null,
+        resend_phone: (csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend') ? csFormData.phone : null,
+        resend_address: (csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend') ? csFormData.address : null,
+        resend_note: (csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend') ? csFormData.resendNote : null,
+        additional_amount: (csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend') ? csFormData.additionalAmount : null,
+        // 부분환불 계좌 정보
+        bank_name: csFormData.solution === 'partial_refund' ? csFormData.bank : null,
+        account_holder: csFormData.solution === 'partial_refund' ? csFormData.accountHolder : null,
+        account_number: csFormData.solution === 'partial_refund' ? csFormData.accountNumber : null,
+      };
+
+      const csResponse = await fetch('/api/cs-records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(csRecordData),
+      });
+
+      const csResult = await csResponse.json();
+
+      console.log('CS 기록 저장 응답:', csResult);
+
+      if (!csResult.success) {
+        console.error('CS 기록 저장 실패 상세:', csResult);
+        alert('CS 기록 저장 실패: ' + csResult.error);
+        return;
+      }
+
+      // 2. 재발송일 경우 새로운 주문 생성
+      if (csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend') {
+        // CS 주문번호 생성: CS+접수일시(YYYYMMDDHHmmss)+001
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const csOrderNumber = `CS${year}${month}${day}${hours}${minutes}${seconds}001`;
+
+        // 옵션명으로 매핑 정보 가져오기
+        const optionName = csFormData.resendOption || selectedOrder.option_name;
+        const mappingData = await fetchMappingByOptionName(optionName);
+
+        // 새 주문 데이터 생성
+        const newOrderData = {
+          sheet_date: new Date().toISOString().split('T')[0],
+          market_name: 'CS발송',
+          order_number: csOrderNumber,
+          payment_date: new Date().toISOString().split('T')[0],
+          recipient_name: csFormData.receiver || selectedOrder.recipient_name,
+          recipient_phone: csFormData.phone || selectedOrder.recipient_phone,
+          recipient_address: csFormData.address || selectedOrder.recipient_address,
+          delivery_message: csFormData.resendNote || '',
+          option_name: optionName,
+          quantity: csFormData.resendQty || selectedOrder.quantity,
+          shipping_status: '접수',
+          memo: `원주문: ${selectedOrder.order_number} / CS유형: ${csFormData.category}`,
+          // 옵션명 기준 자동 매핑 (없으면 원주문 정보 복사)
+          seller_supply_price: mappingData?.seller_supply_price || selectedOrder.seller_supply_price,
+          shipping_source: mappingData?.shipping_source || selectedOrder.shipping_source,
+          invoice_issuer: mappingData?.invoice_issuer || selectedOrder.invoice_issuer,
+          vendor_name: mappingData?.vendor_name || selectedOrder.vendor_name,
+          shipping_location_name: mappingData?.shipping_location_name || selectedOrder.shipping_location_name,
+          shipping_location_address: mappingData?.shipping_location_address || selectedOrder.shipping_location_address,
+          shipping_location_contact: mappingData?.shipping_location_contact || selectedOrder.shipping_location_contact,
+          shipping_cost: mappingData?.shipping_cost || selectedOrder.shipping_cost,
+        };
+
+        // 주문 생성 API 호출
+        const createOrderResponse = await fetch('/api/integrated-orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newOrderData),
+        });
+
+        const createOrderResult = await createOrderResponse.json();
+
+        if (!createOrderResult.success) {
+          alert('재발송 주문 생성 실패: ' + createOrderResult.error);
+          return;
+        }
+
+        console.log('재발송 주문 생성 완료:', csOrderNumber);
+      }
+
+      // 3. 원주문의 cs_status 업데이트
+      const response = await fetch('/api/integrated-orders/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orders: [{
+            id: selectedOrder.id,
+            cs_status: csFormData.category
+          }]
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        const message = (csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend')
+          ? 'CS접수가 완료되었습니다.\n재발송 주문이 생성되었습니다.'
+          : 'CS접수가 완료되었습니다.';
+        alert(message);
+        setShowCSModal(false);
+        setSelectedOrders([]);
+        // 폼 초기화
+        setCSFormData(initialCSFormData);
+        fetchOrders();
+      } else {
+        alert('CS접수 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('CS접수 오류:', error);
+      alert('CS접수 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 환불금액 계산
+  const calculateRefundAmount = () => {
+    const amount = csFormData.paymentAmount * (csFormData.refundPercent / 100);
+    setCSFormData(prev => ({ ...prev, refundAmount: Math.floor(amount) }));
+  };
+
+  // 추가주문 제출 핸들러
+  const handleAdditionalOrderSubmit = async () => {
+    if (!additionalOrderData.option_name) {
+      alert('옵션명을 입력해주세요.');
+      return;
+    }
+    if (!additionalOrderData.recipient_name) {
+      alert('수령인을 입력해주세요.');
+      return;
+    }
+
+    try {
+      // 추가 주문번호 생성: ADD+접수일시(YYYYMMDDHHmmss)+001
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      const additionalOrderNumber = `ADD${year}${month}${day}${hours}${minutes}${seconds}001`;
+
+      // 옵션명으로 매핑 정보 가져오기
+      const mappingData = await fetchMappingByOptionName(additionalOrderData.option_name);
+
+      // 새 주문 데이터 생성
+      const newOrderData = {
+        sheet_date: new Date().toISOString().split('T')[0],
+        market_name: additionalOrderData.market_name || '추가주문',
+        order_number: additionalOrderNumber,
+        payment_date: new Date().toISOString().split('T')[0],
+        recipient_name: additionalOrderData.recipient_name,
+        recipient_phone: additionalOrderData.recipient_phone,
+        recipient_address: additionalOrderData.recipient_address,
+        delivery_message: additionalOrderData.delivery_message,
+        option_name: additionalOrderData.option_name,
+        quantity: additionalOrderData.quantity || 1,
+        shipping_status: '접수',
+        shipping_request_date: additionalOrderData.shipping_request_date || null,
+        memo: `원주문: ${additionalOrderData.original_order_number}`,
+        // 옵션명 기준 자동 매핑
+        seller_supply_price: mappingData?.seller_supply_price || '',
+        shipping_source: mappingData?.shipping_source || '',
+        invoice_issuer: mappingData?.invoice_issuer || '',
+        vendor_name: mappingData?.vendor_name || '',
+        shipping_location_name: mappingData?.shipping_location_name || '',
+        shipping_location_address: mappingData?.shipping_location_address || '',
+        shipping_location_contact: mappingData?.shipping_location_contact || '',
+        shipping_cost: mappingData?.shipping_cost || '',
+      };
+
+      // 주문 생성 API 호출
+      const response = await fetch('/api/integrated-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newOrderData),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('추가주문이 등록되었습니다.');
+        setShowAdditionalOrderModal(false);
+        setAdditionalOrderData({});
+        fetchOrders();
+      } else {
+        alert('추가주문 등록 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('추가주문 등록 오류:', error);
+      alert('추가주문 등록 중 오류가 발생했습니다.');
     }
   };
 
@@ -1320,14 +1876,89 @@ export default function SearchTab() {
 
   // 필터링된 주문 데이터
   const filteredOrders = useMemo(() => {
-    if (!statusFilter) {
-      return orders;
-    }
     return orders.filter(order => {
-      const orderStatus = order.shipping_status || '결제완료';
-      return orderStatus === statusFilter;
+      // 날짜 필터
+      if (filters.startDate || filters.endDate) {
+        const orderDate = filters.dateType === 'payment'
+          ? order.payment_date
+          : order.sheet_date;
+
+        if (orderDate) {
+          const dateStr = orderDate.split('T')[0];
+          if (filters.startDate && dateStr < filters.startDate) return false;
+          if (filters.endDate && dateStr > filters.endDate) return false;
+        }
+      }
+
+      // 마켓명 필터
+      if (filters.marketName && order.market_name !== filters.marketName) {
+        return false;
+      }
+
+      // 발송상태 필터
+      if (filters.shippingStatus && order.shipping_status !== filters.shippingStatus) {
+        return false;
+      }
+
+      // 벤더사 필터
+      if (filters.vendorName && order.vendor_name !== filters.vendorName) {
+        return false;
+      }
+
+      // 검색어 필터
+      if (filters.searchKeyword) {
+        const keyword = filters.searchKeyword.toLowerCase();
+        const searchFields = [
+          order.order_number,
+          order.recipient_name,
+          order.option_name,
+        ].filter(Boolean).map(field => String(field).toLowerCase());
+
+        if (!searchFields.some(field => field.includes(keyword))) {
+          return false;
+        }
+      }
+
+      // 상태카드 필터
+      if (statusFilter) {
+        const orderStatus = order.shipping_status || '결제완료';
+        if (orderStatus !== statusFilter) return false;
+      }
+
+      return true;
     });
-  }, [orders, statusFilter]);
+  }, [orders, statusFilter, filters]);
+
+  // 드롭다운 옵션 추출 (테이블 데이터 기준)
+  const uniqueMarkets = useMemo(() => {
+    const markets = new Set<string>();
+    orders.forEach(order => {
+      if (order.market_name) {
+        markets.add(order.market_name);
+      }
+    });
+    return Array.from(markets).sort();
+  }, [orders]);
+
+  const uniqueStatuses = useMemo(() => {
+    const statuses = new Set<string>();
+    orders.forEach(order => {
+      if (order.shipping_status) {
+        statuses.add(order.shipping_status);
+      }
+    });
+    return Array.from(statuses).sort();
+  }, [orders]);
+
+  const uniqueVendors = useMemo(() => {
+    const vendors = new Set<string>();
+    orders.forEach(order => {
+      if (order.vendor_name) {
+        vendors.add(order.vendor_name);
+      }
+    });
+    return Array.from(vendors).sort();
+  }, [orders]);
 
   // 행 삭제 핸들러 (소프트 삭제)
   const handleDeleteRows = (indices: number[]) => {
@@ -1368,7 +1999,7 @@ export default function SearchTab() {
   return (
     <div className="space-y-4">
       {/* 통계 카드 */}
-      <div className="grid grid-cols-7 gap-4">
+      <div className="grid grid-cols-8 gap-4">
         <div
           onClick={() => handleStatusCardClick(null)}
           className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
@@ -1439,12 +2070,23 @@ export default function SearchTab() {
           onClick={() => handleStatusCardClick('취소완료')}
           className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
             statusFilter === '취소완료'
+              ? 'border-gray-600 border-2 shadow-md'
+              : 'border-gray-200 hover:border-gray-400'
+          }`}
+        >
+          <div className="text-sm text-gray-600 mb-1">취소완료</div>
+          <div className="text-2xl font-semibold text-gray-600">{(stats.취소완료 || 0).toLocaleString()}</div>
+        </div>
+        <div
+          onClick={() => handleStatusCardClick('환불완료')}
+          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+            statusFilter === '환불완료'
               ? 'border-red-600 border-2 shadow-md'
               : 'border-gray-200 hover:border-red-400'
           }`}
         >
-          <div className="text-sm text-gray-600 mb-1">취소완료</div>
-          <div className="text-2xl font-semibold text-red-600">{(stats.취소완료 || 0).toLocaleString()}</div>
+          <div className="text-sm text-gray-600 mb-1">환불완료</div>
+          <div className="text-2xl font-semibold text-red-600">{(stats.환불완료 || 0).toLocaleString()}</div>
         </div>
       </div>
 
@@ -1631,153 +2273,132 @@ export default function SearchTab() {
       </div>
 
       {/* 검색 필터 */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="grid grid-cols-12 gap-3 items-end">
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <div className="flex items-center gap-2">
           {/* 날짜 유형 */}
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">날짜 기준</label>
-            <select
-              value={filters.dateType}
-              onChange={(e) => setFilters({ ...filters, dateType: e.target.value as 'sheet' | 'payment' })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            >
-              <option value="sheet">주문통합일</option>
-              <option value="payment">결제일</option>
-            </select>
-          </div>
+          <select
+            value={filters.dateType}
+            onChange={(e) => setFilters({ ...filters, dateType: e.target.value as 'sheet' | 'payment' })}
+            className="px-2 border border-gray-300 rounded text-xs"
+            style={{ width: '110px', height: '30px' }}
+          >
+            <option value="sheet">주문통합일</option>
+            <option value="payment">결제일</option>
+          </select>
 
           {/* 시작일 */}
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">시작일</label>
-            <input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            />
-          </div>
+          <input
+            type="date"
+            value={filters.startDate}
+            onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+            className="px-2 border border-gray-300 rounded text-xs"
+            style={{ width: '130px', height: '30px' }}
+          />
 
           {/* 종료일 */}
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">종료일</label>
-            <input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            />
-          </div>
+          <input
+            type="date"
+            value={filters.endDate}
+            onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+            className="px-2 border border-gray-300 rounded text-xs"
+            style={{ width: '130px', height: '30px' }}
+          />
 
           {/* 빠른 날짜 필터 */}
-          <div className="col-span-6 flex gap-2">
-            <button
-              onClick={() => setQuickDateFilter(1)}
-              className="px-3 py-2 text-xs border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              오늘
-            </button>
-            <button
-              onClick={() => setQuickDateFilter(7)}
-              className="px-3 py-2 text-xs border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              7일
-            </button>
-            <button
-              onClick={() => setQuickDateFilter(30)}
-              className="px-3 py-2 text-xs border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              30일
-            </button>
-            <button
-              onClick={() => setQuickDateFilter(90)}
-              className="px-3 py-2 text-xs border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              90일
-            </button>
-          </div>
+          <button
+            onClick={() => setQuickDateFilter(0)}
+            className={`px-1 text-xs rounded hover:bg-gray-50 ${
+              isQuickDateFilterActive(0)
+                ? 'border-2 border-blue-500 bg-blue-50'
+                : 'border border-gray-300'
+            }`}
+            style={{ width: '60px', height: '30px' }}
+          >
+            오늘
+          </button>
+          <button
+            onClick={() => setQuickDateFilter(6)}
+            className={`px-1 text-xs rounded hover:bg-gray-50 ${
+              isQuickDateFilterActive(6)
+                ? 'border-2 border-blue-500 bg-blue-50'
+                : 'border border-gray-300'
+            }`}
+            style={{ width: '60px', height: '30px' }}
+          >
+            7일
+          </button>
+          <button
+            onClick={() => setQuickDateFilter(29)}
+            className={`px-1 text-xs rounded hover:bg-gray-50 ${
+              isQuickDateFilterActive(29)
+                ? 'border-2 border-blue-500 bg-blue-50'
+                : 'border border-gray-300'
+            }`}
+            style={{ width: '60px', height: '30px' }}
+          >
+            30일
+          </button>
+          <button
+            onClick={() => setQuickDateFilter(89)}
+            className={`px-1 text-xs rounded hover:bg-gray-50 ${
+              isQuickDateFilterActive(89)
+                ? 'border-2 border-blue-500 bg-blue-50'
+                : 'border border-gray-300'
+            }`}
+            style={{ width: '60px', height: '30px' }}
+          >
+            90일
+          </button>
 
           {/* 마켓명 */}
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">마켓명</label>
-            <select
-              value={filters.marketName}
-              onChange={(e) => setFilters({ ...filters, marketName: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            >
-              <option value="">전체</option>
-              <option value="스마트스토어">스마트스토어</option>
-              <option value="쿠팡">쿠팡</option>
-              <option value="11번가">11번가</option>
-              <option value="토스">토스</option>
-              <option value="전화주문">전화주문</option>
-              <option value="플랫폼">플랫폼</option>
-            </select>
-          </div>
+          <select
+            value={filters.marketName}
+            onChange={(e) => setFilters({ ...filters, marketName: e.target.value })}
+            className="px-2 border border-gray-300 rounded text-xs"
+            style={{ width: '90px', height: '30px' }}
+          >
+            <option value="">마켓전체</option>
+            {uniqueMarkets.map(market => (
+              <option key={market} value={market}>{market}</option>
+            ))}
+          </select>
 
           {/* 발송상태 */}
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">발송상태</label>
-            <select
-              value={filters.shippingStatus}
-              onChange={(e) => setFilters({ ...filters, shippingStatus: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            >
-              <option value="">전체</option>
-              <option value="접수">접수</option>
-              <option value="결제완료">결제완료</option>
-              <option value="상품준비중">상품준비중</option>
-              <option value="발송완료">발송완료</option>
-              <option value="취소요청">취소요청</option>
-              <option value="취소완료">취소완료</option>
-            </select>
-          </div>
+          <select
+            value={filters.shippingStatus}
+            onChange={(e) => setFilters({ ...filters, shippingStatus: e.target.value })}
+            className="px-2 border border-gray-300 rounded text-xs"
+            style={{ width: '90px', height: '30px' }}
+          >
+            <option value="">상태전체</option>
+            {uniqueStatuses.map(status => (
+              <option key={status} value={status}>{status}</option>
+            ))}
+          </select>
 
           {/* 벤더사 */}
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">벤더사</label>
-            <input
-              type="text"
-              value={filters.vendorName}
-              onChange={(e) => setFilters({ ...filters, vendorName: e.target.value })}
-              placeholder="벤더사명"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            />
-          </div>
+          <select
+            value={filters.vendorName}
+            onChange={(e) => setFilters({ ...filters, vendorName: e.target.value })}
+            className="px-2 border border-gray-300 rounded text-xs"
+            style={{ width: '120px', height: '30px' }}
+          >
+            <option value="">벤더전체</option>
+            {uniqueVendors.map(vendor => (
+              <option key={vendor} value={vendor}>{vendor}</option>
+            ))}
+          </select>
 
           {/* 검색어 */}
-          <div className="col-span-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">검색어</label>
+          <div className="relative" style={{ width: '120px', height: '30px' }}>
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
             <input
               type="text"
               value={filters.searchKeyword}
               onChange={(e) => setFilters({ ...filters, searchKeyword: e.target.value })}
-              placeholder="주문번호, 수취인, 옵션명"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              placeholder=""
+              className="w-full h-full pl-7 pr-2 border-2 border-blue-500 rounded text-xs"
             />
-          </div>
-
-          {/* 검색 버튼 */}
-          <div className="col-span-2 flex gap-2">
-            <button
-              onClick={fetchOrders}
-              disabled={loading}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center gap-2 text-sm"
-            >
-              {loading ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <Search className="w-4 h-4" />
-              )}
-              검색
-            </button>
-            <button
-              onClick={handleExcelDownload}
-              disabled={orders.length === 0}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2 text-sm"
-            >
-              <Download className="w-4 h-4" />
-              엑셀
-            </button>
           </div>
         </div>
       </div>
@@ -1811,61 +2432,132 @@ export default function SearchTab() {
                       입금확인
                     </button>
                   )}
-                  <button
-                    onClick={handleOrderConfirm}
-                    className="px-2 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700"
-                  >
-                    발주확인
-                  </button>
-                  <button
-                    onClick={handleCancelApprove}
-                    className="px-2 py-1 bg-orange-600 text-white rounded text-xs font-medium hover:bg-orange-700"
-                  >
-                    취소승인
-                  </button>
+                  {statusFilter === '결제완료' && (
+                    <button
+                      onClick={handleOrderConfirm}
+                      className="px-2 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700"
+                    >
+                      발주확인
+                    </button>
+                  )}
+                  {statusFilter === '취소요청' && (
+                    <>
+                      <button
+                        onClick={handleCancelApprove}
+                        className="px-2 py-1 bg-orange-600 text-white rounded text-xs font-medium hover:bg-orange-700"
+                      >
+                        취소승인
+                      </button>
+                      <button
+                        onClick={handleCancelReject}
+                        className="px-2 py-1 bg-gray-500 text-white rounded text-xs font-medium hover:bg-gray-600"
+                      >
+                        취소반려
+                      </button>
+                    </>
+                  )}
+                  {(statusFilter === '발송완료' || !statusFilter) && (
+                    <button
+                      onClick={() => {
+                        if (selectedOrders.length === 0) {
+                          alert('CS접수할 주문을 선택해주세요.');
+                          return;
+                        }
+                        if (selectedOrders.length > 1) {
+                          alert('CS 접수는 한 번에 하나의 주문만 처리할 수 있습니다.');
+                          return;
+                        }
+                        const selectedOrder = filteredOrders[selectedOrders[0]];
+                        if (selectedOrder.shipping_status !== '발송완료') {
+                          alert('CS접수는 발송완료 상태의 주문만 가능합니다.');
+                          return;
+                        }
+                        setShowCSModal(true);
+                      }}
+                      className="px-2 py-1 bg-pink-600 text-white rounded text-xs font-medium hover:bg-pink-700"
+                    >
+                      CS접수
+                    </button>
+                  )}
+                  {(statusFilter === '결제완료' || statusFilter === '상품준비중' || statusFilter === '발송완료' || !statusFilter) && (
+                    <button
+                      onClick={() => {
+                        if (selectedOrders.length === 0) {
+                          alert('추가주문할 원주문을 선택해주세요.');
+                          return;
+                        }
+                        if (selectedOrders.length > 1) {
+                          alert('추가주문은 한 번에 하나의 주문만 처리할 수 있습니다.');
+                          return;
+                        }
+                        const selectedOrder = filteredOrders[selectedOrders[0]];
+                        setAdditionalOrderData({
+                          ...selectedOrder,
+                          // 새 주문번호 생성 준비
+                          original_order_number: selectedOrder.order_number,
+                        });
+                        setShowAdditionalOrderModal(true);
+                      }}
+                      className="px-2 py-1 bg-teal-600 text-white rounded text-xs font-medium hover:bg-teal-700"
+                    >
+                      추가주문등록
+                    </button>
+                  )}
                 </div>
-                <div className="flex items-center gap-1">
-                  <select
-                    value={bulkApplyValue}
-                    onChange={(e) => setBulkApplyValue(e.target.value)}
-                    className="px-2 border border-gray-300 rounded text-xs h-[26px]"
-                    style={{ width: '100px' }}
-                  >
-                    <option value="">택배사 선택</option>
-                    {courierList.map(courier => (
-                      <option key={courier} value={courier}>{courier}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={handleBulkApply}
-                    className="px-2 py-1 bg-indigo-600 text-white rounded text-xs font-medium hover:bg-indigo-700"
-                  >
-                    일괄적용
-                  </button>
-                  <button
-                    onClick={handleTrackingRegister}
-                    className="px-2 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700"
-                  >
-                    송장등록
-                  </button>
-                  <button
-                    onClick={handleBulkInvoiceUpload}
-                    className="px-2 py-1 bg-purple-600 text-white rounded text-xs font-medium hover:bg-purple-700 flex items-center gap-1"
-                  >
-                    <Upload className="w-3 h-3" />
-                    송장일괄등록
-                  </button>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={handleExcelDownload}
-                    disabled={orders.length === 0}
-                    className="px-2 py-1 bg-gray-600 text-white rounded text-xs font-medium hover:bg-gray-700 disabled:bg-gray-400 flex items-center gap-1"
-                  >
-                    <Download className="w-3 h-3" />
-                    마켓송장파일
-                  </button>
-                </div>
+                {(statusFilter === '상품준비중' || statusFilter === '발송완료') && (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={bulkApplyValue}
+                        onChange={(e) => setBulkApplyValue(e.target.value)}
+                        className="px-2 border border-gray-300 rounded text-xs h-[26px]"
+                        style={{ width: '100px' }}
+                      >
+                        <option value="">택배사 선택</option>
+                        {courierList.map(courier => (
+                          <option key={courier} value={courier}>{courier}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleBulkApply}
+                        className="px-2 py-1 bg-indigo-600 text-white rounded text-xs font-medium hover:bg-indigo-700"
+                      >
+                        일괄적용
+                      </button>
+                      <button
+                        onClick={handleTrackingRegister}
+                        className="px-2 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700"
+                      >
+                        송장등록
+                      </button>
+                      <button
+                        onClick={handleBulkInvoiceUpload}
+                        className="px-2 py-1 bg-purple-600 text-white rounded text-xs font-medium hover:bg-purple-700 flex items-center gap-1"
+                      >
+                        <Upload className="w-3 h-3" />
+                        송장일괄등록
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setShowVendorFileModal(true)}
+                        disabled={orders.length === 0}
+                        className="px-2 py-1 bg-cyan-600 text-white rounded text-xs font-medium hover:bg-cyan-700 disabled:bg-gray-400 flex items-center gap-1"
+                      >
+                        <Download className="w-3 h-3" />
+                        벤더사전송파일
+                      </button>
+                      <button
+                        onClick={handleExcelDownload}
+                        disabled={orders.length === 0}
+                        className="px-2 py-1 bg-gray-600 text-white rounded text-xs font-medium hover:bg-gray-700 disabled:bg-gray-400 flex items-center gap-1"
+                      >
+                        <Download className="w-3 h-3" />
+                        마켓송장파일
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             }
           />
@@ -2091,6 +2783,787 @@ export default function SearchTab() {
           </div>
         </div>
       )}
+
+      {/* CS 접수 모달 */}
+      <Modal
+        isOpen={showCSModal}
+        onClose={() => {
+          setShowCSModal(false);
+          setCSFormData(initialCSFormData);
+        }}
+        title="CS 접수"
+        size="lg"
+        footer={
+          <>
+            <button
+              onClick={() => {
+                setShowCSModal(false);
+                setCSFormData(initialCSFormData);
+              }}
+              className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              취소
+            </button>
+            <button
+              onClick={handleCSSubmit}
+              className="px-4 py-2 bg-pink-600 text-white rounded hover:bg-pink-700"
+            >
+              접수
+            </button>
+          </>
+        }
+      >
+        <div>
+              {/* 주문 정보 */}
+              {selectedOrders.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="grid grid-cols-3 gap-x-4 gap-y-2 text-sm">
+                    <div>
+                      <span className="text-gray-600">주문번호:</span>
+                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.order_number || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">주문자:</span>
+                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.buyer_name || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">주문자전화번호:</span>
+                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.buyer_phone || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">수령인:</span>
+                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.recipient_name || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">수령인전화번호:</span>
+                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.recipient_phone || '-'}</span>
+                    </div>
+                    <div className="col-span-3">
+                      <span className="text-gray-600">주소:</span>
+                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.recipient_address || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">옵션명:</span>
+                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.option_name || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">수량:</span>
+                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.quantity || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">셀러:</span>
+                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.seller_name || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">벤더사:</span>
+                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.vendor_name || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* CS 구분, 내용, 해결방법 */}
+              <div className="flex gap-3 mb-4">
+                <div className="w-32">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    CS구분 <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={csFormData.category}
+                    onChange={(e) => setCSFormData(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">선택</option>
+                    <option value="파손">파손</option>
+                    <option value="썩음/상함">썩음/상함</option>
+                    <option value="맛 불만족">맛 불만족</option>
+                    <option value="분실">분실</option>
+                    <option value="기타">기타</option>
+                  </select>
+                </div>
+
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    CS 내용 <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={csFormData.content}
+                    onChange={(e) => setCSFormData(prev => ({ ...prev, content: e.target.value }))}
+                    onFocus={(e) => e.target.placeholder = ''}
+                    onBlur={(e) => e.target.placeholder = 'CS 내용을 입력하세요'}
+                    placeholder="CS 내용을 입력하세요"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 resize-none"
+                    rows={2}
+                  />
+                </div>
+
+                <div className="w-40">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    해결방법 <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={csFormData.solution}
+                    onChange={(e) => {
+                      const newSolution = e.target.value;
+                      setCSFormData(prev => ({ ...prev, solution: newSolution }));
+
+                      // 재발송 옵션이면 원주문 데이터 자동 채우기
+                      if (newSolution === 'partial_resend' || newSolution === 'full_resend') {
+                        if (selectedOrders.length > 0) {
+                          const order = filteredOrders[selectedOrders[0]];
+                          setCSFormData(prev => ({
+                            ...prev,
+                            resendOption: order.option_name || '',
+                            receiver: order.recipient_name || '',
+                            phone: order.recipient_phone || '',
+                            address: order.recipient_address || ''
+                          }));
+                        }
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">선택하세요</option>
+                    {csTypes.map((type) => (
+                      <option key={type.id} value={type.code}>
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* 기타 조치 입력란 */}
+              {csFormData.solution === 'other_action' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    기타 조치 내용 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={csFormData.otherSolution}
+                    onChange={(e) => setCSFormData(prev => ({ ...prev, otherSolution: e.target.value }))}
+                    onKeyDown={handleCSKeyDown}
+                    onFocus={(e) => e.target.placeholder = ''}
+                    onBlur={(e) => e.target.placeholder = '기타 조치 내용을 입력하세요'}
+                    placeholder="기타 조치 내용을 입력하세요"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+
+              {/* 교환 안내 메시지 */}
+              {csFormData.solution === 'exchange' && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                  <div className="text-sm text-red-800 font-medium">
+                    💡 접수를 완료한 후 업무처리 : 택배사 프로그램에서 반품접수 후 사이트에서 환불처리 하세요 (교환은 불가)
+                  </div>
+                </div>
+              )}
+
+              {/* 반품 안내 메시지 */}
+              {csFormData.solution === 'return' && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+                  <div className="text-sm text-orange-800 font-medium">
+                    💡 접수를 완료한 후 업무처리 : 택배사 프로그램에서 반품접수 후 사이트에서 반품완료처리 하세요
+                  </div>
+                </div>
+              )}
+
+              {/* 전체환불 안내 메시지 */}
+              {csFormData.solution === 'full_refund' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="text-sm text-blue-800 font-medium">
+                    💡 접수를 완료한 후 업무처리 : 사이트에서 환불처리 해주세요
+                  </div>
+                </div>
+              )}
+
+              {/* 부분환불 섹션 */}
+              {csFormData.solution === 'partial_refund' && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 space-y-3">
+                  <div className="text-xs text-yellow-700">
+                    ※ 결제금액은 결제내역을 확인할 수 있는 캡쳐사진으로 확인해야 합니다
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">결제금액</label>
+                      <input
+                        type="number"
+                        value={csFormData.paymentAmount || ''}
+                        onChange={(e) => {
+                          setCSFormData(prev => ({ ...prev, paymentAmount: Number(e.target.value) || 0 }));
+                          setTimeout(calculateRefundAmount, 0);
+                        }}
+                        onKeyDown={handleCSKeyDown}
+                        placeholder="결제금액"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">환불 비율(%)</label>
+                      <input
+                        type="number"
+                        value={csFormData.refundPercent || ''}
+                        onChange={(e) => {
+                          setCSFormData(prev => ({ ...prev, refundPercent: Number(e.target.value) || 0 }));
+                          setTimeout(calculateRefundAmount, 0);
+                        }}
+                        onKeyDown={handleCSKeyDown}
+                        min="0"
+                        max="100"
+                        placeholder="환불 비율"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">환불금액</label>
+                      <div className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50 text-lg font-semibold text-blue-600">
+                        {csFormData.refundAmount.toLocaleString()}원
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">은행</label>
+                      <input
+                        type="text"
+                        value={csFormData.bank}
+                        onChange={(e) => setCSFormData(prev => ({ ...prev, bank: e.target.value }))}
+                        onKeyDown={handleCSKeyDown}
+                        onFocus={(e) => e.target.placeholder = ''}
+                        onBlur={(e) => e.target.placeholder = '은행명'}
+                        placeholder="은행명"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">예금주</label>
+                      <input
+                        type="text"
+                        value={csFormData.accountHolder}
+                        onChange={(e) => setCSFormData(prev => ({ ...prev, accountHolder: e.target.value }))}
+                        onKeyDown={handleCSKeyDown}
+                        onFocus={(e) => e.target.placeholder = ''}
+                        onBlur={(e) => e.target.placeholder = '예금주명'}
+                        placeholder="예금주명"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">계좌번호</label>
+                      <input
+                        type="text"
+                        value={csFormData.accountNumber}
+                        onChange={(e) => setCSFormData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                        onKeyDown={handleCSKeyDown}
+                        onFocus={(e) => e.target.placeholder = ''}
+                        onBlur={(e) => e.target.placeholder = '계좌번호'}
+                        placeholder="계좌번호"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 재발송 섹션 */}
+              {(csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend') && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 space-y-3">
+                  {/* 첫째 줄 */}
+                  <div className="flex gap-2">
+                    <div className="flex-[2]">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">재발송 상품</label>
+                      <input
+                        type="text"
+                        value={csFormData.resendOption}
+                        onChange={(e) => setCSFormData(prev => ({ ...prev, resendOption: e.target.value }))}
+                        onKeyDown={handleCSKeyDown}
+                        onFocus={(e) => e.target.placeholder = ''}
+                        onBlur={(e) => e.target.placeholder = '옵션명'}
+                        placeholder="옵션명"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="w-20">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">수량</label>
+                      <input
+                        type="number"
+                        value={csFormData.resendQty}
+                        onChange={(e) => setCSFormData(prev => ({ ...prev, resendQty: Number(e.target.value) }))}
+                        onKeyDown={handleCSKeyDown}
+                        min="1"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="w-28">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">추가금액</label>
+                      <input
+                        type="number"
+                        value={csFormData.additionalAmount}
+                        onChange={(e) => setCSFormData(prev => ({ ...prev, additionalAmount: Number(e.target.value) }))}
+                        onKeyDown={handleCSKeyDown}
+                        onFocus={(e) => e.target.placeholder = ''}
+                        onBlur={(e) => e.target.placeholder = '0'}
+                        placeholder="0"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="flex-[2]">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">특이/요청사항</label>
+                      <input
+                        type="text"
+                        value={csFormData.resendNote}
+                        onChange={(e) => setCSFormData(prev => ({ ...prev, resendNote: e.target.value }))}
+                        onKeyDown={handleCSKeyDown}
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 둘째 줄 */}
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">수령인</label>
+                      <input
+                        type="text"
+                        value={csFormData.receiver}
+                        onChange={(e) => setCSFormData(prev => ({ ...prev, receiver: e.target.value }))}
+                        onKeyDown={handleCSKeyDown}
+                        onFocus={(e) => e.target.placeholder = ''}
+                        onBlur={(e) => e.target.placeholder = '수령인'}
+                        placeholder="수령인"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">수령인 전화번호</label>
+                      <input
+                        type="text"
+                        value={csFormData.phone}
+                        onChange={(e) => setCSFormData(prev => ({ ...prev, phone: e.target.value }))}
+                        onKeyDown={handleCSKeyDown}
+                        onFocus={(e) => e.target.placeholder = ''}
+                        onBlur={(e) => e.target.placeholder = '수령인 전화번호'}
+                        placeholder="수령인 전화번호"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 셋째 줄 */}
+                  <div className="flex gap-2">
+                    <div className="flex-[3]">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">주소</label>
+                      <input
+                        type="text"
+                        value={csFormData.address}
+                        onChange={(e) => setCSFormData(prev => ({ ...prev, address: e.target.value }))}
+                        onKeyDown={handleCSKeyDown}
+                        onFocus={(e) => e.target.placeholder = ''}
+                        onBlur={(e) => e.target.placeholder = '배송 주소'}
+                        placeholder="배송 주소"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="w-36">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">발송요청일</label>
+                      <input
+                        type="date"
+                        value={csFormData.requestDate}
+                        onChange={(e) => setCSFormData(prev => ({ ...prev, requestDate: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+        </div>
+      </Modal>
+
+      {/* 주문 상세 모달 */}
+      {selectedOrderDetail && (
+        <Modal
+          isOpen={showOrderDetailModal}
+          onClose={() => {
+            setShowOrderDetailModal(false);
+            setSelectedOrderDetail(null);
+          }}
+          title="주문 상세 정보"
+          size="lg"
+          footer={
+            <>
+              <button
+                onClick={() => {
+                  setShowOrderDetailModal(false);
+                  setSelectedOrderDetail(null);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                닫기
+              </button>
+              <button
+                onClick={() => {
+                  // 주문 상세 모달 닫기
+                  setShowOrderDetailModal(false);
+
+                  // 선택된 주문의 인덱스를 찾아서 설정
+                  const orderIndex = filteredOrders.findIndex(o => o.id === selectedOrderDetail.id);
+                  if (orderIndex !== -1) {
+                    setSelectedOrders([orderIndex]);
+                  }
+
+                  // CS 모달 열기
+                  setShowCSModal(true);
+                }}
+                className="px-4 py-2 bg-pink-600 text-white rounded hover:bg-pink-700"
+              >
+                CS접수
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-5" style={{ fontSize: '13px' }}>
+            {/* 주문 기본 정보 - 전체 너비 */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
+              <div className="grid grid-cols-3 gap-x-6 gap-y-2.5">
+                <div className="flex items-center">
+                  <span className="text-gray-600 w-24 flex-shrink-0">주문번호</span>
+                  <span className="text-gray-900 font-semibold">{selectedOrderDetail.order_number || '-'}</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-gray-600 w-24 flex-shrink-0">마켓명</span>
+                  <span className="text-gray-900 font-medium">{selectedOrderDetail.market_name || '-'}</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-gray-600 w-24 flex-shrink-0">결제일</span>
+                  <span className="text-gray-900 font-medium">{selectedOrderDetail.payment_date || '-'}</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-gray-600 w-24 flex-shrink-0">주문자</span>
+                  <span className="text-gray-900 font-medium">{selectedOrderDetail.buyer_name || '-'}</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-gray-600 w-24 flex-shrink-0">주문자 전화</span>
+                  <span className="text-gray-900 font-medium">{selectedOrderDetail.buyer_phone || '-'}</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-gray-600 w-24 flex-shrink-0">발송 상태</span>
+                  <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                    {selectedOrderDetail.shipping_status || '-'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 2단 레이아웃 */}
+            <div className="grid grid-cols-2 gap-5">
+              {/* 수령인 정보 */}
+              <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+                <div className="space-y-2.5">
+                  <div className="flex items-center">
+                    <span className="text-gray-600 w-28 flex-shrink-0">수령인</span>
+                    <span className="text-gray-900 font-medium">{selectedOrderDetail.recipient_name || '-'}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-gray-600 w-28 flex-shrink-0">전화번호</span>
+                    <span className="text-gray-900 font-medium">{selectedOrderDetail.recipient_phone || '-'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-gray-600 mb-1">배송 주소</span>
+                    <span className="text-gray-900 font-medium leading-relaxed bg-white rounded px-3 py-2 border border-green-200">
+                      {selectedOrderDetail.recipient_address || '-'}
+                    </span>
+                  </div>
+                  {selectedOrderDetail.delivery_message && (
+                    <div className="flex flex-col">
+                      <span className="text-gray-600 mb-1">배송 메시지</span>
+                      <span className="text-gray-700 italic bg-white rounded px-3 py-2 border border-green-200">
+                        {selectedOrderDetail.delivery_message}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 상품 정보 */}
+              <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
+                <div className="space-y-2.5">
+                  <div className="flex flex-col">
+                    <span className="text-gray-600 mb-1">옵션명</span>
+                    <span className="text-gray-900 font-semibold bg-white rounded px-3 py-2 border border-purple-200">
+                      {selectedOrderDetail.option_name || '-'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <span className="text-gray-600 block mb-1">수량</span>
+                      <span className="text-gray-900 font-bold text-base bg-white rounded px-3 py-2 border border-purple-200 block text-center">
+                        {selectedOrderDetail.quantity || '-'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600 block mb-1">옵션코드</span>
+                      <span className="text-gray-700 font-mono text-xs bg-white rounded px-3 py-2 border border-purple-200 block text-center">
+                        {selectedOrderDetail.option_code || '-'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 배송 정보 */}
+              <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
+                <div className="space-y-2.5">
+                  <div className="flex items-center">
+                    <span className="text-gray-600 w-24 flex-shrink-0">택배사</span>
+                    <span className="text-gray-900 font-medium">{selectedOrderDetail.courier_company || '-'}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-gray-600 w-24 flex-shrink-0">송장번호</span>
+                    <span className="text-gray-900 font-semibold">{selectedOrderDetail.tracking_number || '-'}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-gray-600 w-24 flex-shrink-0">발송일</span>
+                    <span className="text-gray-900 font-medium">{selectedOrderDetail.shipped_date || '-'}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-gray-600 w-24 flex-shrink-0">발송요청일</span>
+                    <span className="text-gray-900 font-medium">{selectedOrderDetail.shipping_request_date || '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 셀러/벤더 정보 */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="space-y-2.5">
+                  <div className="flex items-center">
+                    <span className="text-gray-600 w-24 flex-shrink-0">셀러</span>
+                    <span className="text-gray-900 font-medium">{selectedOrderDetail.seller_name || '-'}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-gray-600 w-24 flex-shrink-0">벤더사</span>
+                    <span className="text-gray-900 font-medium">{selectedOrderDetail.vendor_name || '-'}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-gray-600 w-24 flex-shrink-0">출고처</span>
+                    <span className="text-gray-900 font-medium">{selectedOrderDetail.shipping_source || '-'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 금액 정보 - 전체 너비 */}
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg p-4 border border-emerald-100">
+              <div className="grid grid-cols-3 gap-x-6 gap-y-2.5">
+                <div className="flex items-center">
+                  <span className="text-gray-600 w-28 flex-shrink-0">셀러 공급가</span>
+                  <span className="text-gray-900 font-semibold">{selectedOrderDetail.seller_supply_price || '-'}</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-gray-600 w-28 flex-shrink-0">정산금액</span>
+                  <span className="text-gray-900 font-semibold">{selectedOrderDetail.settlement_amount || '-'}</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-gray-600 w-28 flex-shrink-0">최종결제금액</span>
+                  <span className="text-emerald-700 font-bold text-base">{selectedOrderDetail.final_payment_amount || '-'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 메모 */}
+            {selectedOrderDetail.memo && (
+              <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
+                <p className="text-gray-700 whitespace-pre-wrap bg-white rounded px-3 py-2 border border-amber-200 leading-relaxed">
+                  {selectedOrderDetail.memo}
+                </p>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* 추가주문등록 모달 */}
+      {showAdditionalOrderModal && (
+        <Modal
+          isOpen={showAdditionalOrderModal}
+          onClose={() => {
+            setShowAdditionalOrderModal(false);
+            setAdditionalOrderData({});
+          }}
+          title="추가주문 등록"
+          size="xl"
+          footer={
+            <>
+              <button
+                onClick={() => {
+                  setShowAdditionalOrderModal(false);
+                  setAdditionalOrderData({});
+                }}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleAdditionalOrderSubmit}
+                className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700"
+              >
+                접수
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-6">
+            {/* 원주문 정보 */}
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+              <h4 className="text-sm font-semibold text-blue-900 mb-3">원주문 정보</h4>
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div>
+                  <span className="text-gray-600">주문번호:</span>
+                  <span className="ml-2 font-medium">{additionalOrderData.original_order_number}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">마켓명:</span>
+                  <span className="ml-2 font-medium">{additionalOrderData.market_name}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">수령인:</span>
+                  <span className="ml-2 font-medium">{additionalOrderData.recipient_name}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 추가주문 정보 */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-semibold text-gray-900">추가주문 정보 (수정 가능)</h4>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* 옵션명 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    옵션명 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={additionalOrderData.option_name || ''}
+                    onChange={(e) => setAdditionalOrderData({ ...additionalOrderData, option_name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+
+                {/* 수량 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">수량</label>
+                  <input
+                    type="number"
+                    value={additionalOrderData.quantity || 1}
+                    onChange={(e) => setAdditionalOrderData({ ...additionalOrderData, quantity: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+
+                {/* 발송요청일 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">발송요청일</label>
+                  <input
+                    type="date"
+                    value={additionalOrderData.shipping_request_date || ''}
+                    onChange={(e) => setAdditionalOrderData({ ...additionalOrderData, shipping_request_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+
+                {/* 빈 공간 (그리드 균형) */}
+                <div></div>
+
+                {/* 수령인 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    수령인 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={additionalOrderData.recipient_name || ''}
+                    onChange={(e) => setAdditionalOrderData({ ...additionalOrderData, recipient_name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+
+                {/* 전화번호 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">전화번호</label>
+                  <input
+                    type="text"
+                    value={additionalOrderData.recipient_phone || ''}
+                    onChange={(e) => setAdditionalOrderData({ ...additionalOrderData, recipient_phone: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+              </div>
+
+              {/* 배송 주소 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">배송 주소</label>
+                <textarea
+                  value={additionalOrderData.recipient_address || ''}
+                  onChange={(e) => setAdditionalOrderData({ ...additionalOrderData, recipient_address: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+
+              {/* 배송 메시지 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">배송 메시지</label>
+                <textarea
+                  value={additionalOrderData.delivery_message || ''}
+                  onChange={(e) => setAdditionalOrderData({ ...additionalOrderData, delivery_message: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+            </div>
+
+            {/* 안내 메시지 */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-sm text-amber-800">
+                💡 옵션명을 기준으로 셀러공급가, 출고처, 벤더사 등의 정보가 자동으로 매핑됩니다.
+              </p>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 벤더사전송파일 모달 */}
+      <Modal
+        isOpen={showVendorFileModal}
+        onClose={() => setShowVendorFileModal(false)}
+        title="벤더사 전송파일 다운로드"
+        size="md"
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600 mb-4">
+            각 벤더사별로 엑셀 파일을 다운로드할 수 있습니다.
+          </p>
+          <div className="space-y-2">
+            {uniqueVendors.map((vendor) => (
+              <div
+                key={vendor}
+                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <span className="font-medium text-gray-900">{vendor}</span>
+                <button
+                  onClick={() => handleVendorExcelDownload(vendor)}
+                  className="px-3 py-1.5 bg-cyan-600 text-white rounded text-sm font-medium hover:bg-cyan-700 flex items-center gap-1"
+                >
+                  <Download className="w-4 h-4" />
+                  다운로드
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

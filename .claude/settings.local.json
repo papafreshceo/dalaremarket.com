@@ -42,7 +42,12 @@
       "Bash(move \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\orders\" \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-platform\")",
       "Bash(del \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-platform\\page.tsx\")",
       "Bash(del nul)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "Bash(Get-Content \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\database\\migrations\\028_change_seller_name_to_seller_id.sql\")",
+      "Bash(del \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\database\\migrations\\040_upgrade_refund_types_to_cs_types.sql\")",
+      "Bash(Get-Content \"database\\migrations\\043_update_cs_types_7.sql\")",
+      "Bash(Get-Content \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-integration\\components\\SearchTab.tsx\")",
+      "Bash(Select-Object -Last 3)"
     ],
     "deny": [],
     "ask": []

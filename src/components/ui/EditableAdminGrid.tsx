@@ -1761,7 +1761,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
               )}
               {showRowNumbers && (
                 <th key="row-number-header" className="border border-gray-200 bg-gray-50 px-2 py-1 font-semibold text-text-secondary whitespace-nowrap sticky top-0" style={{ width: 50, fontSize: '13px', zIndex: 31 }}>
-                  {enableAddRow && (
+                  {enableAddRow ? (
                     <button
                       onClick={handleAddRow}
                       className="text-primary hover:text-blue-800 dark:hover:text-blue-300 font-normal"
@@ -1770,6 +1770,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                     >
                       +행추가
                     </button>
+                  ) : (
+                    '#'
                   )}
                 </th>
               )}

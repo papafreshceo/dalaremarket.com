@@ -20,6 +20,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
         totalAmount: 0,
         paidAmount: 0,
         unpaidAmount: 0,
+        refundAmount: 0,
         orders: []
       };
     }
@@ -31,6 +32,11 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
       acc[month].paidAmount += order.amount || 0;
     } else {
       acc[month].unpaidAmount += order.amount || 0;
+    }
+
+    // 환불금액 집계
+    if ((order.status === 'cancelled' || order.status === 'cancelRequested') && order.refundAmount) {
+      acc[month].refundAmount += order.refundAmount;
     }
 
     acc[month].orders.push(order);
@@ -54,6 +60,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
     { key: 'totalAmount', title: '총 금액', type: 'number' as const, width: 150, renderer: (value: any) => `${value?.toLocaleString()}원` },
     { key: 'paidAmount', title: '완료 금액', type: 'number' as const, width: 150, renderer: (value: any) => `${value?.toLocaleString()}원` },
     { key: 'unpaidAmount', title: '미완료 금액', type: 'number' as const, width: 150, renderer: (value: any) => `${value?.toLocaleString()}원` },
+    { key: 'refundAmount', title: '환불금액', type: 'number' as const, width: 150, renderer: (value: any) => value > 0 ? `${value?.toLocaleString()}원` : '-' },
     {
       key: 'completionRate',
       title: '완료율',
@@ -78,7 +85,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
           gap: '16px',
           marginBottom: '24px'
         }}
@@ -127,6 +134,22 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
           <div className="text-danger" style={{ fontSize: '24px', fontWeight: 'bold' }}>
             ₩{orders.filter(o => o.status !== 'shipped')
               .reduce((sum, o) => sum + (o.amount || 0), 0).toLocaleString()}
+          </div>
+        </div>
+
+        <div
+          className="card"
+          style={{
+            padding: '20px',
+            borderRadius: '8px'
+          }}
+        >
+          <div style={{ fontSize: '14px', marginBottom: '8px' }}>
+            환불금액
+          </div>
+          <div className="text-warning" style={{ fontSize: '24px', fontWeight: 'bold' }}>
+            ₩{orders.filter(o => (o.status === 'cancelled' || o.status === 'cancelRequested') && o.refundAmount)
+              .reduce((sum, o) => sum + (o.refundAmount || 0), 0).toLocaleString()}
           </div>
         </div>
       </div>

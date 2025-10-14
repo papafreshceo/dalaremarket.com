@@ -934,6 +934,20 @@ table textarea {
   color: #000000;
 }
 
+/* 셀러별 상세 테이블 */
+.seller-detail-table,
+.seller-detail-table th,
+.seller-detail-table td,
+.seller-detail-table span,
+.seller-detail-table button,
+.seller-detail-table div {
+  font-size: 14px !important;
+}
+
+.seller-detail-table * {
+  font-size: 14px !important;
+}
+
 /* 원물관리 & 옵션상품관리 테이블 행 높이 조절 */
 .table-fixed th {
   height: 16px !important;
@@ -1484,4 +1498,18 @@ ul, ol {
     width: 125%; /* 100% / 0.8 */
     height: 125%;
   }
+}
+
+/* ========================
+   Number Input 스핀 단추 제거
+   ======================== */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }

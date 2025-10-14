@@ -273,6 +273,57 @@ export default function OrderDetailModal({
           </div>
         </div>
 
+        {/* 환불 정보 (취소/환불 상태일 때만 표시) */}
+        {(selectedOrder.status === 'cancelled' || selectedOrder.status === 'cancelRequested') && selectedOrder.refundAmount && (
+          <div style={{
+            borderTop: '1px solid #dee2e6',
+            paddingTop: '24px',
+            marginTop: '24px'
+          }}>
+            <h3 style={{
+              fontSize: '16px',
+              fontWeight: '600',
+              color: '#ef4444',
+              marginBottom: '16px'
+            }}>
+              환불 정보
+            </h3>
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.05)',
+              borderRadius: '8px',
+              padding: '16px',
+              border: '1px solid rgba(239, 68, 68, 0.2)'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span style={{ fontSize: '14px', color: '#495057', fontWeight: '500' }}>
+                  환불금액
+                </span>
+                <div style={{ fontSize: '18px', fontWeight: '700', color: '#ef4444' }}>
+                  ₩{selectedOrder.refundAmount.toLocaleString()}
+                </div>
+              </div>
+              {selectedOrder.cancelReason && (
+                <div style={{
+                  marginTop: '12px',
+                  paddingTop: '12px',
+                  borderTop: '1px solid rgba(239, 68, 68, 0.1)'
+                }}>
+                  <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px' }}>
+                    취소 사유
+                  </div>
+                  <div style={{ fontSize: '14px', color: '#495057' }}>
+                    {selectedOrder.cancelReason}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div style={{
           display: 'flex',
           gap: '8px',

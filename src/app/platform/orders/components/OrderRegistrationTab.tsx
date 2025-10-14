@@ -149,6 +149,14 @@ export default function OrderRegistrationTab({
     }
   };
 
+  // 한국 시간으로 변환하는 헬퍼 함수
+  const getKoreanTime = () => {
+    const now = new Date();
+    // UTC 시간에 9시간을 더해서 한국 시간으로 변환
+    const koreanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+    return koreanTime.toISOString();
+  };
+
   // 취소요청 핸들러
   const handleCancelRequest = async (orderId: number) => {
     if (!confirm('이 주문의 취소를 요청하시겠습니까?')) {
@@ -163,7 +171,7 @@ export default function OrderRegistrationTab({
         .from('integrated_orders')
         .update({
           shipping_status: '취소요청',
-          cancel_requested_at: new Date().toISOString()
+          cancel_requested_at: getKoreanTime()
         })
         .eq('id', orderId);
 
@@ -210,11 +218,11 @@ export default function OrderRegistrationTab({
       const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
 
-      const { error } = await supabase
+      const { error} = await supabase
         .from('integrated_orders')
         .update({
           shipping_status: '취소요청',
-          cancel_requested_at: new Date().toISOString(),
+          cancel_requested_at: getKoreanTime(),
           cancel_reason: cancelReason.trim()
         })
         .in('id', selectedOrders);
@@ -238,31 +246,1032 @@ export default function OrderRegistrationTab({
 
   // 상태별 칼럼 정의
   const getColumnsByStatus = useMemo(() => {
+    // 날짜 렌더러 함수
+    const dateRenderer = (value: any) => {
+      if (!value) return '';
+      const date = new Date(value);
+      return (
+        <span style={{ fontSize: '13px' }}>
+          {date.toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          })}
+        </span>
+      );
+    };
+
     const baseColumns = [
       {
-        key: 'date',
-        title: filterStatus === 'registered' ? '등록일시' :
-               filterStatus === 'cancelRequested' || filterStatus === 'cancelled' ? '취소요청일시' : '발주일시',
-        width: 160,
+        key: 'orderNumber',
+        title: '주문번호',
         readOnly: true,
-        align: 'center' as const,
-        renderer: (value: any) => {
-          if (!value) return '';
-          const date = new Date(value);
-          return (
-            <span style={{ fontSize: '13px' }}>
-              {date.toLocaleString('ko-KR', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-              })}
-            </span>
-          );
+        align: 'center' as const
+      },
+      {
+        key: 'orderer',
+        title: '주문자',
+        readOnly: true,
+        align: 'center' as const
+      },
+      {
+        key: 'ordererPhone',
+        title: '주문자전화번호',
+        readOnly: true,
+        align: 'center' as const
+      },
+      {
+        key: 'recipient',
+        title: '수령인',
+        readOnly: true,
+        align: 'center' as const
+      },
+      {
+        key: 'recipientPhone',
+        title: '수령인전화번호',
+        readOnly: true,
+        align: 'center' as const
+      },
+      {
+        key: 'address',
+        title: '주소',
+        readOnly: true,
+        align: 'left' as const
+      },
+      {
+        key: 'deliveryMessage',
+        title: '배송메세지',
+        readOnly: true,
+        align: 'left' as const
+      },
+      {
+        key: 'optionName',
+        title: '옵션명',
+        readOnly: true,
+        align: 'left' as const
+      },
+      {
+        key: 'quantity',
+        title: '수량',
+        type: 'number' as const,
+        readOnly: true,
+        align: 'center' as const
+      },
+      {
+        key: 'unitPrice',
+        title: '공급단가',
+        type: 'number' as const,
+        readOnly: true,
+        align: 'right' as const,
+        renderer: (value: any) => (
+          <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+        )
+      },
+      {
+        key: 'specialRequest',
+        title: '특이/요청사항',
+        readOnly: true,
+        align: 'left' as const
+      }
+    ];
+
+    // 상태별 추가 칼럼
+    if (filterStatus === 'registered') {
+      // 발주서등록 단계: 발주번호 없음, 공급가만 표시
+      return [
+        {
+          key: 'rowNumber',
+          title: '#',
+          width: 60,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any, row: any, index: number) => (
+            <span style={{ fontSize: '13px' }}>{index + 1}</span>
+          )
+        },
+        {
+          key: 'date',
+          title: '등록일시',
+          width: 160,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: dateRenderer
+        },
+        {
+          key: 'orderNumber',
+          title: '주문번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'orderer',
+          title: '주문자',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'ordererPhone',
+          title: '주문자전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipient',
+          title: '수령인',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipientPhone',
+          title: '수령인전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'address',
+          title: '주소',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'deliveryMessage',
+          title: '배송메세지',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'optionName',
+          title: '옵션명',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'quantity',
+          title: '수량',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'unitPrice',
+          title: '공급단가',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'supplyPrice',
+          title: '공급가',
+          width: 100,
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'specialRequest',
+          title: '특이/요청사항',
+          readOnly: true,
+          align: 'left' as const
         }
+      ];
+    } else if (filterStatus === 'confirmed') {
+      // 발주확정 이후: 발주번호 표시
+      return [
+        {
+          key: 'rowNumber',
+          title: '#',
+          width: 60,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any, row: any, index: number) => (
+            <span style={{ fontSize: '13px' }}>{index + 1}</span>
+          )
+        },
+        {
+          key: 'confirmedAt',
+          title: '발주확정',
+          width: 160,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: dateRenderer
+        },
+        {
+          key: 'orderNo',
+          title: '발주번호',
+          width: 180,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'orderNumber',
+          title: '주문번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'orderer',
+          title: '주문자',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'ordererPhone',
+          title: '주문자전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipient',
+          title: '수령인',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipientPhone',
+          title: '수령인전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'address',
+          title: '주소',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'deliveryMessage',
+          title: '배송메세지',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'optionName',
+          title: '옵션명',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'quantity',
+          title: '수량',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'unitPrice',
+          title: '공급단가',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'supplyPrice',
+          title: '공급가',
+          width: 100,
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'specialRequest',
+          title: '특이/요청사항',
+          readOnly: true,
+          align: 'left' as const
+        }
+      ];
+    } else if (filterStatus === 'preparing') {
+      // 상품준비중: 발주서확정과 동일한 구조
+      return [
+        {
+          key: 'rowNumber',
+          title: '#',
+          width: 60,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any, row: any, index: number) => (
+            <span style={{ fontSize: '13px' }}>{index + 1}</span>
+          )
+        },
+        {
+          key: 'confirmedAt',
+          title: '발주확정',
+          width: 160,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: dateRenderer
+        },
+        {
+          key: 'orderNo',
+          title: '발주번호',
+          width: 180,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'orderNumber',
+          title: '주문번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'orderer',
+          title: '주문자',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'ordererPhone',
+          title: '주문자전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipient',
+          title: '수령인',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipientPhone',
+          title: '수령인전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'address',
+          title: '주소',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'deliveryMessage',
+          title: '배송메세지',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'optionName',
+          title: '옵션명',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'quantity',
+          title: '수량',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'unitPrice',
+          title: '공급단가',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'supplyPrice',
+          title: '공급가',
+          width: 100,
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'specialRequest',
+          title: '특이/요청사항',
+          readOnly: true,
+          align: 'left' as const
+        }
+      ];
+    } else if (filterStatus === 'shipped') {
+      return [
+        {
+          key: 'shippedDate',
+          title: '발송일',
+          width: 100,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any) => {
+            if (!value) return '';
+            const date = new Date(value);
+            return (
+              <span style={{ fontSize: '13px' }}>
+                {date.toLocaleDateString('ko-KR', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit'
+                })}
+              </span>
+            );
+          }
+        },
+        {
+          key: 'courier',
+          title: '택배사',
+          width: 100,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'trackingNo',
+          title: '송장번호',
+          width: 120,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'confirmedAt',
+          title: '발주확정',
+          width: 160,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: dateRenderer
+        },
+        {
+          key: 'orderNo',
+          title: '발주번호',
+          width: 180,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'orderNumber',
+          title: '주문번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'orderer',
+          title: '주문자',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'ordererPhone',
+          title: '주문자전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipient',
+          title: '수령인',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipientPhone',
+          title: '수령인전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'address',
+          title: '주소',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'deliveryMessage',
+          title: '배송메세지',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'optionName',
+          title: '옵션명',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'quantity',
+          title: '수량',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'unitPrice',
+          title: '공급단가',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'supplyPrice',
+          title: '공급가',
+          width: 100,
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'specialRequest',
+          title: '특이/요청사항',
+          readOnly: true,
+          align: 'left' as const
+        }
+      ];
+    } else if (filterStatus === 'cancelRequested') {
+      // 취소요청 상태: 취소승인일시 칼럼 제외
+      const cols = [
+        {
+          key: 'cancelRequestedAt',
+          title: '취소요청',
+          width: 160,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any) => {
+            if (!value) return '';
+            const date = new Date(value);
+            return (
+              <span style={{ fontSize: '13px' }}>
+                {date.toLocaleString('ko-KR', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false
+                })}
+              </span>
+            );
+          }
+        },
+        {
+          key: 'cancelReason',
+          title: '취소사유',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'orderNo',
+          title: '발주번호',
+          width: 180,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'confirmedAt',
+          title: '발주확정',
+          width: 160,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: dateRenderer
+        },
+        {
+          key: 'orderNumber',
+          title: '주문번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'orderer',
+          title: '주문자',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'ordererPhone',
+          title: '주문자전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipient',
+          title: '수령인',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipientPhone',
+          title: '수령인전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'address',
+          title: '주소',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'deliveryMessage',
+          title: '배송메세지',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'optionName',
+          title: '옵션명',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'quantity',
+          title: '수량',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'unitPrice',
+          title: '공급단가',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'supplyPrice',
+          title: '공급가',
+          width: 100,
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        }
+      ];
+
+      return cols;
+    } else if (filterStatus === 'cancelled') {
+      // 취소완료 상태: 취소승인 -> 취소요청 -> 취소사유 순서
+      const cols = [
+        {
+          key: 'cancelledAt',
+          title: '취소승인',
+          width: 160,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any) => {
+            if (!value) return '';
+            const date = new Date(value);
+            return (
+              <span style={{ fontSize: '13px' }}>
+                {date.toLocaleString('ko-KR', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false
+                })}
+              </span>
+            );
+          }
+        },
+        {
+          key: 'cancelRequestedAt',
+          title: '취소요청',
+          width: 160,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any) => {
+            if (!value) return '';
+            const date = new Date(value);
+            return (
+              <span style={{ fontSize: '13px' }}>
+                {date.toLocaleString('ko-KR', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false
+                })}
+              </span>
+            );
+          }
+        },
+        {
+          key: 'cancelReason',
+          title: '취소사유',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'orderNo',
+          title: '발주번호',
+          width: 180,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'confirmedAt',
+          title: '발주확정',
+          width: 160,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: dateRenderer
+        },
+        {
+          key: 'orderNumber',
+          title: '주문번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'orderer',
+          title: '주문자',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'ordererPhone',
+          title: '주문자전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipient',
+          title: '수령인',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipientPhone',
+          title: '수령인전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'address',
+          title: '주소',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'deliveryMessage',
+          title: '배송메세지',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'optionName',
+          title: '옵션명',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'quantity',
+          title: '수량',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'unitPrice',
+          title: '공급단가',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'supplyPrice',
+          title: '공급가',
+          width: 100,
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        }
+      ];
+
+      return cols;
+    } else if (filterStatus === 'refunded') {
+      // 환불완료 상태: 환불일 -> 환불금액 -> 취소승인 -> 취소요청 -> 취소사유 순서
+      const cols = [
+        {
+          key: 'refundedAt',
+          title: '환불일',
+          width: 100,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any) => {
+            if (!value) return '';
+            const date = new Date(value);
+            return (
+              <span style={{ fontSize: '13px' }}>
+                {date.toLocaleDateString('ko-KR', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit'
+                })}
+              </span>
+            );
+          }
+        },
+        {
+          key: 'refundAmount',
+          title: '환불금액',
+          width: 120,
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px', fontWeight: '600', color: '#dc2626' }}>
+              {value?.toLocaleString()}원
+            </span>
+          )
+        },
+        {
+          key: 'cancelledAt',
+          title: '취소승인',
+          width: 160,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any) => {
+            if (!value) return '';
+            const date = new Date(value);
+            return (
+              <span style={{ fontSize: '13px' }}>
+                {date.toLocaleString('ko-KR', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false
+                })}
+              </span>
+            );
+          }
+        },
+        {
+          key: 'cancelRequestedAt',
+          title: '취소요청',
+          width: 160,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any) => {
+            if (!value) return '';
+            const date = new Date(value);
+            return (
+              <span style={{ fontSize: '13px' }}>
+                {date.toLocaleString('ko-KR', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false
+                })}
+              </span>
+            );
+          }
+        },
+        {
+          key: 'cancelReason',
+          title: '취소사유',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'orderNo',
+          title: '발주번호',
+          width: 180,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'confirmedAt',
+          title: '발주확정',
+          width: 160,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: dateRenderer
+        },
+        {
+          key: 'orderNumber',
+          title: '주문번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'orderer',
+          title: '주문자',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'ordererPhone',
+          title: '주문자전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipient',
+          title: '수령인',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'recipientPhone',
+          title: '수령인전화번호',
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'address',
+          title: '주소',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'deliveryMessage',
+          title: '배송메세지',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'optionName',
+          title: '옵션명',
+          readOnly: true,
+          align: 'left' as const
+        },
+        {
+          key: 'quantity',
+          title: '수량',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'center' as const
+        },
+        {
+          key: 'unitPrice',
+          title: '공급단가',
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        },
+        {
+          key: 'supplyPrice',
+          title: '공급가',
+          width: 100,
+          type: 'number' as const,
+          readOnly: true,
+          align: 'right' as const,
+          renderer: (value: any) => (
+            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
+          )
+        }
+      ];
+
+      return cols;
+    }
+
+    // 전체 보기일 때
+    return [
+      {
+        key: 'orderNo',
+        title: '발주번호',
+        width: 180,
+        readOnly: true,
+        align: 'center' as const
       },
       {
         key: 'orderNumber',
@@ -313,23 +1322,11 @@ export default function OrderRegistrationTab({
         align: 'left' as const
       },
       {
-        key: 'optionCode',
-        title: '옵션코드',
-        readOnly: true,
-        align: 'center' as const
-      },
-      {
         key: 'quantity',
         title: '수량',
         type: 'number' as const,
         readOnly: true,
         align: 'center' as const
-      },
-      {
-        key: 'specialRequest',
-        title: '특이/요청사항',
-        readOnly: true,
-        align: 'left' as const
       },
       {
         key: 'unitPrice',
@@ -340,229 +1337,7 @@ export default function OrderRegistrationTab({
         renderer: (value: any) => (
           <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
         )
-      }
-    ];
-
-    // 상태별 추가 칼럼
-    if (filterStatus === 'registered') {
-      // 발주서등록 단계: 발주번호 없음, 공급가만 표시
-      return [
-        {
-          key: 'rowNumber',
-          title: '연번',
-          width: 60,
-          readOnly: true,
-          align: 'center' as const,
-          renderer: (value: any, row: any, index: number) => (
-            <span style={{ fontSize: '13px' }}>{index + 1}</span>
-          )
-        },
-        ...baseColumns,
-        {
-          key: 'supplyPrice',
-          title: '공급가',
-          width: 100,
-          type: 'number' as const,
-          readOnly: true,
-          align: 'right' as const,
-          renderer: (value: any) => (
-            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
-          )
-        }
-      ];
-    } else if (filterStatus === 'confirmed') {
-      // 발주확정 이후: 발주번호 표시
-      return [
-        {
-          key: 'rowNumber',
-          title: '연번',
-          width: 60,
-          readOnly: true,
-          align: 'center' as const,
-          renderer: (value: any, row: any, index: number) => (
-            <span style={{ fontSize: '13px' }}>{index + 1}</span>
-          )
-        },
-        {
-          key: 'orderNo',
-          title: '발주번호',
-          width: 180,
-          readOnly: true,
-          align: 'center' as const
-        },
-        ...baseColumns,
-        {
-          key: 'supplyPrice',
-          title: '공급가',
-          width: 100,
-          type: 'number' as const,
-          readOnly: true,
-          align: 'right' as const,
-          renderer: (value: any) => (
-            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
-          )
-        }
-      ];
-    } else if (filterStatus === 'preparing') {
-      // 상품준비중: 발주서확정과 동일한 구조
-      return [
-        {
-          key: 'rowNumber',
-          title: '연번',
-          width: 60,
-          readOnly: true,
-          align: 'center' as const,
-          renderer: (value: any, row: any, index: number) => (
-            <span style={{ fontSize: '13px' }}>{index + 1}</span>
-          )
-        },
-        {
-          key: 'orderNo',
-          title: '발주번호',
-          width: 180,
-          readOnly: true,
-          align: 'center' as const
-        },
-        ...baseColumns,
-        {
-          key: 'supplyPrice',
-          title: '공급가',
-          width: 100,
-          type: 'number' as const,
-          readOnly: true,
-          align: 'right' as const,
-          renderer: (value: any) => (
-            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
-          )
-        }
-      ];
-    } else if (filterStatus === 'shipped') {
-      return [
-        {
-          key: 'orderNo',
-          title: '발주번호',
-          width: 180,
-          readOnly: true,
-          align: 'center' as const
-        },
-        ...baseColumns,
-        {
-          key: 'supplyPrice',
-          title: '공급가',
-          width: 100,
-          type: 'number' as const,
-          readOnly: true,
-          align: 'right' as const,
-          renderer: (value: any) => (
-            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
-          )
-        },
-        {
-          key: 'shippedDate',
-          title: '발송일',
-          width: 100,
-          readOnly: true,
-          align: 'center' as const
-        },
-        {
-          key: 'courier',
-          title: '택배사',
-          width: 100,
-          readOnly: true,
-          align: 'center' as const
-        },
-        {
-          key: 'trackingNo',
-          title: '송장번호',
-          width: 120,
-          readOnly: true,
-          align: 'center' as const
-        }
-      ];
-    } else if (filterStatus === 'cancelRequested' || filterStatus === 'cancelled') {
-      const cols = [
-        {
-          key: 'cancelledAt',
-          title: '취소승인일시',
-          width: 160,
-          readOnly: true,
-          align: 'center' as const,
-          renderer: (value: any) => {
-            if (!value) return '';
-            const date = new Date(value);
-            return (
-              <span style={{ fontSize: '13px' }}>
-                {date.toLocaleString('ko-KR', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false
-                })}
-              </span>
-            );
-          }
-        },
-        {
-          key: 'orderNo',
-          title: '발주번호',
-          width: 180,
-          readOnly: true,
-          align: 'center' as const
-        },
-        {
-          key: 'confirmedAt',
-          title: '발주확정일시',
-          width: 160,
-          readOnly: true,
-          align: 'center' as const,
-          renderer: (value: any) => {
-            if (!value) return '';
-            const date = new Date(value);
-            return (
-              <span style={{ fontSize: '13px' }}>
-                {date.toLocaleString('ko-KR', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false
-                })}
-              </span>
-            );
-          }
-        },
-        ...baseColumns,
-        {
-          key: 'refundAmount',
-          title: '환불액',
-          width: 100,
-          type: 'number' as const,
-          readOnly: true,
-          align: 'right' as const,
-          renderer: (value: any) => (
-            <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
-          )
-        }
-      ];
-
-      return cols;
-    }
-
-    // 전체 보기일 때
-    return [
-      {
-        key: 'orderNo',
-        title: '발주번호',
-        width: 180,
-        readOnly: true,
-        align: 'center' as const
       },
-      ...baseColumns,
       {
         key: 'supplyPrice',
         title: '공급가',
@@ -573,6 +1348,12 @@ export default function OrderRegistrationTab({
         renderer: (value: any) => (
           <span style={{ fontSize: '13px' }}>{value?.toLocaleString()}</span>
         )
+      },
+      {
+        key: 'specialRequest',
+        title: '특이/요청사항',
+        readOnly: true,
+        align: 'left' as const
       },
       {
         key: 'status',
@@ -638,8 +1419,8 @@ export default function OrderRegistrationTab({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(6, 1fr)',
-          gap: '16px',
+          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(145px, 1fr))',
+          gap: '10px',
           marginBottom: '32px'
         }}
       >
@@ -656,11 +1437,13 @@ export default function OrderRegistrationTab({
               onClick={() => setFilterStatus(stat.status)}
               className="card"
               style={{
-                padding: '20px',
+                padding: '14px 16px',
                 borderRadius: '8px',
-                border: isSelected ? `2px solid ${config.color}` : undefined,
                 cursor: 'pointer',
-                position: 'relative'
+                position: 'relative',
+                background: isSelected ? `linear-gradient(135deg, ${config.color}10 0%, ${config.color}18 100%)` : undefined,
+                transform: isSelected ? 'translateY(-2px)' : undefined,
+                transition: 'all 0.2s ease'
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -965,6 +1748,7 @@ export default function OrderRegistrationTab({
               const supabase = createClient();
 
               // 각 주문에 발주번호 생성 및 업데이트
+              const now = getKoreanTime();
               for (let i = 0; i < filteredOrders.length; i++) {
                 const order = filteredOrders[i];
                 const orderNo = generateOrderNumber(userEmail, i + 1);
@@ -972,8 +1756,9 @@ export default function OrderRegistrationTab({
                 const { error } = await supabase
                   .from('integrated_orders')
                   .update({
-                    shipping_status: '입금확인전',
-                    order_no: orderNo
+                    shipping_status: '발주서확정',
+                    order_no: orderNo,
+                    confirmed_at: now
                   })
                   .eq('id', order.id);
 
