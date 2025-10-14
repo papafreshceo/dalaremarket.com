@@ -48,4 +48,8 @@ next-env.d.ts
 *~
 
 # OS
-Thumbs.dbnul
+Thumbs.db
+nul
+
+# Claude Code
+.claude/settings.local.json

@@ -49,6 +49,7 @@ interface Order {
   commission_2?: string;
   sell_id?: string;
   seller_id?: string;
+  seller_name?: string;
   separate_shipping?: string;
   delivery_fee?: string;
   shipped_date?: string;
@@ -94,6 +95,7 @@ interface VendorStats {
 
 interface SellerStats {
   seller_id: string;
+  seller_name: string;
   총금액: number;
   입금확인: boolean;
   접수_건수: number;
@@ -293,7 +295,7 @@ export default function SearchTab() {
                 return (
                   <span
                     className="px-2 py-0.5 rounded text-white font-medium"
-                    style={{ backgroundColor: marketColor, fontSize: '13px' }}
+                    style={{ backgroundColor: marketColor, fontSize: '12px' }}
                   >
                     {marketName}
                   </span>
@@ -598,6 +600,13 @@ export default function SearchTab() {
                 column.isQuantityColumn = true; // 마커 추가
               }
 
+              // field_18 (셀러ID) - seller_name 표시
+              if (i === 18) {
+                column.renderer = (value: any, row: any) => {
+                  return <span style={{ fontSize: '13px' }}>{row.seller_name || '-'}</span>;
+                };
+              }
+
               dynamicColumns.push(column);
             }
           }
@@ -673,9 +682,11 @@ export default function SearchTab() {
 
     orderData.forEach((order) => {
       const sellerId = order.seller_id || '미지정';
+      const sellerName = order.seller_name || '미지정';
       if (!statsMap.has(sellerId)) {
         statsMap.set(sellerId, {
           seller_id: sellerId,
+          seller_name: sellerName,
           총금액: 0,
           입금확인: false,
           접수_건수: 0,
@@ -2002,9 +2013,9 @@ export default function SearchTab() {
       <div className="grid grid-cols-8 gap-4">
         <div
           onClick={() => handleStatusCardClick(null)}
-          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+          className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all ${
             statusFilter === null
-              ? 'border-gray-900 border-2 shadow-md'
+              ? 'border-gray-900 shadow-md'
               : 'border-gray-200 hover:border-gray-400'
           }`}
         >
@@ -2013,9 +2024,9 @@ export default function SearchTab() {
         </div>
         <div
           onClick={() => handleStatusCardClick('접수')}
-          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+          className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all ${
             statusFilter === '접수'
-              ? 'border-purple-600 border-2 shadow-md'
+              ? 'border-purple-600 shadow-md'
               : 'border-gray-200 hover:border-purple-400'
           }`}
         >
@@ -2024,9 +2035,9 @@ export default function SearchTab() {
         </div>
         <div
           onClick={() => handleStatusCardClick('결제완료')}
-          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+          className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all ${
             statusFilter === '결제완료'
-              ? 'border-blue-600 border-2 shadow-md'
+              ? 'border-blue-600 shadow-md'
               : 'border-gray-200 hover:border-blue-400'
           }`}
         >
@@ -2035,9 +2046,9 @@ export default function SearchTab() {
         </div>
         <div
           onClick={() => handleStatusCardClick('상품준비중')}
-          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+          className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all ${
             statusFilter === '상품준비중'
-              ? 'border-yellow-600 border-2 shadow-md'
+              ? 'border-yellow-600 shadow-md'
               : 'border-gray-200 hover:border-yellow-400'
           }`}
         >
@@ -2046,9 +2057,9 @@ export default function SearchTab() {
         </div>
         <div
           onClick={() => handleStatusCardClick('발송완료')}
-          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+          className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all ${
             statusFilter === '발송완료'
-              ? 'border-green-600 border-2 shadow-md'
+              ? 'border-green-600 shadow-md'
               : 'border-gray-200 hover:border-green-400'
           }`}
         >
@@ -2057,9 +2068,9 @@ export default function SearchTab() {
         </div>
         <div
           onClick={() => handleStatusCardClick('취소요청')}
-          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+          className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all ${
             statusFilter === '취소요청'
-              ? 'border-orange-600 border-2 shadow-md'
+              ? 'border-orange-600 shadow-md'
               : 'border-gray-200 hover:border-orange-400'
           }`}
         >
@@ -2068,9 +2079,9 @@ export default function SearchTab() {
         </div>
         <div
           onClick={() => handleStatusCardClick('취소완료')}
-          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+          className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all ${
             statusFilter === '취소완료'
-              ? 'border-gray-600 border-2 shadow-md'
+              ? 'border-gray-600 shadow-md'
               : 'border-gray-200 hover:border-gray-400'
           }`}
         >
@@ -2079,9 +2090,9 @@ export default function SearchTab() {
         </div>
         <div
           onClick={() => handleStatusCardClick('환불완료')}
-          className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${
+          className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all ${
             statusFilter === '환불완료'
-              ? 'border-red-600 border-2 shadow-md'
+              ? 'border-red-600 shadow-md'
               : 'border-gray-200 hover:border-red-400'
           }`}
         >
@@ -2196,7 +2207,7 @@ export default function SearchTab() {
               <tbody>
                 {sellerStats.map((stat, idx) => (
                   <tr key={stat.seller_id} style={{ borderTop: idx === 0 ? 'none' : '1px solid #E5E7EB' }} className="hover:bg-gray-50">
-                    <td style={{ fontSize: '16px', padding: '6px 16px', fontWeight: 500, color: '#111827' }}>{stat.seller_id}</td>
+                    <td style={{ fontSize: '16px', padding: '6px 16px', fontWeight: 500, color: '#111827' }}>{stat.seller_name}</td>
                     <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#7E22CE', fontWeight: 600 }}>{(stat.접수_건수 || 0) > 0 ? stat.접수_건수.toLocaleString() : ''}</td>
                     <td style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'right', color: '#047857', fontWeight: 600 }}>{stat.총금액 > 0 ? stat.총금액.toLocaleString() : ''}</td>
                     <td style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center' }}>

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { enrichOrderWithOptionInfo } from '@/lib/order-utils';
 
 /**
  * GET /api/cs-records
@@ -112,9 +113,15 @@ export async function POST(request: NextRequest) {
       body.status = '접수';
     }
 
+    // 옵션 상품 정보 자동 매핑 (option_name이 있는 경우)
+    let csRecordData = body;
+    if (body.option_name) {
+      csRecordData = await enrichOrderWithOptionInfo(body);
+    }
+
     const { data, error } = await supabase
       .from('cs_records')
-      .insert(body)
+      .insert(csRecordData)
       .select()
       .single();
 

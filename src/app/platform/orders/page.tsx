@@ -106,8 +106,10 @@ export default function OrdersPage() {
         '상품준비중': 'preparing',
         '배송중': 'shipped',
         '배송완료': 'shipped',
+        '발송완료': 'shipped',
         '취소요청': 'cancelRequested',
         '취소완료': 'cancelled',
+        '환불완료': 'refunded',
         'refunded': 'refunded'
       };
 
@@ -383,20 +385,23 @@ export default function OrdersPage() {
 
       console.log('💾 DB에 저장할 주문 데이터:', ordersToInsert);
 
-      // DB에 주문 일괄 저장
-      const { data, error } = await supabase
-        .from('integrated_orders')
-        .insert(ordersToInsert)
-        .select();
+      // API를 통해 주문 일괄 저장 (옵션 상품 정보 자동 매핑)
+      const response = await fetch('/api/platform-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: ordersToInsert }),
+      });
 
-      if (error) {
-        console.error('❌ 주문 저장 실패:', error);
-        alert(`주문 저장에 실패했습니다: ${error.message}`);
+      const result = await response.json();
+
+      if (!result.success) {
+        console.error('❌ 주문 저장 실패:', result.error);
+        alert(`주문 저장에 실패했습니다: ${result.error}`);
         return;
       }
 
-      console.log('✅ 주문 저장 성공:', data);
-      alert(`${data.length}건의 주문이 성공적으로 등록되었습니다.`);
+      console.log('✅ 주문 저장 성공:', result.data);
+      alert(`${result.count}건의 주문이 성공적으로 등록되었습니다.`);
 
       // 모달 닫기 및 상태 초기화
       setShowOptionValidationModal(false);

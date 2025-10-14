@@ -43,11 +43,6 @@ export default function ProductsLayout({ children }: { children: ReactNode }) {
           href: '/admin/products/shipping-invoice'
         },
         {
-          title: '공급상태',
-          description: '원물/상품 공급상태 옵션',
-          href: '/admin/products/supply-status'
-        },
-        {
           title: '수수료 설정',
           description: '네이버/쿠팡 수수료',
           href: '/admin/products/commission'

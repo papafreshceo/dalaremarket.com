@@ -152,10 +152,11 @@ export default function MobileRegistrationTab({
       const dateTime = now.toISOString().replace(/[-:T.]/g, '').substring(0, 14);
       const orderNo = `${emailPrefix}${dateTime}0001`;
 
-      // DB에 저장
-      const { error } = await supabase
-        .from('integrated_orders')
-        .insert({
+      // API를 통해 주문 저장 (옵션 상품 정보 자동 매핑)
+      const response = await fetch('/api/platform-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           seller_id: user.id,
           order_no: orderNo,
           order_number: formData.orderNumber || null,
@@ -171,13 +172,19 @@ export default function MobileRegistrationTab({
           special_request: formData.specialRequest || null,
           seller_supply_price: formData.unitPrice.toString(),
           settlement_amount: supplyPrice.toString(),
-          shipping_status: '접수',
+          shipping_status: '발주서등록',
+          market_name: '플랫폼',
+          sheet_date: new Date().toISOString().split('T')[0],
+          payment_date: new Date().toISOString().split('T')[0],
           created_at: new Date().toISOString()
-        });
+        }),
+      });
 
-      if (error) {
-        console.error('주문 등록 오류:', error);
-        alert('주문 등록에 실패했습니다.');
+      const result = await response.json();
+
+      if (!result.success) {
+        console.error('주문 등록 오류:', result.error);
+        alert('주문 등록에 실패했습니다: ' + result.error);
         return;
       }
 

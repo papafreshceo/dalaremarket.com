@@ -1,55 +1,28 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install:*)",
-      "Bash(psql:*)",
-      "Bash(cat:*)",
-      "Bash(lsof:*)",
-      "Bash(npm run dev:*)",
-      "Bash(grep:*)",
-      "Bash(npx supabase db dump:*)",
-      "Bash(npm uninstall:*)",
-      "Bash(npx tsc:*)",
-      "Bash(npx supabase:*)",
-      "Bash(where psql)",
-      "Bash(where:*)",
-      "Bash(node:*)",
-      "Bash(taskkill:*)",
-      "Bash(tasklist)",
-      "Bash(findstr:*)",
-      "Bash(move \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\restored-create-page.tsx\" \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\products\\option-products\\create\\page.tsx\")",
-      "Bash(git checkout:*)",
-      "Bash(python:*)",
-      "Bash(del \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\database\\migrations\\create_integrated_orders.sql\")",
-      "Bash(Get-Content \"database\\migrations\\008_restructure_mapping_fields.sql\")",
-      "Bash(del fetch-market-colors.js)",
-      "Bash(curl:*)",
-      "Bash(npm run build:*)",
-      "Bash(Get-Content \"database\\migrations\\018_change_unique_constraint_for_null_orders.sql\")",
-      "Bash(Get-Content \"database\\migrations\\019_add_shipping_status_to_integrated_orders.sql\")",
-      "Bash(cp:*)",
-      "Bash(Get-Content \"database\\migrations\\009_change_status_to_korean.sql\")",
-      "Bash(Select-Object -First 100)",
-      "Bash(time:*)",
+      "Bash(if exist nul del /f nul)",
       "Bash(powershell:*)",
-      "Bash(\"https://ketdnqhxwqcgyltinjih.supabase.co/rest/v1/rpc/exec_sql\" )",
-      "Bash(Select-Object -First 50)",
-      "Bash(Select-Object -First 20)",
-      "Read(//c//**)",
-      "Bash(dir:*)",
-      "Bash(copy:*)",
-      "Bash(del \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-integration\\components\\ShippingTab.tsx\")",
-      "Bash(move \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\orders\" \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-platform\")",
-      "Bash(del \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-platform\\page.tsx\")",
-      "Bash(del nul)",
-      "Bash(npm view:*)",
-      "Bash(Get-Content \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\database\\migrations\\028_change_seller_name_to_seller_id.sql\")",
-      "Bash(del \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\database\\migrations\\040_upgrade_refund_types_to_cs_types.sql\")",
-      "Bash(Get-Content \"database\\migrations\\043_update_cs_types_7.sql\")",
-      "Bash(Get-Content \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\order-integration\\components\\SearchTab.tsx\")",
-      "Bash(Select-Object -Last 3)"
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
+  },
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres.ketdnqhxwqcgyltinjih:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtldGRucWh4d3FjZ3lsdGluamloIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTIyMzA0NywiZXhwIjoyMDc0Nzk5MDQ3fQ.JG09yOpBvu_Y_-9QNmWGY7GVwUVmTMKD4Sc6FGFhxX4@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres"
+      ]
+    },
+    "fetch": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-fetch"
+      ]
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
 
 /**
  * POST /api/integrated-orders/bulk
@@ -18,12 +19,15 @@ export async function POST(request: NextRequest) {
     }
 
     // sheet_date 기본값 설정
-    const processedOrders = orders.map((order) => {
+    const ordersWithDate = orders.map((order) => {
       if (!order.sheet_date) {
         order.sheet_date = new Date().toISOString().split('T')[0];
       }
       return order;
     });
+
+    // 옵션 상품 정보 자동 매핑 (option_products 테이블)
+    const processedOrders = await enrichOrdersWithOptionInfo(ordersWithDate);
 
     // 저장 전 기존 주문 수 확인
     const { count: beforeCount } = await supabase

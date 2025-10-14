@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { enrichOrderWithOptionInfo } from '@/lib/order-utils';
 
 /**
  * GET /api/integrated-orders
@@ -178,35 +179,12 @@ export async function POST(request: NextRequest) {
       body.sheet_date = new Date().toISOString().split('T')[0];
     }
 
-    // 제품 매핑 적용
-    if (body.option_name) {
-      const { data: mapping } = await supabase
-        .from('product_mapping')
-        .select('*')
-        .ilike('option_name', body.option_name)
-        .eq('is_active', true)
-        .single();
-
-      if (mapping) {
-        // 매핑 정보로 필드 자동 채우기
-        body.shipping_source = body.shipping_source || mapping.shipping_source;
-        body.invoice_issuer = body.invoice_issuer || mapping.invoice_issuer;
-        body.vendor_name = body.vendor_name || mapping.vendor_name;
-        body.shipping_location_name = body.shipping_location_name || mapping.shipping_location_name;
-        body.shipping_location_address = body.shipping_location_address || mapping.shipping_location_address;
-        body.shipping_location_phone = body.shipping_location_phone || mapping.shipping_location_phone;
-        body.shipping_cost = body.shipping_cost || mapping.shipping_cost;
-
-        // 셀러공급가 계산
-        if (!body.seller_supply_price && mapping.seller_supply_price) {
-          body.seller_supply_price = mapping.seller_supply_price * (body.quantity || 1);
-        }
-      }
-    }
+    // 옵션 상품 정보 자동 매핑 (option_products 테이블)
+    const orderDataWithInfo = await enrichOrderWithOptionInfo(body);
 
     const { data, error } = await supabase
       .from('integrated_orders')
-      .insert(body)
+      .insert(orderDataWithInfo)
       .select()
       .single();
 

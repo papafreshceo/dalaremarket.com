@@ -1005,8 +1005,8 @@ export default function OrderPlatformPage() {
             <div className="col-span-1 text-center">발송완료</div>
             <div className="col-span-1 text-center">취소요청</div>
             <div className="col-span-1 text-center">취소완료</div>
-            <div className="col-span-1 text-center">환불액</div>
             <div className="col-span-1 text-center">환불완료</div>
+            <div className="col-span-1 text-center">환불액</div>
             <div className="col-span-1 text-center">처리</div>
           </div>
         </div>
@@ -1048,11 +1048,11 @@ export default function OrderPlatformPage() {
                 <div className="col-span-1 text-center font-semibold text-gray-600">
                   {totalStat.취소완료_건수 > 0 ? totalStat.취소완료_건수 : '-'}
                 </div>
-                <div className="col-span-1 text-center font-bold text-red-600">
-                  {totalStat.환불예정액 > 0 ? `${totalStat.환불예정액.toLocaleString()}원` : '-'}
-                </div>
                 <div className="col-span-1 text-center font-bold text-emerald-600">
                   {totalStat.환불완료_건수 > 0 ? `${totalStat.환불완료_건수}건` : '-'}
+                </div>
+                <div className="col-span-1 text-center font-bold text-red-600">
+                  {totalStat.환불예정액 > 0 ? `${totalStat.환불예정액.toLocaleString()}원` : '-'}
                 </div>
                 <div className="col-span-1"></div>
               </div>
@@ -1125,11 +1125,11 @@ export default function OrderPlatformPage() {
                   <div className="col-span-1 text-center font-semibold text-gray-600">
                     {stat.취소완료_건수 > 0 ? stat.취소완료_건수 : '-'}
                   </div>
-                  <div className="col-span-1 text-center font-semibold text-red-600">
-                    {stat.환불예정액 > 0 ? `${stat.환불예정액.toLocaleString()}원` : '-'}
-                  </div>
                   <div className="col-span-1 text-center font-semibold text-emerald-600">
                     {stat.환불완료_건수 > 0 ? `${stat.환불완료_건수}건` : '-'}
+                  </div>
+                  <div className="col-span-1 text-center font-semibold text-red-600">
+                    {stat.환불예정액 > 0 ? `${stat.환불예정액.toLocaleString()}원` : '-'}
                   </div>
                   <div className="col-span-1"></div>
                 </div>
