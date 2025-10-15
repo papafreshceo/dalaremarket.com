@@ -10,7 +10,9 @@
       "Bash(node:*)",
       "Bash(npm install pg)",
       "Bash(git restore:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(psql:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

@@ -1085,7 +1085,7 @@ export default function ExcelTab() {
   };
 
   // 실제 저장 실행
-  const executeSaveToDatabase = async (overwriteDuplicates: boolean = false) => {
+  const executeSaveToDatabase = async (overwriteDuplicates: boolean = false, skipDuplicateCheck: boolean = false) => {
     setShowSaveConfirmModal(false);
     setShowDuplicateModal(false);
 
@@ -1169,7 +1169,7 @@ export default function ExcelTab() {
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orders: uniqueOrders, checkDuplicatesOnly: !overwriteDuplicates, overwriteDuplicates }),
+        body: JSON.stringify({ orders: uniqueOrders, overwriteDuplicates, skipDuplicateCheck }),
       });
 
       const result = await response.json();
@@ -1921,13 +1921,13 @@ export default function ExcelTab() {
                 취소
               </button>
               <button
-                onClick={() => executeSaveToDatabase(false)}
+                onClick={() => executeSaveToDatabase(false, true)}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 중복 제외
               </button>
               <button
-                onClick={() => executeSaveToDatabase(true)}
+                onClick={() => executeSaveToDatabase(true, true)}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
                 덮어쓰기

@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Order, StatusConfig } from '../types';
 
 interface DashboardTabProps {
@@ -9,6 +10,182 @@ interface DashboardTabProps {
 }
 
 export default function DashboardTab({ isMobile, orders, statusConfig }: DashboardTabProps) {
+  // 현재 날짜 정보
+  const now = useMemo(() => new Date(), []);
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const currentDay = now.getDate();
+
+  // 이번 달 첫날과 마지막 날
+  const firstDayOfMonth = useMemo(() => new Date(currentYear, currentMonth - 1, 1), [currentYear, currentMonth]);
+  const lastDayOfMonth = useMemo(() => new Date(currentYear, currentMonth, 0), [currentYear, currentMonth]);
+  const daysInMonth = lastDayOfMonth.getDate();
+  const firstDayOfWeek = firstDayOfMonth.getDay();
+
+  // 날짜별 주문 집계
+  const ordersByDate = useMemo(() => {
+    const dateMap: Record<number, { count: number; amount: number }> = {};
+
+    orders.forEach(order => {
+      const orderDate = order.registeredAt ? new Date(order.registeredAt) : null;
+      if (!orderDate) return;
+
+      if (orderDate.getFullYear() === currentYear && orderDate.getMonth() === currentMonth - 1) {
+        const day = orderDate.getDate();
+        if (!dateMap[day]) {
+          dateMap[day] = { count: 0, amount: 0 };
+        }
+        dateMap[day].count++;
+        dateMap[day].amount += order.amount || 0;
+      }
+    });
+
+    return dateMap;
+  }, [orders, currentYear, currentMonth]);
+
+  // 이번 달 통계
+  const thisMonthStats = useMemo(() => {
+    let totalAmount = 0;
+    let totalCount = 0;
+
+    orders.forEach(order => {
+      const orderDate = order.registeredAt ? new Date(order.registeredAt) : null;
+      if (!orderDate) return;
+
+      if (orderDate.getFullYear() === currentYear && orderDate.getMonth() === currentMonth - 1) {
+        totalAmount += order.amount || 0;
+        totalCount++;
+      }
+    });
+
+    return { totalAmount, totalCount, avgAmount: totalCount > 0 ? totalAmount / totalCount : 0 };
+  }, [orders, currentYear, currentMonth]);
+
+  // 어제 통계
+  const yesterdayStats = useMemo(() => {
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    let totalAmount = 0;
+    let totalCount = 0;
+
+    orders.forEach(order => {
+      const orderDate = order.registeredAt ? new Date(order.registeredAt) : null;
+      if (!orderDate) return;
+
+      if (
+        orderDate.getFullYear() === yesterday.getFullYear() &&
+        orderDate.getMonth() === yesterday.getMonth() &&
+        orderDate.getDate() === yesterday.getDate()
+      ) {
+        totalAmount += order.amount || 0;
+        totalCount++;
+      }
+    });
+
+    return { totalAmount, totalCount };
+  }, [orders, now]);
+
+  // 최근 7일 통계
+  const last7DaysStats = useMemo(() => {
+    const stats: { day: string; value: number; amount: number }[] = [];
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+
+      let dayAmount = 0;
+      orders.forEach(order => {
+        const orderDate = order.registeredAt ? new Date(order.registeredAt) : null;
+        if (!orderDate) return;
+
+        if (
+          orderDate.getFullYear() === date.getFullYear() &&
+          orderDate.getMonth() === date.getMonth() &&
+          orderDate.getDate() === date.getDate()
+        ) {
+          dayAmount += order.amount || 0;
+        }
+      });
+
+      stats.push({
+        day: dayNames[date.getDay()],
+        value: dayAmount,
+        amount: dayAmount
+      });
+    }
+
+    // Normalize heights (0-100%)
+    const maxAmount = Math.max(...stats.map(s => s.amount), 1);
+    stats.forEach(s => {
+      s.value = (s.amount / maxAmount) * 100;
+    });
+
+    return stats;
+  }, [orders, now]);
+
+  // 월별 발주 추이 (최근 7개월)
+  const monthlyStats = useMemo(() => {
+    const stats: { month: string; value: number; amount: number }[] = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(currentYear, currentMonth - 1 - i, 1);
+      let monthAmount = 0;
+
+      orders.forEach(order => {
+        const orderDate = order.registeredAt ? new Date(order.registeredAt) : null;
+        if (!orderDate) return;
+
+        if (
+          orderDate.getFullYear() === date.getFullYear() &&
+          orderDate.getMonth() === date.getMonth()
+        ) {
+          monthAmount += order.amount || 0;
+        }
+      });
+
+      stats.push({
+        month: `${date.getMonth() + 1}월`,
+        value: monthAmount,
+        amount: monthAmount
+      });
+    }
+
+    // Normalize heights
+    const maxAmount = Math.max(...stats.map(s => s.amount), 1);
+    stats.forEach(s => {
+      s.value = (s.amount / maxAmount) * 100;
+    });
+
+    return stats;
+  }, [orders, currentYear, currentMonth]);
+
+  // 옵션명별 TOP 5
+  const optionTop5 = useMemo(() => {
+    const optionMap: Record<string, number> = {};
+
+    orders.forEach(order => {
+      const optionName = order.optionName || '미지정';
+      if (!optionMap[optionName]) {
+        optionMap[optionName] = 0;
+      }
+      optionMap[optionName] += order.amount || 0;
+    });
+
+    const sorted = Object.entries(optionMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    const maxAmount = sorted[0]?.[1] || 1;
+
+    return sorted.map(([name, amount]) => ({
+      name,
+      amount,
+      percent: (amount / maxAmount) * 100
+    }));
+  }, [orders]);
+
   return (
     <div>
       {/* 통계 대시보드 섹션 */}
@@ -62,7 +239,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 minWidth: '100px',
                 textAlign: 'center'
               }}>
-                2025년 1월
+                {currentYear}년 {currentMonth}월
               </span>
               <button className="bg-white border-gray-200" style={{
                 padding: '6px',
@@ -105,23 +282,19 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             gridTemplateColumns: 'repeat(7, 1fr)',
             gap: '4px'
           }}>
-            {/* 이전 달 날짜 (비활성) */}
-            {[29, 30, 31].map(day => (
-              <div key={`prev-${day}`} style={{
-                padding: '8px 4px',
-                textAlign: 'center',
-                fontSize: '13px'
-              }}>
-                {day}
-              </div>
+            {/* 이전 달 빈 칸 */}
+            {Array.from({ length: firstDayOfWeek }, (_, i) => (
+              <div key={`empty-${i}`} style={{ padding: '8px 4px' }} />
             ))}
+
             {/* 현재 달 날짜 */}
-            {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
-              const isToday = day === 15;
-              const hasOrder = [5, 8, 12, 15, 18, 22, 25, 28].includes(day);
-              const orderCounts: Record<number, number> = { 5: 3, 8: 2, 12: 4, 15: 1, 18: 5, 22: 2, 25: 3, 28: 4 };
-              const orderCount = hasOrder ? orderCounts[day] : 0;
-              const dayOfWeek = (day + 2) % 7; // 1일이 수요일
+            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+              const isToday = day === currentDay;
+              const dayData = ordersByDate[day];
+              const hasOrder = !!dayData;
+              const orderCount = dayData?.count || 0;
+              const orderAmount = dayData?.amount || 0;
+              const dayOfWeek = (firstDayOfWeek + day - 1) % 7;
 
               return (
                 <div key={day} className={hasOrder && !isToday ? 'bg-white' : ''} style={{
@@ -172,7 +345,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         fontSize: '12px',
                         fontWeight: '500'
                       }}>
-                        ₩{(orderCount * 450).toLocaleString()}K
+                        ₩{(orderAmount / 1000).toFixed(0)}K
                       </div>
                     </>
                   )}
@@ -193,16 +366,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 </div>
               );
             })}
-            {/* 다음 달 날짜 (비활성) */}
-            {[1].map(day => (
-              <div key={`next-${day}`} style={{
-                padding: '8px 4px',
-                textAlign: 'center',
-                fontSize: '13px'
-              }}>
-                {day}
-              </div>
-            ))}
           </div>
 
           {/* 캘린더 범례 */}
@@ -272,7 +435,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               fontWeight: '600',
               marginBottom: '8px',
             }}>
-              ₩8,450,000
+              ₩{thisMonthStats.totalAmount.toLocaleString()}
             </div>
             <div style={{
               fontSize: '12px',
@@ -281,8 +444,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               gap: '4px',
               color: '#6b7280'
             }}>
-              <span className="text-success">▲</span>
-              <span>전월 대비 +12.5%</span>
+              <span className="text-success">📊</span>
+              <span>{thisMonthStats.totalCount}건</span>
             </div>
           </div>
 
@@ -302,7 +465,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               fontWeight: '600',
               marginBottom: '8px',
             }}>
-              ₩520,000
+              ₩{yesterdayStats.totalAmount.toLocaleString()}
             </div>
             <div style={{
               fontSize: '12px',
@@ -311,8 +474,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               gap: '4px',
               color: '#6b7280'
             }}>
-              <span className="text-warning">▼</span>
-              <span>전일 대비 -8.2%</span>
+              <span>📈</span>
+              <span>{yesterdayStats.totalCount}건</span>
             </div>
           </div>
 
@@ -332,7 +495,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               fontWeight: '600',
               marginBottom: '8px',
             }}>
-              ₩680,000
+              ₩{Math.round(thisMonthStats.avgAmount).toLocaleString()}
             </div>
             <div style={{
               fontSize: '12px',
@@ -341,8 +504,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               gap: '4px',
               color: '#6b7280'
             }}>
-              <span className="text-success">▲</span>
-              <span>전월 대비 +5.8%</span>
+              <span>💰</span>
+              <span>이번달 기준</span>
             </div>
           </div>
 
@@ -362,7 +525,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               fontWeight: '600',
               marginBottom: '8px',
             }}>
-              156건
+              {orders.length}건
             </div>
             <div style={{
               fontSize: '12px',
@@ -371,8 +534,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               gap: '4px',
               color: '#6b7280'
             }}>
-              <span className="text-success">▲</span>
-              <span>전월 대비 +22건</span>
+              <span>📝</span>
+              <span>전체 주문</span>
             </div>
           </div>
         </div>
@@ -402,7 +565,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               height: '120px',
               gap: '8px'
             }}>
-              {[60, 45, 75, 85, 70, 90, 95].map((height, idx) => (
+              {monthlyStats.map((stat, idx) => (
                 <div key={idx} style={{
                   flex: 1,
                   display: 'flex',
@@ -412,22 +575,22 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 }}>
                   <div style={{
                     width: '100%',
-                    height: `${height}%`,
-                    background: idx === 6 ? '#2563eb' : '#93c5fd',
+                    height: `${stat.value || 5}%`,
+                    background: idx === monthlyStats.length - 1 ? '#2563eb' : '#93c5fd',
                     borderRadius: '4px 4px 0 0',
                     transition: 'all 0.3s'
                   }} />
                   <span style={{
                     fontSize: '10px',
                   }}>
-                    {['7월', '8월', '9월', '10월', '11월', '12월', '1월'][idx]}
+                    {stat.month}
                   </span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 판매채널별 발주 비율 */}
+          {/* 옵션명별 발주 TOP 5 */}
           <div className="card" style={{
             borderRadius: '12px',
             padding: '20px'
@@ -437,107 +600,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               fontWeight: '600',
               marginBottom: '16px'
             }}>
-              판매채널별 발주 비율
-            </h3>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '20px'
-            }}>
-              {/* 도넛 차트 */}
-              <div style={{
-                position: 'relative',
-                width: '100px',
-                height: '100px'
-              }}>
-                <svg width="100" height="100" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="#2563eb" strokeWidth="20"
-                    strokeDasharray="75.4 226.2" transform="rotate(-90 50 50)"/>
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="#10b981" strokeWidth="20"
-                    strokeDasharray="62.8 226.2" strokeDashoffset="-75.4" transform="rotate(-90 50 50)"/>
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="#f59e0b" strokeWidth="20"
-                    strokeDasharray="50.3 226.2" strokeDashoffset="-138.2" transform="rotate(-90 50 50)"/>
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="#8b5cf6" strokeWidth="20"
-                    strokeDasharray="37.7 226.2" strokeDashoffset="-188.5" transform="rotate(-90 50 50)"/>
-                </svg>
-                <div style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  textAlign: 'center'
-                }}>
-                  <div style={{
-                    fontSize: '18px',
-                    fontWeight: '600',
-                  }}>
-                    100%
-                  </div>
-                </div>
-              </div>
-              {/* 범례 */}
-              <div style={{ flex: 1 }}>
-                {[
-                  { label: '온라인몰', value: '35%', color: '#2563eb' },
-                  { label: '오프라인', value: '28%', color: '#10b981' },
-                  { label: 'B2B', value: '22%', color: '#f59e0b' },
-                  { label: '기타', value: '15%', color: '#8b5cf6' }
-                ].map((item, idx) => (
-                  <div key={idx} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '8px'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}>
-                      <div style={{
-                        width: '12px',
-                        height: '12px',
-                        background: item.color,
-                        borderRadius: '2px'
-                      }} />
-                      <span style={{
-                        fontSize: '12px',
-                      }}>
-                        {item.label}
-                      </span>
-                    </div>
-                    <span style={{
-                      fontSize: '12px',
-                      fontWeight: '500',
-                      }}>
-                      {item.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* 품목별 발주 TOP 5 */}
-          <div className="card" style={{
-            borderRadius: '12px',
-            padding: '20px'
-          }}>
-            <h3 style={{
-              fontSize: '14px',
-              fontWeight: '600',
-              marginBottom: '16px'
-            }}>
-              품목별 발주 TOP 5
+              옵션명별 발주 TOP 5
             </h3>
             <div>
-              {[
-                { name: '토마토', amount: '₩2,450,000', percent: 85 },
-                { name: '딸기', amount: '₩1,980,000', percent: 70 },
-                { name: '양파', amount: '₩1,520,000', percent: 55 },
-                { name: '감자', amount: '₩980,000', percent: 40 },
-                { name: '대파', amount: '₩650,000', percent: 25 }
-              ].map((item, idx) => (
+              {optionTop5.length > 0 ? optionTop5.map((item, idx) => (
                 <div key={idx} style={{ marginBottom: '12px' }}>
                   <div style={{
                     display: 'flex',
@@ -553,7 +619,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       fontSize: '12px',
                       fontWeight: '500',
                       }}>
-                      {item.amount}
+                      ₩{item.amount.toLocaleString()}
                     </span>
                   </div>
                   <div className="border-gray-200" style={{
@@ -568,7 +634,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     }} />
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div style={{ textAlign: 'center', color: '#6b7280', padding: '20px' }}>
+                  데이터가 없습니다
+                </div>
+              )}
             </div>
           </div>
 
@@ -591,15 +661,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               height: '100px',
               gap: '8px'
             }}>
-              {[
-                { day: '월', value: 45, amount: '520K' },
-                { day: '화', value: 75, amount: '850K' },
-                { day: '수', value: 60, amount: '680K' },
-                { day: '목', value: 85, amount: '920K' },
-                { day: '금', value: 70, amount: '780K' },
-                { day: '토', value: 30, amount: '350K' },
-                { day: '일', value: 95, amount: '1.2M' }
-              ].map((item, idx) => (
+              {last7DaysStats.map((item, idx) => (
                 <div key={idx} style={{
                   flex: 1,
                   display: 'flex',
@@ -612,11 +674,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     color: '#495057',
                     fontWeight: '500'
                   }}>
-                    {item.amount}
+                    {item.amount >= 1000000
+                      ? `${(item.amount / 1000000).toFixed(1)}M`
+                      : `${(item.amount / 1000).toFixed(0)}K`}
                   </span>
                   <div style={{
                     width: '100%',
-                    height: `${item.value}%`,
+                    height: `${item.value || 5}%`,
                     background: idx === 6 ? '#10b981' : '#93c5fd',
                     borderRadius: '4px 4px 0 0'
                   }} />
@@ -627,6 +691,60 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   </span>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* 상태별 주문 현황 */}
+          <div className="card" style={{
+            borderRadius: '12px',
+            padding: '20px'
+          }}>
+            <h3 style={{
+              fontSize: '14px',
+              fontWeight: '600',
+              marginBottom: '16px'
+            }}>
+              상태별 주문 현황
+            </h3>
+            <div>
+              {Object.entries(statusConfig).map(([status, config], idx) => {
+                const count = orders.filter(o => o.status === status).length;
+                const percent = orders.length > 0 ? (count / orders.length) * 100 : 0;
+
+                return (
+                  <div key={idx} style={{ marginBottom: '12px' }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '4px'
+                    }}>
+                      <span style={{
+                        fontSize: '12px',
+                      }}>
+                        {config.label}
+                      </span>
+                      <span style={{
+                        fontSize: '12px',
+                        fontWeight: '500',
+                      }}>
+                        {count}건
+                      </span>
+                    </div>
+                    <div className="border-gray-200" style={{
+                      height: '6px',
+                      borderRadius: '3px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        width: `${percent}%`,
+                        height: '100%',
+                        background: config.color,
+                        transition: 'width 0.3s'
+                      }} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

@@ -18,6 +18,7 @@
     "ag-grid-react": "^34.2.0",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
+    "exceljs": "^4.4.0",
     "framer-motion": "^12.23.22",
     "frappe-gantt": "^1.0.3",
     "html-to-image": "^1.11.13",

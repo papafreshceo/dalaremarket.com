@@ -1442,6 +1442,7 @@ export default function OrderRegistrationTab({
                 cursor: 'pointer',
                 position: 'relative',
                 background: isSelected ? `linear-gradient(135deg, ${config.color}10 0%, ${config.color}18 100%)` : undefined,
+                border: isSelected ? `2px solid ${config.color}` : '1px solid #e5e7eb',
                 transform: isSelected ? 'translateY(-2px)' : undefined,
                 transition: 'all 0.2s ease'
               }}
@@ -1801,7 +1802,7 @@ export default function OrderRegistrationTab({
 
       {/* 일괄 삭제 버튼 (발주서등록 단계만) */}
       {filterStatus === 'registered' && (
-        <div className="mb-3 flex justify-start">
+        <div className="mb-3 flex justify-start gap-2">
           <button
             onClick={handleBatchDelete}
             disabled={selectedOrders.length === 0}
@@ -1861,6 +1862,50 @@ export default function OrderRegistrationTab({
             }}
           >
             취소요청 ({selectedOrders.length})
+          </button>
+        </div>
+      )}
+
+      {/* CS접수 버튼 (발송완료 단계만) */}
+      {filterStatus === 'shipped' && (
+        <div className="mb-3 flex justify-start">
+          <button
+            onClick={() => {
+              if (selectedOrders.length === 0) {
+                alert('CS접수할 주문을 선택해주세요.');
+                return;
+              }
+              if (selectedOrders.length > 1) {
+                alert('CS접수는 한 번에 하나의 주문만 처리할 수 있습니다.');
+                return;
+              }
+              // CS접수 로직 추가 예정
+              alert('CS접수 기능은 준비 중입니다.');
+            }}
+            disabled={selectedOrders.length === 0}
+            style={{
+              padding: '0.25rem 0.5rem',
+              borderRadius: '0.25rem',
+              fontSize: '0.75rem',
+              fontWeight: '500',
+              transition: 'all 0.2s',
+              backgroundColor: selectedOrders.length === 0 ? '#d1d5db' : '#ec4899',
+              color: selectedOrders.length === 0 ? '#6b7280' : '#ffffff',
+              cursor: selectedOrders.length === 0 ? 'not-allowed' : 'pointer',
+              border: 'none'
+            }}
+            onMouseEnter={(e) => {
+              if (selectedOrders.length > 0) {
+                e.currentTarget.style.backgroundColor = '#db2777';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (selectedOrders.length > 0) {
+                e.currentTarget.style.backgroundColor = '#ec4899';
+              }
+            }}
+          >
+            CS접수
           </button>
         </div>
       )}

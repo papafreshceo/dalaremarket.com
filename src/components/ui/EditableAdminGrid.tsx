@@ -163,22 +163,29 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     } else if (!isInitialMount.current) {
       // 데이터 참조가 변경된 경우 업데이트 (외부에서 새로 로드하거나 상태가 변경된 경우)
       if (data !== prevDataRef.current) {
+        const prevLength = prevDataRef.current.length
+        const newLength = data.length
+
         setGridData(data)
         prevDataRef.current = data
 
-        // 데이터 길이가 변경된 경우에만 원본 데이터 참조 및 상태 초기화 (완전히 새로 로드된 경우)
-        if (data.length !== gridData.length) {
-          originalDataRef.current = JSON.parse(JSON.stringify(data))
+        // 항상 modifiedCells 초기화 (데이터가 새로 로드되었으므로)
+        // addedRows, copiedRows도 초기화 (새 데이터에는 추가/복사 표시 불필요)
+        setModifiedCells(new Set())
+        setAddedRows(new Set())
+        setCopiedRows(new Set())
 
-          // 선택된 행 초기화 (삭제 후 재로딩 시)
+        // 원본 데이터 업데이트 (새로 로드된 데이터가 기준점)
+        originalDataRef.current = JSON.parse(JSON.stringify(data))
+
+        // 데이터 길이가 증가한 경우만 선택 초기화 (새 데이터 로드 또는 추가)
+        // 길이가 같거나 감소한 경우는 선택 유지 (fetchOrders 후 선택 유지)
+        if (newLength > prevLength) {
           setSelectedRows(new Set())
-          setAddedRows(new Set())
-          setCopiedRows(new Set())
-          setModifiedCells(new Set())
         }
       }
     }
-  }, [data, gridData.length])
+  }, [data, selectedRows.size])
 
   // 수정 상태 변경 시 콜백 호출
   useEffect(() => {

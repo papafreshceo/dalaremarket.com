@@ -5,6 +5,7 @@ import { Search, Download, Filter, Calendar, RefreshCw, Upload, ChevronDown, Che
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import { Modal } from '@/components/ui/Modal';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 interface Order {
   id: number;
@@ -216,6 +217,7 @@ export default function SearchTab() {
 
   // 벤더사전송파일 모달 상태
   const [showVendorFileModal, setShowVendorFileModal] = useState(false);
+  const [showMarketInvoiceModal, setShowMarketInvoiceModal] = useState(false);
 
   // 상태 카드 필터
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -982,8 +984,6 @@ export default function SearchTab() {
 
   // 일괄적용 핸들러 - 선택된 주문에 택배사 적용 (그리드에만 반영, DB 저장은 저장 버튼 클릭 시)
   const handleBulkApply = () => {
-    console.log('일괄적용 시작:', { bulkApplyValue, selectedOrders, filteredOrdersLength: filteredOrders.length });
-
     if (!bulkApplyValue.trim()) {
       alert('택배사를 선택해주세요.');
       return;
@@ -993,20 +993,9 @@ export default function SearchTab() {
       return;
     }
 
-    // 선택된 주문의 ID 가져오기
-    const selectedOrderIds = selectedOrders.map(index => filteredOrders[index]?.id).filter(id => id);
-    console.log('선택된 주문 IDs:', selectedOrderIds);
-
-    if (selectedOrderIds.length === 0) {
-      alert('유효한 주문이 선택되지 않았습니다.');
-      return;
-    }
-
     // 전체 orders 배열 업데이트 - 완전히 새로운 배열 생성
     const updatedOrders = orders.map(order => {
-      if (selectedOrderIds.includes(order.id)) {
-        console.log(`  - 주문 ${order.order_number} 택배사: ${order.courier_company} → ${bulkApplyValue}`);
-        // 완전히 새로운 객체 생성
+      if (selectedOrders.includes(order.id)) {
         return {
           ...order,
           courier_company: bulkApplyValue,
@@ -1015,14 +1004,11 @@ export default function SearchTab() {
       return order;
     });
 
-    console.log('프론트엔드 상태 업데이트 완료, 총', updatedOrders.length, '건');
-
     // 새 배열로 상태 업데이트 (깜빡임 없이)
     // orders 배열만 업데이트하면 filteredOrders도 자동으로 업데이트됨 (useMemo)
     setOrders(updatedOrders);
 
-    // 선택 해제
-    setSelectedOrders([]);
+    // 선택 유지 (제거: setSelectedOrders([]))
   };
 
   // 발주확인 핸들러 - 선택된 결제완료 상태 주문을 상품준비중으로 변경
@@ -1033,8 +1019,9 @@ export default function SearchTab() {
       return;
     }
 
-    const confirmOrders = selectedOrders
-      .map(index => filteredOrders[index])
+    // selectedOrders가 ID 배열인지 인덱스 배열인지 확인
+    const confirmOrders = filteredOrders
+      .filter(order => selectedOrders.includes(order.id))
       .filter(order => order && order.shipping_status === '결제완료');
 
     if (confirmOrders.length === 0) {
@@ -1142,14 +1129,39 @@ export default function SearchTab() {
 
   // 송장등록 핸들러 - 택배사, 송장번호, 발송일(송장입력일) DB에 저장
   const handleTrackingRegister = async () => {
-    if (orders.length === 0) return;
+    // 선택된 주문 확인
+    if (selectedOrders.length === 0) {
+      alert('송장을 등록할 주문을 선택해주세요.');
+      return;
+    }
+
+    // 선택된 주문만 필터링 (orders 배열에서 가져와야 일괄적용 후 최신 데이터 반영됨)
+    const selectedOrdersList = orders.filter(order => selectedOrders.includes(order.id));
+
+    // 유효성 검사: 택배사와 송장번호가 모두 입력되었는지 확인
+    const invalidOrders = selectedOrdersList.filter(order =>
+      !order.courier_company || !order.courier_company.trim() ||
+      !order.tracking_number || !order.tracking_number.trim()
+    );
+
+    if (invalidOrders.length > 0) {
+      const missingFields = invalidOrders.map(order => {
+        const missing = [];
+        if (!order.courier_company || !order.courier_company.trim()) missing.push('택배사');
+        if (!order.tracking_number || !order.tracking_number.trim()) missing.push('송장번호');
+        return `  • ${order.order_number || `주문 ID ${order.id}`} - ${missing.join(', ')} 누락`;
+      }).slice(0, 5).join('\n');
+
+      alert(`⚠️ 송장 정보 입력 오류\n\n다음 주문의 정보를 입력해주세요:\n\n${missingFields}${invalidOrders.length > 5 ? `\n  • ... 외 ${invalidOrders.length - 5}건 더 있음` : ''}\n\n✓ 택배사와 송장번호를 모두 입력해야 등록할 수 있습니다.`);
+      return;
+    }
 
     try {
       // 한국 시간으로 발송일 설정
       const shippedDateTime = getKoreanDateTime();
 
       // 택배사, 송장번호, 발송일 저장 + 상태를 '발송완료'로 변경
-      const ordersToSave = orders.map(order => ({
+      const ordersToSave = selectedOrdersList.map(order => ({
         id: order.id,
         courier_company: order.courier_company,
         tracking_number: order.tracking_number,
@@ -1157,22 +1169,21 @@ export default function SearchTab() {
         shipping_status: '발송완료', // 상태를 발송완료로 변경
       }));
 
-      console.log('🚀 송장등록 시작:', ordersToSave.length, '건');
-      console.log('📦 첫번째 주문:', ordersToSave[0]);
-
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orders: ordersToSave }),
       });
 
-      console.log('📡 응답 상태:', response.status);
       const result = await response.json();
-      console.log('📋 응답 결과:', result);
 
       if (result.success) {
-        alert('송장이 등록되었습니다.');
-        // fetchOrders(); // 제거 - 자동 새로고침 안함
+        alert(`${ordersToSave.length}건의 송장이 등록되었습니다.`);
+
+        // DB에서 최신 데이터로 orders 상태 업데이트 (빨간 폰트 해제)
+        await fetchOrders();
+
+        // 선택 유지 (제거: setSelectedOrders([]))
       } else {
         alert(`송장 등록 실패: ${result.error}`);
       }
@@ -1184,14 +1195,39 @@ export default function SearchTab() {
 
   // 송장수정 핸들러 - 송장등록과 동일한 동작 (발송완료 상태에서만 사용)
   const handleTrackingUpdate = async () => {
-    if (orders.length === 0) return;
+    // 선택된 주문 확인
+    if (selectedOrders.length === 0) {
+      alert('송장을 수정할 주문을 선택해주세요.');
+      return;
+    }
+
+    // 선택된 주문만 필터링 (orders 배열에서 가져와야 일괄적용 후 최신 데이터 반영됨)
+    const selectedOrdersList = orders.filter(order => selectedOrders.includes(order.id));
+
+    // 유효성 검사: 택배사와 송장번호가 모두 입력되었는지 확인
+    const invalidOrders = selectedOrdersList.filter(order =>
+      !order.courier_company || !order.courier_company.trim() ||
+      !order.tracking_number || !order.tracking_number.trim()
+    );
+
+    if (invalidOrders.length > 0) {
+      const missingFields = invalidOrders.map(order => {
+        const missing = [];
+        if (!order.courier_company || !order.courier_company.trim()) missing.push('택배사');
+        if (!order.tracking_number || !order.tracking_number.trim()) missing.push('송장번호');
+        return `  • ${order.order_number || `주문 ID ${order.id}`} - ${missing.join(', ')} 누락`;
+      }).slice(0, 5).join('\n');
+
+      alert(`⚠️ 송장 정보 입력 오류\n\n다음 주문의 정보를 입력해주세요:\n\n${missingFields}${invalidOrders.length > 5 ? `\n  • ... 외 ${invalidOrders.length - 5}건 더 있음` : ''}\n\n✓ 택배사와 송장번호를 모두 입력해야 등록할 수 있습니다.`);
+      return;
+    }
 
     try {
       // 한국 시간으로 발송일 설정
       const shippedDateTime = getKoreanDateTime();
 
       // 택배사, 송장번호, 발송일 저장 + 상태를 '발송완료'로 변경
-      const ordersToSave = orders.map(order => ({
+      const ordersToSave = selectedOrdersList.map(order => ({
         id: order.id,
         courier_company: order.courier_company,
         tracking_number: order.tracking_number,
@@ -1210,7 +1246,12 @@ export default function SearchTab() {
       const result = await response.json();
 
       if (result.success) {
-        alert('송장이 수정되었습니다.');
+        alert(`${ordersToSave.length}건의 송장이 수정되었습니다.`);
+
+        // DB에서 최신 데이터로 orders 상태 업데이트 (빨간 폰트 해제)
+        await fetchOrders();
+
+        // 선택 유지 (제거: setSelectedOrders([]))
       } else {
         alert(`송장 수정 실패: ${result.error}`);
       }
@@ -1278,7 +1319,10 @@ export default function SearchTab() {
 
   // 벤더사별 엑셀 다운로드
   const handleVendorExcelDownload = async (vendorName: string) => {
-    const vendorOrders = orders.filter((o) => (o.vendor_name || '미지정') === vendorName);
+    // 현재 필터된 주문(화면에 보이는 것) 중에서 상품준비중 상태이면서 해당 벤더사인 주문만 필터링
+    const vendorOrders = filteredOrders.filter(
+      (o) => o.shipping_status === '상품준비중' && (o.vendor_name || '미지정') === vendorName
+    );
 
     if (vendorOrders.length === 0) {
       alert('다운로드할 주문이 없습니다.');
@@ -1295,9 +1339,13 @@ export default function SearchTab() {
       if (result.success && result.data && result.data.columns.length > 0) {
         // 템플릿이 있는 경우: 템플릿에 맞게 데이터 변환
         const template = result.data;
+
+        // order 필드로 컬럼 정렬
+        const sortedColumns = [...template.columns].sort((a, b) => (a.order || 0) - (b.order || 0));
+
         exportData = vendorOrders.map((order: any) => {
           const row: any = {};
-          template.columns.forEach((col: any) => {
+          sortedColumns.forEach((col: any) => {
             const fieldType = col.field_type || 'db';
 
             if (fieldType === 'db') {
@@ -1330,16 +1378,316 @@ export default function SearchTab() {
         }));
       }
 
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, vendorName);
+      // ExcelJS를 사용하여 스타일이 적용된 엑셀 생성
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet(vendorName);
 
+      if (exportData.length > 0) {
+        // 헤더 추가 (템플릿이 있으면 width와 headerColor 사용)
+        const headers = Object.keys(exportData[0]);
+        if (result.success && result.data && result.data.columns.length > 0) {
+          const template = result.data;
+          const sortedColumns = [...template.columns].sort((a, b) => (a.order || 0) - (b.order || 0));
+
+          worksheet.columns = headers.map((header, index) => ({
+            header: header,
+            key: header,
+            width: sortedColumns[index]?.width || 20,
+          }));
+
+          // 데이터 추가
+          exportData.forEach((row: any) => {
+            worksheet.addRow(row);
+          });
+
+          // 헤더 스타일 적용 (각 칼럼별 색상 적용)
+          const headerRow = worksheet.getRow(1);
+          headerRow.eachCell((cell, colNumber) => {
+            const columnConfig = sortedColumns[colNumber - 1];
+            const headerColor = columnConfig?.headerColor || '#4472C4';
+
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FF' + headerColor.replace('#', '') },
+            };
+            cell.font = {
+              bold: true,
+              color: { argb: 'FFFFFFFF' },
+            };
+            cell.alignment = {
+              horizontal: 'center',
+              vertical: 'middle',
+            };
+          });
+        } else {
+          // 템플릿이 없으면 기본 설정 사용
+          worksheet.columns = headers.map(header => ({
+            header: header,
+            key: header,
+            width: 20,
+          }));
+
+          // 데이터 추가
+          exportData.forEach((row: any) => {
+            worksheet.addRow(row);
+          });
+
+          // 헤더 스타일 적용 (기본 색상)
+          const headerRow = worksheet.getRow(1);
+          headerRow.eachCell((cell) => {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FF4472C4' },
+            };
+            cell.font = {
+              bold: true,
+              color: { argb: 'FFFFFFFF' },
+            };
+            cell.alignment = {
+              horizontal: 'center',
+              vertical: 'middle',
+            };
+          });
+        }
+
+        // 모든 데이터 셀 정렬 (템플릿 설정에 따라)
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber > 1) { // 헤더 제외
+            row.eachCell((cell, colNumber) => {
+              if (result.success && result.data && result.data.columns.length > 0) {
+                const template = result.data;
+                const sortedColumns = [...template.columns].sort((a, b) => (a.order || 0) - (b.order || 0));
+                const columnConfig = sortedColumns[colNumber - 1];
+                const alignment = columnConfig?.alignment || 'center';
+
+                cell.alignment = {
+                  horizontal: alignment,
+                  vertical: 'middle',
+                };
+              } else {
+                cell.alignment = {
+                  horizontal: 'center',
+                  vertical: 'middle',
+                };
+              }
+            });
+          }
+        });
+      }
+
+      // 파일 다운로드
       const fileName = `${vendorName}_발송목록_${new Date().toISOString().split('T')[0]}.xlsx`;
-      XLSX.writeFile(wb, fileName);
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('엑셀 다운로드 오류:', error);
       alert('엑셀 다운로드 중 오류가 발생했습니다.');
     }
+  };
+
+  // 마켓별 송장파일 다운로드
+  const handleMarketInvoiceDownload = async (marketName: string) => {
+    // 현재 필터된 주문 중에서 발송완료 상태이면서 해당 마켓인 주문만 필터링
+    const marketOrders = filteredOrders.filter(
+      (o) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === marketName
+    );
+
+    if (marketOrders.length === 0) {
+      alert('다운로드할 주문이 없습니다.');
+      return;
+    }
+
+    try {
+      // 마켓 송장 템플릿 가져오기
+      const response = await fetch(`/api/market-invoice-templates/${encodeURIComponent(marketName)}`);
+      const result = await response.json();
+
+      let exportData;
+
+      if (result.success && result.data && result.data.columns.length > 0) {
+        // 템플릿이 있는 경우: 템플릿에 맞게 데이터 변환
+        const template = result.data;
+
+        // order 필드로 컬럼 정렬
+        const sortedColumns = [...template.columns].sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        exportData = marketOrders.map((order: any) => {
+          const row: any = {};
+          sortedColumns.forEach((col: any) => {
+            const fieldType = col.field_type || 'db';
+
+            if (fieldType === 'db') {
+              // DB 필드: 실제 값 가져오기
+              const value = order[col.db_field];
+              row[col.header_name] = value || '';
+            } else if (fieldType === 'fixed') {
+              // 고정값: 설정된 값 사용
+              row[col.header_name] = col.fixed_value || '';
+            } else if (fieldType === 'empty') {
+              // 빈칸: 빈 문자열
+              row[col.header_name] = '';
+            }
+          });
+          return row;
+        });
+      } else {
+        // 템플릿이 없는 경우: 기본 양식 사용
+        exportData = marketOrders.map((order) => ({
+          주문번호: order.order_number,
+          수취인: order.recipient_name,
+          전화번호: order.recipient_phone || '',
+          주소: order.recipient_address || '',
+          택배사: order.courier_company || '',
+          송장번호: order.tracking_number || '',
+        }));
+      }
+
+      // ExcelJS를 사용하여 스타일이 적용된 엑셀 생성
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet(marketName);
+
+      if (exportData.length > 0) {
+        // 헤더 추가 (템플릿이 있으면 width와 headerColor 사용)
+        const headers = Object.keys(exportData[0]);
+        if (result.success && result.data && result.data.columns.length > 0) {
+          const template = result.data;
+          const sortedColumns = [...template.columns].sort((a, b) => (a.order || 0) - (b.order || 0));
+
+          worksheet.columns = headers.map((header, index) => ({
+            header: header,
+            key: header,
+            width: sortedColumns[index]?.width || 20,
+          }));
+
+          // 데이터 추가
+          exportData.forEach((row: any) => {
+            worksheet.addRow(row);
+          });
+
+          // 헤더 스타일 적용 (각 칼럼별 색상 적용)
+          const headerRow = worksheet.getRow(1);
+          headerRow.eachCell((cell, colNumber) => {
+            const columnConfig = sortedColumns[colNumber - 1];
+            const headerColor = columnConfig?.headerColor || '#4472C4';
+
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FF' + headerColor.replace('#', '') },
+            };
+            cell.font = {
+              bold: true,
+              color: { argb: 'FFFFFFFF' },
+            };
+            cell.alignment = {
+              horizontal: 'center',
+              vertical: 'middle',
+            };
+          });
+        } else {
+          // 템플릿이 없으면 기본 설정 사용
+          worksheet.columns = headers.map(header => ({
+            header: header,
+            key: header,
+            width: 20,
+          }));
+
+          // 데이터 추가
+          exportData.forEach((row: any) => {
+            worksheet.addRow(row);
+          });
+
+          // 헤더 스타일 적용 (기본 색상)
+          const headerRow = worksheet.getRow(1);
+          headerRow.eachCell((cell) => {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FF4472C4' },
+            };
+            cell.font = {
+              bold: true,
+              color: { argb: 'FFFFFFFF' },
+            };
+            cell.alignment = {
+              horizontal: 'center',
+              vertical: 'middle',
+            };
+          });
+        }
+
+        // 모든 데이터 셀 정렬 (템플릿 설정에 따라)
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber > 1) { // 헤더 제외
+            row.eachCell((cell, colNumber) => {
+              if (result.success && result.data && result.data.columns.length > 0) {
+                const template = result.data;
+                const sortedColumns = [...template.columns].sort((a, b) => (a.order || 0) - (b.order || 0));
+                const columnConfig = sortedColumns[colNumber - 1];
+                const alignment = columnConfig?.alignment || 'center';
+
+                cell.alignment = {
+                  horizontal: alignment,
+                  vertical: 'middle',
+                };
+              } else {
+                cell.alignment = {
+                  horizontal: 'center',
+                  vertical: 'middle',
+                };
+              }
+            });
+          }
+        });
+      }
+
+      // 파일 다운로드
+      const today = new Date().toISOString().split('T')[0];
+      const fileName = `${marketName}_${today}.xlsx`;
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('마켓 송장파일 다운로드 오류:', error);
+      alert('다운로드 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 전체 마켓 일괄 다운로드
+  const handleAllMarketInvoiceDownload = async () => {
+    const activeMarkets = uniqueMarkets.filter((market) => {
+      const marketOrders = filteredOrders.filter(
+        (o) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === market
+      );
+      return marketOrders.length > 0;
+    });
+
+    if (activeMarkets.length === 0) {
+      alert('다운로드할 마켓이 없습니다.');
+      return;
+    }
+
+    // 각 마켓별로 다운로드
+    for (const market of activeMarkets) {
+      await handleMarketInvoiceDownload(market);
+      // 다운로드 사이에 약간의 딜레이 추가 (브라우저가 여러 파일을 처리할 시간 확보)
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    alert(`${activeMarkets.length}개 마켓의 송장파일이 다운로드되었습니다.`);
   };
 
   // 셀러별 엑셀 다운로드
@@ -1724,9 +2072,8 @@ export default function SearchTab() {
       return;
     }
 
-    const selectedOrdersData = selectedOrders.map(index => filteredOrders[index]);
-
-    const cancelOrders = selectedOrdersData
+    const cancelOrders = filteredOrders
+      .filter(order => selectedOrders.includes(order.id))
       .filter(order => order && order.shipping_status === '취소요청');
 
     if (cancelOrders.length === 0) {
@@ -1774,9 +2121,8 @@ export default function SearchTab() {
       return;
     }
 
-    const selectedOrdersData = selectedOrders.map(index => filteredOrders[index]);
-
-    const rejectOrders = selectedOrdersData
+    const rejectOrders = filteredOrders
+      .filter(order => selectedOrders.includes(order.id))
       .filter(order => order && order.shipping_status === '취소요청');
 
     if (rejectOrders.length === 0) {
@@ -2409,13 +2755,14 @@ export default function SearchTab() {
 
   const uniqueVendors = useMemo(() => {
     const vendors = new Set<string>();
-    orders.forEach(order => {
+    // 현재 필터된 주문(화면에 보이는 것)에서만 벤더사 목록 추출
+    filteredOrders.forEach(order => {
       if (order.vendor_name) {
         vendors.add(order.vendor_name);
       }
     });
     return Array.from(vendors).sort();
-  }, [orders]);
+  }, [filteredOrders]);
 
   // 행 삭제 핸들러 (소프트 삭제)
   const handleDeleteRows = (indices: number[]) => {
@@ -2871,12 +3218,22 @@ export default function SearchTab() {
           <EditableAdminGrid
             columns={columns}
             data={filteredOrders}
-            onDataChange={(newData) => setOrders(newData)}
+            onDataChange={(newData) => {
+              // filteredOrders 기반으로 변경된 데이터를 orders 전체에 반영
+              const updatedOrders = orders.map(order => {
+                const updatedOrder = newData.find(n => n.id === order.id);
+                return updatedOrder || order;
+              });
+              setOrders(updatedOrders);
+            }}
             onSave={handleSaveData}
             onDeleteSelected={handleDeleteRows}
             onSelectionChange={(selectedIndices) => {
               // 선택된 행 인덱스를 실제 주문 ID로 변환
-              const selectedIds = Array.from(selectedIndices).map(index => filteredOrders[index]?.id).filter(id => id !== undefined);
+              const selectedIds = Array.from(selectedIndices).map(index => {
+                const order = filteredOrders[index];
+                return order?.id;
+              }).filter(id => id !== undefined);
               setSelectedOrders(selectedIds);
             }}
             height="calc(100vh - 480px)"
@@ -3040,24 +3397,30 @@ export default function SearchTab() {
                         </button>
                       )}
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setShowVendorFileModal(true)}
-                        disabled={orders.length === 0}
-                        className="px-2 py-1 bg-cyan-600 text-white rounded text-xs font-medium hover:bg-cyan-700 disabled:bg-gray-400 flex items-center gap-1"
-                      >
-                        <Download className="w-3 h-3" />
-                        벤더사전송파일
-                      </button>
-                      <button
-                        onClick={handleExcelDownload}
-                        disabled={orders.length === 0}
-                        className="px-2 py-1 bg-gray-600 text-white rounded text-xs font-medium hover:bg-gray-700 disabled:bg-gray-400 flex items-center gap-1"
-                      >
-                        <Download className="w-3 h-3" />
-                        마켓송장파일
-                      </button>
-                    </div>
+                    {statusFilter === '상품준비중' && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setShowVendorFileModal(true)}
+                          disabled={orders.length === 0}
+                          className="px-2 py-1 bg-cyan-600 text-white rounded text-xs font-medium hover:bg-cyan-700 disabled:bg-gray-400 flex items-center gap-1"
+                        >
+                          <Download className="w-3 h-3" />
+                          벤더사전송파일
+                        </button>
+                      </div>
+                    )}
+                    {statusFilter === '발송완료' && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setShowMarketInvoiceModal(true)}
+                          disabled={orders.length === 0}
+                          className="px-2 py-1 bg-gray-600 text-white rounded text-xs font-medium hover:bg-gray-700 disabled:bg-gray-400 flex items-center gap-1"
+                        >
+                          <Download className="w-3 h-3" />
+                          마켓송장파일
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -4135,6 +4498,68 @@ export default function SearchTab() {
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      </Modal>
+
+      {/* 마켓 송장파일 다운로드 모달 */}
+      <Modal
+        isOpen={showMarketInvoiceModal}
+        onClose={() => setShowMarketInvoiceModal(false)}
+        title="마켓별 송장파일 다운로드"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            각 마켓별로 송장파일을 다운로드하거나 전체 마켓을 일괄 다운로드할 수 있습니다.
+          </p>
+
+          <div className="flex justify-end mb-3">
+            <button
+              onClick={handleAllMarketInvoiceDownload}
+              className="px-4 py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              전체 다운로드
+            </button>
+          </div>
+
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {uniqueMarkets.map((market) => {
+              const marketOrders = filteredOrders.filter(
+                (o) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === market
+              );
+              const orderCount = marketOrders.length;
+              const isActive = orderCount > 0;
+
+              return (
+                <div
+                  key={market}
+                  className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                    isActive
+                      ? 'bg-gray-50 hover:bg-gray-100'
+                      : 'bg-gray-100 opacity-50 cursor-not-allowed'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <span className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+                      {market}
+                    </span>
+                    <span className="ml-2 text-sm text-gray-500">
+                      ({orderCount}건)
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleMarketInvoiceDownload(market)}
+                    disabled={!isActive}
+                    className="px-3 py-1.5 bg-gray-600 text-white rounded text-sm font-medium hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    <Download className="w-4 h-4" />
+                    다운로드
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </Modal>

@@ -2,32 +2,30 @@ import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * GET /api/vendor-templates/[vendor]
- * 특정 벤더사 템플릿 조회
+ * GET /api/market-invoice-templates/[market]
+ * 특정 마켓의 송장 템플릿 조회
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ vendor: string }> }
+  { params }: { params: Promise<{ market: string }> }
 ) {
   try {
     const supabase = await createClient();
-    const { vendor: vendorParam } = await params;
-    const vendor = decodeURIComponent(vendorParam);
+    const { market: marketParam } = await params;
+    const market = decodeURIComponent(marketParam);
 
     const { data, error } = await supabase
-      .from('vendor_export_templates')
+      .from('market_invoice_templates')
       .select('*')
-      .eq('vendor_name', vendor)
-      .eq('is_active', true)
+      .eq('market_name', market)
       .single();
 
     if (error) {
+      // 템플릿이 없는 경우 빈 데이터 반환
       if (error.code === 'PGRST116') {
-        // No rows found
         return NextResponse.json({
           success: true,
           data: null,
-          message: '템플릿이 없습니다.',
         });
       }
       return NextResponse.json(
@@ -41,7 +39,7 @@ export async function GET(
       data,
     });
   } catch (error: any) {
-    console.error('GET /api/vendor-templates/[vendor] 오류:', error);
+    console.error('GET /api/market-invoice-templates/[market] 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

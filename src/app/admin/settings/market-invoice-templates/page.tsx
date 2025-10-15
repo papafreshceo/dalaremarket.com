@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, Copy, Download, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Trash2, Save, Copy, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface ColumnMapping {
   order: number;
@@ -15,9 +15,9 @@ interface ColumnMapping {
   alignment?: 'left' | 'center' | 'right';  // 데이터 정렬 (기본값: center)
 }
 
-interface VendorTemplate {
+interface MarketInvoiceTemplate {
   id: number;
-  vendor_name: string;
+  market_name: string;
   template_name: string;
   columns: ColumnMapping[];
   is_active: boolean;
@@ -30,24 +30,22 @@ interface StandardField {
   label: string;
 }
 
-export default function VendorTemplatesPage() {
-  const [templates, setTemplates] = useState<VendorTemplate[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<VendorTemplate | null>(null);
+export default function MarketInvoiceTemplatesPage() {
+  const [templates, setTemplates] = useState<MarketInvoiceTemplate[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<MarketInvoiceTemplate | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [newVendorName, setNewVendorName] = useState('');
+  const [newMarketName, setNewMarketName] = useState('');
   const [standardFields, setStandardFields] = useState<StandardField[]>([]);
-  const [vendors, setVendors] = useState<string[]>([]);
 
   useEffect(() => {
     fetchTemplates();
     fetchStandardFields();
-    fetchVendors();
   }, []);
 
   const fetchTemplates = async () => {
     try {
-      const response = await fetch('/api/vendor-templates');
+      const response = await fetch('/api/market-invoice-templates');
       const result = await response.json();
       if (result.success) {
         setTemplates(result.data);
@@ -64,13 +62,9 @@ export default function VendorTemplatesPage() {
 
   const fetchStandardFields = async () => {
     try {
-      console.log('표준필드 API 호출 시작');
       const response = await fetch('/api/standard-fields');
-      console.log('표준필드 API 응답 상태:', response.status);
       const result = await response.json();
-      console.log('표준필드 API 응답 데이터:', result);
       if (result.success) {
-        console.log('표준필드 설정:', result.data);
         setStandardFields(result.data);
       } else {
         console.error('표준필드 조회 실패:', result.error);
@@ -80,31 +74,19 @@ export default function VendorTemplatesPage() {
     }
   };
 
-  const fetchVendors = async () => {
-    try {
-      const response = await fetch('/api/vendors');
-      const result = await response.json();
-      if (result.success) {
-        setVendors(result.data);
-      }
-    } catch (error) {
-      console.error('벤더사 조회 오류:', error);
-    }
-  };
-
-  const handleAddVendor = async () => {
-    if (!newVendorName.trim()) {
-      alert('벤더사명을 입력해주세요.');
+  const handleAddMarket = async () => {
+    if (!newMarketName.trim()) {
+      alert('마켓명을 입력해주세요.');
       return;
     }
 
     try {
-      const response = await fetch('/api/vendor-templates', {
+      const response = await fetch('/api/market-invoice-templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          vendor_name: newVendorName,
-          template_name: newVendorName + ' 양식',
+          market_name: newMarketName,
+          template_name: newMarketName + ' 송장양식',
           columns: [],
         }),
       });
@@ -113,21 +95,21 @@ export default function VendorTemplatesPage() {
       if (result.success) {
         await fetchTemplates();
         setSelectedTemplate(result.data);
-        setNewVendorName('');
+        setNewMarketName('');
       } else {
-        alert('벤더사 추가 실패: ' + result.error);
+        alert('마켓 추가 실패: ' + result.error);
       }
     } catch (error) {
-      console.error('벤더사 추가 오류:', error);
-      alert('벤더사 추가 중 오류가 발생했습니다.');
+      console.error('마켓 추가 오류:', error);
+      alert('마켓 추가 중 오류가 발생했습니다.');
     }
   };
 
-  const handleDeleteVendor = async (id: number) => {
+  const handleDeleteMarket = async (id: number) => {
     if (!confirm('이 템플릿을 삭제하시겠습니까?')) return;
 
     try {
-      const response = await fetch(`/api/vendor-templates?id=${id}`, {
+      const response = await fetch(`/api/market-invoice-templates?id=${id}`, {
         method: 'DELETE',
       });
 
@@ -151,7 +133,7 @@ export default function VendorTemplatesPage() {
 
     setSaving(true);
     try {
-      const response = await fetch('/api/vendor-templates', {
+      const response = await fetch('/api/market-invoice-templates', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(selectedTemplate),
@@ -244,7 +226,7 @@ export default function VendorTemplatesPage() {
   const handleCopyFromDefault = async () => {
     if (!selectedTemplate) return;
 
-    const defaultTemplate = templates.find(t => t.vendor_name === '기본템플릿');
+    const defaultTemplate = templates.find(t => t.market_name === '기본템플릿');
     if (!defaultTemplate) {
       alert('기본 템플릿을 찾을 수 없습니다.');
       return;
@@ -270,32 +252,28 @@ export default function VendorTemplatesPage() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="w-full">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">벤더사별 엑셀 양식 설정</h1>
+          <h1 className="text-2xl font-bold text-gray-900">마켓별 송장파일 양식 설정</h1>
           <p className="text-sm text-gray-600 mt-1">
-            각 벤더사별로 원하는 엑셀 양식을 설정할 수 있습니다.
+            각 마켓별로 원하는 송장파일 양식을 설정할 수 있습니다.
           </p>
         </div>
 
         <div className="grid grid-cols-10 gap-6">
-          {/* 왼쪽: 벤더사 목록 */}
+          {/* 왼쪽: 마켓 목록 */}
           <div className="col-span-2 bg-white rounded-lg border border-gray-200 p-4">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">벤더사 목록</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-3">마켓 목록</h2>
               <div className="flex gap-2">
-                <select
-                  value={newVendorName}
-                  onChange={(e) => setNewVendorName(e.target.value)}
+                <input
+                  type="text"
+                  value={newMarketName}
+                  onChange={(e) => setNewMarketName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddMarket()}
+                  placeholder="마켓명"
                   className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">벤더사 선택</option>
-                  {vendors.map((vendor) => (
-                    <option key={vendor} value={vendor}>
-                      {vendor}
-                    </option>
-                  ))}
-                </select>
+                />
                 <button
-                  onClick={handleAddVendor}
+                  onClick={handleAddMarket}
                   className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
                 >
                   <Plus className="w-4 h-4" />
@@ -315,14 +293,14 @@ export default function VendorTemplatesPage() {
                   onClick={() => setSelectedTemplate(template)}
                 >
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900">{template.vendor_name}</div>
+                    <div className="font-medium text-gray-900">{template.market_name}</div>
                     <div className="text-xs text-gray-500">{template.columns.length}개 컬럼</div>
                   </div>
-                  {template.vendor_name !== '기본템플릿' && (
+                  {template.market_name !== '기본템플릿' && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteVendor(template.id);
+                        handleDeleteMarket(template.id);
                       }}
                       className="p-1 text-red-600 hover:bg-red-50 rounded"
                     >
@@ -341,7 +319,7 @@ export default function VendorTemplatesPage() {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-xl font-semibold text-gray-900">
-                      {selectedTemplate.vendor_name}
+                      {selectedTemplate.market_name}
                     </h2>
                     <input
                       type="text"
@@ -357,7 +335,7 @@ export default function VendorTemplatesPage() {
                     />
                   </div>
                   <div className="flex gap-2">
-                    {selectedTemplate.vendor_name !== '기본템플릿' && (
+                    {selectedTemplate.market_name !== '기본템플릿' && (
                       <button
                         onClick={handleCopyFromDefault}
                         className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-2"
@@ -587,7 +565,7 @@ export default function VendorTemplatesPage() {
               </>
             ) : (
               <div className="flex items-center justify-center h-full text-gray-500">
-                벤더사를 선택해주세요.
+                마켓을 선택해주세요.
               </div>
             )}
           </div>

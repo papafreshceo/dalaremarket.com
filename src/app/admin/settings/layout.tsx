@@ -46,6 +46,11 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           title: '벤더사 양식',
           description: '벤더사별 엑셀 양식 설정',
           href: '/admin/settings/vendor-templates'
+        },
+        {
+          title: '마켓송장 양식',
+          description: '마켓별 송장파일 양식 설정',
+          href: '/admin/settings/market-invoice-templates'
         }
       ]
     },
