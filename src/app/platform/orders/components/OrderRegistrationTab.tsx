@@ -4,7 +4,12 @@ import { useMemo, useState } from 'react';
 import { Order, StatusConfig, StatsData } from '../types';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import DatePicker from '@/components/ui/DatePicker';
+import { Modal } from '@/components/ui/Modal';
+import { Download, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import toast, { Toaster } from 'react-hot-toast';
+import { getCurrentTimeUTC, formatDateTimeForDisplay } from '@/lib/date';
 
 interface OrderRegistrationTabProps {
   isMobile: boolean;
@@ -59,19 +64,72 @@ export default function OrderRegistrationTab({
   // 툴팁 상태 관리 (최상단에 배치)
   const [hoveredStatus, setHoveredStatus] = useState<Order['status'] | null>(null);
 
+  // 그리드 리마운트 트리거
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // 마켓송장파일 모달 상태
+  const [showMarketInvoiceModal, setShowMarketInvoiceModal] = useState(false);
+
+  // Modal 상태 관리
+  const [modalState, setModalState] = useState<{
+    type: 'confirm' | 'alert' | 'prompt' | null;
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+    onCancel?: () => void;
+    inputValue?: string;
+    showInput?: boolean;
+    confirmText?: string;
+    cancelText?: string;
+  }>({
+    type: null,
+    title: '',
+    message: '',
+    inputValue: ''
+  });
+
+  const showModal = (
+    type: 'confirm' | 'alert' | 'prompt',
+    title: string,
+    message: string,
+    onConfirm?: () => void,
+    onCancel?: () => void,
+    showInput = false,
+    confirmText = '확인',
+    cancelText = '취소'
+  ) => {
+    setModalState({
+      type,
+      title,
+      message,
+      onConfirm,
+      onCancel,
+      inputValue: '',
+      showInput,
+      confirmText,
+      cancelText
+    });
+  };
+
+  const closeModal = () => {
+    setModalState({ type: null, title: '', message: '', inputValue: '' });
+  };
+
   // 발주번호 생성 함수
   const generateOrderNumber = (userEmail: string, sequence: number): string => {
     // 이메일 앞 2글자 추출 (대문자로 변환)
     const emailPrefix = userEmail.substring(0, 2).toUpperCase();
 
-    // 현재 날짜시간 (YYYYMMDDHHMMSS)
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
+    // 한국 시간 (서울 시간대: UTC+9)
+    const utcNow = new Date();
+    const now = new Date(utcNow.getTime() + (9 * 60 * 60 * 1000));
+
+    const year = now.getUTCFullYear();
+    const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(now.getUTCDate()).padStart(2, '0');
+    const hours = String(now.getUTCHours()).padStart(2, '0');
+    const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(now.getUTCSeconds()).padStart(2, '0');
     const dateTime = `${year}${month}${day}${hours}${minutes}${seconds}`;
 
     // 순번 (4자리)
@@ -83,184 +141,238 @@ export default function OrderRegistrationTab({
 
   // 주문 삭제 핸들러
   const handleDeleteOrder = async (orderId: number) => {
-    if (!confirm('정말 이 주문을 삭제하시겠습니까?')) {
-      return;
-    }
+    showModal(
+      'confirm',
+      '주문 삭제',
+      '정말 이 주문을 삭제하시겠습니까?',
+      async () => {
+        try {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
 
-    try {
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
+          const { error } = await supabase
+            .from('integrated_orders')
+            .delete()
+            .eq('id', orderId);
 
-      const { error } = await supabase
-        .from('integrated_orders')
-        .delete()
-        .eq('id', orderId);
+          if (error) {
+            console.error('주문 삭제 오류:', error);
+            showModal('alert', '오류', '주문 삭제에 실패했습니다.');
+            return;
+          }
 
-      if (error) {
-        console.error('주문 삭제 오류:', error);
-        alert('주문 삭제에 실패했습니다.');
-        return;
+          showModal('alert', '완료', '주문이 삭제되었습니다.', () => {
+            if (onRefresh) {
+              onRefresh();
+            }
+          });
+        } catch (error) {
+          console.error('삭제 처리 오류:', error);
+          showModal('alert', '오류', '주문 삭제 중 오류가 발생했습니다.');
+        }
       }
-
-      alert('주문이 삭제되었습니다.');
-      if (onRefresh) {
-        onRefresh();
-      }
-    } catch (error) {
-      console.error('삭제 처리 오류:', error);
-      alert('주문 삭제 중 오류가 발생했습니다.');
-    }
+    );
   };
 
   // 일괄 삭제 핸들러
   const handleBatchDelete = async () => {
     if (selectedOrders.length === 0) {
-      alert('삭제할 주문을 선택해주세요.');
+      showModal('alert', '알림', '삭제할 주문을 선택해주세요.');
       return;
     }
 
-    if (!confirm(`선택한 ${selectedOrders.length}개의 주문을 완전히 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
-      return;
-    }
+    showModal(
+      'confirm',
+      '일괄 삭제',
+      `선택한 ${selectedOrders.length}개의 주문을 완전히 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`,
+      async () => {
+        try {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
 
-    try {
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
+          const { error } = await supabase
+            .from('integrated_orders')
+            .delete()
+            .in('id', selectedOrders);
 
-      const { error } = await supabase
-        .from('integrated_orders')
-        .delete()
-        .in('id', selectedOrders);
+          if (error) {
+            console.error('일괄 삭제 오류:', error);
+            showModal('alert', '오류', '주문 삭제에 실패했습니다.');
+            return;
+          }
 
-      if (error) {
-        console.error('일괄 삭제 오류:', error);
-        alert('주문 삭제에 실패했습니다.');
-        return;
-      }
-
-      alert(`${selectedOrders.length}개의 주문이 삭제되었습니다.`);
-      setSelectedOrders([]); // 선택 초기화
-      if (onRefresh) {
-        onRefresh();
-      }
-    } catch (error) {
-      console.error('일괄 삭제 처리 오류:', error);
-      alert('주문 삭제 중 오류가 발생했습니다.');
-    }
+          showModal('alert', '완료', `${selectedOrders.length}개의 주문이 삭제되었습니다.`, () => {
+            setSelectedOrders([]); // 선택 초기화
+            if (onRefresh) {
+              onRefresh();
+            }
+          });
+        } catch (error) {
+          console.error('일괄 삭제 처리 오류:', error);
+          showModal('alert', '오류', '주문 삭제 중 오류가 발생했습니다.');
+        }
+      },
+      undefined,
+      false,
+      '삭제',
+      '취소'
+    );
   };
 
-  // 한국 시간으로 변환하는 헬퍼 함수
-  const getKoreanTime = () => {
-    const now = new Date();
-    // UTC 시간에 9시간을 더해서 한국 시간으로 변환
-    const koreanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-    return koreanTime.toISOString();
-  };
 
   // 취소요청 핸들러
   const handleCancelRequest = async (orderId: number) => {
-    if (!confirm('이 주문의 취소를 요청하시겠습니까?')) {
-      return;
-    }
+    showModal(
+      'confirm',
+      '취소 요청',
+      '이 주문의 취소를 요청하시겠습니까?',
+      async () => {
+        try {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
 
-    try {
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
+          const { error } = await supabase
+            .from('integrated_orders')
+            .update({
+              shipping_status: '취소요청',
+              cancel_requested_at: getCurrentTimeUTC()
+            })
+            .eq('id', orderId);
 
-      const { error } = await supabase
-        .from('integrated_orders')
-        .update({
-          shipping_status: '취소요청',
-          cancel_requested_at: getKoreanTime()
-        })
-        .eq('id', orderId);
+          if (error) {
+            console.error('취소요청 오류:', error);
+            showModal('alert', '오류', '취소요청에 실패했습니다.');
+            return;
+          }
 
-      if (error) {
-        console.error('취소요청 오류:', error);
-        alert('취소요청에 실패했습니다.');
-        return;
+          showModal('alert', '완료', '취소요청이 완료되었습니다.', () => {
+            if (onRefresh) {
+              onRefresh();
+            }
+          });
+        } catch (error) {
+          console.error('취소요청 처리 오류:', error);
+          showModal('alert', '오류', '취소요청 중 오류가 발생했습니다.');
+        }
       }
-
-      alert('취소요청이 완료되었습니다.');
-      if (onRefresh) {
-        onRefresh();
-      }
-    } catch (error) {
-      console.error('취소요청 처리 오류:', error);
-      alert('취소요청 중 오류가 발생했습니다.');
-    }
+    );
   };
 
   // 일괄 취소요청 핸들러
   const handleBatchCancelRequest = async () => {
     if (selectedOrders.length === 0) {
-      alert('취소요청할 주문을 선택해주세요.');
+      showModal('alert', '알림', '취소요청할 주문을 선택해주세요.');
       return;
     }
 
-    // 취소 사유 입력 받기
-    const cancelReason = prompt('취소 사유를 입력해주세요:');
-    if (cancelReason === null) {
-      // 사용자가 취소를 누른 경우
-      return;
-    }
+    // 취소 사유 입력 모달 표시 (입력 즉시 취소요청 실행)
+    setModalState({
+      type: 'prompt',
+      title: '취소 사유 입력',
+      message: '취소 사유를 입력해주세요:',
+      inputValue: '',
+      showInput: true,
+      confirmText: '취소요청',
+      cancelText: '취소',
+      onConfirm: async () => {
+        // DOM에서 직접 input 값 가져오기
+        const inputElement = document.getElementById('modal-prompt-input') as HTMLInputElement;
+        const inputValue = inputElement?.value?.trim() || '';
 
-    if (!cancelReason.trim()) {
-      alert('취소 사유를 입력해주세요.');
-      return;
-    }
+        if (!inputValue) {
+          // 입력이 없으면 경고 toast 표시
+          toast.error('취소 사유를 입력해주세요.', {
+            duration: 3000,
+            position: 'top-center',
+            style: {
+              marginTop: 'calc(50vh - 50px)',
+              fontSize: '14px',
+              padding: '12px 24px',
+            }
+          });
+          return;
+        }
 
-    if (!confirm(`선택한 ${selectedOrders.length}개의 주문을 취소요청하시겠습니까?`)) {
-      return;
-    }
+        // 모달 닫기
+        closeModal();
 
-    try {
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
+        // 바로 취소요청 실행
+        try {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
 
-      const { error} = await supabase
-        .from('integrated_orders')
-        .update({
-          shipping_status: '취소요청',
-          cancel_requested_at: getKoreanTime(),
-          cancel_reason: cancelReason.trim()
-        })
-        .in('id', selectedOrders);
+          const { error } = await supabase
+            .from('integrated_orders')
+            .update({
+              shipping_status: '취소요청',
+              cancel_requested_at: getCurrentTimeUTC(),
+              cancel_reason: inputValue
+            })
+            .in('id', selectedOrders);
 
-      if (error) {
-        console.error('일괄 취소요청 오류:', error);
-        alert('취소요청에 실패했습니다.');
-        return;
+          if (error) {
+            console.error('일괄 취소요청 오류:', error);
+            toast.error('취소요청에 실패했습니다.', {
+              duration: 3000,
+              position: 'top-center',
+              style: {
+                marginTop: 'calc(50vh - 50px)',
+                fontSize: '14px',
+                padding: '12px 24px',
+              }
+            });
+            return;
+          }
+
+          // 토스트 메시지 (화면 정중앙)
+          const count = selectedOrders.length;
+          toast.success(`${count}개의 주문 취소요청이 완료되었습니다.`, {
+            duration: 3000,
+            position: 'top-center',
+            style: {
+              marginTop: 'calc(50vh - 50px)',
+              fontSize: '14px',
+              padding: '12px 24px',
+            }
+          });
+
+          // 선택 해제
+          setSelectedOrders([]);
+
+          // 그리드 리마운트 트리거 (체크박스 초기화)
+          setRefreshTrigger(prev => prev + 1);
+
+          // 새로고침
+          if (onRefresh) {
+            onRefresh();
+          }
+        } catch (error) {
+          console.error('일괄 취소요청 처리 오류:', error);
+          toast.error('취소요청 중 오류가 발생했습니다.', {
+            duration: 3000,
+            position: 'top-center',
+            style: {
+              marginTop: 'calc(50vh - 50px)',
+              fontSize: '14px',
+              padding: '12px 24px',
+            }
+          });
+        }
+      },
+      onCancel: () => {
+        closeModal();
       }
-
-      alert(`${selectedOrders.length}개의 주문 취소요청이 완료되었습니다.`);
-      setSelectedOrders([]); // 선택 초기화
-      if (onRefresh) {
-        onRefresh();
-      }
-    } catch (error) {
-      console.error('일괄 취소요청 처리 오류:', error);
-      alert('취소요청 중 오류가 발생했습니다.');
-    }
+    });
   };
 
   // 상태별 칼럼 정의
   const getColumnsByStatus = useMemo(() => {
-    // 날짜 렌더러 함수
+    // 날짜 렌더러 함수 - UTC를 한국 시간으로 변환하여 표시
     const dateRenderer = (value: any) => {
       if (!value) return '';
-      const date = new Date(value);
       return (
         <span style={{ fontSize: '13px' }}>
-          {date.toLocaleString('ko-KR', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-          })}
+          {formatDateTimeForDisplay(value)}
         </span>
       );
     };
@@ -268,7 +380,7 @@ export default function OrderRegistrationTab({
     const baseColumns = [
       {
         key: 'orderNumber',
-        title: '주문번호',
+        title: '셀러주문번호',
         readOnly: true,
         align: 'center' as const
       },
@@ -363,7 +475,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'orderNumber',
-          title: '주문번호',
+          title: '셀러주문번호',
           readOnly: true,
           align: 'center' as const
         },
@@ -474,7 +586,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'orderNumber',
-          title: '주문번호',
+          title: '셀러주문번호',
           readOnly: true,
           align: 'center' as const
         },
@@ -585,7 +697,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'orderNumber',
-          title: '주문번호',
+          title: '셀러주문번호',
           readOnly: true,
           align: 'center' as const
         },
@@ -682,7 +794,7 @@ export default function OrderRegistrationTab({
                 {date.toLocaleDateString('ko-KR', {
                   year: 'numeric',
                   month: '2-digit',
-                  day: '2-digit'
+                  day: '2-digit',
                 })}
               </span>
             );
@@ -719,7 +831,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'orderNumber',
-          title: '주문번호',
+          title: '셀러주문번호',
           readOnly: true,
           align: 'center' as const
         },
@@ -809,23 +921,7 @@ export default function OrderRegistrationTab({
           width: 160,
           readOnly: true,
           align: 'center' as const,
-          renderer: (value: any) => {
-            if (!value) return '';
-            const date = new Date(value);
-            return (
-              <span style={{ fontSize: '13px' }}>
-                {date.toLocaleString('ko-KR', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false
-                })}
-              </span>
-            );
-          }
+          renderer: dateRenderer
         },
         {
           key: 'cancelReason',
@@ -850,7 +946,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'orderNumber',
-          title: '주문번호',
+          title: '셀러주문번호',
           readOnly: true,
           align: 'center' as const
         },
@@ -936,23 +1032,7 @@ export default function OrderRegistrationTab({
           width: 160,
           readOnly: true,
           align: 'center' as const,
-          renderer: (value: any) => {
-            if (!value) return '';
-            const date = new Date(value);
-            return (
-              <span style={{ fontSize: '13px' }}>
-                {date.toLocaleString('ko-KR', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false
-                })}
-              </span>
-            );
-          }
+          renderer: dateRenderer
         },
         {
           key: 'cancelRequestedAt',
@@ -960,23 +1040,7 @@ export default function OrderRegistrationTab({
           width: 160,
           readOnly: true,
           align: 'center' as const,
-          renderer: (value: any) => {
-            if (!value) return '';
-            const date = new Date(value);
-            return (
-              <span style={{ fontSize: '13px' }}>
-                {date.toLocaleString('ko-KR', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false
-                })}
-              </span>
-            );
-          }
+          renderer: dateRenderer
         },
         {
           key: 'cancelReason',
@@ -1001,7 +1065,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'orderNumber',
-          title: '주문번호',
+          title: '셀러주문번호',
           readOnly: true,
           align: 'center' as const
         },
@@ -1095,7 +1159,7 @@ export default function OrderRegistrationTab({
                 {date.toLocaleDateString('ko-KR', {
                   year: 'numeric',
                   month: '2-digit',
-                  day: '2-digit'
+                  day: '2-digit',
                 })}
               </span>
             );
@@ -1120,23 +1184,7 @@ export default function OrderRegistrationTab({
           width: 160,
           readOnly: true,
           align: 'center' as const,
-          renderer: (value: any) => {
-            if (!value) return '';
-            const date = new Date(value);
-            return (
-              <span style={{ fontSize: '13px' }}>
-                {date.toLocaleString('ko-KR', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false
-                })}
-              </span>
-            );
-          }
+          renderer: dateRenderer
         },
         {
           key: 'cancelRequestedAt',
@@ -1144,23 +1192,7 @@ export default function OrderRegistrationTab({
           width: 160,
           readOnly: true,
           align: 'center' as const,
-          renderer: (value: any) => {
-            if (!value) return '';
-            const date = new Date(value);
-            return (
-              <span style={{ fontSize: '13px' }}>
-                {date.toLocaleString('ko-KR', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false
-                })}
-              </span>
-            );
-          }
+          renderer: dateRenderer
         },
         {
           key: 'cancelReason',
@@ -1185,7 +1217,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'orderNumber',
-          title: '주문번호',
+          title: '셀러주문번호',
           readOnly: true,
           align: 'center' as const
         },
@@ -1393,6 +1425,171 @@ export default function OrderRegistrationTab({
     document.body.removeChild(link);
   };
 
+  // 마켓 목록 추출 (발송완료 주문의 마켓만)
+  const uniqueMarkets = useMemo(() => {
+    const markets = new Set<string>();
+    filteredOrders.forEach(order => {
+      if (order.marketName) {
+        markets.add(order.marketName);
+      }
+    });
+    return Array.from(markets).sort();
+  }, [filteredOrders]);
+
+  // 마켓별 송장파일 다운로드
+  const handleMarketInvoiceDownload = async (marketName: string) => {
+    const marketOrders = filteredOrders.filter(
+      (o) => (o.marketName || '미지정') === marketName
+    );
+
+    if (marketOrders.length === 0) {
+      alert('다운로드할 주문이 없습니다.');
+      return;
+    }
+
+    try {
+      // 마켓 송장 템플릿 가져오기
+      const response = await fetch(`/api/market-invoice-templates/${encodeURIComponent(marketName)}`);
+      const result = await response.json();
+
+      let exportData;
+
+      if (result.success && result.data && result.data.columns.length > 0) {
+        // 템플릿이 있는 경우: 템플릿에 맞게 데이터 변환
+        const template = result.data;
+
+        // order 필드로 컬럼 정렬
+        const sortedColumns = [...template.columns].sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        exportData = marketOrders.map((order: any) => {
+          const row: any = {};
+          sortedColumns.forEach((col: any) => {
+            const fieldType = col.field_type || 'db';
+
+            if (fieldType === 'db') {
+              // DB 필드
+              const fieldName = col.field_name;
+              row[col.column_name] = order[fieldName] || '';
+            } else if (fieldType === 'static') {
+              // 고정값
+              row[col.column_name] = col.static_value || '';
+            } else if (fieldType === 'computed') {
+              // 계산 필드 (예: 상품명+옵션명)
+              const computedLogic = col.computed_logic;
+              if (computedLogic === 'product_option') {
+                row[col.column_name] = `${order.optionName || ''}`;
+              } else {
+                row[col.column_name] = '';
+              }
+            }
+          });
+          return row;
+        });
+      } else {
+        // 템플릿이 없는 경우: 기본 구조
+        exportData = marketOrders.map((order: any) => ({
+          주문번호: order.orderNumber,
+          수취인: order.recipient,
+          전화번호: order.recipientPhone || '',
+          주소: order.address || '',
+          옵션명: order.optionName,
+          수량: order.quantity,
+          택배사: order.courier || '',
+          송장번호: order.trackingNo || '',
+          발송일: order.shippedDate || '',
+        }));
+      }
+
+      // ExcelJS를 사용하여 엑셀 파일 생성
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('송장정보');
+
+      // 헤더 추가
+      const headers = Object.keys(exportData[0]);
+      worksheet.addRow(headers);
+
+      // 데이터 추가
+      exportData.forEach((row: any) => {
+        worksheet.addRow(Object.values(row));
+      });
+
+      // 스타일 적용
+      worksheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+
+          if (rowNumber === 1) {
+            cell.font = { bold: true, size: 11 };
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFD3D3D3' }
+            };
+            cell.alignment = {
+              horizontal: 'center',
+              vertical: 'middle',
+            };
+          } else if (cell.value && typeof cell.value === 'string' && cell.value.includes('\n')) {
+            cell.alignment = {
+              wrapText: true,
+              horizontal: 'left',
+              vertical: 'middle',
+            };
+          } else {
+            cell.alignment = {
+              horizontal: 'center',
+              vertical: 'middle',
+            };
+          }
+        });
+      });
+
+      // 파일 다운로드
+    const today = new Date().toISOString().split('T')[0];
+    const fileName = `${marketName}_${today}.xlsx`;
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('마켓 송장파일 다운로드 오류:', error);
+      alert('다운로드 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 전체 마켓 일괄 다운로드
+  const handleAllMarketInvoiceDownload = async () => {
+    const activeMarkets = uniqueMarkets.filter((market) => {
+      const marketOrders = filteredOrders.filter(
+        (o) => (o.marketName || '미지정') === market
+      );
+      return marketOrders.length > 0;
+    });
+
+    if (activeMarkets.length === 0) {
+      alert('다운로드할 마켓이 없습니다.');
+      return;
+    }
+
+    // 각 마켓별로 다운로드
+    for (const market of activeMarkets) {
+      await handleMarketInvoiceDownload(market);
+      // 다운로드 사이에 약간의 딜레이 추가 (브라우저가 여러 파일을 처리할 시간 확보)
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    alert(`${activeMarkets.length}개 마켓의 송장파일이 다운로드되었습니다.`);
+  };
+
   // 주문건수 및 공급가 합계 계산
   const orderSummary = useMemo(() => {
     const count = filteredOrders.length;
@@ -1415,6 +1612,9 @@ export default function OrderRegistrationTab({
 
   return (
     <div>
+      {/* Toast Container */}
+      <Toaster />
+
       {/* 상태 통계 카드 섹션 */}
       <div
         style={{
@@ -1435,15 +1635,14 @@ export default function OrderRegistrationTab({
             <div
               key={stat.status}
               onClick={() => setFilterStatus(stat.status)}
-              className="card"
               style={{
                 padding: '14px 16px',
                 borderRadius: '8px',
                 cursor: 'pointer',
                 position: 'relative',
-                background: isSelected ? `linear-gradient(135deg, ${config.color}10 0%, ${config.color}18 100%)` : undefined,
-                border: isSelected ? `2px solid ${config.color}` : '1px solid #e5e7eb',
-                transform: isSelected ? 'translateY(-2px)' : undefined,
+                background: '#fff',
+                border: isSelected ? `1px solid ${config.color}` : '1px solid #e5e7eb',
+                boxShadow: isSelected ? `0 4px 12px ${config.color}30` : '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
                 transition: 'all 0.2s ease'
               }}
             >
@@ -1657,23 +1856,6 @@ export default function OrderRegistrationTab({
         {/* 발주서 관리 버튼들 - 우측 */}
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
-            onClick={handleDownloadTemplate}
-            className="bg-success hover:bg-success-hover"
-            style={{
-              padding: '6px 16px',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              height: '28px'
-            }}
-          >
-            엑셀 양식 다운로드
-          </button>
-          <button
             onClick={() => setShowUploadModal(true)}
             className="bg-primary hover:bg-primary-hover"
             style={{
@@ -1685,13 +1867,18 @@ export default function OrderRegistrationTab({
               fontWeight: '500',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              height: '28px'
+              height: '28px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
             }}
           >
-            엑셀 업로드
+            <Upload size={14} />
+            발주서 업로드
           </button>
           <button
-            className="bg-purple hover:bg-purple-hover"
+            onClick={handleDownloadTemplate}
+            className="bg-success hover:bg-success-hover"
             style={{
               padding: '6px 16px',
               color: 'white',
@@ -1701,10 +1888,14 @@ export default function OrderRegistrationTab({
               fontWeight: '500',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              height: '28px'
+              height: '28px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
             }}
           >
-            새 발주서 작성
+            <Download size={14} />
+            발주서 양식
           </button>
         </div>
       </div>
@@ -1737,49 +1928,53 @@ export default function OrderRegistrationTab({
         <button
           onClick={async () => {
             if (filteredOrders.length === 0) {
-              alert('발주 확정할 주문이 없습니다.');
-              return;
-            }
-            if (!confirm(`${filteredOrders.length}건의 주문을 발주 확정하시겠습니까?\n입금 완료 후 이 버튼을 눌러주세요.`)) {
+              showModal('alert', '알림', '발주 확정할 주문이 없습니다.');
               return;
             }
 
-            try {
-              const { createClient } = await import('@/lib/supabase/client');
-              const supabase = createClient();
+            showModal(
+              'confirm',
+              '발주 확정',
+              `${filteredOrders.length}건의 주문을 발주 확정하시겠습니까?\n입금 완료 후 이 버튼을 눌러주세요.`,
+              async () => {
+                try {
+                  const { createClient } = await import('@/lib/supabase/client');
+                  const supabase = createClient();
 
-              // 각 주문에 발주번호 생성 및 업데이트
-              const now = getKoreanTime();
-              for (let i = 0; i < filteredOrders.length; i++) {
-                const order = filteredOrders[i];
-                const orderNo = generateOrderNumber(userEmail, i + 1);
+                  // 각 주문에 발주번호 생성 및 업데이트
+                  const now = getCurrentTimeUTC();
+                  for (let i = 0; i < filteredOrders.length; i++) {
+                    const order = filteredOrders[i];
+                    const orderNo = generateOrderNumber(userEmail, i + 1);
 
-                const { error } = await supabase
-                  .from('integrated_orders')
-                  .update({
-                    shipping_status: '발주서확정',
-                    order_no: orderNo,
-                    confirmed_at: now
-                  })
-                  .eq('id', order.id);
+                    const { error } = await supabase
+                      .from('integrated_orders')
+                      .update({
+                        shipping_status: '발주서확정',
+                        order_number: orderNo,
+                        confirmed_at: now
+                      })
+                      .eq('id', order.id);
 
-                if (error) {
+                    if (error) {
+                      console.error('발주확정 오류:', error);
+                      showModal('alert', '오류', `발주 확정 중 오류가 발생했습니다: ${error.message}`);
+                      return;
+                    }
+                  }
+
+                  showModal('alert', '완료', `${filteredOrders.length}건의 주문이 발주 확정되었습니다.`, () => {
+                    // 주문 목록 새로고침
+                    if (onRefresh) {
+                      onRefresh();
+                    }
+                  });
+                } catch (error) {
                   console.error('발주확정 오류:', error);
-                  alert(`발주 확정 중 오류가 발생했습니다: ${error.message}`);
-                  return;
+                  showModal('alert', '오류', '발주 확정 중 오류가 발생했습니다.');
                 }
               }
-
-              alert(`${filteredOrders.length}건의 주문이 발주 확정되었습니다.`);
-
-              // 주문 목록 새로고침
-              if (onRefresh) {
-                onRefresh();
-              }
-            } catch (error) {
-              console.error('발주확정 오류:', error);
-              alert('발주 확정 중 오류가 발생했습니다.');
-            }
+            );
           }}
           style={{
             padding: '12px 24px',
@@ -1866,21 +2061,21 @@ export default function OrderRegistrationTab({
         </div>
       )}
 
-      {/* CS접수 버튼 (발송완료 단계만) */}
+      {/* CS접수 및 마켓송장파일 버튼 (발송완료 단계만) */}
       {filterStatus === 'shipped' && (
-        <div className="mb-3 flex justify-start">
+        <div className="mb-3 flex justify-start gap-2">
           <button
             onClick={() => {
               if (selectedOrders.length === 0) {
-                alert('CS접수할 주문을 선택해주세요.');
+                showModal('alert', '알림', 'CS접수할 주문을 선택해주세요.');
                 return;
               }
               if (selectedOrders.length > 1) {
-                alert('CS접수는 한 번에 하나의 주문만 처리할 수 있습니다.');
+                showModal('alert', '알림', 'CS접수는 한 번에 하나의 주문만 처리할 수 있습니다.');
                 return;
               }
               // CS접수 로직 추가 예정
-              alert('CS접수 기능은 준비 중입니다.');
+              showModal('alert', '알림', 'CS접수 기능은 준비 중입니다.');
             }}
             disabled={selectedOrders.length === 0}
             style={{
@@ -1907,11 +2102,43 @@ export default function OrderRegistrationTab({
           >
             CS접수
           </button>
+          <button
+            onClick={() => setShowMarketInvoiceModal(true)}
+            disabled={filteredOrders.length === 0}
+            style={{
+              padding: '0.25rem 0.5rem',
+              borderRadius: '0.25rem',
+              fontSize: '0.75rem',
+              fontWeight: '500',
+              transition: 'all 0.2s',
+              backgroundColor: filteredOrders.length === 0 ? '#d1d5db' : '#4b5563',
+              color: filteredOrders.length === 0 ? '#6b7280' : '#ffffff',
+              cursor: filteredOrders.length === 0 ? 'not-allowed' : 'pointer',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}
+            onMouseEnter={(e) => {
+              if (filteredOrders.length > 0) {
+                e.currentTarget.style.backgroundColor = '#374151';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (filteredOrders.length > 0) {
+                e.currentTarget.style.backgroundColor = '#4b5563';
+              }
+            }}
+          >
+            <Download size={12} />
+            마켓송장파일
+          </button>
         </div>
       )}
 
       {/* 발주 테이블 */}
       <EditableAdminGrid
+        key={`grid-${refreshTrigger}`}
         data={filteredOrders}
         columns={getColumnsByStatus}
         height="600px"
@@ -1930,6 +2157,190 @@ export default function OrderRegistrationTab({
           setSelectedOrders(selectedIds);
         }}
       />
+
+      {/* Modal 컴포넌트 */}
+      {modalState.type && (
+        <Modal
+          isOpen={true}
+          onClose={() => {
+            if (modalState.onCancel) {
+              modalState.onCancel();
+            }
+            closeModal();
+          }}
+          title={modalState.title}
+          size="sm"
+        >
+          <div style={{ padding: '8px 0' }}>
+            <p style={{ whiteSpace: 'pre-line', marginBottom: modalState.showInput ? '16px' : '0' }}>
+              {modalState.message}
+            </p>
+            {modalState.showInput && (
+              <input
+                id="modal-prompt-input"
+                type="text"
+                value={modalState.inputValue}
+                onChange={(e) => setModalState({ ...modalState, inputValue: e.target.value })}
+                placeholder="입력해주세요..."
+                className="filter-input"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  border: '1px solid #d1d5db'
+                }}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && modalState.onConfirm) {
+                    e.preventDefault();
+                    modalState.onConfirm();
+                    if (modalState.type !== 'prompt') {
+                      closeModal();
+                    }
+                  }
+                }}
+              />
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+            {modalState.type === 'confirm' || modalState.type === 'prompt' ? (
+              <>
+                <button
+                  onClick={() => {
+                    if (modalState.onCancel) {
+                      modalState.onCancel();
+                    }
+                    closeModal();
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    border: '1px solid #d1d5db',
+                    background: '#fff',
+                    color: '#374151',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {modalState.cancelText || '취소'}
+                </button>
+                <button
+                  onClick={() => {
+                    if (modalState.onConfirm) {
+                      modalState.onConfirm();
+                    }
+                    // ⚠️ prompt 타입이 아닐 때만 자동으로 closeModal 호출
+                    // prompt 타입은 onConfirm 내부에서 직접 closeModal을 호출함
+                    if (modalState.type !== 'prompt') {
+                      closeModal();
+                    }
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: '#2563eb',
+                    color: '#fff',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {modalState.confirmText || '확인'}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  if (modalState.onConfirm) {
+                    modalState.onConfirm();
+                  }
+                  closeModal();
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  border: 'none',
+                  background: '#2563eb',
+                  color: '#fff',
+                  transition: 'all 0.2s'
+                }}
+              >
+                확인
+              </button>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* 마켓 송장파일 다운로드 모달 */}
+      <Modal
+        isOpen={showMarketInvoiceModal}
+        onClose={() => setShowMarketInvoiceModal(false)}
+        title="마켓별 송장파일 다운로드"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            각 마켓별로 송장파일을 다운로드하거나 전체 마켓을 일괄 다운로드할 수 있습니다.
+          </p>
+
+          <div className="flex justify-end mb-3">
+            <button
+              onClick={handleAllMarketInvoiceDownload}
+              className="px-4 py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              전체 다운로드
+            </button>
+          </div>
+
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {uniqueMarkets.map((market) => {
+              const marketOrders = filteredOrders.filter(
+                (o) => (o.marketName || '미지정') === market
+              );
+              const orderCount = marketOrders.length;
+              const isActive = orderCount > 0;
+
+              return (
+                <div
+                  key={market}
+                  className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                    isActive
+                      ? 'bg-gray-50 hover:bg-gray-100'
+                      : 'bg-gray-100 opacity-50 cursor-not-allowed'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <span className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+                      {market}
+                    </span>
+                    <span className="ml-2 text-sm text-gray-500">
+                      ({orderCount}건)
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleMarketInvoiceDownload(market)}
+                    disabled={!isActive}
+                    className="px-3 py-1.5 bg-gray-600 text-white rounded text-sm font-medium hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    <Download className="w-4 h-4" />
+                    다운로드
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

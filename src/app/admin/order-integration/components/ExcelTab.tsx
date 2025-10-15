@@ -5,6 +5,7 @@ import { Upload, FileSpreadsheet, Save, AlertCircle, CheckCircle, RefreshCw } fr
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import * as XLSX from 'xlsx';
 import toast, { Toaster } from 'react-hot-toast';
+import { getCurrentTimeUTC } from '@/lib/date';
 
 interface UploadedOrder {
   id?: number;
@@ -1147,7 +1148,7 @@ export default function ExcelTab() {
           shipped_date: cleanOrder.field_42,
           courier_company: cleanOrder.field_43,
           tracking_number: cleanOrder.field_44,
-          sheet_date: new Date(new Date().getTime() + (9 * 60 * 60 * 1000)).toISOString().split('T')[0],
+          sheet_date: getCurrentTimeUTC().split('T')[0],
         };
       });
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, AlertCircle, CheckCircle, Edit2, Save } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import toast from 'react-hot-toast';
 
 interface OptionValidationModalProps {
   show: boolean;
@@ -26,12 +27,63 @@ export default function OptionValidationModal({
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [bulkEditFrom, setBulkEditFrom] = useState('');
   const [bulkEditTo, setBulkEditTo] = useState('');
+  const [recommendedOptions, setRecommendedOptions] = useState<string[]>([]); // 추천 옵션명 목록
 
   useEffect(() => {
     if (show && orders.length > 0) {
       validateOrders();
     }
   }, [show, orders, optionProducts]);
+
+  // 문자열 유사도 계산 (Levenshtein Distance)
+  const calculateSimilarity = (str1: string, str2: string): number => {
+    const s1 = str1.toLowerCase().trim();
+    const s2 = str2.toLowerCase().trim();
+
+    if (s1 === s2) return 1;
+
+    const len1 = s1.length;
+    const len2 = s2.length;
+
+    if (len1 === 0) return len2;
+    if (len2 === 0) return len1;
+
+    const matrix: number[][] = Array(len1 + 1)
+      .fill(null)
+      .map(() => Array(len2 + 1).fill(0));
+
+    for (let i = 0; i <= len1; i++) matrix[i][0] = i;
+    for (let j = 0; j <= len2; j++) matrix[0][j] = j;
+
+    for (let i = 1; i <= len1; i++) {
+      for (let j = 1; j <= len2; j++) {
+        const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j - 1] + cost
+        );
+      }
+    }
+
+    const distance = matrix[len1][len2];
+    const maxLen = Math.max(len1, len2);
+    return 1 - distance / maxLen;
+  };
+
+  // 유사한 옵션명 찾기 (상위 N개)
+  const findSimilarOptions = (targetOption: string, topN: number = 5): string[] => {
+    const allOptions = Array.from(optionProducts.keys());
+    const similarities = allOptions.map(option => ({
+      option,
+      score: calculateSimilarity(targetOption, option)
+    }));
+
+    return similarities
+      .sort((a, b) => b.score - a.score)
+      .slice(0, topN)
+      .map(item => optionProducts.get(item.option)?.option_name || item.option);
+  };
 
   // 옵션명 검증 실행
   const validateOrders = (ordersToValidate?: any[]) => {
@@ -172,7 +224,10 @@ export default function OptionValidationModal({
   // 일괄 수정 실행
   const handleBulkEdit = () => {
     if (!bulkEditFrom.trim() || !bulkEditTo.trim()) {
-      alert('수정할 옵션명과 새 옵션명을 모두 입력해주세요.');
+      toast.error('수정할 옵션명과 새 옵션명을 모두 입력해주세요.', {
+        position: 'top-center',
+        duration: 3000
+      });
       return;
     }
 
@@ -232,7 +287,10 @@ export default function OptionValidationModal({
   const handleSaveToDatabase = () => {
     // 미매칭건이 있으면 저장 불가
     if (stats.unmatched > 0) {
-      alert('매칭 실패한 주문건은 발주서등록/확정이 불가능합니다.\n모든 옵션명을 매칭해주세요.');
+      toast.error('매칭 실패한 주문건은 발주서등록/확정이 불가능합니다.\n모든 옵션명을 매칭해주세요.', {
+        position: 'top-center',
+        duration: 3000
+      });
       return;
     }
 
@@ -333,7 +391,26 @@ export default function OptionValidationModal({
           </div>
           <div style={{ marginLeft: 'auto' }}>
             <button
-              onClick={() => setShowBulkEdit(!showBulkEdit)}
+              onClick={() => {
+                if (!showBulkEdit) {
+                  // 매칭 실패한 첫 번째 옵션명 찾기
+                  const unmatchedOrder = validatedOrders.find(o => o.matchStatus === 'unmatched');
+                  if (unmatchedOrder?.optionName) {
+                    const failedOptionName = unmatchedOrder.optionName;
+                    // 추천 옵션명 계산 (상위 5개)
+                    const recommendations = findSimilarOptions(failedOptionName, 5);
+                    setRecommendedOptions(recommendations);
+                    setBulkEditFrom(failedOptionName);
+                    setBulkEditTo(recommendations[0] || '');
+                  } else {
+                    // 매칭 실패한 주문이 없으면 초기화
+                    setRecommendedOptions([]);
+                    setBulkEditFrom('');
+                    setBulkEditTo('');
+                  }
+                }
+                setShowBulkEdit(!showBulkEdit);
+              }}
               style={{
                 padding: '8px 16px',
                 background: '#6366f1',
@@ -355,53 +432,89 @@ export default function OptionValidationModal({
           <div style={{
             padding: '16px 24px',
             background: '#eff6ff',
-            borderBottom: '1px solid #dbeafe',
-            display: 'flex',
-            gap: '12px',
-            alignItems: 'center'
+            borderBottom: '1px solid #dbeafe'
           }}>
-            <input
-              type="text"
-              placeholder="수정할 옵션명"
-              value={bulkEditFrom}
-              onChange={(e) => setBulkEditFrom(e.target.value)}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '13px'
-              }}
-            />
-            <span style={{ color: '#6b7280' }}>→</span>
-            <input
-              type="text"
-              placeholder="새 옵션명"
-              value={bulkEditTo}
-              onChange={(e) => setBulkEditTo(e.target.value)}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '13px'
-              }}
-            />
-            <button
-              onClick={handleBulkEdit}
-              style={{
-                padding: '8px 16px',
-                background: '#2563eb',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
-              일괄 적용
-            </button>
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              alignItems: 'center',
+              marginBottom: recommendedOptions.length > 1 ? '12px' : '0'
+            }}>
+              <input
+                type="text"
+                placeholder="수정할 옵션명"
+                value={bulkEditFrom}
+                onChange={(e) => setBulkEditFrom(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '13px'
+                }}
+              />
+              <span style={{ color: '#6b7280' }}>→</span>
+              <input
+                type="text"
+                placeholder="새 옵션명"
+                value={bulkEditTo}
+                onChange={(e) => setBulkEditTo(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '13px'
+                }}
+              />
+              <button
+                onClick={handleBulkEdit}
+                style={{
+                  padding: '8px 16px',
+                  background: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                일괄 적용
+              </button>
+            </div>
+
+            {/* 추천 옵션명 버튼 (2~5순위) */}
+            {recommendedOptions.length > 1 && (
+              <div style={{
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'center',
+                flexWrap: 'wrap'
+              }}>
+                <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>
+                  추천 옵션명:
+                </span>
+                {recommendedOptions.slice(1, 5).map((option, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setBulkEditTo(option)}
+                    style={{
+                      padding: '6px 12px',
+                      background: bulkEditTo === option ? '#2563eb' : '#ffffff',
+                      color: bulkEditTo === option ? '#ffffff' : '#374151',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

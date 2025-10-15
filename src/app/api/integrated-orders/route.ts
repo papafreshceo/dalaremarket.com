@@ -124,11 +124,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // shipping_status가 없거나 빈 값이면 '결제완료'로 기본 설정
     // seller_id를 통해 company_name을 seller_name에 매핑
     const normalizedData = sortedData.map(order => ({
       ...order,
-      shipping_status: order.shipping_status || '결제완료',
       seller_name: order.seller_id ? sellersMap.get(order.seller_id) || null : null
     }));
 

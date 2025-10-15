@@ -6,9 +6,53 @@
 export const KOREA_TIMEZONE = 'Asia/Seoul';
 export const KOREA_LOCALE = 'ko-KR';
 
+/**
+ * 현재 시각을 UTC ISO 문자열로 반환 (DB 저장용)
+ * @returns UTC ISO 문자열 (예: "2025-10-15T18:32:07.162Z")
+ */
+export function getCurrentTimeUTC(): string {
+  return new Date().toISOString();
+}
+
+/**
+ * 한국 시간대의 Date 객체를 반환
+ * @param date - 변환할 날짜 (없으면 현재 시각)
+ * @returns 한국 시간대로 해석된 Date 객체
+ */
 export function getKoreanTime(date?: Date | string): Date {
   const inputDate = date ? new Date(date) : new Date();
   return new Date(inputDate.toLocaleString('en-US', { timeZone: KOREA_TIMEZONE }));
+}
+
+/**
+ * Date 값을 한국 시간으로 포맷팅 (DB에서 읽은 UTC 값을 표시용)
+ * @param value - DB에서 읽은 날짜 값
+ * @returns 한국 시간으로 포맷된 문자열
+ */
+export function formatDateTimeForDisplay(value: any): string {
+  if (!value) return '';
+
+  // 타임존 정보가 없는 경우 UTC로 강제 변환
+  let dateString = String(value);
+  if (!dateString.includes('+') && !dateString.endsWith('Z')) {
+    // 타임존 정보가 없으면 Z를 붙여서 UTC로 인식하도록 함
+    dateString = dateString.replace(/(\.\d{3})$/, '$1Z');
+    if (!dateString.endsWith('Z')) {
+      dateString += 'Z';
+    }
+  }
+
+  const date = new Date(dateString);
+  return date.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone: KOREA_TIMEZONE
+  });
 }
 
 export function formatDate(date: Date | string, format?: 'short' | 'long' | 'full'): string {

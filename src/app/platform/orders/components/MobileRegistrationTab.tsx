@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import toast from 'react-hot-toast';
+import { getCurrentTimeUTC } from '@/lib/date';
 
 interface MobileRegistrationTabProps {
   isMobile: boolean;
@@ -131,7 +133,10 @@ export default function MobileRegistrationTab({
     e.preventDefault();
 
     if (!validateForm()) {
-      alert('필수 항목을 입력해주세요.');
+      toast.error('필수 항목을 입력해주세요.', {
+        position: 'top-center',
+        duration: 3000
+      });
       return;
     }
 
@@ -142,14 +147,19 @@ export default function MobileRegistrationTab({
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        alert('로그인이 필요합니다.');
+        toast.error('로그인이 필요합니다.', {
+          position: 'top-center',
+          duration: 3000
+        });
         return;
       }
 
+      // UTC 시간 생성
+      const utcTime = getCurrentTimeUTC();
+
       // 발주번호 생성
       const emailPrefix = userEmail.substring(0, 2).toUpperCase();
-      const now = new Date();
-      const dateTime = now.toISOString().replace(/[-:T.]/g, '').substring(0, 14);
+      const dateTime = utcTime.replace(/[-:T.]/g, '').substring(0, 14);
       const orderNo = `${emailPrefix}${dateTime}0001`;
 
       // API를 통해 주문 저장 (옵션 상품 정보 자동 매핑)
@@ -159,7 +169,7 @@ export default function MobileRegistrationTab({
         body: JSON.stringify({
           seller_id: user.id,
           order_no: orderNo,
-          order_number: formData.orderNumber || null,
+          seller_order_number: formData.orderNumber || null,
           buyer_name: formData.orderer || null,
           buyer_phone: formData.ordererPhone || null,
           recipient_name: formData.recipient,
@@ -174,9 +184,9 @@ export default function MobileRegistrationTab({
           settlement_amount: supplyPrice.toString(),
           shipping_status: '발주서등록',
           market_name: '플랫폼',
-          sheet_date: new Date().toISOString().split('T')[0],
-          payment_date: new Date().toISOString().split('T')[0],
-          created_at: new Date().toISOString()
+          sheet_date: utcTime.split('T')[0],
+          payment_date: utcTime.split('T')[0],
+          created_at: utcTime
         }),
       });
 
@@ -184,11 +194,17 @@ export default function MobileRegistrationTab({
 
       if (!result.success) {
         console.error('주문 등록 오류:', result.error);
-        alert('주문 등록에 실패했습니다: ' + result.error);
+        toast.error('주문 등록에 실패했습니다: ' + result.error, {
+          position: 'top-center',
+          duration: 3000
+        });
         return;
       }
 
-      alert('주문이 성공적으로 등록되었습니다.');
+      toast.success('주문이 성공적으로 등록되었습니다.', {
+        position: 'top-center',
+        duration: 3000
+      });
 
       // 폼 초기화
       setFormData({
@@ -211,7 +227,10 @@ export default function MobileRegistrationTab({
       }
     } catch (error) {
       console.error('주문 등록 실패:', error);
-      alert('주문 등록 중 오류가 발생했습니다.');
+      toast.error('주문 등록 중 오류가 발생했습니다.', {
+        position: 'top-center',
+        duration: 3000
+      });
     } finally {
       setIsSubmitting(false);
     }

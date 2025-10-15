@@ -12,7 +12,9 @@
       "Bash(git restore:*)",
       "Bash(taskkill:*)",
       "Bash(psql:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git diff:*)",
+      "Bash(npx supabase db:*)"
     ],
     "deny": [],
     "ask": []

@@ -5,6 +5,7 @@ import { Plus, Save, X, Trash2, Check } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import { Modal } from '@/components/ui';
 import { createClient } from '@/lib/supabase/client';
+import { getCurrentTimeUTC } from '@/lib/date';
 
 interface ProductItem {
   id: string;
@@ -74,7 +75,7 @@ export default function InputTab() {
         recipient_address: '서울특별시 강남구 테헤란로 123, 456호',
         delivery_message: '부재시 문앞에 놓아주세요',
         special_request: '신선도 유지 부탁드립니다',
-        shipping_request_date: new Date(new Date().getTime() + (9 * 60 * 60 * 1000)).toISOString().split('T')[0],
+        shipping_request_date: getCurrentTimeUTC().split('T')[0],
         products: [
           {
             id: Date.now().toString() + '-0',
@@ -160,7 +161,7 @@ export default function InputTab() {
     }
 
     // 오늘 날짜 확인 및 시퀀스 불러오기 (한국 시간)
-    const today = new Date(new Date().getTime() + (9 * 60 * 60 * 1000)).toISOString().split('T')[0];
+    const today = getCurrentTimeUTC().split('T')[0];
     const storedDate = localStorage.getItem('phoneOrderSequenceDate');
     const storedSequence = localStorage.getItem('phoneOrderSequence');
 
@@ -259,22 +260,17 @@ export default function InputTab() {
     }
   };
 
-  // 주문번호 생성: PH + YYMMDDHHMMSS + 3자리 연번 (한국 시간)
+  // 주문번호 생성: PH + YYMMDDHHMMSS + 3자리 연번 (UTC)
   const generateOrderNumber = () => {
-    const now = new Date(new Date().getTime() + (9 * 60 * 60 * 1000));
-    const yy = now.getFullYear().toString().slice(2);
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getUTCDate()).padStart(2, '0');
-    const hh = String(now.getUTCHours()).padStart(2, '0');
-    const min = String(now.getUTCMinutes()).padStart(2, '0');
-    const ss = String(now.getUTCSeconds()).padStart(2, '0');
+    const utcTime = getCurrentTimeUTC();
+    const timestamp = utcTime.replace(/[-:TZ.]/g, '').substring(2, 14); // YYMMDDHHMMSS
     const seq = String(todaySequence).padStart(3, '0');
 
     const newSequence = todaySequence + 1;
     setTodaySequence(newSequence);
     localStorage.setItem('phoneOrderSequence', String(newSequence));
 
-    return `PH${yy}${mm}${dd}${hh}${min}${ss}${seq}`;
+    return `PH${timestamp}${seq}`;
   };
 
   // 수령인 섹션 추가
@@ -290,7 +286,7 @@ export default function InputTab() {
           recipient_address: '',
           delivery_message: '',
           special_request: '',
-          shipping_request_date: new Date(new Date().getTime() + (9 * 60 * 60 * 1000)).toISOString().split('T')[0],
+          shipping_request_date: getCurrentTimeUTC().split('T')[0],
           products: [
             {
               id: Date.now().toString() + '-0',
@@ -466,7 +462,7 @@ export default function InputTab() {
           recipient_address: '',
           delivery_message: '',
           special_request: '',
-          shipping_request_date: new Date(new Date().getTime() + (9 * 60 * 60 * 1000)).toISOString().split('T')[0],
+          shipping_request_date: getCurrentTimeUTC().split('T')[0],
           products: [
             {
               id: Date.now().toString() + '-0',
@@ -552,7 +548,7 @@ export default function InputTab() {
             special_request: section.special_request,
             shipping_request_date: section.shipping_request_date,
             settlement_amount: product.total.toString(),
-            sheet_date: new Date(new Date().getTime() + (9 * 60 * 60 * 1000)).toISOString().split('T')[0],
+            sheet_date: getCurrentTimeUTC().split('T')[0],
             shipping_status: '접수',
           });
         });

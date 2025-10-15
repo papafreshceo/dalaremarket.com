@@ -1,6 +1,7 @@
 export interface Order {
   id: number;
-  orderNo: string;
+  orderNo: string; // 시스템 발주번호 (발주확정 시 생성)
+  orderNumber?: string; // 셀러의 원본 주문번호
   products: string;
   amount: number;
   quantity: number;
@@ -9,6 +10,8 @@ export interface Order {
   registeredAt?: string;
   confirmedAt?: string;
   shippedAt?: string;
+  shippedDate?: string; // 발송일
+  courier?: string; // 택배사
   cancelRequestedAt?: string;
   cancelledAt?: string;
   cancelApprovedAt?: string; // 취소승인일시
@@ -31,6 +34,7 @@ export interface Order {
   specialRequest?: string;
   unitPrice?: number; // 공급단가
   supplyPrice?: number; // 공급가 (정산예정금액)
+  marketName?: string; // 마켓명
 }
 
 export interface StatusConfig {

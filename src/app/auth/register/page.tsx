@@ -143,9 +143,13 @@ function RegisterForm() {
 
         // 3. 초대 링크로 가입한 경우 초대 상태 업데이트
         if (inviteData) {
+          // 한국 시간 (서울 시간대: UTC+9)
+          const utcNow = new Date();
+          const koreaTime = new Date(utcNow.getTime() + (9 * 60 * 60 * 1000));
+
           await supabase
             .from('invitations')
-            .update({ used: true, used_at: new Date().toISOString() })
+            .update({ used: true, used_at: koreaTime.toISOString() })
             .eq('token', inviteData.token)
         }
 

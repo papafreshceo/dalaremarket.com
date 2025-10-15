@@ -15,6 +15,8 @@ import OptionValidationModal from './modals/OptionValidationModal';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import * as XLSX from 'xlsx';
 import { validateRequiredColumns } from './utils/validation';
+import toast, { Toaster } from 'react-hot-toast';
+import { getCurrentTimeUTC } from '@/lib/date';
 
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<Tab>('대시보드');
@@ -119,8 +121,8 @@ export default function OrdersPage() {
     // integrated_orders 데이터를 Order 타입으로 변환
     const convertedOrders: Order[] = (data || []).map((order: any, index: number) => ({
       id: order.id,
-      orderNo: order.order_no || `TEMP${order.id}`, // DB에 저장된 발주번호 사용
-      orderNumber: order.order_number, // 주문번호
+      orderNo: order.order_number || order.order_no || `TEMP${order.id}`, // 시스템 발주번호
+      orderNumber: order.seller_order_number, // 셀러 주문번호
       products: order.option_name,
       amount: 0,
       quantity: parseInt(order.quantity) || 0,
@@ -128,6 +130,9 @@ export default function OrdersPage() {
       date: order.created_at,
       registeredAt: order.created_at,
       confirmedAt: order.confirmed_at, // 발주확정일시
+      shippedDate: order.shipped_date, // 발송일
+      courier: order.courier_company, // 택배사
+      trackingNo: order.tracking_number, // 송장번호
       cancelRequestedAt: order.cancel_requested_at,
       cancelledAt: order.canceled_at,
       cancelReason: order.cancel_reason,
@@ -143,7 +148,8 @@ export default function OrdersPage() {
       unitPrice: order.seller_supply_price ? parseFloat(order.seller_supply_price) : undefined,
       supplyPrice: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined,
       refundAmount: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined, // 환불액 (정산금액과 동일)
-      refundedAt: order.refund_processed_at // 환불일
+      refundedAt: order.refund_processed_at, // 환불일
+      marketName: order.market_name || '미지정' // 마켓명
     }));
 
     console.log('🔄 변환된 주문 데이터:', convertedOrders);
@@ -241,13 +247,15 @@ export default function OrdersPage() {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) {
-          alert('로그인이 필요합니다.');
+          toast.error('로그인이 필요합니다.', {
+            position: 'top-center',
+            duration: 3000
+          });
           return;
         }
 
-        // 한국 시간대로 현재 날짜/시간 생성
-        const now = new Date();
-        const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+        // UTC 시간 생성
+        const utcTime = getCurrentTimeUTC();
 
         // 모든 옵션명과 옵션코드 수집 (중복 제거)
         const uniqueOptionNames = [...new Set(jsonData.map((row: any) => String(row['옵션명'] || '')).filter(Boolean))];
@@ -321,11 +329,11 @@ export default function OrdersPage() {
           specialRequest: String(row['특이/요청사항'] || ''),
           // DB 저장용 메타데이터 (검증 후 사용)
           _metadata: {
-            sheet_date: koreaTime.toISOString().split('T')[0],
+            sheet_date: utcTime.split('T')[0],
             seller_id: user.id,
             created_by: user.id,
             market_name: '플랫폼',
-            payment_date: koreaTime.toISOString().split('T')[0],
+            payment_date: utcTime.split('T')[0],
             shipping_status: '발주서등록'
           }
         }));
@@ -337,7 +345,10 @@ export default function OrdersPage() {
 
       } catch (error) {
         console.error('엑셀 파일 읽기 오류:', error);
-        alert('엑셀 파일을 읽는 중 오류가 발생했습니다. 양식을 확인해주세요.');
+        toast.error('엑셀 파일을 읽는 중 오류가 발생했습니다. 양식을 확인해주세요.', {
+          position: 'top-center',
+          duration: 3000
+        });
       }
     };
     reader.readAsBinaryString(file);
@@ -349,7 +360,10 @@ export default function OrdersPage() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        alert('로그인이 필요합니다.');
+        toast.error('로그인이 필요합니다.', {
+          position: 'top-center',
+          duration: 3000
+        });
         return;
       }
 
@@ -361,7 +375,7 @@ export default function OrdersPage() {
 
         return {
           market_name: order._metadata.market_name,
-          order_number: order.orderNumber,
+          seller_order_number: order.orderNumber, // 셀러의 주문번호
           buyer_name: order.orderer,
           buyer_phone: order.ordererPhone,
           recipient_name: order.recipient,
@@ -379,6 +393,7 @@ export default function OrdersPage() {
           shipping_status: order._metadata.shipping_status,
           seller_id: order._metadata.seller_id,
           created_by: order._metadata.created_by,
+          created_at: getCurrentTimeUTC(),
           is_deleted: false
         };
       });
@@ -396,12 +411,18 @@ export default function OrdersPage() {
 
       if (!result.success) {
         console.error('❌ 주문 저장 실패:', result.error);
-        alert(`주문 저장에 실패했습니다: ${result.error}`);
+        toast.error(`주문 저장에 실패했습니다: ${result.error}`, {
+          position: 'top-center',
+          duration: 3000
+        });
         return;
       }
 
       console.log('✅ 주문 저장 성공:', result.data);
-      alert(`${result.count}건의 주문이 성공적으로 등록되었습니다.`);
+      toast.success(`${result.count}건의 주문이 성공적으로 등록되었습니다.`, {
+        position: 'top-center',
+        duration: 3000
+      });
 
       // 모달 닫기 및 상태 초기화
       setShowOptionValidationModal(false);
@@ -413,7 +434,10 @@ export default function OrdersPage() {
 
     } catch (error) {
       console.error('❌ 주문 저장 중 오류:', error);
-      alert('주문 저장 중 오류가 발생했습니다.');
+      toast.error('주문 저장 중 오류가 발생했습니다.', {
+        position: 'top-center',
+        duration: 3000
+      });
     }
   };
 
@@ -490,6 +514,38 @@ export default function OrdersPage() {
 
   return (
     <div className="platform-orders-page bg-background" style={{ minHeight: '100vh' }}>
+      {/* Toast 컨테이너 - 화면 정중앙 배치 */}
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 9999,
+            minWidth: '300px',
+            maxWidth: '500px',
+            padding: '16px 24px',
+            fontSize: '15px',
+            fontWeight: '500',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
       {/* 발주관리 전용 헤더 */}
       <div className="bg-surface border-border" style={{
         position: 'fixed',

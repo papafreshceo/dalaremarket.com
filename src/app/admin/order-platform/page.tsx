@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw, ChevronDown, ChevronUp, Search, Calendar } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+import { getCurrentTimeUTC, formatDateTimeForDisplay } from '@/lib/date';
 
 interface Order {
   id: number;
@@ -61,13 +62,6 @@ export default function OrderPlatformPage() {
   const [expandedSellers, setExpandedSellers] = useState<Set<string>>(new Set());
   const [totalExpanded, setTotalExpanded] = useState(false);
 
-  // 한국 시간으로 변환하는 헬퍼 함수
-  const getKoreanTime = () => {
-    const now = new Date();
-    // UTC 시간에 9시간을 더해서 한국 시간으로 변환
-    const koreanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-    return koreanTime.toISOString();
-  };
 
   // 날짜 및 검색 필터
   const getTodayDate = () => {
@@ -192,7 +186,8 @@ export default function OrderPlatformPage() {
       }
 
       const stats = statsMap.get(sellerId)!;
-      const status = order.shipping_status || '결제완료';
+      const status = order.shipping_status;
+      if (!status) return; // shipping_status가 없으면 통계에서 제외
       const quantity = Number(order.quantity) || 0;
       const settlementAmount = Number(order.settlement_amount) || 0;
 
@@ -205,7 +200,8 @@ export default function OrderPlatformPage() {
 
       if (order.refund_processed_at && !stats.환불처리일시) {
         const date = new Date(order.refund_processed_at);
-        stats.환불처리일시 = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        // DB에 한국 시간으로 저장되어 있으므로 UTC로 파싱
+        stats.환불처리일시 = date.toISOString().slice(0, 16).replace('T', ' ');
       }
 
       if (status === '발주서등록' || status === '접수') {
@@ -291,7 +287,7 @@ export default function OrderPlatformPage() {
     if (newCheckState) {
       const sellerOrders = orders.filter(order => {
         const orderSellerId = order.seller_id || '미지정';
-        const status = order.shipping_status || '결제완료';
+        const status = order.shipping_status;
         return orderSellerId === sellerId && status === '발주서확정';
       });
 
@@ -301,7 +297,7 @@ export default function OrderPlatformPage() {
       }
 
       try {
-        const now = getKoreanTime();
+        const now = getCurrentTimeUTC();
 
         const updatedOrders = sellerOrders.map(order => ({
           id: order.id,
@@ -367,7 +363,7 @@ export default function OrderPlatformPage() {
     } else {
       const sellerOrders = orders.filter(order => {
         const orderSellerId = order.seller_id || '미지정';
-        const status = order.shipping_status || '결제완료';
+        const status = order.shipping_status;
         return orderSellerId === sellerId && status === '결제완료';
       });
 
@@ -444,7 +440,7 @@ export default function OrderPlatformPage() {
   const handleRefundComplete = async (sellerId: string) => {
     const sellerRefundOrders = orders.filter(order => {
       const orderSellerId = order.seller_id || '미지정';
-      const status = order.shipping_status || '결제완료';
+      const status = order.shipping_status;
       return orderSellerId === sellerId && status === '취소요청';
     });
 
@@ -454,9 +450,7 @@ export default function OrderPlatformPage() {
     }
 
     try {
-      const now = getKoreanTime();
-      const koreanDate = new Date(now);
-      const formattedDateTime = `${koreanDate.getFullYear()}-${String(koreanDate.getMonth() + 1).padStart(2, '0')}-${String(koreanDate.getDate()).padStart(2, '0')} ${String(koreanDate.getHours()).padStart(2, '0')}:${String(koreanDate.getMinutes()).padStart(2, '0')}`;
+      const now = getCurrentTimeUTC();
 
       const updatedOrders = sellerRefundOrders.map(order => ({
         id: order.id,
@@ -493,6 +487,7 @@ export default function OrderPlatformPage() {
         }));
 
         // sellerStats 업데이트
+        const formattedDateTime = new Date(now).toISOString().slice(0, 16).replace('T', ' ');
         setSellerStats(prev =>
           prev.map(stat =>
             stat.seller_id === sellerId
@@ -526,7 +521,7 @@ export default function OrderPlatformPage() {
   // 취소승인: 취소요청 → 취소완료
   const handleCancelApprove = async (orderId: number) => {
     try {
-      const now = getKoreanTime();
+      const now = getCurrentTimeUTC();
       const order = orders.find(o => o.id === orderId);
       if (!order) return;
 
@@ -632,7 +627,7 @@ export default function OrderPlatformPage() {
 
   const handleSingleRefundComplete = async (orderId: number) => {
     try {
-      const now = getKoreanTime();
+      const now = getCurrentTimeUTC();
       const order = orders.find(o => o.id === orderId);
       if (!order) return;
 
@@ -717,7 +712,7 @@ export default function OrderPlatformPage() {
     const sellerId = order.seller_id || '미지정';
     if (selectedSeller && sellerId !== selectedSeller) return false;
 
-    const status = order.shipping_status || '결제완료';
+    const status = order.shipping_status;
     if (filterStatus !== 'all' && status !== filterStatus) return false;
 
     if (filterPayment !== 'all') {
@@ -732,12 +727,19 @@ export default function OrderPlatformPage() {
       if (filterRefund === 'pending' && hasRefund) return false;
     }
 
-    // 날짜 필터
-    if (startDate && order.sheet_date) {
-      if (order.sheet_date < startDate) return false;
-    }
-    if (endDate && order.sheet_date) {
-      if (order.sheet_date > endDate) return false;
+    // 날짜 필터 (created_at을 한국 시간으로 변환하여 날짜 비교)
+    if (startDate || endDate) {
+      const createdDate = new Date(order.created_at);
+      // 한국 시간으로 변환하여 YYYY-MM-DD 형식으로
+      const koreaDateStr = createdDate.toLocaleString('en-CA', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).split(',')[0]; // "2025-10-16" 형식
+
+      if (startDate && koreaDateStr < startDate) return false;
+      if (endDate && koreaDateStr > endDate) return false;
     }
 
     // 검색어 필터 (주문번호, 옵션명, 셀러명)
@@ -789,7 +791,8 @@ export default function OrderPlatformPage() {
       }
 
       const stats = statsMap.get(sellerId)!;
-      const status = order.shipping_status || '결제완료';
+      const status = order.shipping_status;
+      if (!status) return; // shipping_status가 없으면 통계에서 제외
       const quantity = Number(order.quantity) || 0;
       const settlementAmount = Number(order.settlement_amount) || 0;
 
@@ -801,7 +804,8 @@ export default function OrderPlatformPage() {
 
       if (order.refund_processed_at && !stats.환불처리일시) {
         const date = new Date(order.refund_processed_at);
-        stats.환불처리일시 = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        // DB에 한국 시간으로 저장되어 있으므로 UTC로 파싱
+        stats.환불처리일시 = date.toISOString().slice(0, 16).replace('T', ' ');
       }
 
       if (status === '발주서등록' || status === '접수') {
@@ -1157,7 +1161,7 @@ export default function OrderPlatformPage() {
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {sellerOrders.slice(0, 30).map((order) => {
-                          const status = order.shipping_status || '결제완료';
+                          const status = order.shipping_status;
                           // refunded 상태인 경우에만 환불액 표시
                           const refundAmount = (status === '환불완료')
                             ? Number(order.settlement_amount || 0)
@@ -1177,52 +1181,24 @@ export default function OrderPlatformPage() {
                                   {getStatusDisplayName(status)}
                                 </span>
                               </td>
-                              <td className="px-2 py-3 text-center text-gray-600" style={{ width: '180px' }}>
+                              <td className="px-2 py-3 text-center text-gray-600" style={{ width: '180px', fontSize: '12px' }}>
                                 {order.confirmed_at
-                                  ? new Date(order.confirmed_at).toLocaleString('ko-KR', {
-                                      year: 'numeric',
-                                      month: '2-digit',
-                                      day: '2-digit',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                      hour12: false
-                                    }).replace(/\. /g, '-').replace('.', '').replace(' ', ' ')
+                                  ? formatDateTimeForDisplay(order.confirmed_at).replace('. ', '-').replace('. ', '-').replace('. ', ' ')
                                   : '-'}
                               </td>
-                              <td className="px-2 py-3 text-center text-gray-600" style={{ width: '180px' }}>
+                              <td className="px-2 py-3 text-center text-gray-600" style={{ width: '180px', fontSize: '12px' }}>
                                 {order.cancel_requested_at
-                                  ? new Date(order.cancel_requested_at).toLocaleString('ko-KR', {
-                                      year: 'numeric',
-                                      month: '2-digit',
-                                      day: '2-digit',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                      hour12: false
-                                    }).replace(/\. /g, '-').replace('.', '').replace(' ', ' ')
+                                  ? formatDateTimeForDisplay(order.cancel_requested_at).replace('. ', '-').replace('. ', '-').replace('. ', ' ')
                                   : '-'}
                               </td>
-                              <td className="px-2 py-3 text-center text-gray-600" style={{ width: '180px' }}>
+                              <td className="px-2 py-3 text-center text-gray-600" style={{ width: '180px', fontSize: '12px' }}>
                                 {order.canceled_at
-                                  ? new Date(order.canceled_at).toLocaleString('ko-KR', {
-                                      year: 'numeric',
-                                      month: '2-digit',
-                                      day: '2-digit',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                      hour12: false
-                                    }).replace(/\. /g, '-').replace('.', '').replace(' ', ' ')
+                                  ? formatDateTimeForDisplay(order.canceled_at).replace('. ', '-').replace('. ', '-').replace('. ', ' ')
                                   : '-'}
                               </td>
-                              <td className="px-2 py-3 text-center text-gray-600" style={{ width: '180px' }}>
+                              <td className="px-2 py-3 text-center text-gray-600" style={{ width: '180px', fontSize: '12px' }}>
                                 {order.refund_processed_at
-                                  ? new Date(order.refund_processed_at).toLocaleString('ko-KR', {
-                                      year: 'numeric',
-                                      month: '2-digit',
-                                      day: '2-digit',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                      hour12: false
-                                    }).replace(/\. /g, '-').replace('.', '').replace(' ', ' ')
+                                  ? formatDateTimeForDisplay(order.refund_processed_at).replace('. ', '-').replace('. ', '-').replace('. ', ' ')
                                   : '-'}
                               </td>
                               <td className="px-4 py-3 text-right text-red-600 font-medium">

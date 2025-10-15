@@ -6,6 +6,7 @@ import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import { Modal } from '@/components/ui/Modal';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
+import { formatDateTimeForDisplay } from '@/lib/date';
 
 interface Order {
   id: number;
@@ -354,27 +355,28 @@ export default function SearchTab() {
             };
           }
 
-          // 결제일 컬럼 렌더러 (시분초 표시)
+          // 결제일 컬럼 렌더러 (created_at을 한국 시간으로 변환하여 시분초까지 표시)
           if (column.isPaymentDateColumn && !column.renderer) {
             return {
               ...column,
               renderer: (value: any, row: any) => {
-                if (!value) return '-';
+                // payment_date는 날짜만 있으므로, created_at을 한국 시간으로 변환하여 표시
+                if (!row.created_at) return value || '-';
                 try {
-                  const date = new Date(value);
-                  if (isNaN(date.getTime())) return value;
-
-                  // YYYY-MM-DD HH:mm:ss 형식으로 포맷
-                  const year = date.getFullYear();
-                  const month = String(date.getMonth() + 1).padStart(2, '0');
-                  const day = String(date.getDate()).padStart(2, '0');
-                  const hours = String(date.getHours()).padStart(2, '0');
-                  const minutes = String(date.getMinutes()).padStart(2, '0');
-                  const seconds = String(date.getSeconds()).padStart(2, '0');
-
-                  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+                  // UTC created_at을 한국 시간으로 변환하여 YYYY-MM-DD HH:mm:ss 형식으로 표시
+                  const date = new Date(row.created_at);
+                  return date.toLocaleString('ko-KR', {
+                    timeZone: 'Asia/Seoul',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                  }).replace(/\. /g, '-').replace(/\. /g, '-').replace(/\. /g, ' ');
                 } catch (e) {
-                  return value;
+                  return value || '-';
                 }
               }
             };
@@ -538,7 +540,7 @@ export default function SearchTab() {
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
-                hour12: false,
+                hour12: false
               }).replace(/\. /g, '-').replace('.', '');
             }
           });
@@ -2086,10 +2088,14 @@ export default function SearchTab() {
     }
 
     try {
+      // 한국 시간 생성
+      const now = new Date();
+      const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+
       const updates = cancelOrders.map(order => ({
         id: order.id,
         shipping_status: '취소완료',
-        canceled_at: new Date().toISOString(),
+        canceled_at: koreaTime.toISOString(),
       }));
 
       const response = await fetch('/api/integrated-orders/bulk', {
@@ -2514,14 +2520,16 @@ export default function SearchTab() {
       }
 
       try {
-        // 현재 시각 타임스탬프 생성
-        const now = new Date().toISOString();
+        // 한국 시간 생성
+        const now = new Date();
+        const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+        const koreaTimeISO = koreaTime.toISOString();
 
         // 상태를 결제완료로 변경하고 payment_confirmed_at 타임스탬프 저장
         const updatedOrders = sellerOrders.map(order => ({
           ...order,
           shipping_status: '결제완료',
-          payment_confirmed_at: now
+          payment_confirmed_at: koreaTimeISO
         }));
 
         const response = await fetch('/api/integrated-orders/bulk', {
@@ -2623,13 +2631,16 @@ export default function SearchTab() {
     }
 
     try {
-      const now = new Date().toISOString();
-      const formattedDateTime = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')} ${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
+      // 한국 시간 생성
+      const now = new Date();
+      const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+      const koreaTimeISO = koreaTime.toISOString();
+      const formattedDateTime = koreaTimeISO.slice(0, 16).replace('T', ' ');
 
       // refund_processed_at 타임스탬프 저장
       const updatedOrders = sellerRefundOrders.map(order => ({
         ...order,
-        refund_processed_at: now
+        refund_processed_at: koreaTimeISO
       }));
 
       const response = await fetch('/api/integrated-orders/bulk', {
