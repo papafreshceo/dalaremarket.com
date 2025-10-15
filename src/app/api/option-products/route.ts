@@ -11,7 +11,11 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const optionName = searchParams.get('option_name');
 
-    let query = supabase.from('option_products').select('*');
+    // partners 테이블과 조인하여 벤더명 가져오기
+    let query = supabase.from('option_products').select(`
+      *,
+      shipping_vendor:partners!shipping_vendor_id(name)
+    `);
 
     // 옵션명으로 필터링
     if (optionName) {
@@ -28,7 +32,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, data: data || [] });
+    // shipping_vendor.name을 vendor_name으로 변환
+    const processedData = (data || []).map(item => ({
+      ...item,
+      vendor_name: item.shipping_vendor?.name || null,
+      shipping_vendor: undefined // 원본 조인 데이터 제거
+    }));
+
+    return NextResponse.json({ success: true, data: processedData });
   } catch (error: any) {
     console.error('GET /api/option-products 오류:', error);
     return NextResponse.json(

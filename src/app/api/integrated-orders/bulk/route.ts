@@ -9,7 +9,7 @@ import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const { orders } = await request.json();
+    const { orders, checkDuplicatesOnly = false } = await request.json();
 
     if (!orders || !Array.isArray(orders) || orders.length === 0) {
       return NextResponse.json(
@@ -28,6 +28,28 @@ export async function POST(request: NextRequest) {
 
     // 옵션 상품 정보 자동 매핑 (option_products 테이블)
     const processedOrders = await enrichOrdersWithOptionInfo(ordersWithDate);
+
+    // 오늘 날짜
+    const today = processedOrders[0]?.sheet_date || new Date().toISOString().split('T')[0];
+
+    // 회차 정보 계산 - 오늘 날짜 기준 최대 연번 조회
+    const { data: maxSeqData } = await supabase
+      .from('integrated_orders')
+      .select('sequence_number')
+      .eq('sheet_date', today)
+      .eq('is_deleted', false)
+      .order('sequence_number', { ascending: false })
+      .limit(1);
+
+    const maxSeq = maxSeqData?.[0]?.sequence_number;
+    let currentBatch = 1;
+    let nextSeqStart = 1;
+
+    if (maxSeq) {
+      const maxNum = parseInt(maxSeq);
+      currentBatch = Math.floor(maxNum / 1000) + 1;
+      nextSeqStart = currentBatch * 1000 + 1;
+    }
 
     // 저장 전 기존 주문 수 확인
     const { count: beforeCount } = await supabase
@@ -49,12 +71,31 @@ export async function POST(request: NextRequest) {
     );
 
     let duplicateCount = 0;
+    let newCount = 0;
     processedOrders.forEach(order => {
       const key = `${order.market_name || ''}-${order.order_number || ''}-${order.buyer_name || ''}-${order.recipient_name || ''}-${order.option_name || ''}-${order.quantity || ''}`;
       if (existingSet.has(key)) {
         duplicateCount++;
+      } else {
+        newCount++;
       }
     });
+
+    // 중복 체크만 하는 경우
+    if (checkDuplicatesOnly && duplicateCount > 0) {
+      return NextResponse.json({
+        success: true,
+        duplicatesDetected: true,
+        newCount,
+        duplicateCount,
+        total: processedOrders.length,
+        batchInfo: {
+          currentBatch,
+          nextSequenceStart: nextSeqStart,
+          sequenceFormat: `${String(nextSeqStart).padStart(4, '0')}~${String(nextSeqStart + newCount - 1).padStart(4, '0')}`
+        }
+      });
+    }
 
     // UPSERT 수행 (중복 주문 덮어쓰기)
     // market_name, order_number, buyer_name, recipient_name, option_name, quantity 기준
@@ -80,12 +121,12 @@ export async function POST(request: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .eq('is_deleted', false);
 
-    const newCount = (afterCount || 0) - (beforeCount || 0);
+    const actualNewCount = (afterCount || 0) - (beforeCount || 0);
 
     return NextResponse.json({
       success: true,
       total: processedOrders.length,
-      newCount: newCount,
+      newCount: actualNewCount,
       duplicateCount: duplicateCount,
       data,
     });

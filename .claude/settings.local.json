@@ -3,7 +3,14 @@
     "allow": [
       "Bash(if exist nul del /f nul)",
       "Bash(powershell:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: 옵션명 기반 주문 정보 자동 매핑 시스템 구축 및 MCP 설정\n\n- 모든 주문 등록 경로에 옵션 상품 정보 자동 매핑 기능 추가\n- option_products 테이블 기반 자동 조회 및 병합\n- 관리자/플랫폼 주문, CS 재발송 등 5개 경로 모두 적용\n- 대량 주문 처리 성능 최적화 (중복 제거, 병렬 처리, 캐싱)\n\n주요 변경사항:\n- 핵심 유틸리티 함수 생성 (src/lib/order-utils.ts)\n- 플랫폼 셀러 주문 전용 API 생성 (src/app/api/platform-orders)\n- 기존 API에 자동 매핑 기능 통합\n- MCP 서버 설정 추가 (PostgreSQL, Fetch)\n- 택배사 템플릿 마이그레이션 추가\n\n자동 매핑 필드:\n- seller_supply_price, 출고, 송장, 벤더사\n- 발송지명, 발송지주소, 발송지연락처, 출고비용\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(node test-option-mapping.js)",
+      "Bash(npm run dev)",
+      "Bash(node:*)",
+      "Bash(npm install pg)",
+      "Bash(git restore:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []

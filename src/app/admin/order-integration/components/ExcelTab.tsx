@@ -120,6 +120,16 @@ export default function ExcelTab() {
   const [showBatchEditModal, setShowBatchEditModal] = useState(false);
   const [batchEditData, setBatchEditData] = useState<Record<string, string>>({});
   const [recommendedOptions, setRecommendedOptions] = useState<Record<string, string[]>>({});
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateInfo, setDuplicateInfo] = useState<{
+    newCount: number;
+    duplicateCount: number;
+    batchInfo?: {
+      currentBatch: number;
+      nextSequenceStart: number;
+      sequenceFormat: string;
+    }
+  } | null>(null);
 
   // 옵션상품, 마켓 템플릿, 표준 필드 로드
   useEffect(() => {
@@ -638,7 +648,7 @@ export default function ExcelTab() {
   const mapFieldsUsingTemplate = (row: any, template: MarketTemplate, marketFieldMappings: any, sequenceNumber?: number): any => {
     const mappedData: any = {
       field_1: template.market_name, // 첫 번째 필드는 마켓명
-      field_2: sequenceNumber?.toString() || '' // 연번
+      field_2: sequenceNumber ? String(sequenceNumber).padStart(4, '0') : '' // 연번 (4자리)
     };
 
     // marketFieldMappings는 mapping_settings_standard_fields에서 해당 마켓의 매핑 정보
@@ -670,9 +680,9 @@ export default function ExcelTab() {
       }
     }
 
-    // field_13 (마켓): 마켓이니셜 + 시퀀스
+    // field_13 (마켓): 마켓이니셜 + 시퀀스 (3자리)
     if (template.initial && sequenceNumber) {
-      mappedData.field_13 = `${template.initial}${sequenceNumber}`;
+      mappedData.field_13 = `${template.initial}${String(sequenceNumber).padStart(4, '0')}`;
     }
 
     // 정산예정금액 계산 (field_27) - 엑셀에 값이 없을 때만
@@ -853,9 +863,9 @@ export default function ExcelTab() {
 
             const mapped = mapFieldsUsingTemplate(row, template, marketMapping, globalSequence);
 
-            // field_13 (마켓) 값을 마켓별 시퀀스로 교체
+            // field_13 (마켓) 값을 마켓별 시퀀스로 교체 (3자리)
             if (template.initial) {
-              mapped.field_13 = `${template.initial}${currentMarketSeq}`;
+              mapped.field_13 = `${template.initial}${String(currentMarketSeq).padStart(4, '0')}`;
             }
 
             if (index === 0) {
@@ -1075,8 +1085,9 @@ export default function ExcelTab() {
   };
 
   // 실제 저장 실행
-  const executeSaveToDatabase = async () => {
+  const executeSaveToDatabase = async (overwriteDuplicates: boolean = false) => {
     setShowSaveConfirmModal(false);
+    setShowDuplicateModal(false);
 
     setLoading(true);
     try {
@@ -1158,12 +1169,24 @@ export default function ExcelTab() {
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orders: uniqueOrders }),
+        body: JSON.stringify({ orders: uniqueOrders, checkDuplicatesOnly: !overwriteDuplicates, overwriteDuplicates }),
       });
 
       const result = await response.json();
 
       if (result.success) {
+        // 중복 체크만 한 경우
+        if (result.duplicatesDetected && !overwriteDuplicates) {
+          setDuplicateInfo({
+            newCount: result.newCount || 0,
+            duplicateCount: result.duplicateCount || 0,
+            batchInfo: result.batchInfo
+          });
+          setShowDuplicateModal(true);
+          setLoading(false);
+          return;
+        }
+
         // 저장 결과 메시지 생성
         const { total, newCount, duplicateCount } = result;
         let message = '';
@@ -1741,7 +1764,7 @@ export default function ExcelTab() {
                   취소
                 </button>
                 <button
-                  onClick={executeSaveToDatabase}
+                  onClick={() => executeSaveToDatabase(false)}
                   disabled={loading}
                   className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors"
                 >
@@ -1854,6 +1877,65 @@ export default function ExcelTab() {
           </div>
         );
       })()}
+
+      {/* 중복 주문 확인 모달 */}
+      {showDuplicateModal && duplicateInfo && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">중복 주문 확인</h3>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="text-sm text-gray-700 mb-3">
+                <p className="mb-1">📊 <strong>저장 대상 주문</strong></p>
+                <div className="pl-5 space-y-1">
+                  <p>• 중복주문: <strong className="text-red-600">{duplicateInfo.duplicateCount}건</strong></p>
+                  <p>• 신규주문: <strong className="text-blue-600">{duplicateInfo.newCount}건</strong></p>
+                </div>
+              </div>
+
+              {duplicateInfo.batchInfo && (
+                <div className="text-sm text-gray-700 pt-3 border-t border-blue-200">
+                  <p className="mb-1">🔢 <strong>연번 부여 안내</strong> (신규 주문만)</p>
+                  <div className="pl-5 space-y-1">
+                    <p>• 오늘 <strong className="text-purple-600">{duplicateInfo.batchInfo.currentBatch}회차</strong> 저장</p>
+                    <p>• 전체 연번: <strong className="text-purple-600">{duplicateInfo.batchInfo.sequenceFormat}</strong></p>
+                    <p className="text-xs text-gray-500">※ 마켓별 연번은 마켓마다 독립적으로 부여됩니다</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="text-gray-700 mb-6">
+              <p className="text-sm text-gray-600 font-medium mb-2">중복된 주문을 어떻게 처리하시겠습니까?</p>
+              <div className="space-y-2 text-xs text-gray-600 bg-gray-50 rounded p-3">
+                <p>• <strong>덮어쓰기:</strong> 기존 데이터를 새 데이터로 업데이트 (연번 유지)</p>
+                <p>• <strong>중복 제외:</strong> 신규 주문만 저장 (중복 건은 저장 안 함)</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDuplicateModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => executeSaveToDatabase(false)}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                중복 제외
+              </button>
+              <button
+                onClick={() => executeSaveToDatabase(true)}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                덮어쓰기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

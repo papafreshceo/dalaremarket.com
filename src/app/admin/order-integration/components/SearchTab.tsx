@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, Download, Filter, Calendar, RefreshCw, Upload, ChevronDown, ChevronUp } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import { Modal } from '@/components/ui/Modal';
@@ -162,6 +162,12 @@ export default function SearchTab() {
   const [showBulkInvoiceModal, setShowBulkInvoiceModal] = useState(false);
   const [bulkInvoiceFile, setBulkInvoiceFile] = useState<File | null>(null);
   const [selectedOrdersForConfirm, setSelectedOrdersForConfirm] = useState<number[]>([]);
+  const bulkInvoiceFileInputRef = useRef<HTMLInputElement>(null);
+
+  // 송장일괄수정 모달 상태
+  const [showBulkInvoiceUpdateModal, setShowBulkInvoiceUpdateModal] = useState(false);
+  const [bulkInvoiceUpdateFile, setBulkInvoiceUpdateFile] = useState<File | null>(null);
+  const bulkInvoiceUpdateFileInputRef = useRef<HTMLInputElement>(null);
 
   // 선택된 주문 상태
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
@@ -221,8 +227,12 @@ export default function SearchTab() {
     const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
     const todayDate = koreaTime.toISOString().split('T')[0];
 
+    // 7일 범위 (오늘 포함 6일 전) 계산
+    const sevenDaysAgo = new Date(koreaTime.getTime() - (6 * 24 * 60 * 60 * 1000));
+    const sevenDaysAgoDate = sevenDaysAgo.toISOString().split('T')[0];
+
     return {
-      startDate: todayDate,
+      startDate: sevenDaysAgoDate,
       endDate: todayDate,
       dateType: 'sheet',
       marketName: '',
@@ -970,7 +980,7 @@ export default function SearchTab() {
     }
   };
 
-  // 일괄적용 핸들러 - 선택된 주문에 택배사 적용
+  // 일괄적용 핸들러 - 선택된 주문에 택배사 적용 (그리드에만 반영, DB 저장은 저장 버튼 클릭 시)
   const handleBulkApply = () => {
     console.log('일괄적용 시작:', { bulkApplyValue, selectedOrders, filteredOrdersLength: filteredOrders.length });
 
@@ -1005,13 +1015,14 @@ export default function SearchTab() {
       return order;
     });
 
-    console.log('업데이트 완료, orders 배열 설정');
-    // 그리드가 데이터 변경을 감지하도록 임시 행 추가 후 즉시 제거
-    const tempOrder = { id: 'temp_refresh', order_number: '' } as any;
-    setOrders([...updatedOrders, tempOrder]);
-    setTimeout(() => {
-      setOrders(updatedOrders);
-    }, 10);
+    console.log('프론트엔드 상태 업데이트 완료, 총', updatedOrders.length, '건');
+
+    // 새 배열로 상태 업데이트 (깜빡임 없이)
+    // orders 배열만 업데이트하면 filteredOrders도 자동으로 업데이트됨 (useMemo)
+    setOrders(updatedOrders);
+
+    // 선택 해제
+    setSelectedOrders([]);
   };
 
   // 발주확인 핸들러 - 선택된 결제완료 상태 주문을 상품준비중으로 변경
@@ -1063,50 +1074,52 @@ export default function SearchTab() {
     }
   };
 
-  // 입금확인 핸들러 - 선택된 접수 상태 주문을 결제완료로 변경
-  const handlePaymentConfirm = async () => {
-    // 선택된 주문만 필터링
-    if (selectedOrders.length === 0) {
+  // 입금확인 핸들러 - 접수 상태 주문을 결제완료로 변경
+  const handlePaymentConfirm = async (orderIds?: number[]) => {
+    // orderIds가 전달되지 않으면 selectedOrders 사용 (접수 통계카드용)
+    const targetOrderIds = Array.isArray(orderIds) ? orderIds : selectedOrders;
+
+    if (!Array.isArray(targetOrderIds) || targetOrderIds.length === 0) {
       alert('입금확인할 주문을 선택해주세요.');
       return;
     }
 
     // 접수 상태인 주문만 필터링
-    const confirmOrders = selectedOrders.filter(order => {
-      const status = order.shipping_status || '결제완료';
-      return status === '접수';
-    });
+    const ordersToConfirm = filteredOrders.filter(order =>
+      targetOrderIds.includes(order.id) && order.shipping_status === '접수'
+    );
 
-    if (confirmOrders.length === 0) {
-      alert('접수 상태인 주문만 입금확인할 수 있습니다.');
+    if (ordersToConfirm.length === 0) {
+      alert('입금확인할 수 있는 주문이 없습니다. (접수 상태만 가능)');
       return;
     }
 
-    if (!confirm(`${confirmOrders.length}개의 주문을 입금확인 하시겠습니까?\n결제완료 상태로 변경됩니다.`)) {
+    if (!confirm(`${ordersToConfirm.length}건의 주문을 입금확인 하시겠습니까?\n상태가 '결제완료'로 변경됩니다.`)) {
       return;
     }
 
     try {
-      // 상태를 결제완료로 변경한 주문 데이터 생성
-      const updatedOrders = confirmOrders.map(order => ({
-        ...order,
-        shipping_status: '결제완료'
+      console.log('💰 입금확인 시작:', ordersToConfirm.length, '건');
+
+      const ordersToSave = ordersToConfirm.map(order => ({
+        id: order.id,
+        shipping_status: '결제완료',
       }));
 
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orders: updatedOrders }),
+        body: JSON.stringify({ orders: ordersToSave }),
       });
 
       const result = await response.json();
 
       if (result.success) {
-        alert(`${result.count}개 주문이 입금확인 처리되었습니다.`);
+        alert(`${ordersToConfirm.length}건의 입금확인이 완료되었습니다.`);
         setSelectedOrders([]); // 선택 초기화
-        fetchOrders();
+        await fetchOrders();
       } else {
-        alert('입금확인 실패: ' + result.error);
+        alert(`입금확인 실패: ${result.error}`);
       }
     } catch (error) {
       console.error('입금확인 오류:', error);
@@ -1114,24 +1127,152 @@ export default function SearchTab() {
     }
   };
 
-  // 송장등록 핸들러 - 현재 화면의 모든 주문을 DB에 저장
+  // 한국 시간 구하기 (UTC+9)
+  const getKoreanDateTime = () => {
+    const now = new Date();
+    const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+    return koreaTime.toISOString().replace('T', ' ').substring(0, 19);
+  };
+
+  const getKoreanDate = () => {
+    const now = new Date();
+    const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+    return koreaTime.toISOString().split('T')[0]; // YYYY-MM-DD
+  };
+
+  // 송장등록 핸들러 - 택배사, 송장번호, 발송일(송장입력일) DB에 저장
   const handleTrackingRegister = async () => {
     if (orders.length === 0) return;
 
     try {
+      // 한국 시간으로 발송일 설정
+      const shippedDateTime = getKoreanDateTime();
+
+      // 택배사, 송장번호, 발송일 저장 + 상태를 '발송완료'로 변경
+      const ordersToSave = orders.map(order => ({
+        id: order.id,
+        courier_company: order.courier_company,
+        tracking_number: order.tracking_number,
+        shipped_date: shippedDateTime, // 발송일(송장입력일) - 현재 날짜와 시간
+        shipping_status: '발송완료', // 상태를 발송완료로 변경
+      }));
+
+      console.log('🚀 송장등록 시작:', ordersToSave.length, '건');
+      console.log('📦 첫번째 주문:', ordersToSave[0]);
+
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orders }),
+        body: JSON.stringify({ orders: ordersToSave }),
+      });
+
+      console.log('📡 응답 상태:', response.status);
+      const result = await response.json();
+      console.log('📋 응답 결과:', result);
+
+      if (result.success) {
+        alert('송장이 등록되었습니다.');
+        // fetchOrders(); // 제거 - 자동 새로고침 안함
+      } else {
+        alert(`송장 등록 실패: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('송장등록 오류:', error);
+      alert('송장 등록 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 송장수정 핸들러 - 송장등록과 동일한 동작 (발송완료 상태에서만 사용)
+  const handleTrackingUpdate = async () => {
+    if (orders.length === 0) return;
+
+    try {
+      // 한국 시간으로 발송일 설정
+      const shippedDateTime = getKoreanDateTime();
+
+      // 택배사, 송장번호, 발송일 저장 + 상태를 '발송완료'로 변경
+      const ordersToSave = orders.map(order => ({
+        id: order.id,
+        courier_company: order.courier_company,
+        tracking_number: order.tracking_number,
+        shipped_date: shippedDateTime, // 발송일(송장입력일) - 현재 날짜와 시간
+        shipping_status: '발송완료', // 상태를 발송완료로 변경
+      }));
+
+      console.log('🔄 송장수정 시작:', ordersToSave.length, '건');
+
+      const response = await fetch('/api/integrated-orders/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: ordersToSave }),
       });
 
       const result = await response.json();
 
       if (result.success) {
-        fetchOrders();
+        alert('송장이 수정되었습니다.');
+      } else {
+        alert(`송장 수정 실패: ${result.error}`);
       }
     } catch (error) {
-      console.error('송장등록 오류:', error);
+      console.error('송장수정 오류:', error);
+      alert('송장 수정 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 송장회수 핸들러 - 선택한 주문의 택배사, 송장번호, 발송일 비우고 상품준비중으로 변경
+  const handleTrackingRecall = async () => {
+    if (selectedOrders.length === 0) {
+      alert('송장을 회수할 주문을 선택해주세요.');
+      return;
+    }
+
+    if (!confirm(`선택된 ${selectedOrders.length}개 주문의 송장 정보를 회수하고 상품준비중 상태로 되돌리시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      console.log('📋 selectedOrders:', selectedOrders);
+      console.log('📋 filteredOrders 개수:', filteredOrders.length);
+      console.log('📋 filteredOrders 샘플 ID:', filteredOrders.slice(0, 3).map(o => o.id));
+
+      // 선택된 주문만 필터링 (filteredOrders 사용)
+      const selectedOrderList = filteredOrders.filter(order => selectedOrders.includes(order.id));
+
+      console.log('✅ 필터링된 주문 개수:', selectedOrderList.length);
+
+      if (selectedOrderList.length === 0) {
+        alert('선택된 주문을 찾을 수 없습니다.');
+        return;
+      }
+
+      // 택배사, 송장번호, 발송일 모두 비우고 상태를 상품준비중으로 변경
+      const ordersToSave = selectedOrderList.map(order => ({
+        id: order.id,
+        courier_company: null,
+        tracking_number: null,
+        shipped_date: null,
+        shipping_status: '상품준비중',
+      }));
+
+      console.log('🔙 송장회수 시작:', ordersToSave.length, '건');
+
+      const response = await fetch('/api/integrated-orders/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: ordersToSave }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('송장이 회수되었습니다.');
+      } else {
+        alert(`송장 회수 실패: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('송장회수 오류:', error);
+      alert('송장 회수 중 오류가 발생했습니다.');
     }
   };
 
@@ -1234,6 +1375,10 @@ export default function SearchTab() {
   // 송장일괄등록 핸들러
   const handleBulkInvoiceUpload = () => {
     setShowBulkInvoiceModal(true);
+    // 모달이 열린 직후 파일 선택 창 자동 열기
+    setTimeout(() => {
+      bulkInvoiceFileInputRef.current?.click();
+    }, 100);
   };
 
   // 송장일괄등록 엑셀 처리
@@ -1244,6 +1389,8 @@ export default function SearchTab() {
     }
 
     try {
+      console.log('📄 선택된 파일:', bulkInvoiceFile.name, '크기:', bulkInvoiceFile.size, 'bytes');
+
       const reader = new FileReader();
       reader.onload = async (e) => {
         const data = e.target?.result;
@@ -1251,6 +1398,10 @@ export default function SearchTab() {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        console.log('📊 엑셀에서 읽은 전체 행 수:', jsonData.length);
+        console.log('📋 첫 번째 행 데이터:', jsonData[0]);
+        console.log('📋 엑셀 컬럼명:', Object.keys(jsonData[0] || {}));
 
         if (jsonData.length === 0) {
           alert('엑셀 파일에 데이터가 없습니다.');
@@ -1260,13 +1411,33 @@ export default function SearchTab() {
         // 엑셀 데이터에서 주문번호, 택배사, 송장번호 추출
         const invoiceMap = new Map<string, { courier: string; tracking: string }>();
 
-        jsonData.forEach((row) => {
+        jsonData.forEach((row, idx) => {
           const orderNumber = row['주문번호'] || row['order_number'];
           const courier = row['택배사'] || row['courier_company'];
           const tracking = row['송장번호'] || row['운송장번호'] || row['tracking_number'];
 
           if (orderNumber && courier && tracking) {
-            invoiceMap.set(String(orderNumber).trim(), {
+            // 주문번호 정규화: 숫자/문자열 상관없이 통일된 형식으로 변환
+            let key: string;
+
+            if (typeof orderNumber === 'number') {
+              // 숫자형: 지수 표기 방지하고 정수로 변환
+              key = orderNumber.toFixed(0);
+            } else {
+              // 문자열형: 그대로 사용
+              key = String(orderNumber).trim();
+
+              // 지수 표기법이 포함된 경우 (e+16 등)
+              if (key.includes('e+') || key.includes('E+')) {
+                key = Number(orderNumber).toFixed(0);
+              }
+            }
+
+            if (idx < 3) {
+              console.log(`엑셀 ${idx + 1}행:`, {원본: orderNumber, 타입: typeof orderNumber, 변환후: key});
+            }
+
+            invoiceMap.set(key, {
               courier: String(courier).trim(),
               tracking: String(tracking).trim(),
             });
@@ -1278,25 +1449,72 @@ export default function SearchTab() {
           return;
         }
 
-        // UI 테이블의 주문과 매칭하여 업데이트
-        const updates: Order[] = [];
-        orders.forEach((order) => {
-          if (order.order_number && invoiceMap.has(order.order_number)) {
-            const invoice = invoiceMap.get(order.order_number)!;
-            updates.push({
-              ...order,
-              courier_company: invoice.courier,
-              tracking_number: invoice.tracking,
-            });
+        console.log('📦 엑셀에서 읽은 송장 정보:', invoiceMap.size, '건');
+        console.log('📦 엑셀 주문번호 샘플 (처음 5개):', Array.from(invoiceMap.keys()).slice(0, 5));
+
+        // 현재 화면에 보이면서 '상품준비중' 상태인 주문들만 매칭하여 업데이트
+        const updates: any[] = [];
+        const shippedDateTime = getKoreanDateTime(); // 한국 시간으로 발송일 설정
+
+        const targetOrders = filteredOrders.filter(order => order.shipping_status === '상품준비중');
+
+        console.log('📋 현재 화면의 전체 주문 수:', filteredOrders.length, '건');
+        console.log('📋 상품준비중 주문 수:', targetOrders.length, '건');
+        console.log('📋 화면 주문번호 샘플 (처음 5개):', targetOrders.slice(0, 5).map(o => o.order_number));
+
+        let matchCount = 0;
+        let notMatchCount = 0;
+
+        targetOrders.forEach((order, index) => {
+          if (order.order_number) {
+            // 주문번호 정규화: 숫자/문자열 상관없이 통일된 형식으로 변환
+            let key: string;
+
+            if (typeof order.order_number === 'number') {
+              // 숫자형: 지수 표기 방지하고 정수로 변환
+              key = order.order_number.toFixed(0);
+            } else {
+              // 문자열형: 그대로 사용
+              key = String(order.order_number).trim();
+
+              // 지수 표기법이 포함된 경우 (e+16 등)
+              if (key.includes('e+') || key.includes('E+')) {
+                key = Number(order.order_number).toFixed(0);
+              }
+            }
+
+            if (invoiceMap.has(key)) {
+              const invoice = invoiceMap.get(key)!;
+              updates.push({
+                id: order.id,
+                courier_company: invoice.courier,
+                tracking_number: invoice.tracking,
+                shipped_date: shippedDateTime, // 발송일 자동 설정 (한국 시간)
+                shipping_status: '발송완료', // 상태 자동 변경
+              });
+              matchCount++;
+              if (matchCount <= 3) {
+                console.log(`✅ 매칭 성공 ${matchCount}:`, key);
+              }
+            } else {
+              notMatchCount++;
+              if (notMatchCount <= 3) {
+                console.log(`❌ 매칭 실패 ${notMatchCount}:`, key, '(엑셀에 없음)');
+              }
+            }
           }
         });
+
+        console.log(`📊 매칭 결과: 성공 ${matchCount}건, 실패 ${notMatchCount}건`);
+
+        console.log('✅ 매칭된 주문:', updates.length, '건');
 
         if (updates.length === 0) {
           alert('매칭되는 주문이 없습니다.');
           return;
         }
 
-        if (!confirm(`${updates.length}개의 주문에 송장 정보를 업데이트 하시겠습니까?`)) {
+        if (!confirm(`${updates.length}개의 주문에 송장 정보를 업데이트하고 발송완료 상태로 변경하시겠습니까?`)) {
           return;
         }
 
@@ -1323,6 +1541,178 @@ export default function SearchTab() {
     } catch (error) {
       console.error('송장일괄등록 오류:', error);
       alert('송장일괄등록 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 송장일괄수정 핸들러
+  const handleBulkInvoiceUpdate = () => {
+    setShowBulkInvoiceUpdateModal(true);
+    // 모달이 열린 직후 파일 선택 창 자동 열기
+    setTimeout(() => {
+      bulkInvoiceUpdateFileInputRef.current?.click();
+    }, 100);
+  };
+
+  // 송장일괄수정 엑셀 처리 (발송완료 상태만 대상)
+  const processBulkInvoiceUpdateFile = async () => {
+    if (!bulkInvoiceUpdateFile) {
+      alert('파일을 선택해주세요.');
+      return;
+    }
+
+    try {
+      console.log('📄 선택된 파일:', bulkInvoiceUpdateFile.name, '크기:', bulkInvoiceUpdateFile.size, 'bytes');
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary', cellDates: true, WTF: true });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        console.log('📊 엑셀에서 읽은 전체 행 수:', jsonData.length);
+        console.log('📋 첫 번째 행 데이터:', jsonData[0]);
+        console.log('📋 엑셀 컬럼명:', Object.keys(jsonData[0] || {}));
+
+        if (jsonData.length === 0) {
+          alert('엑셀 파일에 데이터가 없습니다.');
+          return;
+        }
+
+        // 엑셀 데이터에서 주문번호, 택배사, 송장번호 추출
+        const invoiceMap = new Map<string, { courier: string; tracking: string }>();
+
+        jsonData.forEach((row, idx) => {
+          const orderNumber = row['주문번호'] || row['order_number'];
+          const courier = row['택배사'] || row['courier_company'];
+          const tracking = row['송장번호'] || row['운송장번호'] || row['tracking_number'];
+
+          if (orderNumber && courier && tracking) {
+            // 주문번호 정규화: 숫자/문자열 상관없이 통일된 형식으로 변환
+            let key: string;
+
+            if (typeof orderNumber === 'number') {
+              // 숫자형: 지수 표기 방지하고 정수로 변환
+              key = orderNumber.toFixed(0);
+            } else {
+              // 문자열형: 그대로 사용
+              key = String(orderNumber).trim();
+
+              // 지수 표기법이 포함된 경우 (e+16 등)
+              if (key.includes('e+') || key.includes('E+')) {
+                key = Number(orderNumber).toFixed(0);
+              }
+            }
+
+            if (idx < 3) {
+              console.log(`엑셀 ${idx + 1}행:`, {원본: orderNumber, 타입: typeof orderNumber, 변환후: key});
+            }
+
+            invoiceMap.set(key, {
+              courier: String(courier).trim(),
+              tracking: String(tracking).trim(),
+            });
+          }
+        });
+
+        if (invoiceMap.size === 0) {
+          alert('유효한 데이터가 없습니다.\n엑셀 파일에 "주문번호", "택배사", "송장번호" 컬럼이 있는지 확인해주세요.');
+          return;
+        }
+
+        console.log('📦 엑셀에서 읽은 송장 정보:', invoiceMap.size, '건');
+        console.log('📦 엑셀 주문번호 샘플 (처음 5개):', Array.from(invoiceMap.keys()).slice(0, 5));
+
+        // 현재 화면에 보이면서 '발송완료' 상태인 주문들만 매칭하여 업데이트
+        const updates: any[] = [];
+        const shippedDateTime = getKoreanDateTime(); // 한국 시간으로 발송일 설정
+
+        const targetOrders = filteredOrders.filter(order => order.shipping_status === '발송완료');
+
+        console.log('📋 현재 화면의 전체 주문 수:', filteredOrders.length, '건');
+        console.log('📋 발송완료 주문 수:', targetOrders.length, '건');
+        console.log('📋 화면 주문번호 샘플 (처음 5개):', targetOrders.slice(0, 5).map(o => o.order_number));
+
+        let matchCount = 0;
+        let notMatchCount = 0;
+
+        targetOrders.forEach((order, index) => {
+          if (order.order_number) {
+            // 주문번호 정규화: 숫자/문자열 상관없이 통일된 형식으로 변환
+            let key: string;
+
+            if (typeof order.order_number === 'number') {
+              // 숫자형: 지수 표기 방지하고 정수로 변환
+              key = order.order_number.toFixed(0);
+            } else {
+              // 문자열형: 그대로 사용
+              key = String(order.order_number).trim();
+
+              // 지수 표기법이 포함된 경우 (e+16 등)
+              if (key.includes('e+') || key.includes('E+')) {
+                key = Number(order.order_number).toFixed(0);
+              }
+            }
+
+            if (invoiceMap.has(key)) {
+              const invoice = invoiceMap.get(key)!;
+              updates.push({
+                id: order.id,
+                courier_company: invoice.courier,
+                tracking_number: invoice.tracking,
+                shipped_date: shippedDateTime, // 발송일 자동 설정 (한국 시간)
+                shipping_status: '발송완료', // 상태 유지
+              });
+              matchCount++;
+              if (matchCount <= 3) {
+                console.log(`✅ 매칭 성공 ${matchCount}:`, key);
+              }
+            } else {
+              notMatchCount++;
+              if (notMatchCount <= 3) {
+                console.log(`❌ 매칭 실패 ${notMatchCount}:`, key, '(엑셀에 없음)');
+              }
+            }
+          }
+        });
+
+        console.log(`📊 매칭 결과: 성공 ${matchCount}건, 실패 ${notMatchCount}건`);
+
+        console.log('✅ 매칭된 주문:', updates.length, '건');
+
+        if (updates.length === 0) {
+          alert('매칭되는 주문이 없습니다.');
+          return;
+        }
+
+        if (!confirm(`${updates.length}개의 주문에 송장 정보를 수정하시겠습니까?`)) {
+          return;
+        }
+
+        // DB 업데이트
+        const response = await fetch('/api/integrated-orders/bulk', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orders: updates }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          alert(`${result.count}개 주문의 송장 정보가 수정되었습니다.`);
+          setShowBulkInvoiceUpdateModal(false);
+          setBulkInvoiceUpdateFile(null);
+          fetchOrders();
+        } else {
+          alert('업데이트 실패: ' + result.error);
+        }
+      };
+
+      reader.readAsBinaryString(bulkInvoiceUpdateFile);
+    } catch (error) {
+      console.error('송장일괄수정 오류:', error);
+      alert('송장일괄수정 중 오류가 발생했습니다.');
     }
   };
 
@@ -1481,9 +1871,38 @@ export default function SearchTab() {
       return;
     }
 
-    const selectedOrder = filteredOrders[selectedOrders[0]];
+    const selectedOrder = filteredOrders.find(order => order.id === selectedOrders[0]);
+    if (!selectedOrder) {
+      alert('선택된 주문을 찾을 수 없습니다.');
+      return;
+    }
 
     try {
+      // 0. CS 기록 중복 검증
+      console.log('🔍 CS 중복 검증 시작:', selectedOrder.order_number);
+      const duplicateCheckResponse = await fetch(
+        `/api/cs-records?orderNumber=${encodeURIComponent(selectedOrder.order_number)}`
+      );
+      const duplicateCheckResult = await duplicateCheckResponse.json();
+
+      if (duplicateCheckResult.success && duplicateCheckResult.data && duplicateCheckResult.data.length > 0) {
+        const existingCS = duplicateCheckResult.data[0];
+        const confirmMessage = `⚠️ 이미 CS 접수된 주문입니다.\n\n` +
+          `접수일: ${existingCS.receipt_date}\n` +
+          `CS구분: ${existingCS.cs_reason || '-'}\n` +
+          `해결방법: ${existingCS.resolution_method || '-'}\n` +
+          `처리상태: ${existingCS.status || '-'}\n\n` +
+          `그래도 중복 등록하시겠습니까?`;
+
+        if (!confirm(confirmMessage)) {
+          console.log('❌ 사용자가 중복 등록을 취소했습니다.');
+          return;
+        }
+        console.log('✅ 사용자가 중복 등록을 승인했습니다.');
+      } else {
+        console.log('✅ 중복된 CS 기록 없음');
+      }
+
       // 1. CS 기록 저장
       const csRecordData = {
         receipt_date: new Date().toISOString().split('T')[0], // 오늘 날짜
@@ -1516,19 +1935,24 @@ export default function SearchTab() {
         account_number: csFormData.solution === 'partial_refund' ? csFormData.accountNumber : null,
       };
 
+      console.log('📤 CS 기록 저장 요청 데이터:', csRecordData);
+
       const csResponse = await fetch('/api/cs-records', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(csRecordData),
       });
 
+      console.log('📡 CS API 응답 상태:', csResponse.status);
+
       const csResult = await csResponse.json();
 
-      console.log('CS 기록 저장 응답:', csResult);
+      console.log('📥 CS 기록 저장 응답:', csResult);
 
       if (!csResult.success) {
-        console.error('CS 기록 저장 실패 상세:', csResult);
-        alert('CS 기록 저장 실패: ' + csResult.error);
+        console.error('❌ CS 기록 저장 실패 상세:', csResult);
+        console.error('❌ 에러 메시지:', csResult.error);
+        alert('CS 기록 저장 실패: ' + (csResult.error || 'Unknown error'));
         return;
       }
 
@@ -1548,12 +1972,12 @@ export default function SearchTab() {
         const optionName = csFormData.resendOption || selectedOrder.option_name;
         const mappingData = await fetchMappingByOptionName(optionName);
 
-        // 새 주문 데이터 생성
+        // 새 주문 데이터 생성 (한국 시간 기준)
+        const koreanDate = getKoreanDate();
         const newOrderData = {
-          sheet_date: new Date().toISOString().split('T')[0],
+          sheet_date: koreanDate,
           market_name: 'CS발송',
           order_number: csOrderNumber,
-          payment_date: new Date().toISOString().split('T')[0],
           recipient_name: csFormData.receiver || selectedOrder.recipient_name,
           recipient_phone: csFormData.phone || selectedOrder.recipient_phone,
           recipient_address: csFormData.address || selectedOrder.recipient_address,
@@ -1562,6 +1986,14 @@ export default function SearchTab() {
           quantity: csFormData.resendQty || selectedOrder.quantity,
           shipping_status: '접수',
           memo: `원주문: ${selectedOrder.order_number} / CS유형: ${csFormData.category}`,
+          // 주문자 정보 추가
+          buyer_name: selectedOrder.buyer_name,
+          buyer_phone: selectedOrder.buyer_phone,
+          // 추가금액을 정산예정금액에 저장
+          settlement_amount: csFormData.additionalAmount || null,
+          // 발송요청일과 CS유형(해결방법) 추가
+          shipping_request_date: csFormData.requestDate || null,
+          cs_type: csFormData.solution || null,
           // 옵션명 기준 자동 매핑 (없으면 원주문 정보 복사)
           seller_supply_price: mappingData?.seller_supply_price || selectedOrder.seller_supply_price,
           shipping_source: mappingData?.shipping_source || selectedOrder.shipping_source,
@@ -1573,6 +2005,8 @@ export default function SearchTab() {
           shipping_cost: mappingData?.shipping_cost || selectedOrder.shipping_cost,
         };
 
+        console.log('📤 재발송 주문 생성 요청 데이터:', newOrderData);
+
         // 주문 생성 API 호출
         const createOrderResponse = await fetch('/api/integrated-orders', {
           method: 'POST',
@@ -1580,14 +2014,18 @@ export default function SearchTab() {
           body: JSON.stringify(newOrderData),
         });
 
+        console.log('📡 재발송 주문 생성 응답 상태:', createOrderResponse.status);
+
         const createOrderResult = await createOrderResponse.json();
+
+        console.log('📥 재발송 주문 생성 응답:', createOrderResult);
 
         if (!createOrderResult.success) {
           alert('재발송 주문 생성 실패: ' + createOrderResult.error);
           return;
         }
 
-        console.log('재발송 주문 생성 완료:', csOrderNumber);
+        console.log('✅ 재발송 주문 생성 완료:', csOrderNumber, '/ ID:', createOrderResult.data?.id);
       }
 
       // 3. 원주문의 cs_status 업데이트
@@ -1654,12 +2092,13 @@ export default function SearchTab() {
       // 옵션명으로 매핑 정보 가져오기
       const mappingData = await fetchMappingByOptionName(additionalOrderData.option_name);
 
-      // 새 주문 데이터 생성
+      // 새 주문 데이터 생성 (한국 시간 기준)
+      const koreanDate = getKoreanDate();
       const newOrderData = {
-        sheet_date: new Date().toISOString().split('T')[0],
+        sheet_date: koreanDate,
         market_name: additionalOrderData.market_name || '추가주문',
         order_number: additionalOrderNumber,
-        payment_date: new Date().toISOString().split('T')[0],
+        payment_date: koreanDate,
         recipient_name: additionalOrderData.recipient_name,
         recipient_phone: additionalOrderData.recipient_phone,
         recipient_address: additionalOrderData.recipient_address,
@@ -1887,7 +2326,7 @@ export default function SearchTab() {
 
   // 필터링된 주문 데이터
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
+    const filtered = orders.filter(order => {
       // 날짜 필터
       if (filters.startDate || filters.endDate) {
         const orderDate = filters.dateType === 'payment'
@@ -1937,6 +2376,13 @@ export default function SearchTab() {
       }
 
       return true;
+    });
+
+    // 정렬: 마켓 칼럼(field_13) 순서 (마켓이니셜+세자리연번)
+    return filtered.sort((a, b) => {
+      const field13A = a.field_13 || '';
+      const field13B = b.field_13 || '';
+      return field13A.localeCompare(field13B);
     });
   }, [orders, statusFilter, filters]);
 
@@ -2428,10 +2874,17 @@ export default function SearchTab() {
             onDataChange={(newData) => setOrders(newData)}
             onSave={handleSaveData}
             onDeleteSelected={handleDeleteRows}
-            onSelectionChange={setSelectedOrders}
+            onSelectionChange={(selectedIndices) => {
+              // 선택된 행 인덱스를 실제 주문 ID로 변환
+              const selectedIds = Array.from(selectedIndices).map(index => filteredOrders[index]?.id).filter(id => id !== undefined);
+              setSelectedOrders(selectedIds);
+            }}
             height="calc(100vh - 480px)"
             enableCSVExport={true}
             enableCSVImport={false}
+            enableAddRow={false}
+            enableDelete={false}
+            enableCopy={false}
             customActions={
               <div className="flex items-center gap-12">
                 <div className="flex items-center gap-1">
@@ -2478,7 +2931,12 @@ export default function SearchTab() {
                           alert('CS 접수는 한 번에 하나의 주문만 처리할 수 있습니다.');
                           return;
                         }
-                        const selectedOrder = filteredOrders[selectedOrders[0]];
+                        // selectedOrders[0]는 이제 실제 ID이므로 find로 찾아야 함
+                        const selectedOrder = filteredOrders.find(order => order.id === selectedOrders[0]);
+                        if (!selectedOrder) {
+                          alert('선택된 주문을 찾을 수 없습니다.');
+                          return;
+                        }
                         if (selectedOrder.shipping_status !== '발송완료') {
                           alert('CS접수는 발송완료 상태의 주문만 가능합니다.');
                           return;
@@ -2501,7 +2959,11 @@ export default function SearchTab() {
                           alert('추가주문은 한 번에 하나의 주문만 처리할 수 있습니다.');
                           return;
                         }
-                        const selectedOrder = filteredOrders[selectedOrders[0]];
+                        const selectedOrder = filteredOrders.find(order => order.id === selectedOrders[0]);
+                        if (!selectedOrder) {
+                          alert('선택된 주문을 찾을 수 없습니다.');
+                          return;
+                        }
                         setAdditionalOrderData({
                           ...selectedOrder,
                           // 새 주문번호 생성 준비
@@ -2535,19 +2997,48 @@ export default function SearchTab() {
                       >
                         일괄적용
                       </button>
-                      <button
-                        onClick={handleTrackingRegister}
-                        className="px-2 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700"
-                      >
-                        송장등록
-                      </button>
-                      <button
-                        onClick={handleBulkInvoiceUpload}
-                        className="px-2 py-1 bg-purple-600 text-white rounded text-xs font-medium hover:bg-purple-700 flex items-center gap-1"
-                      >
-                        <Upload className="w-3 h-3" />
-                        송장일괄등록
-                      </button>
+                      {statusFilter !== '발송완료' && (
+                        <button
+                          onClick={handleTrackingRegister}
+                          className="px-2 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700"
+                        >
+                          송장등록
+                        </button>
+                      )}
+                      {statusFilter === '발송완료' && (
+                        <button
+                          onClick={handleTrackingUpdate}
+                          className="px-2 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700"
+                        >
+                          송장수정
+                        </button>
+                      )}
+                      {statusFilter === '발송완료' && (
+                        <button
+                          onClick={handleTrackingRecall}
+                          className="px-2 py-1 bg-orange-600 text-white rounded text-xs font-medium hover:bg-orange-700"
+                        >
+                          송장회수
+                        </button>
+                      )}
+                      {statusFilter !== '발송완료' && (
+                        <button
+                          onClick={handleBulkInvoiceUpload}
+                          className="px-2 py-1 bg-purple-600 text-white rounded text-xs font-medium hover:bg-purple-700 flex items-center gap-1"
+                        >
+                          <Upload className="w-3 h-3" />
+                          송장일괄등록
+                        </button>
+                      )}
+                      {statusFilter === '발송완료' && (
+                        <button
+                          onClick={handleBulkInvoiceUpdate}
+                          className="px-2 py-1 bg-indigo-600 text-white rounded text-xs font-medium hover:bg-indigo-700 flex items-center gap-1"
+                        >
+                          <Upload className="w-3 h-3" />
+                          송장일괄수정
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center gap-1">
                       <button
@@ -2743,6 +3234,7 @@ export default function SearchTab() {
                 엑셀 파일 선택
               </label>
               <input
+                ref={bulkInvoiceFileInputRef}
                 type="file"
                 accept=".xlsx,.xls"
                 onChange={(e) => setBulkInvoiceFile(e.target.files?.[0] || null)}
@@ -2771,6 +3263,58 @@ export default function SearchTab() {
                 className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400"
               >
                 등록
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 송장일괄수정 모달 */}
+      {showBulkInvoiceUpdateModal && (
+        <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }} className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">송장일괄수정</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              엑셀 파일에 다음 컬럼이 포함되어야 합니다:<br />
+              - 주문번호<br />
+              - 택배사<br />
+              - 송장번호 (또는 운송장번호)
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                엑셀 파일 선택
+              </label>
+              <input
+                ref={bulkInvoiceUpdateFileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(e) => setBulkInvoiceUpdateFile(e.target.files?.[0] || null)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+              {bulkInvoiceUpdateFile && (
+                <p className="mt-2 text-sm text-gray-600">
+                  선택된 파일: {bulkInvoiceUpdateFile.name}
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowBulkInvoiceUpdateModal(false);
+                  setBulkInvoiceUpdateFile(null);
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={processBulkInvoiceUpdateFile}
+                disabled={!bulkInvoiceUpdateFile}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400"
+              >
+                수정
               </button>
             </div>
           </div>
@@ -2826,52 +3370,55 @@ export default function SearchTab() {
       >
         <div>
               {/* 주문 정보 */}
-              {selectedOrders.length > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                  <div className="grid grid-cols-3 gap-x-4 gap-y-2 text-sm">
-                    <div>
-                      <span className="text-gray-600">주문번호:</span>
-                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.order_number || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">주문자:</span>
-                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.buyer_name || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">주문자전화번호:</span>
-                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.buyer_phone || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">수령인:</span>
-                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.recipient_name || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">수령인전화번호:</span>
-                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.recipient_phone || '-'}</span>
-                    </div>
-                    <div className="col-span-3">
-                      <span className="text-gray-600">주소:</span>
-                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.recipient_address || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">옵션명:</span>
-                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.option_name || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">수량:</span>
-                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.quantity || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">셀러:</span>
-                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.seller_name || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">벤더사:</span>
-                      <span className="ml-2 font-medium">{filteredOrders[selectedOrders[0]]?.vendor_name || '-'}</span>
+              {selectedOrders.length > 0 && (() => {
+                const selectedOrder = filteredOrders.find(order => order.id === selectedOrders[0]);
+                return selectedOrder ? (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <div className="grid grid-cols-3 gap-x-4 gap-y-2 text-sm">
+                      <div>
+                        <span className="text-gray-600">주문번호:</span>
+                        <span className="ml-2 font-medium">{selectedOrder.order_number || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">주문자:</span>
+                        <span className="ml-2 font-medium">{selectedOrder.buyer_name || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">주문자전화번호:</span>
+                        <span className="ml-2 font-medium">{selectedOrder.buyer_phone || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">수령인:</span>
+                        <span className="ml-2 font-medium">{selectedOrder.recipient_name || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">수령인전화번호:</span>
+                        <span className="ml-2 font-medium">{selectedOrder.recipient_phone || '-'}</span>
+                      </div>
+                      <div className="col-span-3">
+                        <span className="text-gray-600">주소:</span>
+                        <span className="ml-2 font-medium">{selectedOrder.recipient_address || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">옵션명:</span>
+                        <span className="ml-2 font-medium">{selectedOrder.option_name || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">수량:</span>
+                        <span className="ml-2 font-medium">{selectedOrder.quantity || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">셀러:</span>
+                        <span className="ml-2 font-medium">{selectedOrder.seller_name || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">벤더사:</span>
+                        <span className="ml-2 font-medium">{selectedOrder.vendor_name || '-'}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                ) : null;
+              })()}
 
               {/* CS 구분, 내용, 해결방법 */}
               <div className="flex gap-3 mb-4">
@@ -2921,14 +3468,16 @@ export default function SearchTab() {
                       // 재발송 옵션이면 원주문 데이터 자동 채우기
                       if (newSolution === 'partial_resend' || newSolution === 'full_resend') {
                         if (selectedOrders.length > 0) {
-                          const order = filteredOrders[selectedOrders[0]];
-                          setCSFormData(prev => ({
-                            ...prev,
-                            resendOption: order.option_name || '',
-                            receiver: order.recipient_name || '',
-                            phone: order.recipient_phone || '',
-                            address: order.recipient_address || ''
-                          }));
+                          const order = filteredOrders.find(o => o.id === selectedOrders[0]);
+                          if (order) {
+                            setCSFormData(prev => ({
+                              ...prev,
+                              resendOption: order.option_name || '',
+                              receiver: order.recipient_name || '',
+                              phone: order.recipient_phone || '',
+                              address: order.recipient_address || ''
+                            }));
+                          }
                         }
                       }
                     }}
@@ -3213,24 +3762,38 @@ export default function SearchTab() {
               >
                 닫기
               </button>
-              <button
-                onClick={() => {
-                  // 주문 상세 모달 닫기
-                  setShowOrderDetailModal(false);
+              {selectedOrderDetail.shipping_status === '접수' && (
+                <button
+                  onClick={async () => {
+                    await handlePaymentConfirm([selectedOrderDetail.id]);
+                    setShowOrderDetailModal(false);
+                    setSelectedOrderDetail(null);
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  입금확인
+                </button>
+              )}
+              {selectedOrderDetail.shipping_status === '발송완료' && (
+                <button
+                  onClick={() => {
+                    // 주문 상세 모달 닫기
+                    setShowOrderDetailModal(false);
 
-                  // 선택된 주문의 인덱스를 찾아서 설정
-                  const orderIndex = filteredOrders.findIndex(o => o.id === selectedOrderDetail.id);
-                  if (orderIndex !== -1) {
-                    setSelectedOrders([orderIndex]);
-                  }
+                    // 선택된 주문의 인덱스를 찾아서 설정
+                    const orderIndex = filteredOrders.findIndex(o => o.id === selectedOrderDetail.id);
+                    if (orderIndex !== -1) {
+                      setSelectedOrders([orderIndex]);
+                    }
 
-                  // CS 모달 열기
-                  setShowCSModal(true);
-                }}
-                className="px-4 py-2 bg-pink-600 text-white rounded hover:bg-pink-700"
-              >
-                CS접수
-              </button>
+                    // CS 모달 열기
+                    setShowCSModal(true);
+                  }}
+                  className="px-4 py-2 bg-pink-600 text-white rounded hover:bg-pink-700"
+                >
+                  CS접수
+                </button>
+              )}
             </>
           }
         >

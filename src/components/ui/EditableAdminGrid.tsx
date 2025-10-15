@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { Button } from '@/components/ui'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
@@ -160,27 +160,22 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       setHistoryIndex(0)
       prevDataRef.current = data
       isInitialMount.current = false
-      console.log('=== EditableAdminGrid 초기화 ===')
-      console.log('originalDataRef.current 설정됨, 길이:', originalDataRef.current.length)
     } else if (!isInitialMount.current) {
-      // 데이터 참조가 변경되고, 길이도 변경된 경우만 업데이트 (외부에서 새로 로드한 경우)
-      if (data !== prevDataRef.current && data.length !== gridData.length) {
-        console.log('=== 외부 데이터 변경 감지 (길이 변경) ===')
-        console.log('이전 데이터 길이:', prevDataRef.current.length)
-        console.log('새 데이터 길이:', data.length)
-
-        // 원본 데이터 참조 업데이트 (새로 로드된 데이터)
-        originalDataRef.current = JSON.parse(JSON.stringify(data))
-        console.log('originalDataRef.current 업데이트됨, 길이:', originalDataRef.current.length)
-
+      // 데이터 참조가 변경된 경우 업데이트 (외부에서 새로 로드하거나 상태가 변경된 경우)
+      if (data !== prevDataRef.current) {
         setGridData(data)
         prevDataRef.current = data
 
-        // 선택된 행 초기화 (삭제 후 재로딩 시)
-        setSelectedRows(new Set())
-        setAddedRows(new Set())
-        setCopiedRows(new Set())
-        setModifiedCells(new Set())
+        // 데이터 길이가 변경된 경우에만 원본 데이터 참조 및 상태 초기화 (완전히 새로 로드된 경우)
+        if (data.length !== gridData.length) {
+          originalDataRef.current = JSON.parse(JSON.stringify(data))
+
+          // 선택된 행 초기화 (삭제 후 재로딩 시)
+          setSelectedRows(new Set())
+          setAddedRows(new Set())
+          setCopiedRows(new Set())
+          setModifiedCells(new Set())
+        }
       }
     }
   }, [data, gridData.length])
@@ -188,13 +183,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   // 수정 상태 변경 시 콜백 호출
   useEffect(() => {
     const hasModifications = modifiedCells.size > 0 || addedRows.size > 0 || copiedRows.size > 0
-    console.log('=== EditableAdminGrid 수정 상태 ===')
-    console.log('modifiedCells:', modifiedCells.size)
-    console.log('addedRows:', addedRows.size)
-    console.log('copiedRows:', copiedRows.size)
-    console.log('hasModifications:', hasModifications)
     onModifiedChange?.(hasModifications)
-  }, [modifiedCells.size, addedRows.size, copiedRows.size])
+  }, [modifiedCells.size, addedRows.size, copiedRows.size, onModifiedChange])
 
   useEffect(() => {
     if (editingCell && inputRef.current) {
@@ -482,12 +472,10 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   }
 
   const handleUndo = () => {
-    console.log('Undo called. historyIndex:', historyIndex, 'history.length:', history.length)
     if (historyIndex > 0 && history.length > 0) {
       const newIndex = historyIndex - 1
       setHistoryIndex(newIndex)
       const previousData = JSON.parse(JSON.stringify(history[newIndex]))
-      console.log('Restoring to index:', newIndex, 'data length:', previousData.length)
       if (previousData && previousData.length > 0) {
         setGridData(previousData)
         onDataChange?.(previousData)
@@ -564,7 +552,6 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       return newRow as T
     })
     newHistory.push(safeCopy)
-    console.log('Adding to history. New index:', newHistory.length - 1, 'Total history length:', newHistory.length)
     setHistory(newHistory)
     setHistoryIndex(newHistory.length - 1)
   }
@@ -628,14 +615,6 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
     const oldValue = newData[editingCell.row][editingCell.col]
 
-    console.log('=== commitEdit Debug ===')
-    console.log('rowIndex:', editingCell.row)
-    console.log('columnKey:', editingCell.col)
-    console.log('oldValue:', oldValue)
-    console.log('processedValue:', processedValue)
-    console.log('originalDataRef.current:', originalDataRef.current)
-    console.log('originalDataRef.current[rowIndex]:', originalDataRef.current[editingCell.row])
-
     // 값이 변경된 경우에만 처리
     if (oldValue !== processedValue) {
       newData[editingCell.row] = {
@@ -649,24 +628,19 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
       // 추가되거나 복사된 행은 modifiedCells에서 제외
       const isAddedOrCopied = addedRows.has(rowIndex) || copiedRows.has(rowIndex)
-      console.log('isAddedOrCopied:', isAddedOrCopied)
 
       if (!isAddedOrCopied) {
         // 원본 데이터와 비교 (기존 데이터만)
         const originalValue = originalDataRef.current[rowIndex]?.[editingCell.col]
-        console.log('originalValue:', originalValue)
         if (processedValue === originalValue) {
           // 원래 값으로 돌아간 경우 modifiedCells에서 제거
-          console.log('삭제: 원래 값으로 돌아감')
           newModifiedCells.delete(cellKey)
         } else {
           // 원래 값과 다른 경우 modifiedCells에 추가
-          console.log('추가: modifiedCells에 추가')
           newModifiedCells.add(cellKey)
         }
       }
 
-      console.log('newModifiedCells size:', newModifiedCells.size)
       setModifiedCells(newModifiedCells)
       addToHistory(newData)
       setGridData(newData)
@@ -835,9 +809,6 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   }, [gridData, globalSearchTerm, columns])
 
   const exportToExcel = () => {
-    console.log('=== EditableAdminGrid 엑셀 다운로드 ===')
-    console.log('Columns:', columns)
-
     // ID 컬럼이 있는지 확인
     const hasIdInColumns = columns.some(col => col.key === 'id')
     const hasIdInData = gridData.length > 0 && 'id' in gridData[0]
@@ -847,12 +818,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       ? [{ key: 'id', title: 'ID' }, ...columns]
       : columns
 
-    console.log('Export Columns:', exportColumns)
-    console.log('다운로드할 상품의 필드:', gridData.length > 0 ? Object.keys(gridData[0]) : [])
-
     // 헤더와 데이터 준비
     const headers = exportColumns.map(col => col.title)
-    console.log('엑셀 헤더:', headers)
     const data = gridData.map(row =>
       exportColumns.map(col => row[col.key] ?? '')
     )
@@ -1289,6 +1256,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
   const getCellClassName = useCallback((rowIndex: number, columnKey: string, column: Column<T>, row: T, isSticky: boolean = false) => {
     const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === columnKey
+    const isRowSelected = selectedRows.has(rowIndex)
     const cellKey = `${rowIndex}-${columnKey}`
     const isModified = modifiedCells.has(cellKey)
     const isAdded = addedRows.has(rowIndex)
@@ -1337,6 +1305,10 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     else if (isFillRange) {
       classes += 'bg-red-50 ring-1 ring-red-400 ring-inset '
     }
+    // 체크박스로 선택된 행
+    else if (isRowSelected) {
+      classes += 'bg-blue-50 '
+    }
     // 호버된 행/열
     else if (isHovered && !isSelected && !fillStartCell) {
       classes += 'bg-gray-200 '
@@ -1374,7 +1346,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     }
 
     return classes.trim()
-  }, [selectedCell, modifiedCells, addedRows, copiedRows, hoverCell, fillStartCell, fillPreviewData])
+  }, [selectedCell, modifiedCells, addedRows, copiedRows, hoverCell, fillStartCell, fillPreviewData, selectedRows])
 
   const renderCell = (row: T, column: Column<T>, rowIndex: number) => {
     const isEditing = editingCell?.row === rowIndex && editingCell?.col === column.key

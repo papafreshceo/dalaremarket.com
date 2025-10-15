@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Plus, Save, X, Trash2, Check } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import { Modal } from '@/components/ui';
@@ -14,6 +14,7 @@ interface ProductItem {
   amount: number;
   shippingFee: number;
   total: number;
+  shippingIncluded: boolean;
 }
 
 interface RecipientSection {
@@ -56,6 +57,8 @@ interface OptionProduct {
   product_category?: string;
   seller_supply_price?: number;
   shipping_cost?: number;
+  naver_paid_shipping_price?: number;
+  naver_free_shipping_price?: number;
 }
 
 export default function InputTab() {
@@ -81,6 +84,7 @@ export default function InputTab() {
             amount: 10000,
             shippingFee: 3000,
             total: 13000,
+            shippingIncluded: false,
           },
         ],
       },
@@ -117,6 +121,21 @@ export default function InputTab() {
 
   // 로그인한 사용자 정보
   const [currentUser, setCurrentUser] = useState<string>('');
+
+  // 옵션명 드롭다운 상태
+  const [activeDropdown, setActiveDropdown] = useState<{ sectionId: string; productId: string } | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // 드롭다운 외부 클릭 감지
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setActiveDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // 로그인 사용자 정보 가져오기
   useEffect(() => {
@@ -171,26 +190,19 @@ export default function InputTab() {
 
   const loadOptionProducts = async () => {
     try {
-      const response = await fetch('/api/product-mapping?limit=10000');
+      const response = await fetch('/api/option-products?limit=10000');
 
       if (!response.ok) {
         console.error('API 응답 오류:', response.status, response.statusText);
         return;
       }
 
-      const text = await response.text();
-      let result;
-
-      try {
-        result = JSON.parse(text);
-      } catch (parseError) {
-        console.error('JSON 파싱 오류:', text);
-        return;
-      }
+      const result = await response.json();
 
       if (result.success) {
         const products = result.data;
         setOptionProducts(products);
+        console.log('✅ 옵션 상품 로드 완료:', products.length, '개');
       }
     } catch (error) {
       console.error('옵션 상품 로드 실패:', error);
@@ -288,6 +300,7 @@ export default function InputTab() {
               amount: 0,
               shippingFee: 0,
               total: 0,
+              shippingIncluded: false,
             },
           ],
         },
@@ -333,6 +346,7 @@ export default function InputTab() {
                   amount: 0,
                   shippingFee: 0,
                   total: 0,
+                  shippingIncluded: false,
                 },
               ],
             }
@@ -368,12 +382,37 @@ export default function InputTab() {
                 if (p.id === productId) {
                   const updated = { ...p, [field]: value };
 
-                  // 옵션명 선택 시 가격 자동 입력 (네이버유료판매가격 사용)
+                  // shippingIncluded 토글 시 단가 자동 조정
+                  if (field === 'shippingIncluded') {
+                    const selectedOption = optionProducts.find((op) => op.option_name === p.optionName);
+                    if (selectedOption) {
+                      if (value === true) {
+                        // 포함: naver_free_shipping_price 사용, shippingFee = 0
+                        updated.unitPrice = selectedOption.naver_free_shipping_price || 0;
+                        updated.shippingFee = 0;
+                      } else {
+                        // 별도: naver_paid_shipping_price 사용, shippingFee = 3000
+                        updated.unitPrice = selectedOption.naver_paid_shipping_price || 0;
+                        updated.shippingFee = 3000;
+                      }
+                      updated.amount = updated.quantity * updated.unitPrice;
+                      updated.total = updated.amount + updated.shippingFee;
+                    }
+                  }
+
+                  // 옵션명 선택 시 가격 자동 입력 (현재 shippingIncluded 상태에 따라 가격 설정)
                   if (field === 'optionName' && typeof value === 'string') {
                     const selectedOption = optionProducts.find((op) => op.option_name === value);
                     if (selectedOption) {
-                      updated.unitPrice = selectedOption.naver_paid_shipping_price || 0;
-                      updated.shippingFee = selectedOption.shipping_cost || 0;
+                      if (p.shippingIncluded) {
+                        // 포함: naver_free_shipping_price 사용, shippingFee = 0
+                        updated.unitPrice = selectedOption.naver_free_shipping_price || 0;
+                        updated.shippingFee = 0;
+                      } else {
+                        // 별도: naver_paid_shipping_price 사용, shippingFee = 3000
+                        updated.unitPrice = selectedOption.naver_paid_shipping_price || 0;
+                        updated.shippingFee = 3000;
+                      }
                       updated.amount = updated.quantity * updated.unitPrice;
                       updated.total = updated.amount + updated.shippingFee;
                     }
@@ -437,6 +476,7 @@ export default function InputTab() {
               amount: 0,
               shippingFee: 0,
               total: 0,
+              shippingIncluded: false,
             },
           ],
         },
@@ -445,8 +485,8 @@ export default function InputTab() {
     setVerificationStatus({});
   };
 
-  // 주문 저장 (테이블에 추가)
-  const handleSaveOrder = () => {
+  // 주문 저장 (DB에 직접 저장 - 접수 상태)
+  const handleSaveOrder = async () => {
     // 필수 입력 검증
     if (!formData.buyer_name) {
       alert('주문자명은 필수입니다.');
@@ -466,36 +506,81 @@ export default function InputTab() {
       }
     }
 
-    // 각 수령인 섹션을 개별 주문으로 변환
-    const newOrders: SavedOrder[] = [];
+    try {
+      // 로컬 테이블용 SavedOrder 생성
+      const newOrders: SavedOrder[] = [];
 
-    formData.recipientSections.forEach((section) => {
-      const orderNumber = generateOrderNumber();
+      formData.recipientSections.forEach((section) => {
+        const orderNumber = generateOrderNumber();
 
-      newOrders.push({
-        id: Date.now().toString() + Math.random(),
-        order_number: orderNumber,
-        market_name: '전화주문',
-        buyer_name: formData.buyer_name,
-        buyer_phone: formData.buyer_phone,
-        recipient_name: section.recipient_name,
-        recipient_phone: section.recipient_phone,
-        recipient_address: section.recipient_address,
-        delivery_message: section.delivery_message,
-        special_request: section.special_request,
-        shipping_request_date: section.shipping_request_date,
-        products: [...section.products],
-        registered_by: currentUser,
-        payment_confirmed: false,
+        newOrders.push({
+          id: Date.now().toString() + Math.random(),
+          order_number: orderNumber,
+          market_name: '전화주문',
+          buyer_name: formData.buyer_name,
+          buyer_phone: formData.buyer_phone,
+          recipient_name: section.recipient_name,
+          recipient_phone: section.recipient_phone,
+          recipient_address: section.recipient_address,
+          delivery_message: section.delivery_message,
+          special_request: section.special_request,
+          shipping_request_date: section.shipping_request_date,
+          products: [...section.products],
+          registered_by: currentUser,
+          payment_confirmed: false,
+        });
       });
-    });
 
-    setSavedOrders([...savedOrders, ...newOrders]);
+      // DB 저장용 데이터 생성 (각 상품을 개별 행으로)
+      const ordersToSave: any[] = [];
 
-    // 폼 초기화
-    resetForm();
+      formData.recipientSections.forEach((section) => {
+        const orderNumber = newOrders.find(o => o.recipient_name === section.recipient_name)?.order_number || '';
 
-    alert(`${newOrders.length}건의 주문이 추가되었습니다.`);
+        section.products.forEach((product) => {
+          ordersToSave.push({
+            market_name: '전화주문',
+            order_number: orderNumber,
+            buyer_name: formData.buyer_name,
+            buyer_phone: formData.buyer_phone,
+            recipient_name: section.recipient_name,
+            recipient_phone: section.recipient_phone,
+            recipient_address: section.recipient_address,
+            delivery_message: section.delivery_message,
+            option_name: product.optionName,
+            quantity: product.quantity.toString(),
+            special_request: section.special_request,
+            shipping_request_date: section.shipping_request_date,
+            settlement_amount: product.total.toString(),
+            sheet_date: new Date(new Date().getTime() + (9 * 60 * 60 * 1000)).toISOString().split('T')[0],
+            shipping_status: '접수',
+          });
+        });
+      });
+
+      const response = await fetch('/api/integrated-orders/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orders: ordersToSave }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // savedOrders에 추가
+        setSavedOrders([...savedOrders, ...newOrders]);
+        alert(`${ordersToSave.length}건의 주문이 등록되었습니다.`);
+        // 폼 초기화
+        resetForm();
+      } else {
+        alert(`등록 실패: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('주문 등록 실패:', error);
+      alert('주문 등록 중 오류가 발생했습니다.');
+    }
   };
 
   // 테이블에서 주문 삭제
@@ -515,188 +600,6 @@ export default function InputTab() {
       );
       return newOrders;
     });
-  };
-
-  // 옵션명 검증 (ExcelTab과 동일한 로직)
-  const handleVerifyOptions = async () => {
-    if (savedOrders.length === 0) {
-      alert('검증할 주문 데이터가 없습니다.');
-      return;
-    }
-
-    try {
-      console.log('검증 시작 - 주문 수:', savedOrders.length, '옵션상품 수:', optionProducts.length);
-
-      // 각 주문의 각 상품에 대해 옵션명 검증 및 매핑
-      const updatedOrders = savedOrders.map((order) => {
-        const updatedProducts = order.products.map((product) => {
-          const optionName = product.optionName;
-
-          if (!optionName || optionName.trim() === '') {
-            return {
-              ...product,
-              _optionNameInDB: false,
-              _optionNameVerified: false
-            };
-          }
-
-          const trimmedOption = optionName.trim().toLowerCase();
-          const matchedProduct = optionProducts.find(
-            (op) => op.option_name.trim().toLowerCase() === trimmedOption
-          );
-
-          if (matchedProduct) {
-            // 옵션상품 정보를 상품에 자동 매핑 (네이버유료판매가격 사용)
-            const naverPrice = matchedProduct.naver_paid_shipping_price || product.unitPrice;
-            const shippingCost = matchedProduct.shipping_cost || product.shippingFee;
-
-            return {
-              ...product,
-              unitPrice: naverPrice,
-              shippingFee: shippingCost,
-              amount: product.quantity * naverPrice,
-              total: product.quantity * naverPrice + shippingCost,
-              _optionNameInDB: true,
-              _optionNameVerified: true
-            };
-          } else {
-            return {
-              ...product,
-              _optionNameInDB: false,
-              _optionNameVerified: false
-            };
-          }
-        });
-
-        return {
-          ...order,
-          products: updatedProducts
-        };
-      });
-
-      setSavedOrders(updatedOrders);
-
-      // 검증 통계 계산
-      const allProducts = updatedOrders.flatMap((o) => o.products);
-      const matchedCount = allProducts.filter((p: any) => p._optionNameVerified).length;
-      const unmatchedCount = allProducts.filter((p: any) => !p._optionNameVerified).length;
-
-      // 검증 상태 업데이트
-      const newVerificationStatus: Record<string, boolean> = {};
-      allProducts.forEach((p: any) => {
-        newVerificationStatus[p.optionName] = p._optionNameVerified || false;
-      });
-      setVerificationStatus(newVerificationStatus);
-
-      // 결과 메시지
-      let content = `총 ${allProducts.length}개 상품\n\n`;
-      content += `✓ 매칭 성공: ${matchedCount}개\n`;
-      content += `✗ 매칭 실패: ${unmatchedCount}개\n\n`;
-
-      if (unmatchedCount > 0) {
-        content += `매칭 실패한 옵션명은 출고 정보가 자동으로 입력되지 않았습니다.\n`;
-        content += `option_products에 등록 후 다시 검증하세요.`;
-      } else {
-        content += `✅ 모든 상품의 출고 정보가 자동으로 입력되었습니다!`;
-      }
-
-      alert(content);
-
-    } catch (error) {
-      console.error('옵션명 검증 오류:', error);
-      alert('옵션명 검증 중 오류가 발생했습니다.');
-    }
-  };
-
-  // 주문 접수 등록 (DB 저장)
-  const handleRegisterOrders = async () => {
-    if (savedOrders.length === 0) {
-      alert('등록할 주문이 없습니다.');
-      return;
-    }
-
-    // 입금확인 여부 확인
-    const confirmedOrders = savedOrders.filter((order) => order.payment_confirmed);
-    const unconfirmedOrders = savedOrders.filter((order) => !order.payment_confirmed);
-
-    if (confirmedOrders.length === 0) {
-      alert('입금확인된 주문이 없습니다.');
-      return;
-    }
-
-    // 입금확인 상태 안내
-    let message = `입금확인: ${confirmedOrders.length}건\n미확인: ${unconfirmedOrders.length}건\n\n`;
-    message += `입금확인된 ${confirmedOrders.length}건만 DB에 저장됩니다.\n`;
-    if (unconfirmedOrders.length > 0) {
-      message += `미확인 ${unconfirmedOrders.length}건은 로컬에 유지됩니다.\n\n`;
-    }
-    message += `계속 진행하시겠습니까?`;
-
-    if (!confirm(message)) {
-      return;
-    }
-
-    // 검증되지 않은 옵션명이 있는지 확인 (입금확인된 주문만)
-    const allOptionNames = confirmedOrders.flatMap((order) => order.products.map((p) => p.optionName));
-    const unverified = allOptionNames.filter((name) => verificationStatus[name] === false);
-
-    if (unverified.length > 0) {
-      if (
-        !confirm(
-          `${unverified.length}개의 검증되지 않은 옵션명이 있습니다. 계속 진행하시겠습니까?`
-        )
-      ) {
-        return;
-      }
-    }
-
-    try {
-      // 입금확인된 주문만 상품별로 분리하여 DB에 저장
-      const ordersToSave: any[] = [];
-
-      confirmedOrders.forEach((order) => {
-        order.products.forEach((product) => {
-          ordersToSave.push({
-            market_name: order.market_name,
-            order_number: order.order_number,
-            buyer_name: order.buyer_name,
-            buyer_phone: order.buyer_phone,
-            recipient_name: order.recipient_name,
-            recipient_phone: order.recipient_phone,
-            recipient_address: order.recipient_address,
-            delivery_message: order.delivery_message,
-            option_name: product.optionName,
-            quantity: product.quantity.toString(),
-            special_request: order.special_request,
-            shipping_request_date: order.shipping_request_date,
-            settlement_amount: product.total.toString(), // 정산예정금액 = 합계액 (단가 x 수량 + 택배비)
-            sheet_date: new Date(new Date().getTime() + (9 * 60 * 60 * 1000)).toISOString().split('T')[0],
-          });
-        });
-      });
-
-      const response = await fetch('/api/integrated-orders/bulk', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ orders: ordersToSave }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert(`${result.count}건의 주문이 등록되었습니다.`);
-        // 입금확인된 주문만 제거, 미확인 주문은 로컬에 유지
-        setSavedOrders(unconfirmedOrders);
-        setVerificationStatus({});
-      } else {
-        alert(`등록 실패: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('주문 등록 실패:', error);
-      alert('주문 등록 중 오류가 발생했습니다.');
-    }
   };
 
   // 테이블용 컬럼 정의
@@ -870,7 +773,7 @@ export default function InputTab() {
           {/* 라벨 행 - 전체 */}
           <div className="grid grid-cols-[1fr_2fr] gap-4">
             {/* 왼쪽 라벨 */}
-            <div className="grid grid-cols-[80px_120px_300px_120px_240px_100px] gap-2">
+            <div className="grid grid-cols-[80px_120px_300px_120px_240px_110px] gap-2">
               <div className="text-xs font-medium text-gray-700">수령인</div>
               <div className="text-xs font-medium text-gray-700">전화</div>
               <div className="text-xs font-medium text-gray-700 flex items-center gap-1">
@@ -889,8 +792,9 @@ export default function InputTab() {
             </div>
 
             {/* 오른쪽 라벨 */}
-            <div className="grid grid-cols-[20%_50px_70px_70px_70px_70px_30px] gap-1">
+            <div className="grid grid-cols-[20%_60px_50px_70px_70px_80px_70px_30px] gap-1">
               <div className="text-xs font-medium text-gray-700">옵션명</div>
+              <div className="text-xs font-medium text-gray-700 text-center">배송비</div>
               <div className="text-xs font-medium text-gray-700 text-center">수량</div>
               <div className="text-xs font-medium text-gray-700 text-center">단가</div>
               <div className="text-xs font-medium text-gray-700 text-center">금액</div>
@@ -913,7 +817,7 @@ export default function InputTab() {
           <div className="grid grid-cols-[1fr_2fr] gap-4 mt-1">
             {/* 왼쪽: 수령인 정보 - 모두 가로 1줄 */}
             <div>
-              <div className="grid grid-cols-[80px_120px_300px_120px_240px_100px] gap-2">
+              <div className="grid grid-cols-[80px_120px_300px_120px_240px_110px] gap-2">
                 <input
                   type="text"
                   value={section.recipient_name}
@@ -981,28 +885,74 @@ export default function InputTab() {
                 {section.products.map((product) => (
                   <div
                     key={product.id}
-                    className="grid grid-cols-[20%_50px_70px_70px_70px_70px_30px] gap-1 items-center"
+                    className="grid grid-cols-[20%_60px_50px_70px_70px_80px_70px_30px] gap-1 items-center"
                   >
-                    <input
-                      type="text"
-                      list={`options-${section.id}-${product.id}`}
-                      value={product.optionName}
-                      onChange={(e) =>
-                        updateProduct(section.id, product.id, 'optionName', e.target.value)
-                      }
-                      className="w-full h-8 px-2 py-1 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      placeholder="옵션명 입력 (자동완성) *"
-                    />
-                    <datalist id={`options-${section.id}-${product.id}`}>
-                      {optionProducts
-                        .filter((op) =>
-                          op.option_name.toLowerCase().includes(product.optionName.toLowerCase())
-                        )
-                        .slice(0, 50)
-                        .map((op) => (
-                          <option key={op.id} value={op.option_name} />
-                        ))}
-                    </datalist>
+                    <div className="relative" ref={activeDropdown?.sectionId === section.id && activeDropdown?.productId === product.id ? dropdownRef : null}>
+                      <input
+                        type="text"
+                        value={product.optionName}
+                        onChange={(e) => {
+                          updateProduct(section.id, product.id, 'optionName', e.target.value);
+                          setActiveDropdown({ sectionId: section.id, productId: product.id });
+                        }}
+                        onFocus={() => setActiveDropdown({ sectionId: section.id, productId: product.id })}
+                        className="w-full h-8 px-2 py-1 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="옵션명 입력 *"
+                      />
+                      {activeDropdown?.sectionId === section.id && activeDropdown?.productId === product.id && product.optionName && (
+                        <div
+                          className="absolute left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-[9999]"
+                          style={{ top: '100%' }}
+                        >
+                          {(() => {
+                            const filteredOptions = optionProducts.filter((op) =>
+                              op.option_name.toLowerCase().includes(product.optionName.toLowerCase())
+                            );
+                            const displayOptions = filteredOptions.slice(0, 20);
+
+                            return displayOptions.length > 0 ? (
+                              <>
+                                {displayOptions.map((op) => (
+                                  <div
+                                    key={op.id}
+                                    onClick={() => {
+                                      updateProduct(section.id, product.id, 'optionName', op.option_name);
+                                      setActiveDropdown(null);
+                                    }}
+                                    className="px-2 py-1 text-xs cursor-pointer hover:bg-blue-50"
+                                  >
+                                    {op.option_name}
+                                  </div>
+                                ))}
+                                {filteredOptions.length > 20 && (
+                                  <div className="px-2 py-1 text-xs text-gray-500 bg-gray-50">
+                                    +{filteredOptions.length - 20}개 더 있음 (더 검색하세요)
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="px-2 py-1 text-xs text-gray-500">
+                                검색 결과 없음
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        updateProduct(section.id, product.id, 'shippingIncluded', !product.shippingIncluded);
+                      }}
+                      className={`w-full h-8 px-1 text-xs rounded transition-colors ${
+                        product.shippingIncluded
+                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                      title={product.shippingIncluded ? '배송비 포함' : '배송비 별도'}
+                    >
+                      {product.shippingIncluded ? '포함' : '별도'}
+                    </button>
 
                     <input
                       type="number"
@@ -1044,21 +994,34 @@ export default function InputTab() {
                       placeholder="금액"
                     />
 
-                    <input
-                      type="text"
-                      value={product.shippingFee > 0 ? product.shippingFee.toLocaleString() : ''}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/[^0-9]/g, '');
-                        updateProduct(
-                          section.id,
-                          product.id,
-                          'shippingFee',
-                          parseInt(value) || 0
-                        );
-                      }}
-                      className="w-full h-8 px-2 py-1 text-xs text-right border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      placeholder="택배비"
-                    />
+                    {product.shippingIncluded ? (
+                      <input
+                        type="text"
+                        value="0"
+                        readOnly
+                        className="w-full h-8 px-2 py-1 text-xs text-right border border-gray-200 rounded bg-gray-100 text-gray-700"
+                        placeholder="택배비"
+                      />
+                    ) : (
+                      <select
+                        value={product.shippingFee}
+                        onChange={(e) =>
+                          updateProduct(
+                            section.id,
+                            product.id,
+                            'shippingFee',
+                            parseInt(e.target.value)
+                          )
+                        }
+                        className="w-full h-8 px-2 py-1 text-xs text-right border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value={3000}>3,000</option>
+                        <option value={3500}>3,500</option>
+                        <option value={4000}>4,000</option>
+                        <option value={4500}>4,500</option>
+                        <option value={5000}>5,000</option>
+                      </select>
+                    )}
 
                     <input
                       type="text"
@@ -1139,22 +1102,6 @@ export default function InputTab() {
             onSave={() => {
               alert('수정사항이 로컬 스토리지에 저장되었습니다.');
             }}
-            customActions={
-              <>
-                <button
-                  onClick={handleVerifyOptions}
-                  className="px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                >
-                  옵션명 검증
-                </button>
-                <button
-                  onClick={handleRegisterOrders}
-                  className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-                >
-                  주문접수 등록
-                </button>
-              </>
-            }
             height="400px"
             enableFilter={false}
             enableCSVExport={false}

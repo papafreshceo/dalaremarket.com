@@ -2,16 +2,17 @@ import { createClient } from '@/lib/supabase/server';
 
 /**
  * 옵션 상품 정보 인터페이스
+ * option_products의 영문 컬럼 → integrated_orders의 영문 컬럼 매핑
  */
 export interface OptionProductInfo {
   seller_supply_price?: number | string;
-  출고?: string;
-  송장?: string;
-  벤더사?: string;
-  발송지명?: string;
-  발송지주소?: string;
-  발송지연락처?: string;
-  출고비용?: number | string;
+  shipping_source?: string;          // option_products.shipping_entity → integrated_orders.shipping_source
+  invoice_issuer?: string;           // option_products.invoice_entity → integrated_orders.invoice_issuer
+  vendor_name?: string;              // option_products에서 벤더 정보 (있다면)
+  shipping_location_name?: string;   // 발송지명
+  shipping_location_address?: string; // 발송지주소
+  shipping_location_contact?: string; // 발송지연락처
+  shipping_cost?: number | string;   // 출고비용
 }
 
 /**
@@ -22,45 +23,65 @@ export interface OptionProductInfo {
  */
 export async function getOptionProductInfo(optionName: string): Promise<OptionProductInfo> {
   if (!optionName || optionName.trim() === '') {
+    console.log('⚠️ [getOptionProductInfo] 옵션명이 비어있음');
     return {};
   }
 
   try {
     const supabase = await createClient();
 
+    console.log(`🔍 [getOptionProductInfo] 옵션명 조회: "${optionName}"`);
+
+    // 벤더 정보를 포함하여 조회 (shipping_vendor_id → partners 조인)
     const { data, error } = await supabase
       .from('option_products')
-      .select('seller_supply_price, 출고, 송장, 벤더사, 발송지명, 발송지주소, 발송지연락처, 출고비용')
+      .select(`
+        seller_supply_price,
+        shipping_entity,
+        invoice_entity,
+        shipping_location_name,
+        shipping_location_address,
+        shipping_location_contact,
+        shipping_cost,
+        shipping_vendor:partners!shipping_vendor_id(name)
+      `)
       .eq('option_name', optionName.trim())
       .single();
 
     if (error) {
       // 데이터가 없는 경우는 에러로 처리하지 않음
       if (error.code === 'PGRST116') {
-        console.log(`옵션명 "${optionName}"에 해당하는 상품 정보가 없습니다.`);
+        console.log(`❌ [getOptionProductInfo] 옵션명 "${optionName}"에 해당하는 상품 정보가 없습니다.`);
         return {};
       }
 
-      console.error('옵션 상품 정보 조회 실패:', error);
+      console.error('❌ [getOptionProductInfo] 옵션 상품 정보 조회 실패:', error);
       return {};
     }
 
+    console.log(`✅ [getOptionProductInfo] 조회 성공:`, data);
+
     // null 값들을 제거하고 실제 값만 반환
+    // option_products의 컬럼명 → integrated_orders의 컬럼명으로 매핑
     const result: OptionProductInfo = {};
 
     if (data?.seller_supply_price !== null && data?.seller_supply_price !== undefined) {
       result.seller_supply_price = data.seller_supply_price;
     }
-    if (data?.출고) result.출고 = data.출고;
-    if (data?.송장) result.송장 = data.송장;
-    if (data?.벤더사) result.벤더사 = data.벤더사;
-    if (data?.발송지명) result.발송지명 = data.발송지명;
-    if (data?.발송지주소) result.발송지주소 = data.발송지주소;
-    if (data?.발송지연락처) result.발송지연락처 = data.발송지연락처;
-    if (data?.출고비용 !== null && data?.출고비용 !== undefined) {
-      result.출고비용 = data.출고비용;
+    // shipping_entity → shipping_source로 매핑
+    if (data?.shipping_entity) result.shipping_source = data.shipping_entity;
+    // invoice_entity → invoice_issuer로 매핑
+    if (data?.invoice_entity) result.invoice_issuer = data.invoice_entity;
+    // shipping_vendor 조인 결과 → vendor_name으로 매핑
+    if (data?.shipping_vendor?.name) result.vendor_name = data.shipping_vendor.name;
+    if (data?.shipping_location_name) result.shipping_location_name = data.shipping_location_name;
+    if (data?.shipping_location_address) result.shipping_location_address = data.shipping_location_address;
+    if (data?.shipping_location_contact) result.shipping_location_contact = data.shipping_location_contact;
+    if (data?.shipping_cost !== null && data?.shipping_cost !== undefined) {
+      result.shipping_cost = data.shipping_cost;
     }
 
+    console.log(`📦 [getOptionProductInfo] 최종 매핑 결과:`, result);
     return result;
   } catch (error) {
     console.error('getOptionProductInfo 오류:', error);
