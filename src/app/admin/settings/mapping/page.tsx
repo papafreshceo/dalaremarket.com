@@ -63,6 +63,12 @@ interface MappingField {
   field_42?: string;
   field_43?: string;
   field_44?: string;
+  field_45?: string;
+  field_46?: string;
+  field_47?: string;
+  field_48?: string;
+  field_49?: string;
+  field_50?: string;
   [key: string]: any;
 }
 
@@ -209,10 +215,10 @@ export default function MappingSettingsPage() {
       return
     }
 
-    // 컬럼 정의: 플랫폼 + 표준필드1~표준필드44 (고정)
+    // 컬럼 정의: 플랫폼 + 표준필드1~표준필드50 (확장)
     const newColumns = [
       { key: 'market_name', title: '플랫폼', width: 120, readOnly: true },
-      ...Array.from({ length: 44 }, (_, index) => ({
+      ...Array.from({ length: 50 }, (_, index) => ({
         key: `field_${index + 1}`,
         title: `표준필드${index + 1}`,
         width: 150,

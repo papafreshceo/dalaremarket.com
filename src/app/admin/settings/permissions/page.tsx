@@ -1,281 +1,565 @@
 'use client'
 
-import { useState } from 'react'
-import { Button } from '@/components/ui'
+import { useState, useEffect } from 'react'
 import { useToast } from '@/components/ui/Toast'
+import { useConfirm } from '@/components/ui/ConfirmModal'
+import { ADMIN_PAGES, ROLE_INFO, UserRole } from '@/types/permissions'
 
 interface Permission {
-  id: string
-  name: string
-  description: string
-  category: string
+  id?: string
+  role: UserRole
+  page_path: string
+  can_access: boolean
+  can_create: boolean
+  can_read: boolean
+  can_update: boolean
+  can_delete: boolean
 }
 
-interface Role {
-  id: string
-  name: string
-  description: string
-  color: string
-  permissions: string[]
-}
+const MANAGEMENT_ROLES: UserRole[] = ['super_admin', 'admin', 'employee']
 
 export default function PermissionsPage() {
+  const [selectedRole, setSelectedRole] = useState<UserRole>('admin')
+  const [permissions, setPermissions] = useState<Permission[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const { showToast } = useToast()
-  const [loading, setLoading] = useState(false)
+  const { confirm } = useConfirm()
 
-  const permissions: Permission[] = [
-    // 상품 관리
-    { id: 'product_view', name: '상품 조회', description: '상품 목록 및 상세 조회', category: '상품 관리' },
-    { id: 'product_create', name: '상품 등록', description: '신규 상품 등록', category: '상품 관리' },
-    { id: 'product_edit', name: '상품 수정', description: '기존 상품 정보 수정', category: '상품 관리' },
-    { id: 'product_delete', name: '상품 삭제', description: '상품 삭제', category: '상품 관리' },
+  useEffect(() => {
+    fetchPermissions()
+  }, [selectedRole])
 
-    // 주문 관리
-    { id: 'order_view', name: '주문 조회', description: '주문 목록 및 상세 조회', category: '주문 관리' },
-    { id: 'order_create', name: '주문 등록', description: '관리자 주문 등록', category: '주문 관리' },
-    { id: 'order_edit', name: '주문 수정', description: '주문 정보 수정', category: '주문 관리' },
-    { id: 'order_cancel', name: '주문 취소', description: '주문 취소 처리', category: '주문 관리' },
-
-    // 고객 관리
-    { id: 'customer_view', name: '고객 조회', description: '고객 정보 조회', category: '고객 관리' },
-    { id: 'customer_edit', name: '고객 수정', description: '고객 정보 수정', category: '고객 관리' },
-    { id: 'customer_delete', name: '고객 삭제', description: '고객 계정 삭제', category: '고객 관리' },
-
-    // 재무 관리
-    { id: 'finance_view', name: '재무 조회', description: '매출, 비용 조회', category: '재무 관리' },
-    { id: 'finance_edit', name: '재무 수정', description: '재무 정보 수정', category: '재무 관리' },
-
-    // 설정 관리
-    { id: 'settings_view', name: '설정 조회', description: '시스템 설정 조회', category: '설정 관리' },
-    { id: 'settings_edit', name: '설정 수정', description: '시스템 설정 수정', category: '설정 관리' },
-
-    // 사용자 관리
-    { id: 'user_view', name: '사용자 조회', description: '사용자 목록 조회', category: '사용자 관리' },
-    { id: 'user_create', name: '사용자 등록', description: '신규 사용자 등록', category: '사용자 관리' },
-    { id: 'user_edit', name: '사용자 수정', description: '사용자 정보 수정', category: '사용자 관리' },
-    { id: 'user_delete', name: '사용자 삭제', description: '사용자 계정 삭제', category: '사용자 관리' },
-  ]
-
-  const [roles, setRoles] = useState<Role[]>([
-    {
-      id: 'super_admin',
-      name: '최고 관리자',
-      description: '모든 권한을 가진 최고 관리자',
-      color: 'red',
-      permissions: permissions.map(p => p.id)
-    },
-    {
-      id: 'admin',
-      name: '관리자',
-      description: '일반 관리자',
-      color: 'blue',
-      permissions: [
-        'product_view', 'product_create', 'product_edit',
-        'order_view', 'order_create', 'order_edit', 'order_cancel',
-        'customer_view', 'customer_edit',
-        'finance_view',
-        'settings_view'
-      ]
-    },
-    {
-      id: 'employee',
-      name: '직원',
-      description: '일반 직원',
-      color: 'green',
-      permissions: [
-        'product_view',
-        'order_view', 'order_create', 'order_edit',
-        'customer_view'
-      ]
-    },
-    {
-      id: 'viewer',
-      name: '조회자',
-      description: '조회만 가능',
-      color: 'gray',
-      permissions: [
-        'product_view',
-        'order_view',
-        'customer_view'
-      ]
-    }
-  ])
-
-  const [selectedRole, setSelectedRole] = useState<Role | null>(roles[0])
-
-  const togglePermission = (permissionId: string) => {
-    if (!selectedRole) return
-
-    setRoles(prev => prev.map(role => {
-      if (role.id === selectedRole.id) {
-        const newPermissions = role.permissions.includes(permissionId)
-          ? role.permissions.filter(p => p !== permissionId)
-          : [...role.permissions, permissionId]
-
-        const updatedRole = { ...role, permissions: newPermissions }
-        setSelectedRole(updatedRole)
-        return updatedRole
-      }
-      return role
-    }))
-  }
-
-  const handleSave = async () => {
+  const fetchPermissions = async () => {
     setLoading(true)
+    setError(null)
     try {
-      // 실제로는 Supabase에 저장
-      // await supabase.from('roles').upsert(roles)
+      const response = await fetch(`/api/permissions?role=${selectedRole}`)
 
-      showToast('권한 설정이 저장되었습니다.', 'success')
-    } catch (error) {
-      showToast('저장 중 오류가 발생했습니다.', 'error')
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      console.log('Permissions API result:', result) // 디버그 로그
+
+      if (result.success) {
+        // 모든 페이지에 대한 권한 초기화
+        const permissionsMap = new Map(
+          (result.data || []).map((p: Permission) => [p.page_path, p])
+        )
+
+        const allPermissions = ADMIN_PAGES.map(page => {
+          const existing = permissionsMap.get(page.path)
+          return existing || {
+            role: selectedRole,
+            page_path: page.path,
+            can_access: false,
+            can_create: false,
+            can_read: false,
+            can_update: false,
+            can_delete: false,
+          }
+        })
+
+        console.log('All permissions:', allPermissions) // 디버그 로그
+        setPermissions(allPermissions)
+      } else {
+        const errorMsg = result.error || '권한을 불러오는데 실패했습니다.'
+        setError(errorMsg)
+        showToast(errorMsg, 'error')
+
+        // 에러 발생시에도 빈 권한으로 초기화
+        const emptyPermissions = ADMIN_PAGES.map(page => ({
+          role: selectedRole,
+          page_path: page.path,
+          can_access: false,
+          can_create: false,
+          can_read: false,
+          can_update: false,
+          can_delete: false,
+        }))
+        setPermissions(emptyPermissions)
+      }
+    } catch (error: any) {
+      console.error('권한 조회 오류:', error)
+      const errorMsg = error.message || '권한을 불러오는데 실패했습니다.'
+      setError(errorMsg)
+      showToast(errorMsg, 'error')
+
+      // 에러 발생시에도 빈 권한으로 초기화
+      const emptyPermissions = ADMIN_PAGES.map(page => ({
+        role: selectedRole,
+        page_path: page.path,
+        can_access: false,
+        can_create: false,
+        can_read: false,
+        can_update: false,
+        can_delete: false,
+      }))
+      setPermissions(emptyPermissions)
     } finally {
       setLoading(false)
     }
   }
 
-  const groupedPermissions = permissions.reduce((acc, permission) => {
-    if (!acc[permission.category]) {
-      acc[permission.category] = []
-    }
-    acc[permission.category].push(permission)
-    return acc
-  }, {} as Record<string, Permission[]>)
+  const handleTogglePermission = (
+    pageIndex: number,
+    field: keyof Permission
+  ) => {
+    const newPermissions = [...permissions]
+    const current = newPermissions[pageIndex]
 
-  const getRoleColor = (color: string) => {
-    const colors: Record<string, string> = {
-      red: 'bg-red-100 text-red-800 border-red-200',
-      blue: 'bg-blue-100 text-blue-800 border-blue-200',
-      green: 'bg-green-100 text-green-800 border-green-200',
-      gray: 'bg-gray-100 text-gray-800 border-gray-200'
+    if (field === 'can_access') {
+      // 접근 권한 off시 모든 권한 off
+      if (current.can_access) {
+        current.can_access = false
+        current.can_create = false
+        current.can_read = false
+        current.can_update = false
+        current.can_delete = false
+      } else {
+        current.can_access = true
+        current.can_read = true // 접근 권한 on시 기본적으로 조회 권한도 on
+      }
+    } else {
+      // 다른 권한을 켜려면 접근 권한이 먼저 켜져 있어야 함
+      if (!current.can_access) {
+        showToast('먼저 접근 권한을 활성화해주세요.', 'warning')
+        return
+      }
+      // @ts-ignore
+      current[field] = !current[field]
     }
-    return colors[color] || colors.gray
+
+    setPermissions(newPermissions)
+  }
+
+  const handleSelectAll = (field: keyof Permission) => {
+    const newPermissions = permissions.map(p => {
+      if (field === 'can_access') {
+        return {
+          ...p,
+          can_access: true,
+          can_read: true, // 접근 권한 전체 선택시 조회 권한도 함께
+        }
+      } else {
+        // 다른 권한은 접근 권한이 있는 경우만 선택
+        if (p.can_access) {
+          return { ...p, [field]: true }
+        }
+      }
+      return p
+    })
+    setPermissions(newPermissions)
+  }
+
+  const handleDeselectAll = (field: keyof Permission) => {
+    const newPermissions = permissions.map(p => {
+      if (field === 'can_access') {
+        // 접근 권한 전체 해제시 모든 권한 해제
+        return {
+          ...p,
+          can_access: false,
+          can_create: false,
+          can_read: false,
+          can_update: false,
+          can_delete: false,
+        }
+      } else {
+        return { ...p, [field]: false }
+      }
+    })
+    setPermissions(newPermissions)
+  }
+
+  const handleSave = async () => {
+    const confirmed = await confirm({
+      title: '권한 설정 저장',
+      message: `${ROLE_INFO[selectedRole].label} 역할의 권한 설정을 저장하시겠습니까?`,
+      confirmText: '저장',
+      cancelText: '취소',
+    })
+
+    if (!confirmed) return
+
+    setSaving(true)
+    try {
+      const response = await fetch('/api/permissions/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: selectedRole,
+          permissions: permissions.filter(p => p.can_access), // 접근 권한이 있는 것만 저장
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        showToast('권한 설정이 저장되었습니다.', 'success')
+        fetchPermissions()
+      } else {
+        showToast(`저장 실패: ${result.error}`, 'error')
+      }
+    } catch (error) {
+      console.error('권한 저장 오류:', error)
+      showToast('권한 저장에 실패했습니다.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleReset = async () => {
+    const confirmed = await confirm({
+      title: '권한 설정 초기화',
+      message: '현재 변경사항을 취소하고 저장된 설정으로 되돌리시겠습니까?',
+      confirmText: '초기화',
+      cancelText: '취소',
+      type: 'danger',
+    })
+
+    if (!confirmed) return
+
+    fetchPermissions()
   }
 
   return (
-    <div className="space-y-6">
-      {/* 헤더 */}
-      <div>
-        <h1 className="text-2xl font-bold text-text">권한 설정</h1>
-        <p className="mt-1 text-sm text-text-secondary">역할별 접근 권한을 관리합니다.</p>
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">권한 설정</h1>
+        <p className="mt-1 text-sm text-gray-600">
+          역할별로 접근 가능한 페이지와 작업 권한을 설정합니다.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 좌측: 역할 목록 */}
-        <div className="lg:col-span-1">
-          <div className="bg-surface border border-border rounded-lg p-4">
-            <h2 className="text-lg font-semibold text-text mb-4">역할 목록</h2>
-            <div className="space-y-2">
-              {roles.map((role) => (
-                <button
-                  key={role.id}
-                  onClick={() => setSelectedRole(role)}
-                  className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-                    selectedRole?.id === role.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-transparent hover:bg-surface-hover'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-text">{role.name}</span>
-                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${getRoleColor(role.color)}`}>
-                      {role.permissions.length}개 권한
-                    </span>
-                  </div>
-                  <p className="text-xs text-text-tertiary">{role.description}</p>
-                </button>
-              ))}
+      {/* 역할 선택 탭 */}
+      <div className="mb-6 flex gap-2">
+        {MANAGEMENT_ROLES.map(role => (
+          <button
+            key={role}
+            onClick={() => setSelectedRole(role)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              selectedRole === role
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  ROLE_INFO[role].color === 'red'
+                    ? 'bg-red-500'
+                    : ROLE_INFO[role].color === 'blue'
+                    ? 'bg-blue-500'
+                    : 'bg-green-500'
+                }`}
+              />
+              <span>{ROLE_INFO[role].label}</span>
             </div>
+          </button>
+        ))}
+      </div>
 
-            <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-              <div className="flex gap-2">
-                <svg className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-                <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                  최고 관리자 역할은 수정할 수 없습니다.
-                </p>
-              </div>
+      {/* 역할 설명 */}
+      <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <svg
+            className="w-5 h-5 text-blue-600 mt-0.5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <div>
+            <p className="text-sm font-medium text-blue-900">
+              {ROLE_INFO[selectedRole].label}
+            </p>
+            <p className="text-sm text-blue-700 mt-1">
+              {ROLE_INFO[selectedRole].description}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 에러 메시지 */}
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <svg
+              className="w-5 h-5 text-red-600 mt-0.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-red-900">오류 발생</p>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
             </div>
           </div>
         </div>
+      )}
 
-        {/* 우측: 권한 설정 */}
-        <div className="lg:col-span-2">
-          <div className="bg-surface border border-border rounded-lg p-6">
-            {selectedRole ? (
-              <>
-                <div className="mb-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-lg font-semibold text-text">{selectedRole.name}</h2>
-                      <p className="text-sm text-text-secondary mt-1">{selectedRole.description}</p>
-                    </div>
-                    <span className={`px-3 py-1.5 text-sm font-medium rounded-full border ${getRoleColor(selectedRole.color)}`}>
-                      {selectedRole.permissions.length}개 권한 활성화
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  {Object.entries(groupedPermissions).map(([category, perms]) => (
-                    <div key={category}>
-                      <h3 className="text-sm font-semibold text-text mb-3 pb-2 border-b border-border">
-                        {category}
-                      </h3>
-                      <div className="space-y-2">
-                        {perms.map((permission) => {
-                          const isChecked = selectedRole.permissions.includes(permission.id)
-                          const isDisabled = selectedRole.id === 'super_admin'
-
-                          return (
-                            <label
-                              key={permission.id}
-                              className={`flex items-start gap-3 p-3 rounded-lg transition-colors ${
-                                isDisabled
-                                  ? 'opacity-50 cursor-not-allowed'
-                                  : 'hover:bg-surface-hover cursor-pointer'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => !isDisabled && togglePermission(permission.id)}
-                                disabled={isDisabled}
-                                className="mt-1 rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-50"
-                              />
-                              <div className="flex-1">
-                                <div className="font-medium text-text text-sm">{permission.name}</div>
-                                <div className="text-xs text-text-tertiary mt-0.5">
-                                  {permission.description}
-                                </div>
-                              </div>
-                            </label>
-                          )
-                        })}
+      {/* 권한 테이블 */}
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        {loading ? (
+          <div className="p-6 text-center text-gray-500">로딩 중...</div>
+        ) : permissions.length === 0 ? (
+          <div className="p-6 text-center text-gray-500">
+            페이지 목록을 불러올 수 없습니다.
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase w-64">
+                      페이지
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                      <div>접근</div>
+                      <div className="mt-1 flex gap-1 justify-center">
+                        <button
+                          onClick={() => handleSelectAll('can_access')}
+                          className="text-[10px] text-blue-600 hover:text-blue-800"
+                        >
+                          전체
+                        </button>
+                        <span className="text-gray-400">|</span>
+                        <button
+                          onClick={() => handleDeselectAll('can_access')}
+                          className="text-[10px] text-gray-600 hover:text-gray-800"
+                        >
+                          해제
+                        </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-12 text-text-tertiary">
-                역할을 선택하세요
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                      <div>생성</div>
+                      <div className="mt-1 flex gap-1 justify-center">
+                        <button
+                          onClick={() => handleSelectAll('can_create')}
+                          className="text-[10px] text-blue-600 hover:text-blue-800"
+                        >
+                          전체
+                        </button>
+                        <span className="text-gray-400">|</span>
+                        <button
+                          onClick={() => handleDeselectAll('can_create')}
+                          className="text-[10px] text-gray-600 hover:text-gray-800"
+                        >
+                          해제
+                        </button>
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                      <div>조회</div>
+                      <div className="mt-1 flex gap-1 justify-center">
+                        <button
+                          onClick={() => handleSelectAll('can_read')}
+                          className="text-[10px] text-blue-600 hover:text-blue-800"
+                        >
+                          전체
+                        </button>
+                        <span className="text-gray-400">|</span>
+                        <button
+                          onClick={() => handleDeselectAll('can_read')}
+                          className="text-[10px] text-gray-600 hover:text-gray-800"
+                        >
+                          해제
+                        </button>
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                      <div>수정</div>
+                      <div className="mt-1 flex gap-1 justify-center">
+                        <button
+                          onClick={() => handleSelectAll('can_update')}
+                          className="text-[10px] text-blue-600 hover:text-blue-800"
+                        >
+                          전체
+                        </button>
+                        <span className="text-gray-400">|</span>
+                        <button
+                          onClick={() => handleDeselectAll('can_update')}
+                          className="text-[10px] text-gray-600 hover:text-gray-800"
+                        >
+                          해제
+                        </button>
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                      <div>삭제</div>
+                      <div className="mt-1 flex gap-1 justify-center">
+                        <button
+                          onClick={() => handleSelectAll('can_delete')}
+                          className="text-[10px] text-blue-600 hover:text-blue-800"
+                        >
+                          전체
+                        </button>
+                        <span className="text-gray-400">|</span>
+                        <button
+                          onClick={() => handleDeselectAll('can_delete')}
+                          className="text-[10px] text-gray-600 hover:text-gray-800"
+                        >
+                          해제
+                        </button>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {permissions.map((permission, index) => {
+                    const page = ADMIN_PAGES[index]
+                    return (
+                      <tr
+                        key={page.path}
+                        className={`hover:bg-gray-50 ${
+                          !permission.can_access ? 'opacity-50' : ''
+                        }`}
+                      >
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {page.name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {page.description}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            checked={permission.can_access}
+                            onChange={() =>
+                              handleTogglePermission(index, 'can_access')
+                            }
+                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            checked={permission.can_create}
+                            onChange={() =>
+                              handleTogglePermission(index, 'can_create')
+                            }
+                            className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                            disabled={!permission.can_access}
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            checked={permission.can_read}
+                            onChange={() =>
+                              handleTogglePermission(index, 'can_read')
+                            }
+                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                            disabled={!permission.can_access}
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            checked={permission.can_update}
+                            onChange={() =>
+                              handleTogglePermission(index, 'can_update')
+                            }
+                            className="w-4 h-4 text-yellow-600 rounded focus:ring-yellow-500"
+                            disabled={!permission.can_access}
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            checked={permission.can_delete}
+                            onChange={() =>
+                              handleTogglePermission(index, 'can_delete')
+                            }
+                            className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
+                            disabled={!permission.can_access}
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 하단 버튼 */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+              <div className="text-sm text-gray-600">
+                {permissions.filter(p => p.can_access).length}개 페이지 접근
+                가능
               </div>
-            )}
-          </div>
-        </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleReset}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={saving}
+                >
+                  초기화
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                  disabled={saving}
+                >
+                  {saving ? '저장 중...' : '저장'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* 저장 버튼 */}
-      <div className="flex justify-end">
-        <Button
-          onClick={handleSave}
-          disabled={loading}
-          className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50"
-        >
-          {loading ? '저장 중...' : '저장'}
-        </Button>
+      {/* 안내 문구 */}
+      <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <svg
+            className="w-5 h-5 text-yellow-600 mt-0.5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
+          </svg>
+          <div className="text-sm text-yellow-800">
+            <p className="font-medium">권한 설정 시 주의사항</p>
+            <ul className="mt-2 space-y-1 list-disc list-inside">
+              <li>접근 권한이 없으면 해당 페이지에 접근할 수 없습니다.</li>
+              <li>
+                생성/수정/삭제 권한은 접근 권한이 있어야만 설정할 수 있습니다.
+              </li>
+              <li>최고관리자 권한은 변경할 수 없습니다.</li>
+              <li>
+                권한 변경 후 저장하면 즉시 모든 사용자에게 적용됩니다.
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   )

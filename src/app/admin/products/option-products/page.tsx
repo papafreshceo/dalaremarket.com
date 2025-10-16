@@ -1718,42 +1718,6 @@ export default function OptionProductsManagementPage() {
                 : undefined
             }))
           })()}
-          onDataChange={(newData) => {
-            // 벤더사 이름을 ID로 변환
-            const dataWithVendorId = newData.map(item => {
-              // shipping_vendor_id가 이름(문자열)인 경우 ID로 변환
-              if (item.shipping_vendor_id && typeof item.shipping_vendor_id === 'string') {
-                const vendor = vendorPartners.find(p => p.name === item.shipping_vendor_id)
-                if (vendor) {
-                  return { ...item, shipping_vendor_id: vendor.id }
-                }
-              }
-              return item
-            })
-
-            // 가격 계산 함수 사용
-            const dataWithCalculations = dataWithVendorId.map(item => ({
-              ...item,
-              ...calculatePrices(item)
-            }))
-
-            // 새로 추가된 행도 products에 포함시킴
-            setProducts(prevProducts => {
-              const existingIds = new Set(prevProducts.map(p => p.id))
-              const updatedMap = new Map(dataWithCalculations.map(item => [item.id, item]))
-
-              // 기존 행 업데이트
-              const updated = prevProducts.map(item => updatedMap.get(item.id) || item)
-
-              // 새로 추가된 행 추가 (temp_로 시작하는 ID)
-              const newItems = dataWithCalculations.filter(item => !existingIds.has(item.id))
-
-              return [...updated, ...newItems]
-            })
-
-            // filteredProducts도 업데이트
-            setFilteredProducts(dataWithCalculations)
-          }}
           onSave={handleSave}
           globalSearchPlaceholder="옵션코드, 상품명, 품목, 품종 검색"
           height="900px"

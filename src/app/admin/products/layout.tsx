@@ -51,6 +51,16 @@ export default function ProductsLayout({ children }: { children: ReactNode }) {
           title: '수수료 설정',
           description: '네이버/쿠팡 수수료',
           href: '/admin/products/commission'
+        },
+        {
+          title: '이미지 관리',
+          description: 'Cloudinary 이미지 관리',
+          href: '/admin/media'
+        },
+        {
+          title: '다운로드 분석',
+          description: '이미지 다운로드 통계',
+          href: '/admin/media/analytics'
         }
       ]
     }

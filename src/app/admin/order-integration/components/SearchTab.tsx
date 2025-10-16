@@ -403,6 +403,7 @@ export default function SearchTab() {
           templateMap.set(template.market_name.toLowerCase(), template);
         });
         console.log('✅ 마켓 템플릿 로드 완료:', templateMap.size, '개');
+        console.log('📋 저장된 마켓 목록:', Array.from(templateMap.keys()));
         console.log('템플릿 샘플:', Array.from(templateMap.entries()).slice(0, 3));
         setMarketTemplates(templateMap);
         return templateMap;
@@ -496,6 +497,12 @@ export default function SearchTab() {
             'shipped_date',             // field_42 - 발송일(송장입력일) (이전 field_41)
             'courier_company',          // field_43 - 택배사 (이전 field_42)
             'tracking_number',          // field_44 - 송장번호 (이전 field_43)
+            'field_45',                 // field_45 - 추가필드1 (예: 묶음배송번호)
+            'field_46',                 // field_46 - 추가필드2
+            'field_47',                 // field_47 - 추가필드3
+            'field_48',                 // field_48 - 추가필드4
+            'field_49',                 // field_49 - 추가필드5
+            'field_50',                 // field_50 - 추가필드6
           ];
 
           const dynamicColumns = [];
@@ -545,8 +552,8 @@ export default function SearchTab() {
             }
           });
 
-          // field_1 ~ field_44 표준 필드 순회
-          for (let i = 1; i <= 44; i++) {
+          // field_1 ~ field_50 표준 필드 순회 (확장)
+          for (let i = 1; i <= 50; i++) {
             // field_4(주문번호) 차례가 되면 먼저 택배사(43), 송장번호(44) 삽입
             if (i === 4) {
               // 택배사(field_43)
@@ -1497,10 +1504,14 @@ export default function SearchTab() {
 
   // 마켓별 송장파일 다운로드
   const handleMarketInvoiceDownload = async (marketName: string) => {
+    console.log('📦 [송장다운로드] 시작:', marketName);
+
     // 현재 필터된 주문 중에서 발송완료 상태이면서 해당 마켓인 주문만 필터링
     const marketOrders = filteredOrders.filter(
       (o) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === marketName
     );
+
+    console.log('📦 [송장다운로드] 주문 수:', marketOrders.length);
 
     if (marketOrders.length === 0) {
       alert('다운로드할 주문이 없습니다.');
@@ -1509,14 +1520,20 @@ export default function SearchTab() {
 
     try {
       // 마켓 송장 템플릿 가져오기
-      const response = await fetch(`/api/market-invoice-templates/${encodeURIComponent(marketName)}`);
+      const apiUrl = `/api/market-invoice-templates/${encodeURIComponent(marketName)}`;
+      console.log('📦 [송장다운로드] API 호출:', apiUrl);
+
+      const response = await fetch(apiUrl);
       const result = await response.json();
+
+      console.log('📦 [송장다운로드] API 응답:', result);
 
       let exportData;
 
       if (result.success && result.data && result.data.columns.length > 0) {
         // 템플릿이 있는 경우: 템플릿에 맞게 데이터 변환
         const template = result.data;
+        console.log('✅ [송장다운로드] 템플릿 발견:', template.template_name, '컬럼 수:', template.columns.length);
 
         // order 필드로 컬럼 정렬
         const sortedColumns = [...template.columns].sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -1540,8 +1557,11 @@ export default function SearchTab() {
           });
           return row;
         });
+
+        console.log('✅ [송장다운로드] 템플릿 적용 완료, 헤더:', Object.keys(exportData[0] || {}));
       } else {
         // 템플릿이 없는 경우: 기본 양식 사용
+        console.log('⚠️ [송장다운로드] 템플릿 없음 - 기본 양식 사용');
         exportData = marketOrders.map((order) => ({
           주문번호: order.order_number,
           수취인: order.recipient_name,
@@ -1554,7 +1574,14 @@ export default function SearchTab() {
 
       // ExcelJS를 사용하여 스타일이 적용된 엑셀 생성
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet(marketName);
+
+      // 템플릿에 시트명이 설정되어 있으면 사용, 없으면 마켓명 사용
+      const sheetName = (result.success && result.data?.sheet_name)
+        ? result.data.sheet_name
+        : marketName;
+
+      const worksheet = workbook.addWorksheet(sheetName);
+      console.log('📄 [송장다운로드] 시트명:', sheetName);
 
       if (exportData.length > 0) {
         // 헤더 추가 (템플릿이 있으면 width와 headerColor 사용)
@@ -1671,6 +1698,11 @@ export default function SearchTab() {
   // 전체 마켓 일괄 다운로드
   const handleAllMarketInvoiceDownload = async () => {
     const activeMarkets = uniqueMarkets.filter((market) => {
+      // CS발송, 전화주문 제외
+      if (market === 'CS발송' || market === '전화주문') {
+        return false;
+      }
+
       const marketOrders = filteredOrders.filter(
         (o) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === market
       );
@@ -4536,41 +4568,43 @@ export default function SearchTab() {
           </div>
 
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {uniqueMarkets.map((market) => {
-              const marketOrders = filteredOrders.filter(
-                (o) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === market
-              );
-              const orderCount = marketOrders.length;
-              const isActive = orderCount > 0;
+            {uniqueMarkets
+              .filter(market => market !== 'CS발송' && market !== '전화주문') // CS발송, 전화주문 제외
+              .map((market) => {
+                const marketOrders = filteredOrders.filter(
+                  (o) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === market
+                );
+                const orderCount = marketOrders.length;
+                const isActive = orderCount > 0;
 
-              return (
-                <div
-                  key={market}
-                  className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-gray-50 hover:bg-gray-100'
-                      : 'bg-gray-100 opacity-50 cursor-not-allowed'
-                  }`}
-                >
-                  <div className="flex-1">
-                    <span className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-500'}`}>
-                      {market}
-                    </span>
-                    <span className="ml-2 text-sm text-gray-500">
-                      ({orderCount}건)
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleMarketInvoiceDownload(market)}
-                    disabled={!isActive}
-                    className="px-3 py-1.5 bg-gray-600 text-white rounded text-sm font-medium hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
+                return (
+                  <div
+                    key={market}
+                    className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-gray-50 hover:bg-gray-100'
+                        : 'bg-gray-100 opacity-50 cursor-not-allowed'
+                    }`}
                   >
-                    <Download className="w-4 h-4" />
-                    다운로드
-                  </button>
-                </div>
-              );
-            })}
+                    <div className="flex-1">
+                      <span className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+                        {market}
+                      </span>
+                      <span className="ml-2 text-sm text-gray-500">
+                        ({orderCount}건)
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => handleMarketInvoiceDownload(market)}
+                      disabled={!isActive}
+                      className="px-3 py-1.5 bg-gray-600 text-white rounded text-sm font-medium hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                      <Download className="w-4 h-4" />
+                      다운로드
+                    </button>
+                  </div>
+                );
+              })}
           </div>
         </div>
       </Modal>

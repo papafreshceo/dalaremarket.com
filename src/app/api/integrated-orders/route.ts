@@ -1,14 +1,20 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { enrichOrderWithOptionInfo } from '@/lib/order-utils';
+import { requireAuth, requireAdmin, auditLog } from '@/lib/api-security';
 
 /**
  * GET /api/integrated-orders
  * 주문 조회 (검색, 필터링, 페이지네이션)
  * Updated: seller_name fallback to name/email when company_name is null
+ * Security: 인증 필요
  */
 export async function GET(request: NextRequest) {
   try {
+    // 🔒 보안: 로그인한 사용자만 주문 조회 가능
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.error;
+
     const supabase = await createClient();
     const searchParams = request.nextUrl.searchParams;
 
@@ -155,9 +161,14 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/integrated-orders
  * 단건 주문 생성
+ * Security: 직원 이상 권한 필요
  */
 export async function POST(request: NextRequest) {
   try {
+    // 🔒 보안: 직원 이상만 주문 생성 가능
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.error;
+
     const supabase = await createClient();
     const body = await request.json();
 
@@ -207,9 +218,14 @@ export async function POST(request: NextRequest) {
 /**
  * PUT /api/integrated-orders
  * 주문 수정
+ * Security: 인증 필요
  */
 export async function PUT(request: NextRequest) {
   try {
+    // 🔒 보안: 로그인한 사용자만 주문 수정 가능
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.error;
+
     const supabase = await createClient();
     const body = await request.json();
 
@@ -250,9 +266,14 @@ export async function PUT(request: NextRequest) {
 /**
  * DELETE /api/integrated-orders
  * 주문 삭제
+ * Security: 관리자 이상 권한 필요
  */
 export async function DELETE(request: NextRequest) {
   try {
+    // 🔒 보안: 관리자 이상만 주문 삭제 가능
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.error;
+
     const supabase = await createClient();
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
@@ -263,6 +284,13 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // 삭제할 주문 정보 조회 (감사 로그용)
+    const { data: order } = await supabase
+      .from('integrated_orders')
+      .select('order_number, market_name')
+      .eq('id', id)
+      .single();
 
     const { error } = await supabase
       .from('integrated_orders')
@@ -275,6 +303,15 @@ export async function DELETE(request: NextRequest) {
         { success: false, error: error.message },
         { status: 500 }
       );
+    }
+
+    // 🔒 감사 로그: 주문 삭제 기록
+    if (order) {
+      auditLog('주문 삭제', auth.userData, {
+        order_id: id,
+        order_number: order.order_number,
+        market_name: order.market_name
+      });
     }
 
     return NextResponse.json({ success: true });

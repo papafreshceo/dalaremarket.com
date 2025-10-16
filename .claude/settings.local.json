@@ -14,7 +14,10 @@
       "Bash(psql:*)",
       "Bash(npm install:*)",
       "Bash(git diff:*)",
-      "Bash(npx supabase db:*)"
+      "Bash(npx supabase db:*)",
+      "Bash(npx tsc:*)",
+      "Bash(if exist \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\fix-empty-templates.js\" del /f \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\fix-empty-templates.js\")",
+      "Bash(del /f fix-empty-templates.js)"
     ],
     "deny": [],
     "ask": []

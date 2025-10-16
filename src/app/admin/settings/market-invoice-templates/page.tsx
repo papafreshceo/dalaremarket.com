@@ -19,6 +19,7 @@ interface MarketInvoiceTemplate {
   id: number;
   market_name: string;
   template_name: string;
+  sheet_name?: string;  // 엑셀 시트명
   columns: ColumnMapping[];
   is_active: boolean;
   created_at: string;
@@ -317,22 +318,42 @@ export default function MarketInvoiceTemplatesPage() {
             {selectedTemplate ? (
               <>
                 <div className="flex items-center justify-between mb-6">
-                  <div>
+                  <div className="flex-1">
                     <h2 className="text-xl font-semibold text-gray-900">
                       {selectedTemplate.market_name}
                     </h2>
-                    <input
-                      type="text"
-                      value={selectedTemplate.template_name}
-                      onChange={(e) =>
-                        setSelectedTemplate({
-                          ...selectedTemplate,
-                          template_name: e.target.value,
-                        })
-                      }
-                      className="mt-2 px-3 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
-                      placeholder="템플릿 이름"
-                    />
+                    <div className="mt-2 flex gap-3">
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-600 mb-1">템플릿 이름</label>
+                        <input
+                          type="text"
+                          value={selectedTemplate.template_name}
+                          onChange={(e) =>
+                            setSelectedTemplate({
+                              ...selectedTemplate,
+                              template_name: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                          placeholder="예: 쿠팡 송장양식"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-600 mb-1">엑셀 시트명</label>
+                        <input
+                          type="text"
+                          value={selectedTemplate.sheet_name || selectedTemplate.market_name}
+                          onChange={(e) =>
+                            setSelectedTemplate({
+                              ...selectedTemplate,
+                              sheet_name: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                          placeholder="예: 쿠팡송장"
+                        />
+                      </div>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     {selectedTemplate.market_name !== '기본템플릿' && (

@@ -99,13 +99,14 @@ export async function PUT(request: NextRequest) {
     const supabase = await createClient();
     const body = await request.json();
 
-    const { id, market_name, template_name, columns, is_active } = body;
+    const { id, market_name, template_name, sheet_name, columns, is_active } = body;
 
     const { data, error } = await supabase
       .from('market_invoice_templates')
       .update({
         market_name,
         template_name,
+        sheet_name,
         columns,
         is_active,
       })

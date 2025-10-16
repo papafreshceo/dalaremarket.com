@@ -57,6 +57,12 @@ interface UploadedOrder {
   field_42?: string; // 발송일(송장입력일)
   field_43?: string; // 택배사
   field_44?: string; // 송장번호
+  field_45?: string; // 추가필드1 (예: 묶음배송번호)
+  field_46?: string; // 추가필드2
+  field_47?: string; // 추가필드3
+  field_48?: string; // 추가필드4
+  field_49?: string; // 추가필드5
+  field_50?: string; // 추가필드6
   [key: string]: any; // 동적 필드 지원
 }
 
@@ -199,9 +205,9 @@ export default function ExcelTab() {
         console.log('표준필드 행:', standardRow);
 
         if (standardRow) {
-          // field_1 ~ field_43까지 있는 필드들을 컬럼으로 변환
+          // field_1 ~ field_50까지 있는 필드들을 컬럼으로 변환
           const dynamicColumns = [];
-          for (let i = 1; i <= 43; i++) {
+          for (let i = 1; i <= 50; i++) {
             const fieldKey = `field_${i}`;
             const fieldValue = standardRow[fieldKey];
 
@@ -385,8 +391,8 @@ export default function ExcelTab() {
     console.log('  - shipping_vendor_id:', product.shipping_vendor_id);
     console.log('  - shipping_vendor name:', product.shipping_vendor?.name);
 
-    // 표준필드(field_1~43)를 순회하면서 매칭
-    for (let i = 1; i <= 43; i++) {
+    // 표준필드(field_1~50)를 순회하면서 매칭
+    for (let i = 1; i <= 50; i++) {
       const fieldKey = `field_${i}`;
       const standardFieldName = standardFields[fieldKey]; // 예: "셀러공급가"
 
@@ -572,7 +578,7 @@ export default function ExcelTab() {
 
     // 표준필드명 -> field 번호 매핑 (예: "정산예정금액" -> field_26)
     let targetFieldNumber: number | null = null;
-    for (let i = 1; i <= 43; i++) {
+    for (let i = 1; i <= 50; i++) {
       const fieldKey = `field_${i}`;
       if (standardFields[fieldKey] === fieldName) {
         targetFieldNumber = i;
@@ -657,7 +663,7 @@ export default function ExcelTab() {
     // 날짜 필드 목록 (field_3: 결제일, field_16: 발송요청일, field_42: 발송일)
     const dateFields = [3, 16, 42];
 
-    for (let i = 1; i <= 43; i++) {
+    for (let i = 1; i <= 50; i++) {
       const fieldKey = `field_${i}`;
       const marketFieldName = marketFieldMappings[fieldKey]; // 예: "결제일"
 
@@ -1148,6 +1154,12 @@ export default function ExcelTab() {
           shipped_date: cleanOrder.field_42,
           courier_company: cleanOrder.field_43,
           tracking_number: cleanOrder.field_44,
+          field_45: cleanOrder.field_45,
+          field_46: cleanOrder.field_46,
+          field_47: cleanOrder.field_47,
+          field_48: cleanOrder.field_48,
+          field_49: cleanOrder.field_49,
+          field_50: cleanOrder.field_50,
           sheet_date: getCurrentTimeUTC().split('T')[0],
         };
       });

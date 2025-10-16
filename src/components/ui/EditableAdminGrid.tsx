@@ -108,7 +108,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   const [isKeyboardEdit, setIsKeyboardEdit] = useState(false) // 키보드 입력으로 시작했는지 추적
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({ key: '', direction: null })
   const [globalSearchTerm, setGlobalSearchTerm] = useState<string>('')
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set()) // ID 기반 선택 (인덱스 대신)
   const [history, setHistory] = useState<T[][]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [modifiedCells, setModifiedCells] = useState<Set<string>>(new Set())
@@ -127,6 +127,11 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
   // data prop 변경 추적을 위한 ref
   const prevDataRef = useRef<T[]>([])
+
+  // ID 기반 선택을 위한 헬퍼 함수
+  const getRowId = useCallback((row: T): string => {
+    return String(row.id ?? `temp_${Date.now()}_${Math.random()}`)
+  }, [])
 
   // 컬럼 너비 초기화 (컨텐츠 기반 자동 계산)
   useEffect(() => {
@@ -181,11 +186,11 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
         // 데이터 길이가 증가한 경우만 선택 초기화 (새 데이터 로드 또는 추가)
         // 길이가 같거나 감소한 경우는 선택 유지 (fetchOrders 후 선택 유지)
         if (newLength > prevLength) {
-          setSelectedRows(new Set())
+          setSelectedRowIds(new Set())
         }
       }
     }
-  }, [data, selectedRows.size])
+  }, [data, selectedRowIds.size])
 
   // 수정 상태 변경 시 콜백 호출
   useEffect(() => {
@@ -1263,7 +1268,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
   const getCellClassName = useCallback((rowIndex: number, columnKey: string, column: Column<T>, row: T, isSticky: boolean = false) => {
     const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === columnKey
-    const isRowSelected = selectedRows.has(rowIndex)
+    const rowId = getRowId(row)
+    const isRowSelected = selectedRowIds.has(rowId)
     const cellKey = `${rowIndex}-${columnKey}`
     const isModified = modifiedCells.has(cellKey)
     const isAdded = addedRows.has(rowIndex)
@@ -1353,7 +1359,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     }
 
     return classes.trim()
-  }, [selectedCell, modifiedCells, addedRows, copiedRows, hoverCell, fillStartCell, fillPreviewData, selectedRows])
+  }, [selectedCell, modifiedCells, addedRows, copiedRows, hoverCell, fillStartCell, fillPreviewData, selectedRowIds, getRowId])
 
   const renderCell = (row: T, column: Column<T>, rowIndex: number) => {
     const isEditing = editingCell?.row === rowIndex && editingCell?.col === column.key
@@ -1510,27 +1516,34 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   const modifiedCount = modifiedCells.size
 
   const handleToggleAll = () => {
-    let newSelected: Set<number>
-    if (selectedRows.size === filteredData.length) {
+    let newSelected: Set<string>
+    if (selectedRowIds.size === filteredData.length) {
       newSelected = new Set()
     } else {
-      newSelected = new Set(filteredData.map((_, idx) => idx))
+      newSelected = new Set(filteredData.map(row => getRowId(row)))
     }
-    setSelectedRows(newSelected)
-    // 부모에게 선택 변경 알림
-    onSelectionChange?.(Array.from(newSelected))
+    setSelectedRowIds(newSelected)
+    // 부모에게 선택 변경 알림 (인덱스로 변환)
+    const indices = filteredData
+      .map((row, idx) => (newSelected.has(getRowId(row)) ? idx : -1))
+      .filter(idx => idx !== -1)
+    onSelectionChange?.(indices)
   }
 
-  const handleToggleRow = (rowIndex: number) => {
-    const newSelected = new Set(selectedRows)
-    if (newSelected.has(rowIndex)) {
-      newSelected.delete(rowIndex)
+  const handleToggleRow = (row: T) => {
+    const rowId = getRowId(row)
+    const newSelected = new Set(selectedRowIds)
+    if (newSelected.has(rowId)) {
+      newSelected.delete(rowId)
     } else {
-      newSelected.add(rowIndex)
+      newSelected.add(rowId)
     }
-    setSelectedRows(newSelected)
-    // 부모에게 선택 변경 알림
-    onSelectionChange?.(Array.from(newSelected))
+    setSelectedRowIds(newSelected)
+    // 부모에게 선택 변경 알림 (인덱스로 변환)
+    const indices = filteredData
+      .map((r, idx) => (newSelected.has(getRowId(r)) ? idx : -1))
+      .filter(idx => idx !== -1)
+    onSelectionChange?.(indices)
   }
 
   const handleSaveClick = () => {
@@ -1558,22 +1571,22 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   }
 
   const handleDeleteSelectedClick = () => {
+    // 선택된 ID를 인덱스로 변환
+    const selectedIndices = gridData
+      .map((row, idx) => (selectedRowIds.has(getRowId(row)) ? idx : -1))
+      .filter(idx => idx !== -1)
+
     if (onDeleteSelected) {
       // 커스텀 삭제 핸들러가 있으면 사용
-      onDeleteSelected(Array.from(selectedRows))
+      onDeleteSelected(selectedIndices)
     } else {
       // 기본 삭제 동작: 선택된 행을 데이터에서 제거
-      const selectedIndices = Array.from(selectedRows).sort((a, b) => b - a) // 역순 정렬
-      const newData = [...gridData]
-
-      selectedIndices.forEach(index => {
-        newData.splice(index, 1)
-      })
+      const newData = gridData.filter((row) => !selectedRowIds.has(getRowId(row)))
 
       setGridData(newData)
       addToHistory(newData)
       onDataChange?.(newData)
-      setSelectedRows(new Set())
+      setSelectedRowIds(new Set())
 
       // 삭제된 행 인덱스를 추적 상태에서도 제거
       setModifiedCells(new Set())
@@ -1584,11 +1597,10 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
   const handleCopyClick = () => {
     // 선택된 행들을 복사해서 바로 아래에 추가
-    const selectedIndices = Array.from(selectedRows).sort((a, b) => a - b)
+    const selectedRows = gridData.filter(row => selectedRowIds.has(getRowId(row)))
     const copiedRowsList: T[] = []
 
-    selectedIndices.forEach(index => {
-      const originalRow = gridData[index]
+    selectedRows.forEach(originalRow => {
       const copiedRow = { ...originalRow, id: `temp_${Date.now()}_${Math.random()}` }
       copiedRowsList.push(copiedRow as T)
     })
@@ -1606,11 +1618,14 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     setGridData(newData)
     addToHistory(newData)
     onDataChange?.(newData)
-    setSelectedRows(new Set())
+    setSelectedRowIds(new Set())
 
-    // 콜백이 있으면 호출 (추가 로직용)
+    // 콜백이 있으면 호출 (추가 로직용) - 인덱스로 변환
     if (onCopy) {
-      onCopy(Array.from(selectedRows))
+      const indices = gridData
+        .map((row, idx) => (selectedRowIds.has(getRowId(row)) ? idx : -1))
+        .filter(idx => idx !== -1)
+      onCopy(indices)
     }
   }
 
@@ -1699,15 +1714,15 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
               저장
             </button>
           )}
-          {selectedRows.size > 0 && enableDelete && (
+          {selectedRowIds.size > 0 && enableDelete && (
             <button
               onClick={handleDeleteSelectedClick}
               className="px-2 py-1 bg-danger text-white rounded text-xs hover:bg-danger-hover"
             >
-              삭제 ({selectedRows.size})
+              삭제 ({selectedRowIds.size})
             </button>
           )}
-          {selectedRows.size > 0 && enableCopy && (
+          {selectedRowIds.size > 0 && enableCopy && (
             <button
               onClick={handleCopyClick}
               className="px-2 py-1 bg-primary text-white rounded text-xs hover:bg-primary-hover"
@@ -1732,7 +1747,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                 <th key="checkbox-header" className="border border-gray-200 bg-gray-50 px-2 py-1 text-center align-middle sticky top-0" style={{ width: 40, fontSize: '13px', zIndex: 31 }}>
                   <input
                     type="checkbox"
-                    checked={selectedRows.size === filteredData.length && filteredData.length > 0}
+                    checked={selectedRowIds.size === filteredData.length && filteredData.length > 0}
                     onChange={handleToggleAll}
                     className="cursor-pointer align-middle"
                   />
@@ -1822,8 +1837,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   <td key="checkbox" className="border border-gray-200 px-2 py-1 text-center align-middle">
                     <input
                       type="checkbox"
-                      checked={selectedRows.has(rowIndex)}
-                      onChange={() => handleToggleRow(rowIndex)}
+                      checked={selectedRowIds.has(getRowId(row))}
+                      onChange={() => handleToggleRow(row)}
                       className="cursor-pointer align-middle"
                     />
                   </td>
