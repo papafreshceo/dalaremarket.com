@@ -24,7 +24,7 @@ export default function UsersPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const supabase = createClient()
   const { showToast } = useToast()
-  const { showConfirm } = useConfirm()
+  const { confirm } = useConfirm()
 
   useEffect(() => {
     fetchCurrentUser()
@@ -71,21 +71,29 @@ export default function UsersPage() {
   }
 
   const handleApprove = async (userId: string, userName: string) => {
-    const confirmed = await showConfirm(
-      `${userName} 사용자를 승인하시겠습니까?`,
-      '승인 후 해당 사용자는 시스템에 로그인할 수 있습니다.'
-    )
+    const confirmed = await confirm({
+      title: '사용자 승인',
+      message: `${userName} 사용자를 승인하시겠습니까?\n승인 후 해당 사용자는 시스템에 로그인할 수 있습니다.`,
+      confirmText: '승인',
+      cancelText: '취소',
+      type: 'info'
+    })
 
     if (!confirmed) return
 
-    const { error } = await supabase
+    console.log('Approving user:', userId, userName)
+
+    const { data, error } = await supabase
       .from('users')
       .update({ approved: true })
       .eq('id', userId)
+      .select()
+
+    console.log('Update result:', { data, error })
 
     if (error) {
-      showToast('승인 처리에 실패했습니다.', 'error')
-      console.error(error)
+      showToast(`승인 처리에 실패했습니다: ${error.message}`, 'error')
+      console.error('Approval error details:', error)
     } else {
       showToast('사용자가 승인되었습니다.', 'success')
       fetchUsers()
@@ -93,10 +101,13 @@ export default function UsersPage() {
   }
 
   const handleReject = async (userId: string, userName: string) => {
-    const confirmed = await showConfirm(
-      `${userName} 사용자의 승인을 거부하시겠습니까?`,
-      '승인 거부 시 해당 사용자의 계정이 삭제됩니다.'
-    )
+    const confirmed = await confirm({
+      title: '사용자 승인 거부',
+      message: `${userName} 사용자의 승인을 거부하시겠습니까?\n승인 거부 시 해당 사용자의 계정이 삭제됩니다.`,
+      confirmText: '거부',
+      cancelText: '취소',
+      type: 'danger'
+    })
 
     if (!confirmed) return
 

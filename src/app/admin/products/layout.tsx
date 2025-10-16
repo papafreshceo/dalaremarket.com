@@ -26,6 +26,11 @@ export default function ProductsLayout({ children }: { children: ReactNode }) {
           title: '원물매칭',
           description: '옵션상품-원물 연결',
           href: '/admin/products/material-matching'
+        },
+        {
+          title: '시세 분석',
+          description: '원물 시세 추이',
+          href: '/admin/products/price-analysis'
         }
       ]
     },
@@ -46,41 +51,6 @@ export default function ProductsLayout({ children }: { children: ReactNode }) {
           title: '수수료 설정',
           description: '네이버/쿠팡 수수료',
           href: '/admin/products/commission'
-        }
-      ]
-    },
-    {
-      category: '가격 및 재고',
-      items: [
-        {
-          title: '가격표 관리',
-          description: '고객별 가격표',
-          href: '/admin/products/price-table'
-        },
-        {
-          title: '재고 현황',
-          description: '실시간 재고',
-          href: '/admin/products/inventory'
-        },
-        {
-          title: '시세 분석',
-          description: '원물 시세 추이',
-          href: '/admin/products/price-analysis'
-        }
-      ]
-    },
-    {
-      category: '도구',
-      items: [
-        {
-          title: '일괄 업로드',
-          description: '엑셀 일괄 등록',
-          href: '/admin/products/bulk-upload'
-        },
-        {
-          title: '바코드 관리',
-          description: '바코드 생성/출력',
-          href: '/admin/products/barcode'
         }
       ]
     }

@@ -131,6 +131,11 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           title: 'API 설정',
           description: 'API 키 및 웹훅',
           href: '/admin/settings/api'
+        },
+        {
+          title: 'DB 문제 해결',
+          description: '데이터베이스 진단 도구',
+          href: '/admin/settings/database-fix'
         }
       ]
     }
