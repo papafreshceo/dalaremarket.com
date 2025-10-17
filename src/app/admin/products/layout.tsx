@@ -23,6 +23,11 @@ export default function ProductsLayout({ children }: { children: ReactNode }) {
           href: '/admin/products/option-products'
         },
         {
+          title: '옵션상품등록',
+          description: '원물 기반 옵션상품 등록',
+          href: '/admin/products/option-products/register'
+        },
+        {
           title: '원물매칭',
           description: '옵션상품-원물 연결',
           href: '/admin/products/material-matching'

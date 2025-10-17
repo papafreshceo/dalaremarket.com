@@ -1160,7 +1160,12 @@ export default function ExcelTab() {
           field_48: cleanOrder.field_48,
           field_49: cleanOrder.field_49,
           field_50: cleanOrder.field_50,
-          sheet_date: getCurrentTimeUTC().split('T')[0],
+          sheet_date: (() => {
+            // 한국 시간 기준 날짜 (YYYY-MM-DD)
+            const now = new Date();
+            const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+            return koreaTime.toISOString().split('T')[0];
+          })(),
         };
       });
 

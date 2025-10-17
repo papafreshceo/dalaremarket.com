@@ -899,17 +899,66 @@ export default function SearchTab() {
   }, []);
 
   // 빠른 날짜 필터 (한국 시간 기준)
-  const setQuickDateFilter = (days: number) => {
+  const setQuickDateFilter = async (days: number) => {
     const now = new Date();
     const koreaEndDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
     const koreaStartDate = new Date(koreaEndDate);
     koreaStartDate.setDate(koreaStartDate.getDate() - days);
 
-    setFilters({
+    const newFilters = {
       ...filters,
       startDate: koreaStartDate.toISOString().split('T')[0],
       endDate: koreaEndDate.toISOString().split('T')[0],
-    });
+    };
+
+    setFilters(newFilters);
+
+    // 필터 변경 후 즉시 조회
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('startDate', newFilters.startDate);
+      params.append('endDate', newFilters.endDate);
+      params.append('dateType', newFilters.dateType);
+      if (newFilters.marketName) params.append('marketName', newFilters.marketName);
+      if (newFilters.searchKeyword) params.append('searchKeyword', newFilters.searchKeyword);
+      if (newFilters.shippingStatus) params.append('shippingStatus', newFilters.shippingStatus);
+      if (newFilters.vendorName) params.append('vendorName', newFilters.vendorName);
+      params.append('limit', '1000');
+
+      const response = await fetch(`/api/integrated-orders?${params}`);
+      const result = await response.json();
+
+      if (result.success) {
+        setOrders(result.data || []);
+
+        // 통계 계산
+        const statusCounts = (result.data || []).reduce((acc: any, order: Order) => {
+          const status = order.shipping_status || '결제완료';
+          acc[status] = (acc[status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+
+        setStats({
+          total: result.data?.length || 0,
+          접수: statusCounts['접수'] || 0,
+          결제완료: statusCounts['결제완료'] || 0,
+          상품준비중: statusCounts['상품준비중'] || 0,
+          발송완료: statusCounts['발송완료'] || 0,
+          취소요청: statusCounts['취소요청'] || 0,
+          취소완료: statusCounts['취소완료'] || 0,
+          환불완료: statusCounts['환불완료'] || 0,
+        });
+
+        calculateVendorStats(result.data || []);
+        calculateSellerStats(result.data || []);
+        calculateOptionStats(result.data || []);
+      }
+    } catch (error) {
+      console.error('주문 조회 오류:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 선택된 빠른 날짜 필터 확인 (한국 시간 기준)
@@ -2552,16 +2601,14 @@ export default function SearchTab() {
       }
 
       try {
-        // 한국 시간 생성
-        const now = new Date();
-        const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-        const koreaTimeISO = koreaTime.toISOString();
+        // UTC 시간으로 타임스탬프 저장 (DB는 TIMESTAMPTZ)
+        const now = new Date().toISOString();
 
         // 상태를 결제완료로 변경하고 payment_confirmed_at 타임스탬프 저장
         const updatedOrders = sellerOrders.map(order => ({
           ...order,
           shipping_status: '결제완료',
-          payment_confirmed_at: koreaTimeISO
+          payment_confirmed_at: now
         }));
 
         const response = await fetch('/api/integrated-orders/bulk', {
@@ -3195,6 +3242,15 @@ export default function SearchTab() {
             style={{ width: '60px', height: '30px' }}
           >
             90일
+          </button>
+
+          {/* 조회 버튼 */}
+          <button
+            onClick={fetchOrders}
+            className="px-3 text-xs font-semibold bg-blue-600 text-white rounded hover:bg-blue-700"
+            style={{ height: '30px' }}
+          >
+            조회
           </button>
 
           {/* 마켓명 */}

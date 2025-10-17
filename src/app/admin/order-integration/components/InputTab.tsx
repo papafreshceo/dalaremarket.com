@@ -150,21 +150,38 @@ export default function InputTab() {
     });
   }, []);
 
-  // DB에서 저장된 주문 불러오기 ('전화주문'이면서 '발송완료'가 아닌 주문)
+  // DB에서 저장된 주문 불러오기 ('전화주문'이면서 '접수' 상태인 주문)
   const loadSavedOrders = async () => {
     try {
-      const response = await fetch('/api/integrated-orders?market_name=전화주문');
+      console.log('🔄 주문 로드 시작...');
+
+      // 최근 30일 날짜 계산 (한국 시간 기준)
+      const now = new Date();
+      const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+      const endDate = koreaTime.toISOString().split('T')[0];
+      const startTime = new Date(koreaTime.getTime() - (30 * 24 * 60 * 60 * 1000));
+      const startDate = startTime.toISOString().split('T')[0];
+
+      // shipping_status 필터와 날짜 범위 추가하여 접수 상태만 조회
+      const response = await fetch(
+        `/api/integrated-orders?market_name=전화주문&shippingStatus=접수&startDate=${startDate}&endDate=${endDate}&dateType=sheet&limit=10000`
+      );
       if (!response.ok) {
-        console.error('주문 로드 실패:', response.status);
+        console.error('❌ 주문 로드 실패:', response.status);
         return;
       }
 
       const result = await response.json();
+      console.log('📦 API 응답:', result);
+
       if (result.success) {
-        // '접수' 상태 주문만 필터링
-        const filteredOrders = result.data.filter(
-          (order: any) => order.shipping_status === '접수'
-        );
+        console.log('✅ 접수 주문 수:', result.data.length);
+        console.log('📋 주문 상태:', result.data.map((o: any) => ({ id: o.id, status: o.shipping_status })));
+
+        const filteredOrders = result.data;
+
+        console.log('🔍 필터링된 접수 주문 수:', filteredOrders.length);
+        console.log('📝 필터링된 주문:', filteredOrders);
 
         // DB 데이터를 SavedOrder 형식으로 변환
         const ordersMap = new Map<string, SavedOrder>();
@@ -215,10 +232,13 @@ export default function InputTab() {
           }
         });
 
-        setSavedOrders(Array.from(ordersMap.values()));
+        const finalOrders = Array.from(ordersMap.values());
+        console.log('🎯 최종 SavedOrder 개수:', finalOrders.length);
+        console.log('🎯 최종 SavedOrder 데이터:', finalOrders);
+        setSavedOrders(finalOrders);
       }
     } catch (error) {
-      console.error('주문 로드 실패:', error);
+      console.error('❌ 주문 로드 실패:', error);
     }
   };
 
@@ -634,8 +654,14 @@ export default function InputTab() {
             special_request: section.special_request,
             shipping_request_date: section.shipping_request_date,
             settlement_amount: product.total.toString(),
-            sheet_date: getCurrentTimeUTC().split('T')[0],
+            sheet_date: (() => {
+              // 한국 시간 기준 날짜 (YYYY-MM-DD)
+              const now = new Date();
+              const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+              return koreaTime.toISOString().split('T')[0];
+            })(),
             shipping_status: '접수',
+            registered_by: currentUser, // 접수자 정보 추가
           });
         });
       });
@@ -651,12 +677,15 @@ export default function InputTab() {
       const result = await response.json();
 
       if (result.success) {
+        console.log('✅ 주문 저장 성공!', result);
         alert(`${ordersToSave.length}건의 주문이 등록되었습니다.`);
         // 폼 초기화
         resetForm();
         // DB에서 저장된 주문 다시 로드
+        console.log('🔄 저장 후 주문 다시 로드 시작...');
         await loadSavedOrders();
       } else {
+        console.error('❌ 주문 저장 실패:', result.error);
         alert(`등록 실패: ${result.error}`);
       }
     } catch (error) {

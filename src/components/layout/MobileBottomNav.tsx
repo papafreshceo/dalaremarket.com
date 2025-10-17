@@ -18,8 +18,8 @@ export default function MobileBottomNav() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // 항상 표시 (모바일 체크 제거)
-  // if (!isMobile) return null;
+  // 모바일이 아니면 하단 네비게이션 숨김
+  if (!isMobile) return null;
 
   const navItems = [
     {

@@ -29,6 +29,14 @@ const invoiceFields = [
   { value: 'tracking_number', label: '송장번호' },
 ];
 
+interface VendorCourierDefault {
+  id: number;
+  vendor_name: string;
+  default_courier: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function CourierSettingsPage() {
   const [templates, setTemplates] = useState<CourierTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<CourierTemplate | null>(null);
@@ -41,9 +49,23 @@ export default function CourierSettingsPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [columnValidation, setColumnValidation] = useState<{
+    hasOrderNumber: boolean;
+    hasCourier: boolean;
+    hasTracking: boolean;
+  } | null>(null);
+  const [selectedCourier, setSelectedCourier] = useState<string>('');
+
+  // 벤더사별 기본 택배사 설정
+  const [vendorDefaults, setVendorDefaults] = useState<VendorCourierDefault[]>([]);
+  const [newVendorName, setNewVendorName] = useState('');
+  const [newVendorCourier, setNewVendorCourier] = useState('');
+  const [courierList, setCourierList] = useState<string[]>([]);
 
   useEffect(() => {
     fetchTemplates();
+    fetchVendorDefaults();
+    fetchCourierList();
   }, []);
 
   const fetchTemplates = async () => {
@@ -60,6 +82,107 @@ export default function CourierSettingsPage() {
       console.error('템플릿 조회 오류:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchVendorDefaults = async () => {
+    try {
+      const response = await fetch('/api/vendor-courier-defaults');
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setVendorDefaults(data);
+      }
+    } catch (error) {
+      console.error('벤더 기본 택배사 조회 오류:', error);
+    }
+  };
+
+  const fetchCourierList = async () => {
+    try {
+      const response = await fetch('/api/market-invoice-templates');
+      const result = await response.json();
+      if (result.success && Array.isArray(result.data)) {
+        const couriers = result.data
+          .map((item: any) => item.courier_name)
+          .filter((name: string) => name && name.trim())
+          .sort();
+        setCourierList([...new Set(couriers)]);
+      }
+    } catch (error) {
+      console.error('택배사 목록 조회 오류:', error);
+    }
+  };
+
+  const handleAddVendorDefault = async () => {
+    if (!newVendorName.trim() || !newVendorCourier.trim()) {
+      alert('벤더사명과 기본 택배사를 입력해주세요.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/vendor-courier-defaults', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendor_name: newVendorName.trim(),
+          default_courier: newVendorCourier.trim(),
+        }),
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        await fetchVendorDefaults();
+        setNewVendorName('');
+        setNewVendorCourier('');
+        alert('벤더 기본 택배사 설정이 추가되었습니다.');
+      } else {
+        alert('추가 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('벤더 기본 택배사 추가 오류:', error);
+      alert('추가 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleUpdateVendorDefault = async (id: number, vendor_name: string, default_courier: string) => {
+    try {
+      const response = await fetch('/api/vendor-courier-defaults', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, vendor_name, default_courier }),
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        await fetchVendorDefaults();
+        alert('수정되었습니다.');
+      } else {
+        alert('수정 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('벤더 기본 택배사 수정 오류:', error);
+      alert('수정 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleDeleteVendorDefault = async (id: number) => {
+    if (!confirm('이 벤더 기본 택배사 설정을 삭제하시겠습니까?')) return;
+
+    try {
+      const response = await fetch(`/api/vendor-courier-defaults?id=${id}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        await fetchVendorDefaults();
+        alert('삭제되었습니다.');
+      } else {
+        alert('삭제 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('벤더 기본 택배사 삭제 오류:', error);
+      alert('삭제 중 오류가 발생했습니다.');
     }
   };
 
@@ -225,7 +348,7 @@ export default function CourierSettingsPage() {
     });
   };
 
-  // 송장일괄등록 - 파일 처리
+  // 송장일괄등록 - 파일 처리 및 칼럼 검증
   const handleUploadFile = async () => {
     if (!uploadFile) {
       alert('파일을 선택해주세요.');
@@ -246,68 +369,133 @@ export default function CourierSettingsPage() {
           return;
         }
 
-        // 현재 주문 데이터 가져오기
-        const ordersResponse = await fetch('/api/integrated-orders');
-        const ordersResult = await ordersResponse.json();
+        // 1단계: 필수 칼럼 검증
+        const firstRow = jsonData[0];
+        const hasOrderNumber = !!(firstRow['주문번호'] || firstRow['order_number']);
+        const hasCourier = !!(firstRow['택배사'] || firstRow['courier_company']);
+        const hasTracking = !!(firstRow['송장번호'] || firstRow['운송장번호'] || firstRow['tracking_number']);
 
-        if (!ordersResult.success) {
-          alert('주문 데이터 조회 실패');
+        setColumnValidation({ hasOrderNumber, hasCourier, hasTracking });
+
+        // 택배사 칼럼이 없으면 여기서 멈추고 사용자에게 선택 요청
+        if (!hasCourier) {
+          console.log('택배사 칼럼이 없습니다. 사용자 선택 대기 중...');
           return;
         }
 
-        const orders = ordersResult.data || [];
+        // 모든 필수 칼럼이 있으면 바로 처리
+        await processInvoiceData(jsonData);
+      };
 
-        // 엑셀 데이터 매칭 분석
-        const uploadedOrders: any[] = [];
-        const matchedOrders: any[] = [];
-        const unmatchedOrders: any[] = [];
-        const overwriteOrders: any[] = [];
+      reader.readAsBinaryString(uploadFile);
+    } catch (error) {
+      console.error('파일 처리 오류:', error);
+      alert('파일 처리 중 오류가 발생했습니다.');
+    }
+  };
 
-        jsonData.forEach((row) => {
-          const orderNumber = row['주문번호'] || row['order_number'];
-          const courier = row['택배사'] || row['courier_company'];
-          const tracking = row['송장번호'] || row['운송장번호'] || row['tracking_number'];
+  // 송장 데이터 처리 (택배사 정보가 확정된 후)
+  const processInvoiceData = async (jsonData: any[]) => {
+    try {
+      // 현재 주문 데이터 가져오기
+      const ordersResponse = await fetch('/api/integrated-orders');
+      const ordersResult = await ordersResponse.json();
 
-          if (orderNumber) {
-            uploadedOrders.push({ orderNumber, courier, tracking });
+      if (!ordersResult.success) {
+        alert('주문 데이터 조회 실패');
+        return;
+      }
 
-            // 주문 매칭
-            const matchedOrder = orders.find((o: any) => o.order_number === String(orderNumber).trim());
+      const orders = ordersResult.data || [];
 
-            if (matchedOrder) {
-              if (matchedOrder.tracking_number) {
-                // 이미 송장번호가 있는 경우
-                overwriteOrders.push({
-                  ...matchedOrder,
-                  new_courier: courier,
-                  new_tracking: tracking,
-                  old_courier: matchedOrder.courier_company,
-                  old_tracking: matchedOrder.tracking_number,
-                });
-              } else {
-                // 송장번호가 없는 경우
-                matchedOrders.push({
-                  ...matchedOrder,
-                  new_courier: courier,
-                  new_tracking: tracking,
-                });
-              }
+      // 엑셀 데이터 매칭 분석
+      const uploadedOrders: any[] = [];
+      const matchedOrders: any[] = [];
+      const unmatchedOrders: any[] = [];
+      const overwriteOrders: any[] = [];
+
+      jsonData.forEach((row) => {
+        const orderNumber = row['주문번호'] || row['order_number'];
+        let courier = row['택배사'] || row['courier_company'];
+        const tracking = row['송장번호'] || row['운송장번호'] || row['tracking_number'];
+
+        // 택배사가 없으면 선택된 택배사 사용
+        if (!courier && selectedCourier) {
+          courier = selectedCourier;
+        }
+
+        if (orderNumber) {
+          uploadedOrders.push({ orderNumber, courier, tracking });
+
+          // 주문 매칭
+          const matchedOrder = orders.find((o: any) => o.order_number === String(orderNumber).trim());
+
+          if (matchedOrder) {
+            if (matchedOrder.tracking_number) {
+              // 이미 송장번호가 있는 경우
+              overwriteOrders.push({
+                ...matchedOrder,
+                new_courier: courier,
+                new_tracking: tracking,
+                old_courier: matchedOrder.courier_company,
+                old_tracking: matchedOrder.tracking_number,
+              });
             } else {
-              unmatchedOrders.push({ orderNumber, courier, tracking });
+              // 송장번호가 없는 경우
+              matchedOrders.push({
+                ...matchedOrder,
+                new_courier: courier,
+                new_tracking: tracking,
+              });
             }
+          } else {
+            unmatchedOrders.push({ orderNumber, courier, tracking });
           }
-        });
+        }
+      });
 
-        // 미리보기 데이터 설정
-        setPreviewData({
-          uploadedOrders,
-          matchedOrders,
-          unmatchedOrders,
-          overwriteOrders,
-        });
+      // 미리보기 데이터 설정
+      setPreviewData({
+        uploadedOrders,
+        matchedOrders,
+        unmatchedOrders,
+        overwriteOrders,
+        validation: columnValidation,
+      });
 
-        setShowUploadModal(false);
-        setShowPreviewModal(true);
+      setShowUploadModal(false);
+      setShowPreviewModal(true);
+      setColumnValidation(null); // 검증 상태 초기화
+      setSelectedCourier(''); // 선택된 택배사 초기화
+    } catch (error) {
+      console.error('데이터 처리 오류:', error);
+      alert('데이터 처리 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 택배사 선택 후 등록 버튼 클릭
+  const handleRegisterWithSelectedCourier = async () => {
+    if (!selectedCourier) {
+      alert('택배사를 선택해주세요.');
+      return;
+    }
+
+    if (!uploadFile) {
+      alert('파일이 선택되지 않았습니다.');
+      return;
+    }
+
+    // 파일 다시 읽어서 처리
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        await processInvoiceData(jsonData);
       };
 
       reader.readAsBinaryString(uploadFile);
@@ -607,15 +795,144 @@ export default function CourierSettingsPage() {
             )}
           </div>
         </div>
+
+        {/* 벤더사별 기본 택배사 설정 */}
+        <div className="mt-8 bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">벤더사별 기본 택배사 설정</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            엑셀 파일에 택배사 칼럼이 없을 경우 자동으로 적용될 벤더사별 기본 택배사를 설정합니다.
+          </p>
+
+          {/* 추가 폼 */}
+          <div className="flex gap-3 mb-4">
+            <input
+              type="text"
+              value={newVendorName}
+              onChange={(e) => setNewVendorName(e.target.value)}
+              placeholder="벤더사명"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+            />
+            <select
+              value={newVendorCourier}
+              onChange={(e) => setNewVendorCourier(e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">기본 택배사 선택</option>
+              {courierList.map((courier) => (
+                <option key={courier} value={courier}>
+                  {courier}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={handleAddVendorDefault}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              추가
+            </button>
+          </div>
+
+          {/* 벤더 목록 테이블 */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                    벤더사명
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                    기본 택배사
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 w-24">
+                    삭제
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {vendorDefaults.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-8 text-center text-gray-500">
+                      등록된 벤더 기본 택배사 설정이 없습니다.
+                    </td>
+                  </tr>
+                ) : (
+                  vendorDefaults.map((vendor) => (
+                    <tr key={vendor.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <input
+                          type="text"
+                          value={vendor.vendor_name}
+                          onChange={(e) => {
+                            const newVendors = vendorDefaults.map(v =>
+                              v.id === vendor.id ? { ...v, vendor_name: e.target.value } : v
+                            );
+                            setVendorDefaults(newVendors);
+                          }}
+                          onBlur={() => handleUpdateVendorDefault(vendor.id, vendor.vendor_name, vendor.default_courier)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <select
+                          value={vendor.default_courier}
+                          onChange={(e) => {
+                            const newVendors = vendorDefaults.map(v =>
+                              v.id === vendor.id ? { ...v, default_courier: e.target.value } : v
+                            );
+                            setVendorDefaults(newVendors);
+                            handleUpdateVendorDefault(vendor.id, vendor.vendor_name, e.target.value);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">선택하세요</option>
+                          {courierList.map((courier) => (
+                            <option key={courier} value={courier}>
+                              {courier}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleDeleteVendorDefault(vendor.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 설명 박스 */}
+          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <h3 className="text-sm font-semibold text-yellow-900 mb-2">택배사 우선순위</h3>
+            <div className="text-sm text-yellow-800">
+              1️⃣ <strong>Excel 칼럼</strong>: 엑셀 파일에 택배사 정보가 있으면 우선 사용<br />
+              2️⃣ <strong>UI 선택</strong>: 파일 업로드 시 수동으로 선택한 택배사<br />
+              3️⃣ <strong>벤더 기본값</strong>: 위 설정표의 벤더사별 기본 택배사<br />
+              <span className="text-xs text-yellow-600">※ 모두 없는 경우 택배사 정보가 빈 값으로 저장됩니다</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 송장일괄등록 - 파일 선택 모달 */}
       {showUploadModal && (
-        <Modal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)}>
+        <Modal isOpen={showUploadModal} onClose={() => {
+          setShowUploadModal(false);
+          setUploadFile(null);
+          setColumnValidation(null);
+          setSelectedCourier('');
+        }}>
           <div className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">송장일괄등록</h3>
             <p className="text-sm text-gray-600 mb-4">
-              엑셀 파일에 다음 컬럼이 포함되어야 합니다:<br />
+              엑셀 파일에 다음 3개 컬럼이 필수입니다:<br />
               - 주문번호<br />
               - 택배사<br />
               - 송장번호 (또는 운송장번호)
@@ -628,28 +945,122 @@ export default function CourierSettingsPage() {
               <input
                 type="file"
                 accept=".xlsx, .xls"
-                onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                onChange={(e) => {
+                  setUploadFile(e.target.files?.[0] || null);
+                  setColumnValidation(null);
+                  setSelectedCourier('');
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
               />
             </div>
+
+            {/* 칼럼 검증 결과 표시 */}
+            {columnValidation && (
+              <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">필수 칼럼 검증 결과</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    {columnValidation.hasOrderNumber ? (
+                      <span className="text-green-600">✅</span>
+                    ) : (
+                      <span className="text-red-600">❌</span>
+                    )}
+                    <span className={columnValidation.hasOrderNumber ? 'text-green-700' : 'text-red-700'}>
+                      주문번호
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {columnValidation.hasCourier ? (
+                      <span className="text-green-600">✅</span>
+                    ) : (
+                      <span className="text-orange-600">⚠️</span>
+                    )}
+                    <span className={columnValidation.hasCourier ? 'text-green-700' : 'text-orange-700'}>
+                      택배사 {!columnValidation.hasCourier && '(아래에서 선택 필요)'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {columnValidation.hasTracking ? (
+                      <span className="text-green-600">✅</span>
+                    ) : (
+                      <span className="text-red-600">❌</span>
+                    )}
+                    <span className={columnValidation.hasTracking ? 'text-green-700' : 'text-red-700'}>
+                      송장번호
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 택배사 칼럼이 없을 경우 선택 UI */}
+            {columnValidation && !columnValidation.hasCourier && columnValidation.hasOrderNumber && columnValidation.hasTracking && (
+              <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <h4 className="text-sm font-semibold text-orange-900 mb-3">
+                  ⚠️ 택배사 정보가 없습니다
+                </h4>
+                <p className="text-xs text-orange-700 mb-3">
+                  택배사를 선택하면 모든 주문에 동일한 택배사가 적용됩니다.
+                </p>
+                <select
+                  value={selectedCourier}
+                  onChange={(e) => setSelectedCourier(e.target.value)}
+                  className="w-full px-3 py-2 border border-orange-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="">택배사를 선택하세요</option>
+                  {courierList.map((courier) => (
+                    <option key={courier} value={courier}>
+                      {courier}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* 에러 메시지 */}
+            {columnValidation && (!columnValidation.hasOrderNumber || !columnValidation.hasTracking) && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <h4 className="text-sm font-semibold text-red-900 mb-2">❌ 필수 칼럼 누락</h4>
+                <p className="text-xs text-red-700">
+                  주문번호와 송장번호는 필수 칼럼입니다. 엑셀 파일을 확인해주세요.
+                </p>
+              </div>
+            )}
 
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => {
                   setShowUploadModal(false);
                   setUploadFile(null);
+                  setColumnValidation(null);
+                  setSelectedCourier('');
                 }}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
               >
                 취소
               </button>
-              <button
-                onClick={handleUploadFile}
-                disabled={!uploadFile}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400"
-              >
-                미리보기
-              </button>
+
+              {/* 검증 전 또는 모든 칼럼 있을 때: 미리보기 버튼 */}
+              {!columnValidation && (
+                <button
+                  onClick={handleUploadFile}
+                  disabled={!uploadFile}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400"
+                >
+                  검증 및 미리보기
+                </button>
+              )}
+
+              {/* 택배사만 없을 때: 등록하기 버튼 */}
+              {columnValidation && !columnValidation.hasCourier && columnValidation.hasOrderNumber && columnValidation.hasTracking && (
+                <button
+                  onClick={handleRegisterWithSelectedCourier}
+                  disabled={!selectedCourier}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400"
+                >
+                  등록하기
+                </button>
+              )}
             </div>
           </div>
         </Modal>

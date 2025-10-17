@@ -203,27 +203,52 @@ export default function MaterialMatchingPage() {
     const material = rawMaterials.find(m => m.id === materialId)
     if (!material) return
 
-    const { data, error } = await supabase
-      .from('option_product_materials')
-      .insert([{
-        option_product_id: selectedProduct.id,
-        raw_material_id: materialId,
-        quantity: 0,
-        unit_price: material.latest_price
-      }])
-      .select()
+    try {
+      // 1. 원물 링크 추가
+      const { data, error } = await supabase
+        .from('option_product_materials')
+        .insert([{
+          option_product_id: selectedProduct.id,
+          raw_material_id: materialId,
+          quantity: 0,
+          unit_price: material.latest_price
+        }])
+        .select()
 
-    if (error) {
-      console.error('Error adding material:', error)
-      showToast('원물 추가 중 오류가 발생했습니다.', 'error')
-      return
+      if (error) {
+        console.error('Error adding material:', error)
+        showToast('원물 추가 중 오류가 발생했습니다.', 'error')
+        return
+      }
+
+      // 2. 옵션상품에 원물의 카테고리 자동 복사
+      const { error: updateError } = await supabase
+        .from('option_products')
+        .update({
+          category_1: material.category_1,
+          category_2: material.category_2,
+          category_3: material.category_3,
+          category_4: material.category_4,
+          category_5: material.category_5
+        })
+        .eq('id', selectedProduct.id)
+
+      if (updateError) {
+        console.error('Error updating categories:', updateError)
+        // 카테고리 업데이트 실패해도 원물 추가는 성공으로 처리
+        showToast('원물이 추가되었으나 카테고리 업데이트에 실패했습니다.', 'warning')
+      } else {
+        showToast('원물이 추가되고 카테고리가 자동 설정되었습니다.', 'success')
+      }
+
+      setShowMaterialSelector(false)
+      setSearchTerm('')
+      await fetchLinkedMaterials(selectedProduct.id)
+      await fetchOptionProducts()
+    } catch (error) {
+      console.error('Error in handleAddMaterial:', error)
+      showToast('처리 중 오류가 발생했습니다.', 'error')
     }
-
-    showToast('원물이 추가되었습니다.', 'success')
-    setShowMaterialSelector(false)
-    setSearchTerm('')
-    await fetchLinkedMaterials(selectedProduct.id)
-    await fetchOptionProducts()
   }
 
   const handleDeleteMaterial = async (linkId: string) => {
