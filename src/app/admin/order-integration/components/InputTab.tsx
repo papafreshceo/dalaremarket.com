@@ -637,9 +637,9 @@ export default function InputTab() {
       const ordersToSave: any[] = [];
 
       formData.recipientSections.forEach((section) => {
-        const orderNumber = generateOrderNumber();
-
         section.products.forEach((product) => {
+          const orderNumber = generateOrderNumber(); // 각 상품마다 고유한 주문번호 생성
+
           ordersToSave.push({
             market_name: '전화주문',
             order_number: orderNumber,

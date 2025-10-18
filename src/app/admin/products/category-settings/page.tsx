@@ -15,6 +15,7 @@ interface CategorySetting {
   category_2: string | null
   category_3: string | null
   category_4: string | null
+  category_4_code: string | null
   category_5: string | null
   notes: string | null
   is_active: boolean
@@ -147,6 +148,7 @@ export default function CategorySettingsPage() {
             category_2: row.category_2 || null,
             category_3: row.category_3 || null,
             category_4: row.category_4 || null,
+            category_4_code: row.category_4_code || null,
             category_5: row.category_5 || null,
             notes: row.notes || null,
             is_active: true
@@ -197,6 +199,7 @@ export default function CategorySettingsPage() {
               category_2: row.category_2 || null,
               category_3: row.category_3 || null,
               category_4: row.category_4 || null,
+              category_4_code: row.category_4_code || null,
               category_5: row.category_5 || null,
               notes: row.notes || null,
               is_active: true
@@ -216,6 +219,7 @@ export default function CategorySettingsPage() {
               category_2: row.category_2 || null,
               category_3: row.category_3 || null,
               category_4: row.category_4 || null,
+              category_4_code: row.category_4_code || null,
               category_5: row.category_5 || null,
               notes: row.notes || null
             }).eq('id', row.id)
@@ -355,6 +359,7 @@ export default function CategorySettingsPage() {
     { key: 'category_2', title: '중분류', width: 150, className: 'text-center' },
     { key: 'category_3', title: '소분류', width: 150, className: 'text-center' },
     { key: 'category_4', title: '품목', width: 150, className: 'text-center' },
+    { key: 'category_4_code', title: '품목코드', width: 120, className: 'text-center' },
     { key: 'category_5', title: '품종', width: 150, className: 'text-center' },
     { key: 'notes', title: '비고', width: 200, className: 'text-center' }
   ]
@@ -375,6 +380,7 @@ export default function CategorySettingsPage() {
                 '중분류': cat.category_2 || '',
                 '소분류': cat.category_3 || '',
                 '품목': cat.category_4 || '',
+                '품목코드': cat.category_4_code || '',
                 '품종': cat.category_5 || '',
                 '비고': cat.notes || '',
                 '활성화': cat.is_active ? 'Y' : 'N'
@@ -434,6 +440,7 @@ export default function CategorySettingsPage() {
                     '중분류': 'category_2',
                     '소분류': 'category_3',
                     '품목': 'category_4',
+                    '품목코드': 'category_4_code',
                     '품종': 'category_5',
                     '비고': 'notes',
                     '활성화': 'is_active'

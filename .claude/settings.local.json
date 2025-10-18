@@ -17,7 +17,9 @@
       "Bash(npx supabase db:*)",
       "Bash(npx tsc:*)",
       "Bash(if exist \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\fix-empty-templates.js\" del /f \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\fix-empty-templates.js\")",
-      "Bash(del /f fix-empty-templates.js)"
+      "Bash(del /f fix-empty-templates.js)",
+      "Bash(del \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\media\\layout.tsx\")",
+      "Bash(if exist \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\media\\layout.tsx\" del /f \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\media\\layout.tsx\")"
     ],
     "deny": [],
     "ask": []

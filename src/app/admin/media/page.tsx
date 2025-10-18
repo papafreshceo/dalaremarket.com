@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Upload, Search, Filter, Download, Trash2, Edit2, Eye, EyeOff, Image as ImageIcon, Grid, List } from 'lucide-react';
+import { Upload, Search, Filter, Download, Trash2, Edit2, Eye, EyeOff, Image as ImageIcon, Grid, List, Copy, Check } from 'lucide-react';
 import Image from 'next/image';
+import { createClient } from '@/lib/supabase/client';
 
 interface CloudinaryImage {
   id: string;
@@ -33,6 +34,7 @@ interface Category {
 }
 
 export default function MediaManagementPage() {
+  const supabase = createClient();
   const [images, setImages] = useState<CloudinaryImage[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +51,7 @@ export default function MediaManagementPage() {
 
   // 업로드 모달
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadType, setUploadType] = useState<'raw_material' | 'option_product' | 'category_4'>('category_4');
   const [uploadForm, setUploadForm] = useState({
     file: null as File | null,
     category: '기타',
@@ -57,7 +60,17 @@ export default function MediaManagementPage() {
     tags: '',
     is_public: true,
     is_downloadable: true,
+    raw_material_id: '',
+    option_product_id: '',
+    category_4_id: '',
   });
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+
+  // 원물/옵션상품/품목 목록
+  const [rawMaterials, setRawMaterials] = useState<any[]>([]);
+  const [optionProducts, setOptionProducts] = useState<any[]>([]);
+  const [productCategories, setProductCategories] = useState<Array<{id: string, category_4: string}>>([]);
 
   // 수정 모달
   const [editingImage, setEditingImage] = useState<CloudinaryImage | null>(null);
@@ -66,6 +79,13 @@ export default function MediaManagementPage() {
     fetchImages();
     fetchCategories();
   }, [selectedCategory, searchQuery, currentPage]);
+
+  // 원물/옵션상품/품목 목록은 최초 1회만 로드
+  useEffect(() => {
+    fetchRawMaterials();
+    fetchOptionProducts();
+    fetchProductCategories();
+  }, []);
 
   const fetchImages = async () => {
     try {
@@ -108,6 +128,66 @@ export default function MediaManagementPage() {
     }
   };
 
+  const fetchRawMaterials = async () => {
+    try {
+      console.log('원물 목록 조회 시작...');
+      const { data, error } = await supabase
+        .from('raw_materials')
+        .select('id, material_code, material_name')
+        .order('material_name');
+
+      if (error) {
+        console.error('원물 조회 에러:', error);
+        throw error;
+      }
+      console.log('원물 목록 조회 완료:', data?.length, '개');
+      setRawMaterials(data || []);
+    } catch (error) {
+      console.error('원물 조회 오류:', error);
+    }
+  };
+
+  const fetchOptionProducts = async () => {
+    try {
+      console.log('옵션상품 목록 조회 시작...');
+      const { data, error } = await supabase
+        .from('option_products')
+        .select('id, option_code, option_name')
+        .order('option_name');
+
+      if (error) {
+        console.error('옵션상품 조회 에러:', error);
+        throw error;
+      }
+      console.log('옵션상품 목록 조회 완료:', data?.length, '개');
+      setOptionProducts(data || []);
+    } catch (error) {
+      console.error('옵션상품 조회 오류:', error);
+    }
+  };
+
+  const fetchProductCategories = async () => {
+    try {
+      console.log('품목 마스터 조회 시작...');
+      const { data, error } = await supabase
+        .from('product_categories')
+        .select('id, category_4, category_4_code')
+        .eq('is_active', true)
+        .order('category_4');
+
+      if (error) {
+        console.error('품목 마스터 조회 에러:', error);
+        throw error;
+      }
+
+      console.log('품목 마스터 조회 완료:', data?.length, '개');
+      console.log('품목 코드 샘플:', data?.[0]?.category_4_code);
+      setProductCategories(data || []);
+    } catch (error) {
+      console.error('품목 마스터 조회 오류:', error);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -125,6 +205,21 @@ export default function MediaManagementPage() {
       return;
     }
 
+    if (uploadType === 'raw_material' && !uploadForm.raw_material_id) {
+      alert('원물을 선택해주세요.');
+      return;
+    }
+
+    if (uploadType === 'option_product' && !uploadForm.option_product_id) {
+      alert('옵션상품을 선택해주세요.');
+      return;
+    }
+
+    if (uploadType === 'category_4' && !uploadForm.category_4_id) {
+      alert('품목을 선택해주세요.');
+      return;
+    }
+
     try {
       setUploading(true);
       const formData = new FormData();
@@ -135,6 +230,15 @@ export default function MediaManagementPage() {
       formData.append('tags', uploadForm.tags);
       formData.append('is_public', uploadForm.is_public.toString());
       formData.append('is_downloadable', uploadForm.is_downloadable.toString());
+      formData.append('upload_type', uploadType);
+
+      if (uploadType === 'raw_material') {
+        formData.append('raw_material_id', uploadForm.raw_material_id);
+      } else if (uploadType === 'option_product') {
+        formData.append('option_product_id', uploadForm.option_product_id);
+      } else if (uploadType === 'category_4') {
+        formData.append('category_4_id', uploadForm.category_4_id);
+      }
 
       const response = await fetch('/api/cloudinary/upload', {
         method: 'POST',
@@ -144,17 +248,7 @@ export default function MediaManagementPage() {
       const result = await response.json();
 
       if (result.success) {
-        alert('업로드 완료!');
-        setShowUploadModal(false);
-        setUploadForm({
-          file: null,
-          category: '기타',
-          title: '',
-          description: '',
-          tags: '',
-          is_public: true,
-          is_downloadable: true,
-        });
+        setUploadedImageUrl(result.data.secure_url);
         fetchImages();
       } else {
         alert('업로드 실패: ' + result.error);
@@ -165,6 +259,32 @@ export default function MediaManagementPage() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleCopyUrl = async () => {
+    if (uploadedImageUrl) {
+      await navigator.clipboard.writeText(uploadedImageUrl);
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2000);
+    }
+  };
+
+  const handleCloseUploadModal = () => {
+    setShowUploadModal(false);
+    setUploadedImageUrl(null);
+    setCopiedUrl(false);
+    setUploadForm({
+      file: null,
+      category: '기타',
+      title: '',
+      description: '',
+      tags: '',
+      is_public: true,
+      is_downloadable: true,
+      raw_material_id: '',
+      option_product_id: '',
+      category_4_id: '',
+    });
   };
 
   const handleUpdate = async () => {
@@ -307,12 +427,6 @@ export default function MediaManagementPage() {
         <div className="text-center py-12 bg-white rounded-lg shadow">
           <ImageIcon size={48} className="mx-auto text-gray-400 mb-4" />
           <p className="text-gray-600">이미지가 없습니다.</p>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            첫 이미지 업로드하기
-          </button>
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -470,118 +584,266 @@ export default function MediaManagementPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <h2 className="text-xl font-bold mb-4">이미지 업로드</h2>
+              <h2 className="text-[18px] font-bold mb-4">이미지 업로드</h2>
 
-              <div className="space-y-4">
-                {/* 파일 선택 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">파일</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                  {uploadForm.file && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      선택된 파일: {uploadForm.file.name} ({formatFileSize(uploadForm.file.size)})
-                    </p>
-                  )}
-                </div>
+              {/* 업로드 완료 화면 */}
+              {uploadedImageUrl ? (
+                <div className="space-y-4">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p className="text-[14px] text-green-800 font-medium mb-2">✓ 업로드 완료!</p>
+                    <p className="text-[14px] text-green-700">이미지가 Cloudinary에 성공적으로 업로드되었습니다.</p>
+                  </div>
 
-                {/* 카테고리 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">카테고리</label>
-                  <select
-                    value={uploadForm.category}
-                    onChange={(e) => setUploadForm({ ...uploadForm, category: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  {/* URL 표시 및 복사 */}
+                  <div>
+                    <label className="block text-[14px] font-medium text-gray-700 mb-2">이미지 URL</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={uploadedImageUrl}
+                        readOnly
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-[14px] whitespace-nowrap overflow-x-auto"
+                      />
+                      <button
+                        onClick={handleCopyUrl}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap text-[14px]"
+                      >
+                        {copiedUrl ? (
+                          <>
+                            <Check size={16} />
+                            복사됨
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={16} />
+                            복사
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 미리보기 */}
+                  <div>
+                    <label className="block text-[14px] font-medium text-gray-700 mb-2">미리보기</label>
+                    <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden">
+                      <Image
+                        src={uploadedImageUrl}
+                        alt="업로드된 이미지"
+                        fill
+                        className="object-contain"
+                        sizes="(max-width: 768px) 100vw, 672px"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleCloseUploadModal}
+                    className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-[14px]"
                   >
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.name}>
-                        {cat.icon} {cat.name}
-                      </option>
-                    ))}
-                  </select>
+                    닫기
+                  </button>
                 </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* 업로드 타입 선택 */}
+                  <div>
+                    <label className="block text-[14px] font-medium text-gray-700 mb-2">업로드 타입</label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 whitespace-nowrap">
+                        <input
+                          type="radio"
+                          value="category_4"
+                          checked={uploadType === 'category_4'}
+                          onChange={(e) => setUploadType(e.target.value as 'category_4')}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-[14px]">품목</span>
+                      </label>
+                      <label className="flex items-center gap-2 whitespace-nowrap">
+                        <input
+                          type="radio"
+                          value="raw_material"
+                          checked={uploadType === 'raw_material'}
+                          onChange={(e) => setUploadType(e.target.value as 'raw_material')}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-[14px]">원물</span>
+                      </label>
+                      <label className="flex items-center gap-2 whitespace-nowrap">
+                        <input
+                          type="radio"
+                          value="option_product"
+                          checked={uploadType === 'option_product'}
+                          onChange={(e) => setUploadType(e.target.value as 'option_product')}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-[14px]">옵션상품</span>
+                      </label>
+                    </div>
+                  </div>
 
-                {/* 제목 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
-                  <input
-                    type="text"
-                    value={uploadForm.title}
-                    onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
-                    placeholder="이미지 제목"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
+                  {/* 품목/원물/옵션상품 선택 */}
+                  {uploadType === 'category_4' ? (
+                    <div>
+                      <label className="block text-[14px] font-medium text-gray-700 mb-2">품목 선택</label>
+                      <select
+                        value={uploadForm.category_4_id}
+                        onChange={(e) => setUploadForm({ ...uploadForm, category_4_id: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
+                      >
+                        <option value="">품목을 선택하세요</option>
+                        {productCategories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.category_4}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : uploadType === 'raw_material' ? (
+                    <div>
+                      <label className="block text-[14px] font-medium text-gray-700 mb-2">원물 선택</label>
+                      <select
+                        value={uploadForm.raw_material_id}
+                        onChange={(e) => setUploadForm({ ...uploadForm, raw_material_id: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
+                      >
+                        <option value="">원물을 선택하세요</option>
+                        {rawMaterials.map((material) => (
+                          <option key={material.id} value={material.id}>
+                            {material.material_name} ({material.material_code})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-[14px] font-medium text-gray-700 mb-2">옵션상품 선택</label>
+                      <select
+                        value={uploadForm.option_product_id}
+                        onChange={(e) => setUploadForm({ ...uploadForm, option_product_id: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
+                      >
+                        <option value="">옵션상품을 선택하세요</option>
+                        {optionProducts.map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.option_name} ({product.option_code})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
-                {/* 설명 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">설명</label>
-                  <textarea
-                    value={uploadForm.description}
-                    onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
-                    placeholder="이미지 설명"
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-
-                {/* 태그 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    태그 <span className="text-xs text-gray-500">(콤마로 구분)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={uploadForm.tags}
-                    onChange={(e) => setUploadForm({ ...uploadForm, tags: e.target.value })}
-                    placeholder="태그1, 태그2, 태그3"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-
-                {/* 공개 설정 */}
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2">
+                  {/* 파일 선택 */}
+                  <div>
+                    <label className="block text-[14px] font-medium text-gray-700 mb-2">파일</label>
                     <input
-                      type="checkbox"
-                      checked={uploadForm.is_public}
-                      onChange={(e) => setUploadForm({ ...uploadForm, is_public: e.target.checked })}
-                      className="w-4 h-4"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
                     />
-                    <span className="text-sm">공개</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={uploadForm.is_downloadable}
-                      onChange={(e) => setUploadForm({ ...uploadForm, is_downloadable: e.target.checked })}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm">다운로드 가능</span>
-                  </label>
-                </div>
-              </div>
+                    {uploadForm.file && (
+                      <p className="text-[14px] text-gray-500 mt-2 whitespace-nowrap overflow-hidden text-ellipsis">
+                        선택된 파일: {uploadForm.file.name} ({formatFileSize(uploadForm.file.size)})
+                      </p>
+                    )}
+                  </div>
 
-              <div className="flex gap-2 mt-6">
-                <button
-                  onClick={handleUpload}
-                  disabled={uploading || !uploadForm.file}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {uploading ? '업로드 중...' : '업로드'}
-                </button>
-                <button
-                  onClick={() => setShowUploadModal(false)}
-                  disabled={uploading}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                >
-                  취소
-                </button>
-              </div>
+                  {/* 카테고리 */}
+                  <div>
+                    <label className="block text-[14px] font-medium text-gray-700 mb-2">카테고리</label>
+                    <select
+                      value={uploadForm.category}
+                      onChange={(e) => setUploadForm({ ...uploadForm, category: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
+                    >
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.name}>
+                          {cat.icon} {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 제목 */}
+                  <div>
+                    <label className="block text-[14px] font-medium text-gray-700 mb-2">제목</label>
+                    <input
+                      type="text"
+                      value={uploadForm.title}
+                      onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
+                      placeholder="이미지 제목"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
+                    />
+                  </div>
+
+                  {/* 설명 */}
+                  <div>
+                    <label className="block text-[14px] font-medium text-gray-700 mb-2">설명</label>
+                    <textarea
+                      value={uploadForm.description}
+                      onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
+                      placeholder="이미지 설명"
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
+                    />
+                  </div>
+
+                  {/* 태그 */}
+                  <div>
+                    <label className="block text-[14px] font-medium text-gray-700 mb-2">
+                      태그 <span className="text-[12px] text-gray-500">(콤마로 구분)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={uploadForm.tags}
+                      onChange={(e) => setUploadForm({ ...uploadForm, tags: e.target.value })}
+                      placeholder="태그1, 태그2, 태그3"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
+                    />
+                  </div>
+
+                  {/* 공개 설정 */}
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={uploadForm.is_public}
+                        onChange={(e) => setUploadForm({ ...uploadForm, is_public: e.target.checked })}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-[14px]">공개</span>
+                    </label>
+                    <label className="flex items-center gap-2 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={uploadForm.is_downloadable}
+                        onChange={(e) => setUploadForm({ ...uploadForm, is_downloadable: e.target.checked })}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-[14px]">다운로드 가능</span>
+                    </label>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleUpload}
+                      disabled={uploading || !uploadForm.file}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-[14px] whitespace-nowrap"
+                    >
+                      {uploading ? '업로드 중...' : '업로드'}
+                    </button>
+                    <button
+                      onClick={handleCloseUploadModal}
+                      disabled={uploading}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-[14px] whitespace-nowrap"
+                    >
+                      취소
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

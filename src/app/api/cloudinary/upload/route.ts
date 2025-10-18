@@ -17,6 +17,12 @@ export async function POST(request: NextRequest) {
     const isPublic = formData.get('is_public') === 'true';
     const isDownloadable = formData.get('is_downloadable') === 'true';
 
+    // 업로드 타입별 ID 정보
+    const uploadType = formData.get('upload_type') as string;
+    const rawMaterialId = formData.get('raw_material_id') as string;
+    const optionProductId = formData.get('option_product_id') as string;
+    const category4Id = formData.get('category_4_id') as string;
+
     if (!file) {
       return NextResponse.json(
         { success: false, error: '파일이 필요합니다.' },
@@ -28,11 +34,61 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
+    // Supabase 클라이언트 생성 (폴더 경로 조회용)
+    const supabase = await createClient();
+
+    // Cloudinary 폴더 경로 결정
+    let folderPath = 'dalreamarket';
+
+    if (uploadType === 'category_4' && category4Id) {
+      // 품목 단위: dalreamarket/{품목코드}/
+      const { data: category } = await supabase
+        .from('product_categories')
+        .select('category_4_code')
+        .eq('id', category4Id)
+        .single();
+
+      if (category?.category_4_code) {
+        folderPath = `dalreamarket/${category.category_4_code}`;
+      }
+    } else if (uploadType === 'option_product' && optionProductId) {
+      // 옵션상품 단위: dalreamarket/{품목코드}/{옵션상품코드}/
+      const { data: optionProduct } = await supabase
+        .from('option_products')
+        .select('option_code, category_4')
+        .eq('id', optionProductId)
+        .single();
+
+      if (optionProduct) {
+        // 옵션상품의 품목으로 품목코드 조회
+        const { data: category } = await supabase
+          .from('product_categories')
+          .select('category_4_code')
+          .eq('category_4', optionProduct.category_4)
+          .single();
+
+        if (category?.category_4_code && optionProduct.option_code) {
+          folderPath = `dalreamarket/${category.category_4_code}/${optionProduct.option_code}`;
+        }
+      }
+    } else if (uploadType === 'raw_material' && rawMaterialId) {
+      // 원물 단위: dalreamarket/raw_materials/{원물코드}/
+      const { data: rawMaterial } = await supabase
+        .from('raw_materials')
+        .select('material_code')
+        .eq('id', rawMaterialId)
+        .single();
+
+      if (rawMaterial?.material_code) {
+        folderPath = `dalreamarket/raw_materials/${rawMaterial.material_code}`;
+      }
+    }
+
     // Cloudinary에 업로드
     const uploadResult = await new Promise<any>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: 'dalreamarket', // Cloudinary 폴더명
+          folder: folderPath, // 동적 폴더 경로
           resource_type: 'auto',
           tags: tags ? tags.split(',').map(t => t.trim()) : [],
         },
@@ -44,26 +100,36 @@ export async function POST(request: NextRequest) {
       uploadStream.end(buffer);
     });
 
-    // DB에 메타데이터 저장
-    const supabase = await createClient();
+    // 저장할 데이터 객체 생성
+    const insertData: any = {
+      cloudinary_id: uploadResult.public_id,
+      cloudinary_url: uploadResult.url,
+      secure_url: uploadResult.secure_url,
+      filename: file.name,
+      format: uploadResult.format,
+      width: uploadResult.width,
+      height: uploadResult.height,
+      file_size: uploadResult.bytes,
+      category,
+      title: title || file.name,
+      description,
+      tags: tags ? tags.split(',').map(t => t.trim()) : [],
+      is_public: isPublic,
+      is_downloadable: isDownloadable,
+    };
+
+    // 업로드 타입에 따라 관련 ID 추가
+    if (uploadType === 'raw_material' && rawMaterialId) {
+      insertData.raw_material_id = rawMaterialId;
+    } else if (uploadType === 'option_product' && optionProductId) {
+      insertData.option_product_id = optionProductId;
+    } else if (uploadType === 'category_4' && category4Id) {
+      insertData.category_4_id = category4Id;
+    }
+
     const { data, error } = await supabase
       .from('cloudinary_images')
-      .insert({
-        cloudinary_id: uploadResult.public_id,
-        cloudinary_url: uploadResult.url,
-        secure_url: uploadResult.secure_url,
-        filename: file.name,
-        format: uploadResult.format,
-        width: uploadResult.width,
-        height: uploadResult.height,
-        file_size: uploadResult.bytes,
-        category,
-        title: title || file.name,
-        description,
-        tags: tags ? tags.split(',').map(t => t.trim()) : [],
-        is_public: isPublic,
-        is_downloadable: isDownloadable,
-      })
+      .insert(insertData)
       .select()
       .single();
 
