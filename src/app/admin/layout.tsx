@@ -33,6 +33,28 @@ export default function AdminLayout({
     return () => window.removeEventListener('resize', checkScreenSize)
   }, [])
 
+  // 관리자 화면 파비콘 설정
+  useEffect(() => {
+    // 기존 파비콘 제거
+    const existingFavicons = document.querySelectorAll("link[rel*='icon']");
+    existingFavicons.forEach(el => el.remove());
+
+    // 관리자용 파비콘 추가
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.type = 'image/png';
+    link.href = '/admin-favicon.png';
+    document.head.appendChild(link);
+
+    // 타이틀 변경
+    document.title = '달래마켓 관리자';
+
+    return () => {
+      // 컴포넌트 언마운트 시 원래대로 복원
+      link.remove();
+    };
+  }, []);
+
   // 사용자 정보 가져오기
   useEffect(() => {
     const getUser = async () => {
