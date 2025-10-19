@@ -8,6 +8,7 @@ import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 import { useToast } from '@/components/ui/Toast'
 import * as XLSX from 'xlsx'
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
+import { inheritRawMaterialToOptionProducts } from '@/lib/inheritance-utils'
 
 // ===== 타입 =====
 interface Supplier {
@@ -889,6 +890,11 @@ export default function RawMaterialsManagementPage() {
       }))
       const { error: upErr } = await supabase.from('raw_materials').upsert(rows, { onConflict: 'id' })
       if (upErr) throw upErr
+
+      // 상속 실행: 각 수정된 원물에 대해 옵션상품 업데이트
+      for (const row of rows) {
+        await inheritRawMaterialToOptionProducts(row.id)
+      }
 
       const today = new Date().toISOString().split('T')[0]
       const priceRows = modifiedRows

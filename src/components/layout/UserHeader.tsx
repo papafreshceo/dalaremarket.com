@@ -278,37 +278,65 @@ export default function UserHeader() {
                       position: 'absolute',
                       top: '100%',
                       left: 0,
-                      marginTop: '8px',
-                      background: 'white',
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-                      border: '1px solid #e0e0e0',
-                      minWidth: item.text === '업무도구' ? '600px' : '200px',
-                      maxHeight: '400px',
-                      overflowY: 'auto',
-                      zIndex: 1001,
-                      padding: item.text === '업무도구' ? '16px' : '0'
+                      paddingTop: '8px',
+                      zIndex: 1001
                     }}>
-                      {item.text === '업무도구' ? (
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(3, 1fr)',
-                          gap: '0'
-                        }}>
-                          {item.submenu?.map(subItem => (
+                      <div style={{
+                        background: 'white',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                        border: '1px solid #e0e0e0',
+                        minWidth: item.text === '업무도구' ? '600px' : '200px',
+                        maxHeight: '400px',
+                        overflowY: 'auto',
+                        padding: item.text === '업무도구' ? '16px' : '0'
+                      }}>
+                        {item.text === '업무도구' ? (
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gap: '0'
+                          }}>
+                            {item.submenu?.map(subItem => (
+                              <Link
+                                key={subItem.path}
+                                href={subItem.path}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '8px 12px',
+                                  fontSize: '13px',
+                                  color: '#212529',
+                                  textDecoration: 'none',
+                                  transition: 'all 0.2s',
+                                  borderRadius: '4px'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#f8f9fa';
+                                  e.currentTarget.style.color = '#2563eb';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'transparent';
+                                  e.currentTarget.style.color = '#212529';
+                                }}
+                              >
+                                <span>{subItem.text}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        ) : (
+                          item.submenu?.map(subItem => (
                             <Link
                               key={subItem.path}
                               href={subItem.path}
                               style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '8px 12px',
+                                display: 'block',
+                                padding: '10px 16px',
                                 fontSize: '13px',
                                 color: '#212529',
                                 textDecoration: 'none',
-                                transition: 'all 0.2s',
-                                borderRadius: '4px'
+                                transition: 'all 0.2s'
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.background = '#f8f9fa';
@@ -319,36 +347,11 @@ export default function UserHeader() {
                                 e.currentTarget.style.color = '#212529';
                               }}
                             >
-                              <span>{subItem.text}</span>
+                              {subItem.text}
                             </Link>
-                          ))}
-                        </div>
-                      ) : (
-                        item.submenu?.map(subItem => (
-                          <Link
-                            key={subItem.path}
-                            href={subItem.path}
-                            style={{
-                              display: 'block',
-                              padding: '10px 16px',
-                              fontSize: '13px',
-                              color: '#212529',
-                              textDecoration: 'none',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.color = '#2563eb';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'transparent';
-                              e.currentTarget.style.color = '#212529';
-                            }}
-                          >
-                            {subItem.text}
-                          </Link>
-                        ))
-                      )}
+                          ))
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
