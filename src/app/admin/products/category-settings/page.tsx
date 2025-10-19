@@ -17,6 +17,12 @@ interface CategorySetting {
   category_4: string | null
   category_4_code: string | null
   category_5: string | null
+  raw_material_status: string | null
+  seller_supply: boolean | null
+  is_best: boolean | null
+  is_recommended: boolean | null
+  has_image: boolean | null
+  has_detail_page: boolean | null
   notes: string | null
   is_active: boolean
 }
@@ -30,6 +36,7 @@ export default function CategorySettingsPage() {
   const [filteredTableData, setFilteredTableData] = useState<CategorySetting[]>([])
   const [loading, setLoading] = useState(false)
   const [filterExpenseType, setFilterExpenseType] = useState<'전체' | '사입' | '지출' | '가'>('전체')
+  const [supplyStatuses, setSupplyStatuses] = useState<Array<{ code: string; name: string }>>([])
 
   // 엑셀 업로드 모달
   const [excelUploadModal, setExcelUploadModal] = useState<{ data: any[], mode: 'replace' | 'merge' | null } | null>(null)
@@ -49,7 +56,26 @@ export default function CategorySettingsPage() {
 
   useEffect(() => {
     fetchCategories()
+    fetchSupplyStatuses()
   }, [])
+
+  const fetchSupplyStatuses = async () => {
+    const { data, error } = await supabase
+      .from('supply_status_settings')
+      .select('code, name')
+      .eq('status_type', 'raw_material')
+      .eq('is_active', true)
+      .order('display_order')
+
+    if (error) {
+      console.error('공급 상태 조회 오류:', error)
+      return
+    }
+
+    if (data) {
+      setSupplyStatuses(data)
+    }
+  }
 
   // categories를 tableData에 복사 (전체 데이터)
   useEffect(() => {
@@ -150,6 +176,12 @@ export default function CategorySettingsPage() {
             category_4: row.category_4 || null,
             category_4_code: row.category_4_code || null,
             category_5: row.category_5 || null,
+            raw_material_status: row.raw_material_status || null,
+            seller_supply: row.seller_supply !== null ? row.seller_supply : true,
+            is_best: row.is_best || false,
+            is_recommended: row.is_recommended || false,
+            has_image: row.has_image || false,
+            has_detail_page: row.has_detail_page || false,
             notes: row.notes || null,
             is_active: true
           }])
@@ -201,6 +233,12 @@ export default function CategorySettingsPage() {
               category_4: row.category_4 || null,
               category_4_code: row.category_4_code || null,
               category_5: row.category_5 || null,
+              raw_material_status: row.raw_material_status || null,
+              seller_supply: row.seller_supply !== null ? row.seller_supply : true,
+              is_best: row.is_best || false,
+              is_recommended: row.is_recommended || false,
+              has_image: row.has_image || false,
+              has_detail_page: row.has_detail_page || false,
               notes: row.notes || null,
               is_active: true
             }])
@@ -221,6 +259,12 @@ export default function CategorySettingsPage() {
               category_4: row.category_4 || null,
               category_4_code: row.category_4_code || null,
               category_5: row.category_5 || null,
+              raw_material_status: row.raw_material_status || null,
+              seller_supply: row.seller_supply !== null ? row.seller_supply : true,
+              is_best: row.is_best || false,
+              is_recommended: row.is_recommended || false,
+              has_image: row.has_image || false,
+              has_detail_page: row.has_detail_page || false,
               notes: row.notes || null
             }).eq('id', row.id)
 
@@ -276,6 +320,126 @@ export default function CategorySettingsPage() {
     } catch (error) {
       console.error('삭제 중 오류:', error)
       showToast('삭제 중 오류가 발생했습니다.', 'error')
+    }
+  }
+
+  const handleSyncCategories = async () => {
+    const confirmed = await confirm({
+      title: '원물과 옵션상품의 카테고리를 동기화하시겠습니까?',
+      message: 'category_settings의 최신 카테고리 정보로 원물과 옵션상품의 카테고리가 업데이트됩니다. 이 작업은 시간이 걸릴 수 있습니다.',
+      type: 'warning'
+    })
+
+    if (!confirmed) return
+
+    try {
+      setLoading(true)
+
+      // 1. category_settings에서 모든 카테고리 가져오기
+      const { data: categorySettings, error: catError } = await supabase
+        .from('category_settings')
+        .select('category_1, category_2, category_3, category_4, category_5')
+        .eq('is_active', true)
+        .not('category_4', 'is', null)
+
+      if (catError) {
+        showToast('카테고리 설정 조회 실패', 'error')
+        setLoading(false)
+        return
+      }
+
+      // category_4를 키로 하는 맵 생성
+      const categoryMap = new Map()
+      categorySettings?.forEach(cat => {
+        if (cat.category_4) {
+          categoryMap.set(cat.category_4, cat)
+        }
+      })
+
+      // 2. 원물 카테고리 동기화
+      const { data: rawMaterials, error: rmError } = await supabase
+        .from('raw_materials')
+        .select('id, category_4')
+        .not('category_4', 'is', null)
+
+      if (rmError) {
+        showToast('원물 조회 실패', 'error')
+        setLoading(false)
+        return
+      }
+
+      let rmUpdated = 0
+      for (const rm of rawMaterials || []) {
+        const catSettings = categoryMap.get(rm.category_4)
+        if (catSettings) {
+          const { error } = await supabase
+            .from('raw_materials')
+            .update({
+              category_1: catSettings.category_1,
+              category_2: catSettings.category_2,
+              category_3: catSettings.category_3,
+              category_5: catSettings.category_5
+            })
+            .eq('id', rm.id)
+
+          if (!error) rmUpdated++
+        }
+      }
+
+      // 3. 옵션상품 카테고리 동기화 (원물 매칭을 통해)
+      // 옵션상품-원물 매칭 정보 조회
+      const { data: materialLinks, error: linkError } = await supabase
+        .from('option_product_materials')
+        .select('option_product_id, raw_material_id')
+
+      if (linkError) {
+        showToast('원물 매칭 정보 조회 실패', 'error')
+        setLoading(false)
+        return
+      }
+
+      // 원물 ID -> 원물 정보 맵
+      const rawMaterialMap = new Map()
+      for (const rm of rawMaterials || []) {
+        rawMaterialMap.set(rm.id, rm)
+      }
+
+      let opUpdated = 0
+      const processedProducts = new Set()
+
+      // 매칭된 옵션상품의 카테고리를 원물에서 복사
+      for (const link of materialLinks || []) {
+        if (processedProducts.has(link.option_product_id)) continue
+
+        const rawMaterial = rawMaterialMap.get(link.raw_material_id)
+        if (rawMaterial && rawMaterial.category_4) {
+          const { error } = await supabase
+            .from('option_products')
+            .update({
+              category_1: rawMaterial.category_1,
+              category_2: rawMaterial.category_2,
+              category_3: rawMaterial.category_3,
+              category_4: rawMaterial.category_4,
+              category_5: rawMaterial.category_5
+            })
+            .eq('id', link.option_product_id)
+
+          if (!error) {
+            opUpdated++
+            processedProducts.add(link.option_product_id)
+          }
+        }
+      }
+
+      showToast(
+        `동기화 완료! 원물 ${rmUpdated}개, 옵션상품 ${opUpdated}개 업데이트됨`,
+        'success'
+      )
+      setLoading(false)
+    } catch (error) {
+      console.error('카테고리 동기화 중 오류:', error)
+      showToast('카테고리 동기화 중 오류가 발생했습니다.', 'error')
+      setLoading(false)
     }
   }
 
@@ -361,6 +525,49 @@ export default function CategorySettingsPage() {
     { key: 'category_4', title: '품목', width: 150, className: 'text-center' },
     { key: 'category_4_code', title: '품목코드', width: 120, className: 'text-center' },
     { key: 'category_5', title: '품종', width: 150, className: 'text-center' },
+    {
+      key: 'raw_material_status',
+      title: '원물상태',
+      width: 120,
+      className: 'text-center',
+      type: 'dropdown' as const,
+      source: supplyStatuses.map(s => s.name)
+    },
+    {
+      key: 'seller_supply',
+      title: '셀러공급',
+      width: 100,
+      className: 'text-center',
+      type: 'checkbox' as const
+    },
+    {
+      key: 'is_best',
+      title: '베스트',
+      width: 80,
+      className: 'text-center',
+      type: 'checkbox' as const
+    },
+    {
+      key: 'is_recommended',
+      title: '추천상품',
+      width: 90,
+      className: 'text-center',
+      type: 'checkbox' as const
+    },
+    {
+      key: 'has_image',
+      title: '이미지제공',
+      width: 100,
+      className: 'text-center',
+      type: 'checkbox' as const
+    },
+    {
+      key: 'has_detail_page',
+      title: '상세페이지',
+      width: 100,
+      className: 'text-center',
+      type: 'checkbox' as const
+    },
     { key: 'notes', title: '비고', width: 200, className: 'text-center' }
   ]
 
@@ -382,6 +589,12 @@ export default function CategorySettingsPage() {
                 '품목': cat.category_4 || '',
                 '품목코드': cat.category_4_code || '',
                 '품종': cat.category_5 || '',
+                '원물상태': cat.raw_material_status || '',
+                '셀러공급': cat.seller_supply ? 'Y' : 'N',
+                '베스트': cat.is_best ? 'Y' : 'N',
+                '추천상품': cat.is_recommended ? 'Y' : 'N',
+                '이미지제공': cat.has_image ? 'Y' : 'N',
+                '상세페이지': cat.has_detail_page ? 'Y' : 'N',
                 '비고': cat.notes || '',
                 '활성화': cat.is_active ? 'Y' : 'N'
               }))
@@ -442,6 +655,8 @@ export default function CategorySettingsPage() {
                     '품목': 'category_4',
                     '품목코드': 'category_4_code',
                     '품종': 'category_5',
+                    '원물상태': 'raw_material_status',
+                    '셀러공급': 'seller_supply',
                     '비고': 'notes',
                     '활성화': 'is_active'
                   }
@@ -453,8 +668,8 @@ export default function CategorySettingsPage() {
                       const englishKey = reverseFieldMapping[key] || key
                       let value = row[key]
 
-                      // is_active 필드 처리 (Y/N -> boolean)
-                      if (englishKey === 'is_active') {
+                      // Boolean 필드 처리 (Y/N -> boolean)
+                      if (englishKey === 'is_active' || englishKey === 'seller_supply') {
                         value = value === 'Y' || value === true || value === 1
                       }
 
@@ -495,6 +710,9 @@ export default function CategorySettingsPage() {
 
           <Button onClick={handleRemoveDuplicates} variant="ghost" className="text-orange-600">
             중복 제거
+          </Button>
+          <Button onClick={handleSyncCategories} variant="ghost" className="text-purple-600">
+            카테고리 동기화
           </Button>
         </div>
       </div>

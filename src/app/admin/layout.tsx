@@ -1,14 +1,16 @@
 // app/admin/layout.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import Head from 'next/head'
 import { createClient } from '@/lib/supabase/client'
 import { ToastProvider } from '@/components/ui/Toast'
 import { ConfirmProvider } from '@/components/ui/ConfirmModal'
 import { LogoutButton } from '@/components/ui/LogoutButton'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { FloatingHtmlBuilder } from '@/components/admin/FloatingHtmlBuilder'
 
 export default function AdminLayout({
   children,
@@ -20,6 +22,7 @@ export default function AdminLayout({
   const [isMobile, setIsMobile] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [userData, setUserData] = useState<any>(null)
+  const [showHtmlBuilder, setShowHtmlBuilder] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -33,25 +36,40 @@ export default function AdminLayout({
     return () => window.removeEventListener('resize', checkScreenSize)
   }, [])
 
-  // 관리자 화면 파비콘 설정
-  useEffect(() => {
-    // 기존 파비콘 제거
+  // 관리자 화면 파비콘 설정 (useLayoutEffect로 렌더링 전에 실행)
+  useLayoutEffect(() => {
+    // 기존 파비콘 모두 제거
     const existingFavicons = document.querySelectorAll("link[rel*='icon']");
     existingFavicons.forEach(el => el.remove());
 
-    // 관리자용 파비콘 추가
+    // 관리자용 파비콘 추가 (캐시 무효화)
+    const timestamp = Date.now();
     const link = document.createElement('link');
     link.rel = 'icon';
     link.type = 'image/png';
-    link.href = '/admin-favicon.png';
+    link.href = `/admin-favicon.png?v=${timestamp}`;
     document.head.appendChild(link);
 
     // 타이틀 변경
     document.title = '달래마켓 관리자';
 
+    // 주기적으로 파비콘 확인 및 복원 (다른 스크립트가 변경할 경우 대비)
+    const intervalId = setInterval(() => {
+      const currentFavicon = document.querySelector("link[rel*='icon']");
+      if (!currentFavicon || !currentFavicon.getAttribute('href')?.includes('admin-favicon')) {
+        const existingFavicons = document.querySelectorAll("link[rel*='icon']");
+        existingFavicons.forEach(el => el.remove());
+
+        const newLink = document.createElement('link');
+        newLink.rel = 'icon';
+        newLink.type = 'image/png';
+        newLink.href = `/admin-favicon.png?v=${Date.now()}`;
+        document.head.appendChild(newLink);
+      }
+    }, 1000);
+
     return () => {
-      // 컴포넌트 언마운트 시 원래대로 복원
-      link.remove();
+      clearInterval(intervalId);
     };
   }, []);
 
@@ -273,6 +291,17 @@ export default function AdminLayout({
             <div className="w-px h-6 bg-gray-300" />
 
             <button
+              onClick={() => setShowHtmlBuilder(!showHtmlBuilder)}
+              className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-1"
+              title="HTML 생성기"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+              </svg>
+              HTML
+            </button>
+
+            <button
               onClick={() => window.open('/', '_blank')}
               className="px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
             >
@@ -376,6 +405,12 @@ export default function AdminLayout({
       </div>
     </div>
       </ConfirmProvider>
+
+      {/* 플로팅 HTML 생성기 */}
+      <FloatingHtmlBuilder
+        isOpen={showHtmlBuilder}
+        onClose={() => setShowHtmlBuilder(false)}
+      />
     </ToastProvider>
   )
 }

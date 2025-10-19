@@ -272,12 +272,40 @@ export default function RawMaterialsManagementPage() {
       .order('material_code', { ascending: true })
 
     if (data) {
+      // 품목별 원물상태 조회
+      const { data: categories } = await supabase
+        .from('category_settings')
+        .select('category_4, raw_material_status')
+        .eq('is_active', true)
+        .not('category_4', 'is', null)
+
+      const categoryStatusMap = new Map(
+        (categories || []).map(cat => [cat.category_4, cat.raw_material_status])
+      )
+
+      // 상태 코드 -> 한글 이름 매핑
+      const { data: statuses } = await supabase
+        .from('supply_status_settings')
+        .select('code, name')
+        .eq('status_type', 'raw_material')
+        .eq('is_active', true)
+
+      const statusNameMap = new Map(
+        (statuses || []).map(s => [s.code, s.name])
+      )
+
       // supplier name을 supplier_name 필드로 매핑하고 supplier 객체는 제거
+      // 품목의 원물상태를 supply_status로 무조건 사용 (개별 설정 불가)
       const mapped = data.map(row => {
         const { supplier, ...rest } = row
+        const categoryStatus = categoryStatusMap.get(row.category_4)
+        const statusName = categoryStatus ? (statusNameMap.get(categoryStatus) || categoryStatus) : null
+
         return {
           ...rest,
-          supplier_name: supplier?.name || null
+          supplier_name: supplier?.name || null,
+          // 무조건 품목의 raw_material_status 사용 (한글명)
+          supply_status: statusName
         }
       })
       setMaterials(mapped)

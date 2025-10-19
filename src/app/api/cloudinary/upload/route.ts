@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
 
     // 업로드 타입별 ID 정보
     const uploadType = formData.get('upload_type') as string;
+    const rootFolder = (formData.get('root_folder') as string) || 'dalraemarket'; // 기본값: dalraemarket
     const rawMaterialId = formData.get('raw_material_id') as string;
     const optionProductId = formData.get('option_product_id') as string;
     const category4Id = formData.get('category_4_id') as string;
@@ -64,49 +65,53 @@ export async function POST(request: NextRequest) {
     }
 
     // Cloudinary 폴더 경로 결정
-    let folderPath = 'dalreamarket';
+    let folderPath = rootFolder; // 루트 폴더를 기본값으로 사용
 
-    if (uploadType === 'category_4' && category4Id) {
-      // 품목 단위: dalreamarket/{품목코드}/
-      const { data: category } = await supabase
-        .from('product_categories')
-        .select('category_4_code')
-        .eq('id', category4Id)
-        .single();
-
-      if (category?.category_4_code) {
-        folderPath = `dalreamarket/${category.category_4_code}`;
-      }
-    } else if (uploadType === 'option_product' && optionProductId) {
-      // 옵션상품 단위: dalreamarket/{품목코드}/{옵션상품코드}/
-      const { data: optionProduct } = await supabase
-        .from('option_products')
-        .select('option_code, category_4')
-        .eq('id', optionProductId)
-        .single();
-
-      if (optionProduct) {
-        // 옵션상품의 품목으로 품목코드 조회
+    // personal 타입이 아닐 경우에만 하위 폴더 구조 생성
+    if (uploadType !== 'personal') {
+      if (uploadType === 'category_4' && category4Id) {
+        // 품목 단위: {rootFolder}/{품목코드}/
         const { data: category } = await supabase
-          .from('product_categories')
+          .from('category_settings')
           .select('category_4_code')
-          .eq('category_4', optionProduct.category_4)
+          .eq('id', category4Id)
           .single();
 
-        if (category?.category_4_code && optionProduct.option_code) {
-          folderPath = `dalreamarket/${category.category_4_code}/${optionProduct.option_code}`;
+        if (category?.category_4_code) {
+          folderPath = `${rootFolder}/${category.category_4_code}`;
         }
-      }
-    } else if (uploadType === 'raw_material' && rawMaterialId) {
-      // 원물 단위: dalreamarket/raw_materials/{원물코드}/
-      const { data: rawMaterial } = await supabase
-        .from('raw_materials')
-        .select('material_code')
-        .eq('id', rawMaterialId)
-        .single();
+      } else if (uploadType === 'option_product' && optionProductId) {
+        // 옵션상품 단위: {rootFolder}/{품목코드}/{옵션상품코드}/
+        const { data: optionProduct } = await supabase
+          .from('option_products')
+          .select('option_code, category_4')
+          .eq('id', optionProductId)
+          .single();
 
-      if (rawMaterial?.material_code) {
-        folderPath = `dalreamarket/raw_materials/${rawMaterial.material_code}`;
+        if (optionProduct) {
+          // 옵션상품의 품목으로 품목코드 조회
+          const { data: category } = await supabase
+            .from('category_settings')
+            .select('category_4_code')
+            .eq('category_4', optionProduct.category_4)
+            .eq('is_active', true)
+            .single();
+
+          if (category?.category_4_code && optionProduct.option_code) {
+            folderPath = `${rootFolder}/${category.category_4_code}/${optionProduct.option_code}`;
+          }
+        }
+      } else if (uploadType === 'raw_material' && rawMaterialId) {
+        // 원물 단위: {rootFolder}/raw_materials/{원물코드}/
+        const { data: rawMaterial } = await supabase
+          .from('raw_materials')
+          .select('material_code')
+          .eq('id', rawMaterialId)
+          .single();
+
+        if (rawMaterial?.material_code) {
+          folderPath = `${rootFolder}/raw_materials/${rawMaterial.material_code}`;
+        }
       }
     }
 

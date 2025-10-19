@@ -71,6 +71,10 @@ export default function MaterialMatchingPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
+  // 품목 매칭용
+  const [categorySettings, setCategorySettings] = useState<Array<{category_4: string}>>([])
+  const [selectedCategory4, setSelectedCategory4] = useState<string>('')
+
   useEffect(() => {
     fetchData()
   }, [])
@@ -100,13 +104,35 @@ export default function MaterialMatchingPage() {
     try {
       await Promise.all([
         fetchOptionProducts(),
-        fetchRawMaterials()
+        fetchRawMaterials(),
+        fetchCategorySettings()
       ])
     } catch (error) {
       showToast('데이터 로딩 중 오류가 발생했습니다.', 'error')
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchCategorySettings = async () => {
+    const { data, error } = await supabase
+      .from('category_settings')
+      .select('category_4')
+      .eq('is_active', true)
+      .eq('expense_type', '사입') // 지출유형이 '사입'인 것만
+      .not('category_4', 'is', null)
+      .order('category_4')
+
+    if (error) {
+      console.error('품목 목록 조회 오류:', error)
+      return
+    }
+
+    // 중복 제거
+    const uniqueCategories = Array.from(new Set(data.map(c => c.category_4)))
+      .map(c4 => ({ category_4: c4 }))
+
+    setCategorySettings(uniqueCategories)
   }
 
   const fetchOptionProducts = async () => {
@@ -418,15 +444,155 @@ export default function MaterialMatchingPage() {
         if (error) throw error
       }
 
-      showToast('저장되었습니다.', 'success')
+      // 원물 매칭 저장 후 카테고리 업데이트
       if (selectedProduct) {
+        await updateProductCategory(selectedProduct.id)
         await fetchLinkedMaterials(selectedProduct.id)
       }
+
+      showToast('저장되었습니다.', 'success')
     } catch (error) {
       console.error('Error saving:', error)
       showToast('저장 중 오류가 발생했습니다.', 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // 품목으로 카테고리 매칭 (원물이 없는 옵션상품용)
+  const handleCategoryMatching = async () => {
+    if (!selectedProduct) {
+      showToast('옵션상품을 선택해주세요', 'error')
+      return
+    }
+
+    const targetCategory4 = selectedCategory4 || selectedProduct.category_4
+
+    if (!targetCategory4) {
+      showToast('품목을 선택해주세요', 'error')
+      return
+    }
+
+    try {
+      setSaving(true)
+
+      // category_settings에서 품목으로 조회
+      const { data: categorySettings, error: fetchError } = await supabase
+        .from('category_settings')
+        .select('category_1, category_2, category_3, category_4, category_5')
+        .eq('category_4', targetCategory4)
+        .eq('is_active', true)
+        .limit(1)
+        .single()
+
+      if (fetchError || !categorySettings) {
+        showToast(`품목 "${targetCategory4}"에 대한 카테고리 설정을 찾을 수 없습니다`, 'error')
+        return
+      }
+
+      // 옵션상품의 카테고리 업데이트
+      const { error: updateError } = await supabase
+        .from('option_products')
+        .update({
+          category_1: categorySettings.category_1,
+          category_2: categorySettings.category_2,
+          category_3: categorySettings.category_3,
+          category_4: categorySettings.category_4,
+          category_5: categorySettings.category_5
+        })
+        .eq('id', selectedProduct.id)
+
+      if (updateError) throw updateError
+
+      showToast('품목 매칭이 완료되었습니다', 'success')
+
+      // 옵션상품 목록 새로고침
+      await fetchOptionProducts()
+
+      // 현재 선택된 상품 정보 업데이트
+      const { data: updatedProduct } = await supabase
+        .from('option_products')
+        .select('*')
+        .eq('id', selectedProduct.id)
+        .single()
+
+      if (updatedProduct) {
+        setSelectedProduct(updatedProduct)
+      }
+
+      // 선택 초기화
+      setSelectedCategory4('')
+    } catch (error) {
+      console.error('품목 매칭 오류:', error)
+      showToast('품목 매칭 중 오류가 발생했습니다', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // 옵션상품의 카테고리 업데이트 (원물 매칭 또는 품목 매칭 기반)
+  const updateProductCategory = async (productId: string) => {
+    try {
+      // 1. 원물 매칭이 있는지 확인
+      const { data: materialLinks } = await supabase
+        .from('option_product_materials')
+        .select('raw_material_id')
+        .eq('option_product_id', productId)
+
+      if (materialLinks && materialLinks.length > 0) {
+        // 원물 매칭이 있으면 첫 번째 원물의 카테고리 사용
+        const { data: rawMaterial } = await supabase
+          .from('raw_materials')
+          .select('category_1, category_2, category_3, category_4, category_5')
+          .eq('id', materialLinks[0].raw_material_id)
+          .single()
+
+        if (rawMaterial && rawMaterial.category_4) {
+          await supabase
+            .from('option_products')
+            .update({
+              category_1: rawMaterial.category_1,
+              category_2: rawMaterial.category_2,
+              category_3: rawMaterial.category_3,
+              category_4: rawMaterial.category_4,
+              category_5: rawMaterial.category_5
+            })
+            .eq('id', productId)
+        }
+      } else {
+        // 원물 매칭이 없으면 옵션상품의 category_4로 category_settings에서 직접 조회
+        const { data: product } = await supabase
+          .from('option_products')
+          .select('category_4')
+          .eq('id', productId)
+          .single()
+
+        if (product?.category_4) {
+          const { data: categorySettings } = await supabase
+            .from('category_settings')
+            .select('category_1, category_2, category_3, category_4, category_5')
+            .eq('category_4', product.category_4)
+            .eq('is_active', true)
+            .limit(1)
+            .single()
+
+          if (categorySettings) {
+            await supabase
+              .from('option_products')
+              .update({
+                category_1: categorySettings.category_1,
+                category_2: categorySettings.category_2,
+                category_3: categorySettings.category_3,
+                category_4: categorySettings.category_4,
+                category_5: categorySettings.category_5
+              })
+              .eq('id', productId)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('카테고리 업데이트 오류:', error)
+      // 에러가 나도 저장은 성공으로 처리 (카테고리 업데이트는 부가 기능)
     }
   }
 
@@ -796,14 +962,18 @@ export default function MaterialMatchingPage() {
                           }`}
                         >
                           <div className="flex items-center justify-between gap-3">
-                            {/* 왼쪽 그룹: 옵션코드 + 체크 + 옵션명 + 표준수량 */}
+                            {/* 왼쪽 그룹: 옵션코드 + 체크/배지 + 옵션명 + 표준수량 */}
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded flex-shrink-0">
                                 {product.option_code}
                               </span>
-                              {product.has_materials && (
-                                <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
-                              )}
+                              {product.has_materials ? (
+                                <Check className="w-4 h-4 text-green-600 flex-shrink-0" title="원물 매칭됨" />
+                              ) : product.category_4 ? (
+                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded flex-shrink-0 font-medium" title="품목 매칭됨">
+                                  품목
+                                </span>
+                              ) : null}
                               <h3 className="font-medium text-gray-900 text-[16px]" title={product.option_name}>
                                 {product.option_name}
                               </h3>
@@ -811,8 +981,8 @@ export default function MaterialMatchingPage() {
                                 {product.standard_quantity || 0}{product.standard_unit || ''}
                               </span>
                             </div>
-                            {/* 오른쪽: 원물명 배지 */}
-                            {productMaterials.length > 0 && (
+                            {/* 오른쪽: 원물명 배지 또는 품목명 */}
+                            {productMaterials.length > 0 ? (
                               <div className="flex items-center gap-1 flex-shrink-0">
                                 {productMaterials.slice(0, 2).map((link, idx) => (
                                   <span
@@ -831,7 +1001,13 @@ export default function MaterialMatchingPage() {
                                   </span>
                                 )}
                               </div>
-                            )}
+                            ) : product.category_4 ? (
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium" title="품목명">
+                                  {product.category_4}
+                                </span>
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       )
@@ -892,13 +1068,58 @@ export default function MaterialMatchingPage() {
                   <div className="py-12 text-center">
                     <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600 mb-4">연결된 원물이 없습니다</p>
-                    <button
-                      onClick={() => setShowMaterialSelector(true)}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                      원물 추가하기
-                    </button>
+                    <div className="text-xs bg-gray-100 p-3 rounded mb-4 max-w-md mx-auto">
+                      <div className="grid grid-cols-2 gap-2 text-left">
+                        <span className="text-gray-500">품목(category_4):</span>
+                        <span className="font-medium">{selectedProduct?.category_4 || '(없음)'}</span>
+                        <span className="text-gray-500">대분류:</span>
+                        <span>{selectedProduct?.category_1 || '-'}</span>
+                        <span className="text-gray-500">중분류:</span>
+                        <span>{selectedProduct?.category_2 || '-'}</span>
+                        <span className="text-gray-500">소분류:</span>
+                        <span>{selectedProduct?.category_3 || '-'}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center gap-3">
+                      <button
+                        onClick={() => setShowMaterialSelector(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        원물 추가하기
+                      </button>
+                      <div className="text-sm text-gray-500">또는</div>
+
+                      {/* 품목 선택 드롭다운 */}
+                      <div className="w-full max-w-xs">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          품목 선택 {selectedProduct?.category_4 && (
+                            <span className="text-xs text-gray-500">(현재: {selectedProduct.category_4})</span>
+                          )}
+                        </label>
+                        <select
+                          value={selectedCategory4}
+                          onChange={(e) => setSelectedCategory4(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        >
+                          <option value="">품목을 선택하세요</option>
+                          {categorySettings.map(cat => (
+                            <option key={cat.category_4} value={cat.category_4}>
+                              {cat.category_4}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        onClick={handleCategoryMatching}
+                        disabled={!selectedProduct?.category_4 && !selectedCategory4}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Package className="w-4 h-4" />
+                        {selectedProduct?.category_4 ? '품목 재매칭' : '품목으로 카테고리 매칭'}
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">

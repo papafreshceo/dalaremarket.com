@@ -21,6 +21,7 @@ interface CloudinaryImage {
   tags: string[];
   is_public: boolean;
   is_downloadable: boolean;
+  is_representative?: boolean;
   view_count: number;
   download_count: number;
   created_at: string;
@@ -47,9 +48,9 @@ export default function MediaManagementPage() {
   const [uploading, setUploading] = useState(false);
 
   // 폴더 트리 상태
-  const [folderTree, setFolderTree] = useState<FolderNode | null>(null);
+  const [folderTree, setFolderTree] = useState<FolderNode[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>('');
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['dalreamarket']));
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['dalraemarket', 'papafresh']));
 
   // 필터 상태
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -62,15 +63,16 @@ export default function MediaManagementPage() {
 
   // 업로드 모달
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadType, setUploadType] = useState<'raw_material' | 'option_product' | 'category_4'>('category_4');
+  const [uploadType, setUploadType] = useState<'raw_material' | 'option_product' | 'category_4' | 'personal'>('category_4');
+  const [rootFolder, setRootFolder] = useState<'dalraemarket' | 'papafresh'>('dalraemarket');
   const [uploadForm, setUploadForm] = useState({
     files: [] as File[],
     category: '기타',
     title: '',
     description: '',
     tags: '',
-    is_public: true,
-    is_downloadable: true,
+    is_public: true, // 공개 여부 (플랫폼 사용자에게 보임)
+    is_downloadable: true, // 다운로드 가능 여부 (플랫폼 사용자가 다운로드 가능)
     raw_material_id: '',
     option_product_id: '',
     category_4_id: '',
@@ -90,12 +92,9 @@ export default function MediaManagementPage() {
   // 이미지 선택 상태 (대량 삭제용)
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
 
-  // HTML 빌더 상태
-  const [showHtmlBuilder, setShowHtmlBuilder] = useState(false);
-  const [builderImages, setBuilderImages] = useState<CloudinaryImage[]>([]);
-  const [youtubeUrls, setYoutubeUrls] = useState<string[]>([]);
-  const [newYoutubeUrl, setNewYoutubeUrl] = useState('');
-  const [generatedHtml, setGeneratedHtml] = useState('');
+  // 대표이미지 설정용 단일 선택
+  const [selectedForRepresentative, setSelectedForRepresentative] = useState<string | null>(null);
+
 
   useEffect(() => {
     fetchImages();
@@ -208,9 +207,10 @@ export default function MediaManagementPage() {
     try {
       console.log('품목 마스터 조회 시작...');
       const { data, error } = await supabase
-        .from('product_categories')
+        .from('category_settings')
         .select('id, category_4, category_4_code')
         .eq('is_active', true)
+        .not('category_4', 'is', null)
         .order('category_4');
 
       if (error) {
@@ -243,19 +243,22 @@ export default function MediaManagementPage() {
       return;
     }
 
-    if (uploadType === 'raw_material' && !uploadForm.raw_material_id) {
-      alert('원물을 선택해주세요.');
-      return;
-    }
+    // dalraemarket 폴더 선택 시에만 품목/원물/옵션상품 검증
+    if (rootFolder === 'dalraemarket') {
+      if (uploadType === 'raw_material' && !uploadForm.raw_material_id) {
+        alert('원물을 선택해주세요.');
+        return;
+      }
 
-    if (uploadType === 'option_product' && !uploadForm.option_product_id) {
-      alert('옵션상품을 선택해주세요.');
-      return;
-    }
+      if (uploadType === 'option_product' && !uploadForm.option_product_id) {
+        alert('옵션상품을 선택해주세요.');
+        return;
+      }
 
-    if (uploadType === 'category_4' && !uploadForm.category_4_id) {
-      alert('품목을 선택해주세요.');
-      return;
+      if (uploadType === 'category_4' && !uploadForm.category_4_id) {
+        alert('품목을 선택해주세요.');
+        return;
+      }
     }
 
     try {
@@ -279,6 +282,7 @@ export default function MediaManagementPage() {
         formData.append('is_public', uploadForm.is_public.toString());
         formData.append('is_downloadable', uploadForm.is_downloadable.toString());
         formData.append('upload_type', uploadType);
+        formData.append('root_folder', rootFolder); // 루트 폴더 추가
 
         if (uploadType === 'raw_material') {
           formData.append('raw_material_id', uploadForm.raw_material_id);
@@ -559,109 +563,55 @@ export default function MediaManagementPage() {
 
   // HTML 빌더 함수들
   const addImageToBuilder = (image: CloudinaryImage) => {
-    // 중복 체크
-    if (builderImages.find(img => img.id === image.id)) {
-      alert('이미 추가된 이미지입니다.');
-      return;
-    }
-    setBuilderImages([...builderImages, image]);
-  };
-
-  const removeImageFromBuilder = (imageId: string) => {
-    setBuilderImages(builderImages.filter(img => img.id !== imageId));
-  };
-
-  const moveImageUp = (index: number) => {
-    if (index === 0) return;
-    const newImages = [...builderImages];
-    [newImages[index - 1], newImages[index]] = [newImages[index], newImages[index - 1]];
-    setBuilderImages(newImages);
-  };
-
-  const moveImageDown = (index: number) => {
-    if (index === builderImages.length - 1) return;
-    const newImages = [...builderImages];
-    [newImages[index], newImages[index + 1]] = [newImages[index + 1], newImages[index]];
-    setBuilderImages(newImages);
-  };
-
-  const addYoutubeUrl = () => {
-    if (!newYoutubeUrl.trim()) {
-      alert('YouTube URL을 입력해주세요.');
-      return;
-    }
-
-    const videoId = extractYoutubeVideoId(newYoutubeUrl);
-    if (!videoId) {
-      alert('올바른 YouTube URL이 아닙니다.');
-      return;
-    }
-
-    setYoutubeUrls([...youtubeUrls, newYoutubeUrl]);
-    setNewYoutubeUrl('');
-  };
-
-  const removeYoutubeUrl = (index: number) => {
-    setYoutubeUrls(youtubeUrls.filter((_, i) => i !== index));
-  };
-
-  const moveYoutubeUp = (index: number) => {
-    if (index === 0) return;
-    const newUrls = [...youtubeUrls];
-    [newUrls[index - 1], newUrls[index]] = [newUrls[index], newUrls[index - 1]];
-    setYoutubeUrls(newUrls);
-  };
-
-  const moveYoutubeDown = (index: number) => {
-    if (index === youtubeUrls.length - 1) return;
-    const newUrls = [...youtubeUrls];
-    [newUrls[index], newUrls[index + 1]] = [newUrls[index + 1], newUrls[index]];
-    setYoutubeUrls(newUrls);
-  };
-
-  const generateHtml = () => {
-    let html = '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="UTF-8">\n  <style>\n    body { margin: 0; padding: 0; font-family: Arial, sans-serif; }\n    .product-detail { max-width: 1000px; margin: 0 auto; }\n    .video-container { position: relative; width: 100%; padding-bottom: 56.25%; margin-bottom: 20px; }\n    .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }\n    .product-image { width: 100%; display: block; margin-bottom: 0; }\n  </style>\n</head>\n<body>\n  <div class="product-detail">\n';
-
-    // YouTube 동영상들 추가
-    youtubeUrls.forEach((url) => {
-      const videoId = extractYoutubeVideoId(url);
-      if (videoId) {
-        html += `    <div class="video-container">\n      <iframe src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>\n    </div>\n`;
+    // 플로팅 HTML 생성기로 이미지 추가 이벤트 발송
+    const event = new CustomEvent('addToHtmlBuilder', {
+      detail: {
+        id: image.id,
+        secure_url: image.secure_url,
+        title: image.title,
+        filename: image.filename,
       }
     });
-
-    // 이미지들 추가
-    builderImages.forEach((image) => {
-      html += `    <img src="${image.secure_url}" alt="${image.title}" class="product-image" />\n`;
-    });
-
-    html += '  </div>\n</body>\n</html>';
-    setGeneratedHtml(html);
+    window.dispatchEvent(event);
+    alert('HTML 생성기에 추가되었습니다!');
   };
 
-  const extractYoutubeVideoId = (url: string): string | null => {
-    const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-      /youtube\.com\/shorts\/([^&\n?#]+)/
-    ];
-
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match && match[1]) {
-        return match[1];
-      }
-    }
-    return null;
-  };
-
-  const copyHtmlToClipboard = async () => {
-    if (!generatedHtml) {
-      alert('먼저 HTML을 생성해주세요.');
+  const handleSetRepresentativeImage = async () => {
+    if (!selectedForRepresentative) {
+      alert('대표이미지로 설정할 이미지를 선택해주세요.');
       return;
     }
-    await navigator.clipboard.writeText(generatedHtml);
-    alert('HTML 코드가 복사되었습니다!');
+
+    const selectedImage = images.find(img => img.id === selectedForRepresentative);
+    if (!selectedImage) {
+      alert('선택한 이미지를 찾을 수 없습니다.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/cloudinary/images/representative', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageId: selectedForRepresentative,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('대표이미지로 설정되었습니다!');
+        setSelectedForRepresentative(null); // 선택 해제
+        fetchImages(); // 목록 새로고침
+      } else {
+        alert('대표이미지 설정 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('대표이미지 설정 오류:', error);
+      alert('대표이미지 설정 중 오류가 발생했습니다.');
+    }
   };
+
 
   return (
     <div className="p-6">
@@ -671,18 +621,6 @@ export default function MediaManagementPage() {
           <p className="text-gray-600 text-sm mt-1">Cloudinary 이미지 업로드 및 관리</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowHtmlBuilder(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-          >
-            <Code size={20} />
-            HTML 생성기
-            {(builderImages.length > 0 || youtubeUrls.length > 0) && (
-              <span className="ml-1 bg-white text-purple-600 px-2 py-0.5 rounded-full text-xs font-semibold">
-                {builderImages.length + youtubeUrls.length}
-              </span>
-            )}
-          </button>
           <button
             onClick={() => setShowUploadModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -714,7 +652,7 @@ export default function MediaManagementPage() {
                 <span className="text-sm font-medium">전체</span>
               </div>
               {/* 폴더 트리 */}
-              {folderTree && renderFolderTree(folderTree)}
+              {folderTree.map(tree => renderFolderTree(tree))}
             </div>
           </div>
         </div>
@@ -776,6 +714,16 @@ export default function MediaManagementPage() {
             >
               <List size={20} />
             </button>
+            {/* 대표이미지 설정 버튼 */}
+            {viewMode === 'list' && (
+              <button
+                onClick={handleSetRepresentativeImage}
+                disabled={!selectedForRepresentative}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+              >
+                대표이미지 설정
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -926,40 +874,91 @@ export default function MediaManagementPage() {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">미리보기</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">제목</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">이미지 유형</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">크기</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">통계</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">작업</th>
+                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase w-12">선택</th>
+                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20">미리보기</th>
+                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase w-32">파일명</th>
+                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase">URL</th>
+                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase w-24">유형</th>
+                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase w-24">크기</th>
+                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20">상태</th>
+                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase w-24">통계</th>
+                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20">작업</th>
+                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase w-24">대표이미지</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {images.map((image) => (
                 <tr key={image.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div className="relative w-16 h-16 bg-gray-100 rounded">
-                      <Image
-                        src={image.secure_url}
-                        alt={image.title}
-                        fill
-                        className="object-cover rounded"
-                        sizes="64px"
+                  {/* 선택 라디오 버튼 */}
+                  <td className="px-2 py-3">
+                    <div className="flex justify-center">
+                      <input
+                        type="radio"
+                        name="representativeImage"
+                        checked={selectedForRepresentative === image.id}
+                        onChange={() => setSelectedForRepresentative(image.id)}
+                        className="w-4 h-4 cursor-pointer accent-blue-600"
                       />
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-sm">{image.title}</p>
-                    <p className="text-xs text-gray-500">{image.filename}</p>
+                  {/* 미리보기 이미지 */}
+                  <td className="px-2 py-3">
+                    <div className="flex justify-center">
+                      <div className="relative w-16 h-16 bg-gray-100 rounded">
+                        <Image
+                          src={image.secure_url}
+                          alt={image.title}
+                          fill
+                          className="object-cover rounded"
+                          sizes="64px"
+                        />
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-4 py-3 text-sm">{image.category}</td>
-                  <td className="px-4 py-3 text-sm">
+                  {/* 파일명 */}
+                  <td className="px-2 py-3 text-center">
+                    <p className="font-medium text-sm truncate">{image.filename}</p>
+                    {image.title !== image.filename && (
+                      <p className="text-xs text-gray-500 mt-1 truncate">{image.title}</p>
+                    )}
+                  </td>
+                  {/* URL */}
+                  <td className="px-2 py-3">
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={image.secure_url}
+                        readOnly
+                        className="w-full px-2 py-1 text-xs bg-gray-50 border border-gray-200 rounded font-mono"
+                      />
+                      <button
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(image.secure_url);
+                          // 임시로 복사됨 표시
+                          const btn = document.activeElement as HTMLButtonElement;
+                          const originalText = btn.innerHTML;
+                          btn.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>';
+                          setTimeout(() => {
+                            btn.innerHTML = originalText;
+                          }, 1000);
+                        }}
+                        className="p-1.5 text-gray-600 hover:bg-gray-100 rounded flex-shrink-0"
+                        title="URL 복사"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    </div>
+                  </td>
+                  {/* 유형 */}
+                  <td className="px-2 py-3 text-xs text-center">{image.category}</td>
+                  {/* 크기 */}
+                  <td className="px-2 py-3 text-xs text-center">
                     <p>{formatFileSize(image.file_size)}</p>
                     <p className="text-xs text-gray-500">{image.width} × {image.height}</p>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
+                  {/* 상태 */}
+                  <td className="px-2 py-3">
+                    <div className="flex gap-1 justify-center">
                       {image.is_public ? (
                         <span className="bg-green-100 text-green-600 px-2 py-1 rounded text-xs">공개</span>
                       ) : (
@@ -967,27 +966,37 @@ export default function MediaManagementPage() {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
+                  {/* 통계 */}
+                  <td className="px-2 py-3 text-xs text-gray-500 text-center">
                     <p>👁 {image.view_count}</p>
                     <p>⬇ {image.download_count}</p>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
+                  {/* 작업 */}
+                  <td className="px-2 py-3">
+                    <div className="flex gap-1 justify-center">
                       <button
                         onClick={() => setEditingImage(image)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
                         title="수정"
                       >
-                        <Edit2 size={16} />
+                        <Edit2 size={14} />
                       </button>
                       <button
                         onClick={() => handleDelete(image.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded"
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded"
                         title="삭제"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
+                  </td>
+                  {/* 대표이미지 */}
+                  <td className="px-2 py-3 text-center">
+                    {image.is_representative && (
+                      <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs font-medium">
+                        대표이미지
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -1022,267 +1031,6 @@ export default function MediaManagementPage() {
         {/* 오른쪽 컨텐츠 영역 끝 */}
       </div>
       {/* 2단 레이아웃 끝 */}
-
-      {/* HTML 빌더 모달 */}
-      {showHtmlBuilder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              {/* 헤더 */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <Code size={24} className="text-purple-600" />
-                  <h2 className="text-xl font-bold">상세페이지 HTML 생성기</h2>
-                  {(youtubeUrls.length > 0 || builderImages.length > 0) && (
-                    <div className="flex gap-2">
-                      {youtubeUrls.length > 0 && (
-                        <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-sm font-medium">
-                          동영상 {youtubeUrls.length}개
-                        </span>
-                      )}
-                      {builderImages.length > 0 && (
-                        <span className="bg-purple-100 text-purple-600 px-3 py-1 rounded-full text-sm font-medium">
-                          이미지 {builderImages.length}개
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => setShowHtmlBuilder(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
-                  title="닫기"
-                >
-                  <X size={24} className="text-gray-600" />
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                {/* YouTube URL 입력 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    YouTube 동영상 ({youtubeUrls.length}개)
-                  </label>
-                  <div className="flex gap-2 mb-3">
-                    <input
-                      type="text"
-                      value={newYoutubeUrl}
-                      onChange={(e) => setNewYoutubeUrl(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addYoutubeUrl();
-                        }
-                      }}
-                      placeholder="https://www.youtube.com/watch?v=..."
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                    />
-                    <button
-                      onClick={addYoutubeUrl}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
-                    >
-                      <Plus size={16} className="inline mr-1" />
-                      추가
-                    </button>
-                  </div>
-
-                  {/* YouTube URL 리스트 */}
-                  {youtubeUrls.length > 0 && (
-                    <div className="space-y-2 mb-3">
-                      {youtubeUrls.map((url, index) => {
-                        const videoId = extractYoutubeVideoId(url);
-                        return (
-                          <div
-                            key={index}
-                            className="flex items-center gap-3 p-3 bg-red-50 rounded-lg"
-                          >
-                            {/* 순서 번호 */}
-                            <div className="flex-shrink-0 w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center font-semibold text-sm">
-                              {index + 1}
-                            </div>
-
-                            {/* 썸네일 */}
-                            {videoId && (
-                              <div className="relative w-24 h-16 bg-gray-100 rounded flex-shrink-0">
-                                <Image
-                                  src={`https://img.youtube.com/vi/${videoId}/mqdefault.jpg`}
-                                  alt="YouTube thumbnail"
-                                  fill
-                                  className="object-cover rounded"
-                                  sizes="96px"
-                                />
-                              </div>
-                            )}
-
-                            {/* URL 정보 */}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-mono truncate text-gray-700">{url}</p>
-                              <p className="text-xs text-gray-500 mt-1">Video ID: {videoId}</p>
-                            </div>
-
-                            {/* 컨트롤 버튼 */}
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => moveYoutubeUp(index)}
-                                disabled={index === 0}
-                                className="p-2 hover:bg-red-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                                title="위로"
-                              >
-                                <ArrowUp size={16} />
-                              </button>
-                              <button
-                                onClick={() => moveYoutubeDown(index)}
-                                disabled={index === youtubeUrls.length - 1}
-                                className="p-2 hover:bg-red-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                                title="아래로"
-                              >
-                                <ArrowDown size={16} />
-                              </button>
-                              <button
-                                onClick={() => removeYoutubeUrl(index)}
-                                className="p-2 hover:bg-red-200 rounded text-red-600"
-                                title="제거"
-                              >
-                                <X size={16} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  <p className="text-xs text-gray-500">
-                    YouTube URL을 추가하면 상세페이지 상단에 순서대로 동영상이 표시됩니다.
-                  </p>
-                </div>
-
-                {/* 이미지 리스트 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    상세페이지 이미지 ({builderImages.length}개)
-                  </label>
-                  {builderImages.length === 0 ? (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                      <ImageIcon size={48} className="mx-auto text-gray-400 mb-2" />
-                      <p className="text-gray-600">이미지를 추가해주세요.</p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        이미지 목록에서 "추가" 버튼을 클릭하세요.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {builderImages.map((image, index) => (
-                        <div
-                          key={image.id}
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-                        >
-                          {/* 순서 번호 */}
-                          <div className="flex-shrink-0 w-8 h-8 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-semibold text-sm">
-                            {index + 1}
-                          </div>
-
-                          {/* 썸네일 */}
-                          <div className="relative w-16 h-16 bg-gray-100 rounded flex-shrink-0">
-                            <Image
-                              src={image.secure_url}
-                              alt={image.title}
-                              fill
-                              className="object-cover rounded"
-                              sizes="64px"
-                            />
-                          </div>
-
-                          {/* 이미지 정보 */}
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{image.title}</p>
-                            <p className="text-xs text-gray-500">{image.filename}</p>
-                          </div>
-
-                          {/* 컨트롤 버튼 */}
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => moveImageUp(index)}
-                              disabled={index === 0}
-                              className="p-2 hover:bg-gray-200 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                              title="위로"
-                            >
-                              <ArrowUp size={16} />
-                            </button>
-                            <button
-                              onClick={() => moveImageDown(index)}
-                              disabled={index === builderImages.length - 1}
-                              className="p-2 hover:bg-gray-200 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                              title="아래로"
-                            >
-                              <ArrowDown size={16} />
-                            </button>
-                            <button
-                              onClick={() => removeImageFromBuilder(image.id)}
-                              className="p-2 hover:bg-red-100 rounded text-red-600"
-                              title="제거"
-                            >
-                              <X size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* HTML 생성 버튼 */}
-                <div className="flex gap-3">
-                  <button
-                    onClick={generateHtml}
-                    disabled={builderImages.length === 0 && youtubeUrls.length === 0}
-                    className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                  >
-                    <Code size={16} className="inline mr-2" />
-                    HTML 코드 생성
-                  </button>
-                  {generatedHtml && (
-                    <button
-                      onClick={copyHtmlToClipboard}
-                      className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
-                    >
-                      <Copy size={16} className="inline mr-2" />
-                      복사
-                    </button>
-                  )}
-                </div>
-
-                {/* 생성된 HTML 미리보기 */}
-                {generatedHtml && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      생성된 HTML 코드
-                    </label>
-                    <div className="relative">
-                      <pre className="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-xs max-h-96">
-                        <code>{generatedHtml}</code>
-                      </pre>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      이 코드를 오픈마켓 상세페이지 에디터에 붙여넣으세요.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* 하단 버튼 */}
-              <div className="flex justify-end gap-2 mt-6 pt-6 border-t">
-                <button
-                  onClick={() => setShowHtmlBuilder(false)}
-                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-                >
-                  닫기
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 업로드 모달 */}
       {showUploadModal && (
@@ -1351,92 +1099,142 @@ export default function MediaManagementPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* 업로드 타입 선택 */}
+                  {/* 루트 폴더 선택 */}
                   <div>
-                    <label className="block text-[14px] font-medium text-gray-700 mb-2">업로드 타입</label>
+                    <label className="block text-[14px] font-medium text-gray-700 mb-2">저장 위치</label>
                     <div className="flex gap-4">
                       <label className="flex items-center gap-2 whitespace-nowrap">
                         <input
                           type="radio"
-                          value="category_4"
-                          checked={uploadType === 'category_4'}
-                          onChange={(e) => setUploadType(e.target.value as 'category_4')}
+                          value="dalraemarket"
+                          checked={rootFolder === 'dalraemarket'}
+                          onChange={(e) => {
+                            setRootFolder(e.target.value as 'dalraemarket');
+                            // dalraemarket은 공개, 다운로드 가능으로 설정
+                            setUploadForm({
+                              ...uploadForm,
+                              is_public: true,
+                              is_downloadable: true
+                            });
+                          }}
                           className="w-4 h-4"
                         />
-                        <span className="text-[14px]">품목</span>
+                        <span className="text-[14px]">공개용 (dalraemarket) - 플랫폼 사용자 다운로드 가능</span>
                       </label>
                       <label className="flex items-center gap-2 whitespace-nowrap">
                         <input
                           type="radio"
-                          value="raw_material"
-                          checked={uploadType === 'raw_material'}
-                          onChange={(e) => setUploadType(e.target.value as 'raw_material')}
+                          value="papafresh"
+                          checked={rootFolder === 'papafresh'}
+                          onChange={(e) => {
+                            setRootFolder(e.target.value as 'papafresh');
+                            setUploadType('personal');
+                            // papafresh는 비공개, 다운로드 불가로 설정
+                            setUploadForm({
+                              ...uploadForm,
+                              is_public: false,
+                              is_downloadable: false
+                            });
+                          }}
                           className="w-4 h-4"
                         />
-                        <span className="text-[14px]">원물</span>
-                      </label>
-                      <label className="flex items-center gap-2 whitespace-nowrap">
-                        <input
-                          type="radio"
-                          value="option_product"
-                          checked={uploadType === 'option_product'}
-                          onChange={(e) => setUploadType(e.target.value as 'option_product')}
-                          className="w-4 h-4"
-                        />
-                        <span className="text-[14px]">옵션상품</span>
+                        <span className="text-[14px]">전용 (papafresh) - 상세페이지 관리용</span>
                       </label>
                     </div>
                   </div>
 
-                  {/* 품목/원물/옵션상품 선택 */}
-                  {uploadType === 'category_4' ? (
+                  {/* 업로드 타입 선택 (dalraemarket 선택 시만 표시) */}
+                  {rootFolder === 'dalraemarket' && (
                     <div>
-                      <label className="block text-[14px] font-medium text-gray-700 mb-2">품목 선택</label>
-                      <select
-                        value={uploadForm.category_4_id}
-                        onChange={(e) => setUploadForm({ ...uploadForm, category_4_id: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
-                      >
-                        <option value="">품목을 선택하세요</option>
-                        {productCategories.map((cat) => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.category_4}
-                          </option>
-                        ))}
-                      </select>
+                      <label className="block text-[14px] font-medium text-gray-700 mb-2">업로드 타입</label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 whitespace-nowrap">
+                          <input
+                            type="radio"
+                            value="category_4"
+                            checked={uploadType === 'category_4'}
+                            onChange={(e) => setUploadType(e.target.value as 'category_4')}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-[14px]">품목</span>
+                        </label>
+                        <label className="flex items-center gap-2 whitespace-nowrap">
+                          <input
+                            type="radio"
+                            value="raw_material"
+                            checked={uploadType === 'raw_material'}
+                            onChange={(e) => setUploadType(e.target.value as 'raw_material')}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-[14px]">원물</span>
+                        </label>
+                        <label className="flex items-center gap-2 whitespace-nowrap">
+                          <input
+                            type="radio"
+                            value="option_product"
+                            checked={uploadType === 'option_product'}
+                            onChange={(e) => setUploadType(e.target.value as 'option_product')}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-[14px]">옵션상품</span>
+                        </label>
+                      </div>
                     </div>
-                  ) : uploadType === 'raw_material' ? (
-                    <div>
-                      <label className="block text-[14px] font-medium text-gray-700 mb-2">원물 선택</label>
-                      <select
-                        value={uploadForm.raw_material_id}
-                        onChange={(e) => setUploadForm({ ...uploadForm, raw_material_id: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
-                      >
-                        <option value="">원물을 선택하세요</option>
-                        {rawMaterials.map((material) => (
-                          <option key={material.id} value={material.id}>
-                            {material.material_name} ({material.material_code})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-[14px] font-medium text-gray-700 mb-2">옵션상품 선택</label>
-                      <select
-                        value={uploadForm.option_product_id}
-                        onChange={(e) => setUploadForm({ ...uploadForm, option_product_id: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
-                      >
-                        <option value="">옵션상품을 선택하세요</option>
-                        {optionProducts.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.option_name} ({product.option_code})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  )}
+
+                  {/* 품목/원물/옵션상품 선택 (dalraemarket 선택 시만 표시) */}
+                  {rootFolder === 'dalraemarket' && (
+                    <>
+                      {uploadType === 'category_4' ? (
+                        <div>
+                          <label className="block text-[14px] font-medium text-gray-700 mb-2">품목 선택</label>
+                          <select
+                            value={uploadForm.category_4_id}
+                            onChange={(e) => setUploadForm({ ...uploadForm, category_4_id: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
+                          >
+                            <option value="">품목을 선택하세요</option>
+                            {productCategories.map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.category_4}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : uploadType === 'raw_material' ? (
+                        <div>
+                          <label className="block text-[14px] font-medium text-gray-700 mb-2">원물 선택</label>
+                          <select
+                            value={uploadForm.raw_material_id}
+                            onChange={(e) => setUploadForm({ ...uploadForm, raw_material_id: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
+                          >
+                            <option value="">원물을 선택하세요</option>
+                            {rawMaterials.map((material) => (
+                              <option key={material.id} value={material.id}>
+                                {material.material_name} ({material.material_code})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : uploadType === 'option_product' && (
+                        <div>
+                          <label className="block text-[14px] font-medium text-gray-700 mb-2">옵션상품 선택</label>
+                          <select
+                            value={uploadForm.option_product_id}
+                            onChange={(e) => setUploadForm({ ...uploadForm, option_product_id: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]"
+                          >
+                            <option value="">옵션상품을 선택하세요</option>
+                            {optionProducts.map((product) => (
+                              <option key={product.id} value={product.id}>
+                                {product.option_name} ({product.option_code})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {/* 파일 선택 */}
@@ -1534,26 +1332,40 @@ export default function MediaManagementPage() {
                     />
                   </div>
 
-                  {/* 공개 설정 */}
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={uploadForm.is_public}
-                        onChange={(e) => setUploadForm({ ...uploadForm, is_public: e.target.checked })}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-[14px]">공개</span>
+                  {/* 공개 설정 - dalraemarket만 수정 가능 */}
+                  <div>
+                    <label className="block text-[14px] font-medium text-gray-700 mb-2">
+                      접근 권한
+                      {rootFolder === 'papafresh' && (
+                        <span className="ml-2 text-[12px] text-gray-500">(전용 폴더는 자동으로 비공개/다운로드 불가)</span>
+                      )}
                     </label>
-                    <label className="flex items-center gap-2 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={uploadForm.is_downloadable}
-                        onChange={(e) => setUploadForm({ ...uploadForm, is_downloadable: e.target.checked })}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-[14px]">다운로드 가능</span>
-                    </label>
+                    <div className="flex gap-4">
+                      <label className={`flex items-center gap-2 whitespace-nowrap ${rootFolder === 'papafresh' ? 'opacity-50' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={uploadForm.is_public}
+                          onChange={(e) => setUploadForm({ ...uploadForm, is_public: e.target.checked })}
+                          disabled={rootFolder === 'papafresh'}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-[14px]">
+                          공개 (플랫폼 사용자에게 보임)
+                        </span>
+                      </label>
+                      <label className={`flex items-center gap-2 whitespace-nowrap ${rootFolder === 'papafresh' ? 'opacity-50' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={uploadForm.is_downloadable}
+                          onChange={(e) => setUploadForm({ ...uploadForm, is_downloadable: e.target.checked })}
+                          disabled={rootFolder === 'papafresh'}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-[14px]">
+                          다운로드 가능 (플랫폼 사용자가 다운로드 가능)
+                        </span>
+                      </label>
+                    </div>
                   </div>
 
                   <div className="flex gap-2">

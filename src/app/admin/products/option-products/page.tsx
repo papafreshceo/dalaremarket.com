@@ -225,6 +225,11 @@ export default function OptionProductsManagementPage() {
   const FIELD_LABELS: Record<string,string> = {
     option_code: '옵션코드',
     option_name: '상품명',
+    category_1: '대분류',
+    category_2: '중분류',
+    category_3: '소분류',
+    category_4: '품목',
+    category_5: '품종',
     specification_1: '규격1',
     specification_2: '규격2',
     specification_3: '규격3',
@@ -311,6 +316,7 @@ export default function OptionProductsManagementPage() {
 
   const FIELD_ORDER = [
     'option_code','option_name',
+    'category_1','category_2','category_3','category_4','category_5',
     'specification_1','specification_2','specification_3',
     'used_material_1','used_material_2','used_material_3',
     'standard_quantity','standard_unit',

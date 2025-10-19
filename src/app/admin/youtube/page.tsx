@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Youtube, RefreshCw, Search, Eye, EyeOff, Trash2, Play, ThumbsUp, Copy } from 'lucide-react';
+import { Youtube, RefreshCw, Search, Eye, EyeOff, Trash2, Play, ThumbsUp, Copy, Plus } from 'lucide-react';
 import Image from 'next/image';
 
 interface YoutubeVideo {
@@ -160,6 +160,16 @@ export default function YoutubeManagementPage() {
     return num.toString();
   };
 
+  const addToHtmlBuilder = (video: YoutubeVideo) => {
+    // 플로팅 HTML 생성기로 YouTube URL 추가 이벤트 발송
+    const youtubeUrl = `https://www.youtube.com/watch?v=${video.video_id}`;
+    const event = new CustomEvent('addYoutubeToBuilder', {
+      detail: youtubeUrl
+    });
+    window.dispatchEvent(event);
+    alert('HTML 생성기에 추가되었습니다!');
+  };
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -273,15 +283,22 @@ export default function YoutubeManagementPage() {
                   </div>
 
                   {/* 버튼 */}
-                  <div className="flex gap-2">
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => addToHtmlBuilder(video)}
+                      className="flex-1 px-2 py-1 text-xs bg-green-100 text-green-600 rounded hover:bg-green-200"
+                      title="HTML 생성기에 추가"
+                    >
+                      <Plus size={12} className="inline" />
+                    </button>
                     <a
                       href={`https://www.youtube.com/watch?v=${video.video_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200 text-center"
+                      title="YouTube에서 보기"
                     >
-                      <Play size={12} className="inline mr-1" />
-                      보기
+                      <Play size={12} className="inline" />
                     </a>
                     <button
                       onClick={() => toggleActive(video)}
@@ -293,6 +310,7 @@ export default function YoutubeManagementPage() {
                     <button
                       onClick={() => handleDelete(video.id)}
                       className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                      title="삭제"
                     >
                       <Trash2 size={12} />
                     </button>

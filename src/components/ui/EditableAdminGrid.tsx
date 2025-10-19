@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, memo, startTransition } from 'react'
 import { Button } from '@/components/ui'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
@@ -124,6 +124,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   const tableRef = useRef<HTMLTableElement>(null)
   const isInitialMount = useRef(true)
   const originalDataRef = useRef<T[]>([])
+  const isInternalUpdate = useRef(false) // 내부 업데이트 플래그
 
   // data prop 변경 추적을 위한 ref
   const prevDataRef = useRef<T[]>([])
@@ -168,6 +169,13 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     } else if (!isInitialMount.current) {
       // 데이터 참조가 변경된 경우 업데이트 (외부에서 새로 로드하거나 상태가 변경된 경우)
       if (data !== prevDataRef.current) {
+        // 내부 업데이트로 인한 변경인 경우 무시
+        if (isInternalUpdate.current) {
+          isInternalUpdate.current = false
+          prevDataRef.current = data
+          return
+        }
+
         const prevLength = prevDataRef.current.length
         const newLength = data.length
 
@@ -578,6 +586,46 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     const column = columns.find(col => col.key === columnKey)
     const row = gridData[rowIndex]
 
+    // 체크박스는 클릭 한 번에 즉시 토글
+    if (column?.type === 'checkbox' && !isReadOnly(column, row)) {
+      const newValue = !currentValue
+      const newData = [...gridData]
+      newData[rowIndex] = {
+        ...newData[rowIndex],
+        [columnKey]: newValue
+      }
+
+      // 수정 추적
+      const cellKey = `${rowIndex}-${columnKey}`
+      const isAddedOrCopied = addedRows.has(rowIndex) || copiedRows.has(rowIndex)
+      const newModifiedCells = new Set(modifiedCells)
+
+      if (!isAddedOrCopied) {
+        const originalValue = originalDataRef.current[rowIndex]?.[columnKey]
+        if (newValue === originalValue) {
+          newModifiedCells.delete(cellKey)
+        } else {
+          newModifiedCells.add(cellKey)
+        }
+      }
+
+      // 즉시 상태 업데이트 (딜레이 없음)
+      setGridData(newData)
+      setModifiedCells(newModifiedCells)
+      setSelectedCell({ row: rowIndex, col: columnKey })
+
+      // 히스토리와 콜백은 다음 프레임에
+      requestAnimationFrame(() => {
+        addToHistory(newData)
+        if (onDataChange) {
+          isInternalUpdate.current = true
+          onDataChange(newData)
+        }
+      })
+
+      return
+    }
+
     // 이미 선택된 셀을 다시 클릭하면 편집 모드 활성화 (드롭다운 제외)
     if (selectedCell?.row === rowIndex && selectedCell?.col === columnKey && !isReadOnly(column, row) && column?.type !== 'dropdown') {
       setIsKeyboardEdit(false)
@@ -625,40 +673,47 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       processedValue = rawValue === 'true' || rawValue === true
     }
 
-    const oldValue = newData[editingCell.row][editingCell.col]
+    const cellKey = `${editingCell.row}-${editingCell.col}`
+    const rowIndex = editingCell.row
 
-    // 값이 변경된 경우에만 처리
-    if (oldValue !== processedValue) {
-      newData[editingCell.row] = {
-        ...newData[editingCell.row],
-        [editingCell.col]: processedValue
-      }
+    // 추가되거나 복사된 행은 modifiedCells에서 제외
+    const isAddedOrCopied = addedRows.has(rowIndex) || copiedRows.has(rowIndex)
 
-      const cellKey = `${editingCell.row}-${editingCell.col}`
-      const newModifiedCells = new Set(modifiedCells)
-      const rowIndex = editingCell.row
+    // 원본 데이터와 비교하여 변경 여부 확인
+    const originalValue = originalDataRef.current[rowIndex]?.[editingCell.col]
+    const currentValue = newData[editingCell.row][editingCell.col]
 
-      // 추가되거나 복사된 행은 modifiedCells에서 제외
-      const isAddedOrCopied = addedRows.has(rowIndex) || copiedRows.has(rowIndex)
-
-      if (!isAddedOrCopied) {
-        // 원본 데이터와 비교 (기존 데이터만)
-        const originalValue = originalDataRef.current[rowIndex]?.[editingCell.col]
-        if (processedValue === originalValue) {
-          // 원래 값으로 돌아간 경우 modifiedCells에서 제거
-          newModifiedCells.delete(cellKey)
-        } else {
-          // 원래 값과 다른 경우 modifiedCells에 추가
-          newModifiedCells.add(cellKey)
-        }
-      }
-
-      setModifiedCells(newModifiedCells)
-      addToHistory(newData)
-      setGridData(newData)
-      onDataChange?.(newData)
-      onCellEdit?.(editingCell.row, editingCell.col, processedValue)
+    // 데이터 업데이트
+    newData[editingCell.row] = {
+      ...newData[editingCell.row],
+      [editingCell.col]: processedValue
     }
+
+    // 수정 상태 추적 (추가/복사된 행이 아닌 경우만)
+    const newModifiedCells = new Set(modifiedCells)
+
+    if (!isAddedOrCopied) {
+      // 원본 데이터와 비교
+      if (processedValue === originalValue) {
+        // 원래 값으로 돌아간 경우 modifiedCells에서 제거
+        newModifiedCells.delete(cellKey)
+      } else {
+        // 원래 값과 다른 경우 modifiedCells에 추가
+        newModifiedCells.add(cellKey)
+      }
+    }
+
+    setModifiedCells(newModifiedCells)
+    addToHistory(newData)
+    setGridData(newData)
+
+    // 내부 업데이트 플래그 설정 (onDataChange로 인한 재렌더링에서 modifiedCells 초기화 방지)
+    if (onDataChange) {
+      isInternalUpdate.current = true
+      onDataChange(newData)
+    }
+
+    onCellEdit?.(editingCell.row, editingCell.col, processedValue)
 
     // Enter 키로 아래 셀로 이동
     const nextRow = editingCell.row + 1
@@ -1395,12 +1450,9 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
         return (
           <div className="flex items-center justify-center h-full">
             <input
-              ref={inputRef as React.RefObject<HTMLInputElement>}
               type="checkbox"
               checked={editValue === 'true' || editValue === true}
-              onChange={(e) => setEditValue(String(e.target.checked))}
-              onBlur={() => commitEdit()}
-              onKeyDown={handleKeyDown}
+              readOnly
               className="w-4 h-4"
             />
           </div>
@@ -1461,8 +1513,13 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
     if (column.type === 'checkbox') {
       return (
-        <div className="flex items-center justify-center h-full">
-          <input type="checkbox" checked={!!value} readOnly className="w-4 h-4" />
+        <div className="flex items-center justify-center h-full cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!value}
+            readOnly
+            className="w-4 h-4 pointer-events-none"
+          />
         </div>
       )
     }
@@ -1782,11 +1839,57 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                     }}
                   >
                     <div
-                      className={`flex items-center justify-center gap-1 ${enableSort ? 'cursor-pointer hover:text-primary' : ''}`}
-                      onClick={() => handleSort(column.key)}
+                      className={`flex items-center justify-center gap-1 ${enableSort && column.type !== 'checkbox' ? 'cursor-pointer hover:text-primary' : ''}`}
+                      onClick={() => column.type !== 'checkbox' && handleSort(column.key)}
                     >
                       <span>{column.title}</span>
-                      {enableSort && sortConfig.key === column.key && (
+                      {column.type === 'checkbox' && (
+                        <input
+                          type="checkbox"
+                          checked={filteredData.every(row => row[column.key] === true)}
+                          onChange={(e) => {
+                            const newValue = e.target.checked
+                            const newData = [...gridData]
+                            const newModifiedCells = new Set(modifiedCells)
+
+                            filteredData.forEach((row, idx) => {
+                              const rowIndex = gridData.findIndex(r => r === row)
+                              if (rowIndex !== -1) {
+                                newData[rowIndex] = {
+                                  ...newData[rowIndex],
+                                  [column.key]: newValue
+                                }
+
+                                const cellKey = `${rowIndex}-${column.key}`
+                                const isAddedOrCopied = addedRows.has(rowIndex) || copiedRows.has(rowIndex)
+
+                                if (!isAddedOrCopied) {
+                                  const originalValue = originalDataRef.current[rowIndex]?.[column.key]
+                                  if (newValue === originalValue) {
+                                    newModifiedCells.delete(cellKey)
+                                  } else {
+                                    newModifiedCells.add(cellKey)
+                                  }
+                                }
+                              }
+                            })
+
+                            setGridData(newData)
+                            setModifiedCells(newModifiedCells)
+
+                            requestAnimationFrame(() => {
+                              addToHistory(newData)
+                              if (onDataChange) {
+                                isInternalUpdate.current = true
+                                onDataChange(newData)
+                              }
+                            })
+                          }}
+                          className="w-4 h-4 cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
+                      {enableSort && column.type !== 'checkbox' && sortConfig.key === column.key && (
                         <span className="text-primary">
                           {sortConfig.direction === 'asc' ? '↑' : '↓'}
                         </span>

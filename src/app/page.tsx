@@ -9,6 +9,28 @@ export default function PlatformHome() {
   const [activeTab, setActiveTab] = useState<{ main?: number }>({})
   const [isMobile, setIsMobile] = useState(false)
 
+  // 플랫폼 화면 파비콘 설정
+  useEffect(() => {
+    const updateFavicon = () => {
+      // 기존 파비콘 모두 제거
+      const existingFavicons = document.querySelectorAll("link[rel*='icon']");
+      existingFavicons.forEach(el => el.remove());
+
+      // 플랫폼용 파비콘 추가
+      const timestamp = Date.now();
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/png';
+      link.href = `/platform-favicon.png?v=${timestamp}`;
+      document.head.appendChild(link);
+
+      // 타이틀 변경
+      document.title = '달래마켓';
+    };
+
+    updateFavicon();
+  }, []);
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768)

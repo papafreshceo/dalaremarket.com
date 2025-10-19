@@ -187,14 +187,16 @@ export default function SupplyStatusSettingsPage() {
 
     const newStatuses = [...statuses]
     const targetIndex = direction === 'up' ? index - 1 : index + 1
-    
+
     // Swap display_order values
     const tempOrder = newStatuses[index]!.display_order
     newStatuses[index]!.display_order = newStatuses[targetIndex]!.display_order
     newStatuses[targetIndex]!.display_order = tempOrder
 
-    // Swap array positions
-    [newStatuses[index], newStatuses[targetIndex]] = [newStatuses[targetIndex]!, newStatuses[index]!]
+    // Swap array positions using temp variable
+    const temp = newStatuses[index]
+    newStatuses[index] = newStatuses[targetIndex]!
+    newStatuses[targetIndex] = temp!
 
     setStatuses(newStatuses)
 

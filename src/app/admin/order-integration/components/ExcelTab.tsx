@@ -137,6 +137,12 @@ export default function ExcelTab() {
       sequenceFormat: string;
     }
   } | null>(null);
+  const [optionStats, setOptionStats] = useState<{
+    optionName: string;
+    quantity: number;
+    orderCount: number;
+    markets: string[];
+  }[]>([]);
 
   // 옵션상품, 마켓 템플릿, 표준 필드 로드
   useEffect(() => {
@@ -943,6 +949,9 @@ export default function ExcelTab() {
         unmatched: unmatchedCount,
       });
 
+      // 옵션별 통계 계산
+      calculateOptionStats(ordersWithMapping);
+
       setResultMessage({
         title: '주문 통합 완료',
         content: `총 ${ordersWithMapping.length}개 주문\n✓ 옵션명 매칭 성공: ${matchedCount}개\n✗ 옵션명 매칭 실패: ${unmatchedCount}개\n\n${
@@ -1033,6 +1042,9 @@ export default function ExcelTab() {
         matched: matchedCount,
         unmatched: unmatchedCount,
       });
+
+      // 옵션별 통계 재계산
+      calculateOptionStats(ordersWithMapping);
 
       // 검증 결과 모달 표시
       let content = `총 ${ordersWithMapping.length}개 주문\n\n`;
@@ -1249,6 +1261,47 @@ export default function ExcelTab() {
     }
   };
 
+  // 옵션별 통계 계산
+  const calculateOptionStats = (ordersData: UploadedOrder[]) => {
+    const statsMap = new Map<string, {
+      quantity: number;
+      orderCount: number;
+      markets: Set<string>;
+    }>();
+
+    ordersData.forEach(order => {
+      const optionName = order.field_11; // 옵션명
+      const quantity = parseInt(String(order.field_12 || '0'), 10); // 수량
+      const market = order.field_1; // 마켓명
+
+      if (optionName) {
+        const existing = statsMap.get(optionName) || {
+          quantity: 0,
+          orderCount: 0,
+          markets: new Set<string>()
+        };
+
+        existing.quantity += isNaN(quantity) ? 0 : quantity;
+        existing.orderCount += 1;
+        if (market) {
+          existing.markets.add(market);
+        }
+
+        statsMap.set(optionName, existing);
+      }
+    });
+
+    // Map을 배열로 변환하고 옵션명 기준 오름차순 정렬
+    const statsArray = Array.from(statsMap.entries()).map(([optionName, data]) => ({
+      optionName,
+      quantity: data.quantity,
+      orderCount: data.orderCount,
+      markets: Array.from(data.markets)
+    })).sort((a, b) => a.optionName.localeCompare(b.optionName));
+
+    setOptionStats(statsArray);
+  };
+
   // 데이터 수정 핸들러
   const handleDataChange = (updatedData: any[]) => {
     // field_11 (옵션명)이 수정되었는지 확인
@@ -1284,6 +1337,9 @@ export default function ExcelTab() {
       matched: matchedCount,
       unmatched: unmatchedCount,
     });
+
+    // 옵션별 통계 재계산
+    calculateOptionStats(dataWithModifiedFlag);
   };
 
   // 문자열 유사도 계산 (Levenshtein Distance 기반)
@@ -1492,6 +1548,9 @@ export default function ExcelTab() {
       unmatched: unmatchedCount,
     });
 
+    // 옵션별 통계 재계산
+    calculateOptionStats(updatedOrders);
+
     toast.success(`${modifiedCount}개 주문의 옵션명을 수정했습니다.`, {
       duration: 3000,
       position: 'top-center',
@@ -1667,7 +1726,7 @@ export default function ExcelTab() {
 
       {/* EditableAdminGrid */}
       {integrationStage === 'integrated' && orders.length > 0 && (
-        <div>
+        <div className="space-y-4">
           <EditableAdminGrid
             key={orders.length + '-' + orders.filter(o => o._optionNameModified).length + '-' + orders.filter(o => o._optionNameVerified).length}
             columns={columns}
@@ -1724,6 +1783,72 @@ export default function ExcelTab() {
               </div>
             }
           />
+
+          {/* 옵션별 통계 테이블 */}
+          {optionStats.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <h3 className="text-base font-semibold text-gray-900 mb-3">옵션별 통계</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      <th className="px-4 py-2 text-left font-medium text-gray-700">순번</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-700">옵션명</th>
+                      <th className="px-4 py-2 text-center font-medium text-gray-700">수량 합계</th>
+                      <th className="px-4 py-2 text-center font-medium text-gray-700">주문 건수</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-700">마켓</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {optionStats.map((stat, index) => (
+                      <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="px-4 py-2 text-gray-600">{index + 1}</td>
+                        <td className="px-4 py-2 text-gray-900 font-medium">{stat.optionName}</td>
+                        <td className="px-4 py-2 text-center text-blue-600 font-semibold">{stat.quantity.toLocaleString()}</td>
+                        <td className="px-4 py-2 text-center text-gray-600">{stat.orderCount.toLocaleString()}</td>
+                        <td className="px-4 py-2">
+                          <div className="flex gap-1 flex-wrap">
+                            {stat.markets.map((market, idx) => {
+                              const template = marketTemplates.get(market.toLowerCase());
+                              let marketColor = '#6B7280';
+                              if (template?.color_rgb) {
+                                if (template.color_rgb.includes(',')) {
+                                  marketColor = `rgb(${template.color_rgb})`;
+                                } else {
+                                  marketColor = template.color_rgb;
+                                }
+                              }
+                              return (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-0.5 rounded text-white text-xs font-medium"
+                                  style={{ backgroundColor: marketColor }}
+                                >
+                                  {market}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
+                      <td className="px-4 py-2 text-gray-900" colSpan={2}>합계</td>
+                      <td className="px-4 py-2 text-center text-blue-600 font-bold">
+                        {optionStats.reduce((sum, stat) => sum + stat.quantity, 0).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2 text-center text-gray-900">
+                        {optionStats.reduce((sum, stat) => sum + stat.orderCount, 0).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2"></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
