@@ -63,6 +63,11 @@ export default function ProductsLayout({ children }: { children: ReactNode }) {
           href: '/admin/media'
         },
         {
+          title: 'YouTube 영상 관리',
+          description: 'YouTube 채널 영상 관리',
+          href: '/admin/youtube'
+        },
+        {
           title: '다운로드 분석',
           description: '이미지 다운로드 통계',
           href: '/admin/media/analytics'

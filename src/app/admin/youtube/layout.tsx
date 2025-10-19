@@ -1,11 +1,11 @@
-// app/admin/media/layout.tsx
+// app/admin/youtube/layout.tsx
 'use client'
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { ReactNode } from 'react'
 
-export default function MediaLayout({ children }: { children: ReactNode }) {
+export default function YoutubeLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
 
   const productCategories = [

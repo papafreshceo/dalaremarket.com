@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import cloudinary from '@/lib/cloudinary/config';
 import { createClient } from '@/lib/supabase/server';
+import crypto from 'crypto';
 
 /**
  * POST /api/cloudinary/upload
@@ -34,8 +35,33 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
+    // 파일 해시 계산 (SHA-256)
+    const fileHash = crypto.createHash('sha256').update(buffer).digest('hex');
+
     // Supabase 클라이언트 생성 (폴더 경로 조회용)
     const supabase = await createClient();
+
+    // 1. 해시 기반 중복 체크
+    const { data: hashDuplicate } = await supabase
+      .from('cloudinary_images')
+      .select('id, filename, secure_url, cloudinary_id')
+      .eq('file_hash', fileHash)
+      .maybeSingle();
+
+    if (hashDuplicate) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '동일한 파일이 이미 존재합니다.',
+          duplicate: {
+            type: 'hash',
+            message: `같은 내용의 파일이 이미 업로드되어 있습니다: ${hashDuplicate.filename}`,
+            existingFile: hashDuplicate
+          }
+        },
+        { status: 409 }
+      );
+    }
 
     // Cloudinary 폴더 경로 결정
     let folderPath = 'dalreamarket';
@@ -84,13 +110,49 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Cloudinary에 업로드
+    // 2. 파일명 기반 중복 체크 (같은 폴더 내)
+    const expectedCloudinaryId = `${folderPath}/${file.name.replace(/\.[^/.]+$/, '')}`; // 확장자 제외한 경로
+    const { data: filenameDuplicate } = await supabase
+      .from('cloudinary_images')
+      .select('id, filename, secure_url, cloudinary_id')
+      .eq('filename', file.name)
+      .ilike('cloudinary_id', `${folderPath}/%`)
+      .maybeSingle();
+
+    if (filenameDuplicate) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '같은 이름의 파일이 이미 존재합니다.',
+          duplicate: {
+            type: 'filename',
+            message: `같은 폴더에 동일한 파일명이 이미 존재합니다: ${filenameDuplicate.filename}`,
+            existingFile: filenameDuplicate
+          }
+        },
+        { status: 409 }
+      );
+    }
+
+    // Cloudinary에 업로드 (이미지 최적화 옵션 포함)
     const uploadResult = await new Promise<any>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: folderPath, // 동적 폴더 경로
           resource_type: 'auto',
           tags: tags ? tags.split(',').map(t => t.trim()) : [],
+          // 이미지 최적화 옵션
+          quality: 'auto:good', // 자동 품질 최적화 (auto:best, auto:good, auto:eco, auto:low)
+          fetch_format: 'auto', // 브라우저별 최적 포맷 자동 선택 (WebP, AVIF 등)
+          flags: 'lossy', // 손실 압축 활성화
+          // HD 절반 수준 (960x540) 최적화 - 용량 대폭 감소
+          transformation: [
+            {
+              width: 960,
+              height: 960,
+              crop: 'limit', // 비율 유지하며 최대 크기 제한 (작은 이미지는 확대 안함)
+            }
+          ],
         },
         (error, result) => {
           if (error) reject(error);
@@ -110,6 +172,7 @@ export async function POST(request: NextRequest) {
       width: uploadResult.width,
       height: uploadResult.height,
       file_size: uploadResult.bytes,
+      file_hash: fileHash, // 파일 해시 저장
       category,
       title: title || file.name,
       description,

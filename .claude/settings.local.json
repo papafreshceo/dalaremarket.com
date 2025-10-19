@@ -19,7 +19,19 @@
       "Bash(if exist \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\fix-empty-templates.js\" del /f \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\fix-empty-templates.js\")",
       "Bash(del /f fix-empty-templates.js)",
       "Bash(del \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\media\\layout.tsx\")",
-      "Bash(if exist \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\media\\layout.tsx\" del /f \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\media\\layout.tsx\")"
+      "Bash(if exist \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\media\\layout.tsx\" del /f \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\media\\layout.tsx\")",
+      "Bash(del apply-image-types-migration.js)",
+      "Bash(if exist apply-image-types-migration.js del /f apply-image-types-migration.js)",
+      "Bash(curl http://localhost:3001/api/cloudinary/folders)",
+      "Bash(curl -X POST \"https://qxhpgjftkkcxdttgjkzj.supabase.co/rest/v1/rpc/exec_sql\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4aHBnamZ0a2tjeGR0dGdqa3pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3MDQxNDAsImV4cCI6MjA1ODI4MDE0MH0.wXUEJ4KY3Gg-fHb6lCvwKrGOvWrGJlC2hvStD0uDBrs\" -H \"Content-Type: application/json\" -d '{\"\"sql\"\":\"\"ALTER TABLE cloudinary_images ADD COLUMN IF NOT EXISTS file_hash TEXT;\"\"}')",
+      "Bash(tasklist)",
+      "Bash(findstr:*)",
+      "Bash(curl -X POST http://localhost:3000/api/youtube/sync -H \"Content-Type: application/json\" -d \"{\"\"channelId\"\":\"\"test\"\"}\")",
+      "Bash(echo $YOUTUBE_API_KEY)",
+      "Bash(cat:*)",
+      "Bash(curl -s \"https://www.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id=UC_x5XG1OV2P6uZZ5FSM9Ttw&key=AIzaSyCZAEAULRodHckBRsC_7PCqmXkJ2XGq8uA\")",
+      "Bash(if exist apply-registered-by-migration.js del /f apply-registered-by-migration.js)",
+      "Bash(del apply-registered-by-migration.js)"
     ],
     "deny": [],
     "ask": []
