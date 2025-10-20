@@ -79,35 +79,37 @@ export default function AllProductsPage() {
         return;
       }
 
-      // 2. category_settings 조회 (품목명으로 ID 매핑용 + 원물상태 + 소분류 + 셀러공급여부 + 배지정보 + 발송기한)
-      const { data: categories, error: catError } = await supabase
-        .from('category_settings')
-        .select('id, category_3, category_4, raw_material_status, seller_supply, is_best, is_recommended, has_image, has_detail_page, shipping_deadline')
+      // 2. products_master 조회 (품목 정보 + 원물상태 + 셀러공급여부 + 배지정보 + 발송기한)
+      const { data: productsMaster, error: masterError } = await supabase
+        .from('products_master')
+        .select('id, category_1, category_2, category_3, raw_material_status, seller_supply, is_best, is_recommended, has_image, has_detail_page, shipping_deadline')
         .eq('is_active', true)
         .eq('seller_supply', true) // 셀러공급 품목만 조회
-        .not('category_4', 'is', null); // category_4가 있는 것만
+        .not('category_3', 'is', null); // category_3(품목)가 있는 것만
 
-      if (catError) {
-        console.error('품목 조회 오류:', catError);
+      if (masterError) {
+        console.error('품목 마스터 조회 오류:', masterError);
       }
 
-      // 품목명 -> 품목정보 맵핑
+      // 품목 마스터 ID -> 품목정보 맵핑 (product_master_id로 매칭)
       const categoryMap = new Map(
-        (categories || []).map(cat => [cat.category_4, {
-          id: cat.id,
-          category_3: cat.category_3,
-          raw_material_status: cat.raw_material_status,
-          is_best: cat.is_best,
-          is_recommended: cat.is_recommended,
-          has_image: cat.has_image,
-          has_detail_page: cat.has_detail_page,
-          shipping_deadline: cat.shipping_deadline
+        (productsMaster || []).map(pm => [pm.id, {
+          id: pm.id,
+          category_1: pm.category_1,
+          category_2: pm.category_2,
+          category_3: pm.category_3,
+          raw_material_status: pm.raw_material_status,
+          is_best: pm.is_best,
+          is_recommended: pm.is_recommended,
+          has_image: pm.has_image,
+          has_detail_page: pm.has_detail_page,
+          shipping_deadline: pm.shipping_deadline
         }])
       );
 
-      // 품목ID -> 품목명 맵핑 (대표이미지 매핑용)
+      // 품목 마스터 ID -> 품목명 맵핑 (대표이미지 매핑용)
       const categoryIdToNameMap = new Map(
-        (categories || []).map(cat => [cat.id, cat.category_4])
+        (productsMaster || []).map(pm => [pm.id, pm.category_3])
       );
 
       // 3. 대표이미지 조회 (옵션상품 기준 + 품목 기준)
@@ -146,21 +148,22 @@ export default function AllProductsPage() {
       // 필터링 조건: 품목의 seller_supply=true AND 옵션상품의 seller_supply=true
       const productsWithThumbnail = (optionProducts || [])
         .map(product => {
-          // 옵션상품의 category_4 필드(품목명)로 품목정보 찾기
-          const categoryInfo = categoryMap.get(product.category_4);
+          // 옵션상품의 product_master_id로 품목 마스터 정보 찾기
+          const categoryInfo = categoryMap.get(product.product_master_id);
           const categoryId = categoryInfo?.id;
 
           // 썸네일 우선순위: 옵션상품 대표이미지 > 품목 대표이미지
-          const thumbnailUrl = optionImageMap.get(product.id) || newCategoryImageMap.get(product.category_4) || null;
+          const thumbnailUrl = optionImageMap.get(product.id) ||
+            (categoryId ? newCategoryImageMap.get(categoryId) : null) || null;
 
           return {
             ...product,
             thumbnail_url: thumbnailUrl,
             // 품목의 원물상태 및 소분류 추가
             category_raw_material_status: categoryInfo?.raw_material_status || null,
-            category_3: categoryInfo?.category_3 || null,
+            category_2: categoryInfo?.category_2 || null,
             category_seller_supply: !!categoryInfo, // 품목의 셀러공급 여부
-            category_4_id: categoryId, // 품목 ID 추가
+            category_4_id: categoryId, // 품목 마스터 ID 추가
             // 배지 정보 추가
             is_best: categoryInfo?.is_best || false,
             is_recommended: categoryInfo?.is_recommended || false,
@@ -180,28 +183,13 @@ export default function AllProductsPage() {
       console.log('조회된 상품 수:', productsWithThumbnail.length);
       console.log('옵션상품 대표이미지 수:', optionImageMap.size);
       console.log('품목 대표이미지 수:', categoryImageMap.size);
-      console.log('샘플 상품 thumbnail_url:', productsWithThumbnail[0]?.thumbnail_url);
-      console.log('샘플 상품 category_4_id:', productsWithThumbnail[0]?.category_4_id);
-      console.log('샘플 상품 shipping_deadline:', productsWithThumbnail[0]?.shipping_deadline);
-      console.log('대표이미지 데이터:', representativeImages?.slice(0, 3));
-
-      // 신비, 신선 상품 디버깅
-      const sinbiProducts = productsWithThumbnail.filter(p => p.category_4 === '신비');
-      const sinsunProducts = productsWithThumbnail.filter(p => p.category_4 === '신선');
-      console.log('신비 품목 상품 수:', sinbiProducts.length, sinbiProducts.map(p => p.option_name));
-      console.log('신선 품목 상품 수:', sinsunProducts.length, sinsunProducts.map(p => p.option_name));
-      console.log('신비 카테고리 정보:', categoryMap.get('신비'));
-      console.log('신선 카테고리 정보:', categoryMap.get('신선'));
-
-      // 반시 관련 상품 확인
-      const bansiProducts = productsWithThumbnail.filter(p => p.option_name?.includes('반시'));
-      if (bansiProducts.length > 0) {
-        console.log('반시 상품들:', bansiProducts.map(p => ({
-          name: p.option_name,
-          category_4: p.category_4,
-          has_category_info: !!categoryMap.get(p.category_4)
-        })));
-      }
+      console.log('샘플 상품:', {
+        option_name: productsWithThumbnail[0]?.option_name,
+        category_3: productsWithThumbnail[0]?.category_3,
+        product_master_id: productsWithThumbnail[0]?.product_master_id,
+        thumbnail_url: productsWithThumbnail[0]?.thumbnail_url,
+        shipping_deadline: productsWithThumbnail[0]?.shipping_deadline
+      });
 
       setProducts(productsWithThumbnail);
     } catch (error) {
@@ -324,7 +312,7 @@ export default function AllProductsPage() {
             {(() => {
               const groupedData = Object.entries(
                 filteredProducts.reduce((groups, product) => {
-                  const itemName = product.category_4 || '기타';
+                  const itemName = product.category_3 || '기타'; // 품목명으로 그룹핑
                   if (!groups[itemName]) {
                     groups[itemName] = [];
                   }
@@ -336,17 +324,17 @@ export default function AllProductsPage() {
                 const getOrder = (products: OptionProduct[]) => {
                   const rawMaterialStatus = (products[0] as any).category_raw_material_status;
                   if (!rawMaterialStatus) return 999;
-                  // name으로 비교 (category_settings에 name으로 저장되어 있음)
+                  // name으로 비교
                   const statusInfo = supplyStatuses.find(s => s.name === rawMaterialStatus);
                   return statusInfo?.display_order ?? 999;
                 };
                 const orderDiff = getOrder(productsA) - getOrder(productsB);
 
-                // 상태값이 같으면 두 번째 정렬: 소분류 가나다 순
+                // 상태값이 같으면 두 번째 정렬: 소분류(category_2) 가나다 순
                 if (orderDiff === 0) {
-                  const category3A = (productsA[0] as any).category_3 || '';
-                  const category3B = (productsB[0] as any).category_3 || '';
-                  return category3A.localeCompare(category3B, 'ko');
+                  const category2A = (productsA[0] as any).category_2 || '';
+                  const category2B = (productsB[0] as any).category_2 || '';
+                  return category2A.localeCompare(category2B, 'ko');
                 }
 
                 return orderDiff;
@@ -377,8 +365,8 @@ export default function AllProductsPage() {
                   </div>
 
                   {groupedData.map(([itemName, groupProducts]) => {
-                    const category3 = (groupProducts[0] as any).category_3 || '';
-                    const displayTitle = category3 ? `${category3}/${itemName}` : itemName;
+                    const category2 = (groupProducts[0] as any).category_2 || '';
+                    const displayTitle = category2 ? `${category2}/${itemName}` : itemName;
                     const isExpanded = expandedGroups.has(itemName);
 
                     // 출하중 상태 확인
@@ -628,8 +616,8 @@ export default function AllProductsPage() {
                   </div>
 
                   {groupedData.map(([itemName, groupProducts]) => {
-                    const category3 = (groupProducts[0] as any).category_3 || '';
-                    const displayTitle = category3 ? `${category3}/${itemName}` : itemName;
+                    const category2 = (groupProducts[0] as any).category_2 || '';
+                    const displayTitle = category2 ? `${category2}/${itemName}` : itemName;
                     const isExpanded = expandedGroups.has(itemName);
 
                     // 출하중 상태 확인
