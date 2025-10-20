@@ -7,7 +7,6 @@ import { useToast } from '@/components/ui/Toast'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 import * as XLSX from 'xlsx'
-import { inheritProductMasterToAllDescendants, linkAllProductMasters } from '@/lib/inheritance-utils'
 
 interface ProductMaster {
   id: string
@@ -151,12 +150,14 @@ export default function ProductsMasterPage() {
           savedId = data?.id
         } else {
           // 기존 데이터 수정
+          console.log('업데이트 데이터:', productData)
           const { error } = await supabase
             .from('products_master')
             .update(productData)
             .eq('id', row.id)
 
           if (error) {
+            console.error('업데이트 에러 상세:', error)
             showToast(`품목 수정 실패: ${error.message}`, 'error')
             return
           }
@@ -165,7 +166,12 @@ export default function ProductsMasterPage() {
 
         // 상속 실행: 품목 마스터 → 원물 → 옵션상품
         if (savedId) {
-          const result = await inheritProductMasterToAllDescendants(savedId)
+          const response = await fetch('/api/inherit-product-master', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productMasterId: savedId })
+          })
+          const result = await response.json()
           if (result.success) {
             totalRawMaterials += result.rawMaterialsUpdated || 0
             totalOptionProducts += result.optionProductsUpdated || 0
@@ -230,12 +236,17 @@ export default function ProductsMasterPage() {
 
     setLoading(true)
     try {
-      const result = await linkAllProductMasters()
+      const response = await fetch('/api/link-product-masters', {
+        method: 'POST'
+      })
+      const result = await response.json()
+
       if (result.success) {
         showToast(
           `매칭 완료! ${result.productMastersCount}개 품목 → 원물 ${result.totalRawMaterials}개, 옵션상품 ${result.totalOptionProducts}개`,
           'success'
         )
+        fetchProducts() // 데이터 다시 로드
       } else {
         showToast('매칭 중 오류가 발생했습니다.', 'error')
       }

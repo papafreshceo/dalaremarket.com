@@ -69,24 +69,7 @@ export async function inheritRawMaterialToOptionProducts(rawMaterialId: string) 
     return { success: false, error: rawMaterialError }
   }
 
-  // 2. 해당 원물과 매칭된 옵션상품 ID 조회
-  const { data: materialLinks, error: linkError } = await supabase
-    .from('option_product_materials')
-    .select('option_product_id')
-    .eq('raw_material_id', rawMaterialId)
-
-  if (linkError) {
-    console.error('Failed to fetch material links:', linkError)
-    return { success: false, error: linkError }
-  }
-
-  if (!materialLinks || materialLinks.length === 0) {
-    console.log('⚠️ 매칭된 옵션상품이 없습니다.')
-    return { success: true, updatedCount: 0 } // 매칭된 옵션상품이 없으면 성공으로 처리
-  }
-
-  // 3. 매칭된 옵션상품들 업데이트
-  const optionProductIds = materialLinks.map(link => link.option_product_id)
+  // 2. raw_material_partner를 통해 연결된 옵션상품 업데이트
   const { error: updateError, count } = await supabase
     .from('option_products')
     .update({
@@ -104,7 +87,7 @@ export async function inheritRawMaterialToOptionProducts(rawMaterialId: string) 
       has_image: rawMaterial.has_image,
       has_detail_page: rawMaterial.has_detail_page
     })
-    .in('id', optionProductIds)
+    .eq('raw_material_partner', rawMaterialId)
 
   if (updateError) {
     console.error('Failed to update option products:', updateError)
@@ -117,47 +100,62 @@ export async function inheritRawMaterialToOptionProducts(rawMaterialId: string) 
 
 /**
  * 품목 마스터 업데이트 시 전체 상속 체인 실행
- * products_master → raw_materials → option_products
+ * products_master → raw_materials
+ * products_master → option_products
  */
 export async function inheritProductMasterToAllDescendants(productMasterId: string) {
   const supabase = createClient()
 
   console.log(`🔄 품목 마스터 상속 시작: ${productMasterId}`)
 
-  // 1. 품목 마스터 → 원물 상속
+  // 1. 품목 마스터 정보 조회
+  const { data: productMaster, error: masterError } = await supabase
+    .from('products_master')
+    .select('*')
+    .eq('id', productMasterId)
+    .single()
+
+  if (masterError || !productMaster) {
+    console.error('Failed to fetch product master:', masterError)
+    return { success: false, error: masterError }
+  }
+
+  // 2. 품목 마스터 → 원물 상속
   const result1 = await inheritProductMasterToRawMaterials(productMasterId)
   if (!result1.success) {
     return result1
   }
 
-  // 2. 해당 품목 마스터와 연결된 모든 원물 조회
-  const { data: rawMaterials, error: rawMaterialsError } = await supabase
-    .from('raw_materials')
-    .select('id')
+  // 3. 품목 마스터 → 옵션상품 직접 상속 (category_4 기준)
+  const { error: optionUpdateError, count: optionCount } = await supabase
+    .from('option_products')
+    .update({
+      category_1: productMaster.category_1,
+      category_2: productMaster.category_2,
+      category_3: productMaster.category_3,
+      category_4: productMaster.category_4,
+      shipping_deadline: productMaster.shipping_deadline,
+      season_start_date: productMaster.season_start_date,
+      season_end_date: productMaster.season_end_date,
+      seller_supply: productMaster.seller_supply,
+      is_best: productMaster.is_best,
+      is_recommended: productMaster.is_recommended,
+      has_image: productMaster.has_image,
+      has_detail_page: productMaster.has_detail_page
+    })
     .eq('product_master_id', productMasterId)
 
-  if (rawMaterialsError) {
-    console.error('Failed to fetch raw materials:', rawMaterialsError)
-    return { success: false, error: rawMaterialsError }
+  if (optionUpdateError) {
+    console.error('Failed to update option products:', optionUpdateError)
+    return { success: false, error: optionUpdateError }
   }
 
-  // 3. 각 원물 → 옵션상품 상속
-  let totalOptionProductsUpdated = 0
-  if (rawMaterials && rawMaterials.length > 0) {
-    for (const rawMaterial of rawMaterials) {
-      const result2 = await inheritRawMaterialToOptionProducts(rawMaterial.id)
-      if (result2.success) {
-        totalOptionProductsUpdated += result2.updatedCount || 0
-      }
-    }
-  }
-
-  console.log(`✅ 전체 상속 완료: 원물 ${result1.updatedCount}개, 옵션상품 ${totalOptionProductsUpdated}개`)
+  console.log(`✅ 전체 상속 완료: 원물 ${result1.updatedCount}개, 옵션상품 ${optionCount || 0}개`)
 
   return {
     success: true,
     rawMaterialsUpdated: result1.updatedCount || 0,
-    optionProductsUpdated: totalOptionProductsUpdated
+    optionProductsUpdated: optionCount || 0
   }
 }
 
@@ -212,6 +210,7 @@ export async function linkRawMaterialsToProductMaster(productMasterId: string) {
   }
 
   // 3. category_4(품목명) 기준으로 옵션상품 조회 및 개별 업데이트
+  // 옵션상품도 원물처럼 category_4로 품목 마스터와 매칭
   const { data: optionProducts } = await supabase
     .from('option_products')
     .select('id')

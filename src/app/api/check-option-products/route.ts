@@ -1,46 +1,60 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const supabase = await createClient()
+  try {
+    // Service Role Key로 RLS 우회
+    const supabase = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
 
-  // Check option_products with category_4 = '신비' or '신선'
-  const { data: sinbi } = await supabase
-    .from('option_products')
-    .select('id, option_name, category_4')
-    .eq('category_4', '신비')
+    // 1. 옵션상품 샘플 조회 (category_4와 product_master_id 확인)
+    const { data: samples, error: sampleError } = await supabase
+      .from('option_products')
+      .select('id, option_name, category_4, product_master_id')
+      .limit(10)
 
-  const { data: sinsun } = await supabase
-    .from('option_products')
-    .select('id, option_name, category_4')
-    .eq('category_4', '신선')
+    // 2. 통계
+    const { count: total } = await supabase
+      .from('option_products')
+      .select('*', { count: 'exact', head: true })
 
-  // Get all unique category_4 values from option_products
-  const { data: allProducts } = await supabase
-    .from('option_products')
-    .select('category_4')
+    const { count: withCategory4 } = await supabase
+      .from('option_products')
+      .select('*', { count: 'exact', head: true })
+      .not('category_4', 'is', null)
 
-  const uniqueCategories = [...new Set(allProducts?.map(p => p.category_4).filter(Boolean))]
+    const { count: withProductMasterId } = await supabase
+      .from('option_products')
+      .select('*', { count: 'exact', head: true })
+      .not('product_master_id', 'is', null)
 
-  // Check if any products contain '신비' or '신선' in option_name
-  const { data: sinbiInName } = await supabase
-    .from('option_products')
-    .select('id, option_name, category_4')
-    .ilike('option_name', '%신비%')
+    const { count: nullProductMasterId } = await supabase
+      .from('option_products')
+      .select('*', { count: 'exact', head: true })
+      .is('product_master_id', null)
 
-  const { data: sinsunInName } = await supabase
-    .from('option_products')
-    .select('id, option_name, category_4')
-    .ilike('option_name', '%신선%')
-
-  return NextResponse.json({
-    sinbi_count: sinbi?.length || 0,
-    sinbi_products: sinbi,
-    sinsun_count: sinsun?.length || 0,
-    sinsun_products: sinsun,
-    products_with_sinbi_in_name: sinbiInName,
-    products_with_sinsun_in_name: sinsunInName,
-    total_unique_categories: uniqueCategories.length,
-    sample_categories: uniqueCategories.slice(0, 20)
-  })
+    return NextResponse.json({
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      samples: samples || [],
+      sampleError,
+      statistics: {
+        total,
+        withCategory4,
+        withProductMasterId,
+        nullProductMasterId
+      }
+    })
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
 }
