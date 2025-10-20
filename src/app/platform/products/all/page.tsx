@@ -42,6 +42,7 @@ export default function AllProductsPage() {
   const [supplyStatuses, setSupplyStatuses] = useState<Array<{code: string; name: string; color: string; display_order: number}>>([]);
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [selectedImageCategory, setSelectedImageCategory] = useState<{category4: string; category4Id?: number} | null>(null);
+  const [categoryImageMap, setCategoryImageMap] = useState<Map<string, string>>(new Map());
 
   const supabase = createClient();
 
@@ -103,32 +104,44 @@ export default function AllProductsPage() {
         }])
       );
 
+      // 품목ID -> 품목명 맵핑 (대표이미지 매핑용)
+      const categoryIdToNameMap = new Map(
+        (categories || []).map(cat => [cat.id, cat.category_4])
+      );
+
       // 3. 대표이미지 조회 (옵션상품 기준 + 품목 기준)
       const { data: representativeImages, error: imgError } = await supabase
         .from('cloudinary_images')
-        .select('option_product_id, category_4_id, secure_url')
+        .select('option_product_id, category_4_id, secure_url, is_representative')
         .eq('is_representative', true);
 
       if (imgError) {
         console.error('대표이미지 조회 오류:', imgError);
       }
 
-      // 4. 옵션상품별 대표이미지 맵핑
+      // 4. 옵션상품별 대표이미지 맵핑 (option_product_id 기준)
       const optionImageMap = new Map(
         (representativeImages || [])
           .filter(img => img.option_product_id)
           .map(img => [img.option_product_id, img.secure_url])
       );
 
-      // 5. 품목별 대표이미지 맵핑
-      const categoryImageMap = new Map(
+      // 5. 품목별 대표이미지 맵핑 (category_4_id -> category_4 이름으로 변환)
+      const newCategoryImageMap = new Map(
         (representativeImages || [])
           .filter(img => img.category_4_id)
-          .map(img => [img.category_4_id, img.secure_url])
+          .map(img => {
+            const categoryName = categoryIdToNameMap.get(img.category_4_id);
+            return [categoryName, img.secure_url];
+          })
+          .filter(([categoryName]) => categoryName) // 품목명이 있는 것만
       );
 
+      // 상태로 저장 (카드보기에서 품목 썸네일 표시용)
+      setCategoryImageMap(newCategoryImageMap);
+
       // 6. 대표이미지 URL을 thumbnail_url로 매핑 및 셀러공급 필터링
-      // 우선순위: 기존 thumbnail_url > 옵션상품 대표이미지 > 품목 대표이미지
+      // 우선순위: 1) 옵션상품 대표이미지 2) 품목 대표이미지
       // 필터링 조건: 품목의 seller_supply=true AND 옵션상품의 seller_supply=true
       const productsWithThumbnail = (optionProducts || [])
         .map(product => {
@@ -136,13 +149,12 @@ export default function AllProductsPage() {
           const categoryInfo = categoryMap.get(product.category_4);
           const categoryId = categoryInfo?.id;
 
+          // 썸네일 우선순위: 옵션상품 대표이미지 > 품목 대표이미지
+          const thumbnailUrl = optionImageMap.get(product.id) || newCategoryImageMap.get(product.category_4) || null;
+
           return {
             ...product,
-            thumbnail_url:
-              product.thumbnail_url ||
-              optionImageMap.get(product.id) ||
-              (categoryId ? categoryImageMap.get(categoryId) : null) ||
-              null,
+            thumbnail_url: thumbnailUrl,
             // 품목의 원물상태 및 소분류 추가
             category_raw_material_status: categoryInfo?.raw_material_status || null,
             category_3: categoryInfo?.category_3 || null,
@@ -391,9 +403,22 @@ export default function AllProductsPage() {
                             onClick={() => toggleGroup(itemName)}
                             className="flex items-center gap-3 flex-1"
                           >
-                            <div className={`p-2 rounded-lg ${isExpanded ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                              <Package className={`w-5 h-5 ${isExpanded ? 'text-blue-600' : 'text-gray-600'}`} />
-                            </div>
+                            {/* 품목 대표이미지 썸네일 */}
+                            {(() => {
+                              const categoryThumbnail = categoryImageMap.get(itemName);
+                              if (categoryThumbnail) {
+                                return (
+                                  <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                                    <img src={categoryThumbnail} alt={itemName} className="w-full h-full object-cover block" />
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div className={`p-2 rounded-lg ${isExpanded ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                                  <Package className={`w-5 h-5 ${isExpanded ? 'text-blue-600' : 'text-gray-600'}`} />
+                                </div>
+                              );
+                            })()}
                             <div className="text-left">
                               <h3 className="text-lg font-semibold text-gray-900">{displayTitle}</h3>
                               <p className="text-sm text-gray-500">{groupProducts.length}개 옵션상품</p>
@@ -522,84 +547,284 @@ export default function AllProductsPage() {
             })()}
           </div>
         ) : (
-          // 품목별 그룹화 리스트 뷰
-          <div className="space-y-8">
-            {Object.entries(
-              filteredProducts.reduce((groups, product) => {
-                const itemName = (product as any).item_name || '기타';
-                if (!groups[itemName]) {
-                  groups[itemName] = [];
-                }
-                groups[itemName].push(product);
-                return groups;
-              }, {} as Record<string, OptionProduct[]>)
-            )
-            .sort(([, productsA], [, productsB]) => {
-              const getOrder = (products: OptionProduct[]) => {
-                const rawMaterialStatus = (products[0] as any).category_raw_material_status;
-                if (!rawMaterialStatus) return 999;
-                const statusInfo = supplyStatuses.find(s => s.code === rawMaterialStatus);
-                return statusInfo?.display_order ?? 999;
-              };
+          // 품목별 그룹화 리스트 뷰 (카드보기와 동일한 형식)
+          <div className="space-y-4">
+            {(() => {
+              const groupedData = Object.entries(
+                filteredProducts.reduce((groups, product) => {
+                  const itemName = product.category_4 || '기타';
+                  if (!groups[itemName]) {
+                    groups[itemName] = [];
+                  }
+                  groups[itemName].push(product);
+                  return groups;
+                }, {} as Record<string, OptionProduct[]>)
+              ).sort(([, productsA], [, productsB]) => {
+                // 첫 번째 정렬: 상태값 순서
+                const getOrder = (products: OptionProduct[]) => {
+                  const rawMaterialStatus = (products[0] as any).category_raw_material_status;
+                  if (!rawMaterialStatus) return 999;
+                  const statusInfo = supplyStatuses.find(s => s.name === rawMaterialStatus);
+                  return statusInfo?.display_order ?? 999;
+                };
+                const orderDiff = getOrder(productsA) - getOrder(productsB);
 
-              return getOrder(productsA) - getOrder(productsB);
-            })
-            .map(([itemName, groupProducts]) => {
-              // 소분류 정보 가져오기 (그룹의 첫 번째 상품에서)
-              const category3 = (groupProducts[0] as any).category_3 || '';
-              const displayTitle = category3 ? `${category3}/${itemName}` : itemName;
+                // 상태값이 같으면 두 번째 정렬: 소분류 가나다 순
+                if (orderDiff === 0) {
+                  const category3A = (productsA[0] as any).category_3 || '';
+                  const category3B = (productsB[0] as any).category_3 || '';
+                  return category3A.localeCompare(category3B, 'ko');
+                }
+
+                return orderDiff;
+              });
+
+              const groupKeys = groupedData.map(([key]) => key);
 
               return (
-              <div key={itemName}>
-                {/* 품목명 헤더 */}
-                <div className="mb-4 pb-2 border-b-2 border-blue-500 flex items-baseline justify-between">
-                  <div className="flex items-baseline gap-3">
-                    <h2 className="text-xl font-bold text-gray-800">{displayTitle}</h2>
-                    <p className="text-sm text-gray-500">{groupProducts.length}개 옵션상품</p>
+                <>
+                  {/* 전체 펼치기/접기 버튼 */}
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => toggleAllGroups(groupKeys)}
+                      className="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      {expandedGroups.size === groupKeys.length ? (
+                        <>
+                          <ChevronUp className="w-4 h-4" />
+                          전체 접기
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-4 h-4" />
+                          전체 펼치기
+                        </>
+                      )}
+                    </button>
                   </div>
-                  {/* 상태별 배지 */}
-                  <div className="flex gap-2">
-                    {Object.entries(
-                      groupProducts.reduce((statusCounts, product) => {
-                        const statusCode = (product as any).status || 'NONE';
-                        statusCounts[statusCode] = (statusCounts[statusCode] || 0) + 1;
-                        return statusCounts;
-                      }, {} as Record<string, number>)
-                    )
-                    .sort(([codeA], [codeB]) => {
-                      const statusA = supplyStatuses.find(s => s.code === codeA);
-                      const statusB = supplyStatuses.find(s => s.code === codeB);
-                      const orderA = statusA?.display_order ?? 999;
-                      const orderB = statusB?.display_order ?? 999;
-                      return orderA - orderB;
-                    })
-                    .map(([statusCode, count]) => {
-                      const statusInfo = supplyStatuses.find(s => s.code === statusCode);
-                      const statusName = statusInfo?.name || statusCode;
-                      const bgColor = statusInfo?.color || '#9CA3AF';
 
-                      return (
-                        <span
-                          key={statusCode}
-                          className="px-2 py-1 text-xs font-medium rounded-full text-white"
-                          style={{ backgroundColor: bgColor }}
-                        >
-                          {statusName}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
+                  {groupedData.map(([itemName, groupProducts]) => {
+                    const category3 = (groupProducts[0] as any).category_3 || '';
+                    const displayTitle = category3 ? `${category3}/${itemName}` : itemName;
+                    const isExpanded = expandedGroups.has(itemName);
 
-                {/* 리스트 그리드 */}
-                <ProductGrid
-                  products={groupProducts}
-                  onProductClick={handleProductClick}
-                  onShowPriceChart={handleShowPriceChart}
-                />
-              </div>
+                    // 출하중 상태 확인
+                    const categoryStatus = (groupProducts[0] as any).category_raw_material_status;
+                    const isShipping = categoryStatus === '출하중';
+
+                    return (
+                      <div
+                        key={itemName}
+                        className={`bg-white rounded-lg shadow-sm overflow-hidden ${
+                          isShipping ? 'animate-shipping' : 'border border-gray-200'
+                        }`}
+                      >
+                        {/* 그룹 헤더 */}
+                        <div className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                          <button
+                            onClick={() => toggleGroup(itemName)}
+                            className="flex items-center gap-3 flex-1"
+                          >
+                            {/* 품목 대표이미지 썸네일 */}
+                            {(() => {
+                              const categoryThumbnail = categoryImageMap.get(itemName);
+                              if (categoryThumbnail) {
+                                return (
+                                  <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                                    <img src={categoryThumbnail} alt={itemName} className="w-full h-full object-cover block" />
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div className={`p-2 rounded-lg ${isExpanded ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                                  <Package className={`w-5 h-5 ${isExpanded ? 'text-blue-600' : 'text-gray-600'}`} />
+                                </div>
+                              );
+                            })()}
+                            <div className="text-left">
+                              <h3 className="text-lg font-semibold text-gray-900">{displayTitle}</h3>
+                              <p className="text-sm text-gray-500">{groupProducts.length}개 옵션상품</p>
+                            </div>
+                          </button>
+                          <div className="flex items-center gap-3">
+                            {/* 배지 */}
+                            <div className="flex items-center gap-1.5">
+                              {(groupProducts[0] as any).is_best && (
+                                <span className="px-2 py-0.5 text-xs font-normal border border-gray-400 text-gray-600 rounded">
+                                  BEST
+                                </span>
+                              )}
+                              {(groupProducts[0] as any).is_recommended && (
+                                <span className="px-2 py-0.5 text-xs font-normal border border-gray-400 text-gray-600 rounded">
+                                  추천
+                                </span>
+                              )}
+                              {(groupProducts[0] as any).has_image && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const firstProduct = groupProducts[0] as any;
+                                    setSelectedImageCategory({
+                                      category4: itemName,
+                                      category4Id: firstProduct.category_4_id
+                                    });
+                                    setShowImageGallery(true);
+                                  }}
+                                  className="px-2 py-0.5 text-xs font-normal border border-gray-400 text-gray-600 rounded hover:bg-gray-100 transition-colors"
+                                >
+                                  이미지
+                                </button>
+                              )}
+                              {(groupProducts[0] as any).has_detail_page && (
+                                <span className="px-2 py-0.5 text-xs font-normal border border-gray-400 text-gray-600 rounded">
+                                  상세페이지
+                                </span>
+                              )}
+                            </div>
+
+                            {/* 상태별 배지 (품목의 원물상태 표시) */}
+                            {(() => {
+                              const categoryStatus = (groupProducts[0] as any).category_raw_material_status;
+                              if (!categoryStatus) return null;
+
+                              const statusInfo = supplyStatuses.find(s => s.name === categoryStatus);
+                              if (!statusInfo) return null;
+
+                              return (
+                                <span
+                                  className="px-2 py-1 text-xs font-medium rounded-full text-white"
+                                  style={{ backgroundColor: statusInfo.color }}
+                                >
+                                  {statusInfo.name}
+                                </span>
+                              );
+                            })()}
+
+                            {/* 펼치기/접기 아이콘 */}
+                            <button
+                              onClick={() => toggleGroup(itemName)}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            >
+                              {isExpanded ? (
+                                <ChevronUp className="w-5 h-5 text-gray-400" />
+                              ) : (
+                                <ChevronDown className="w-5 h-5 text-gray-400" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 그룹 컨텐츠 - 테이블 형태 */}
+                        {isExpanded && (
+                          <div className="border-t border-gray-200">
+                            <div className="divide-y divide-gray-200">
+                              {groupProducts.map((product) => (
+                                <div
+                                  key={product.id}
+                                  className="px-6 py-3 hover:bg-gray-50 transition-colors cursor-pointer flex items-center gap-4"
+                                  onClick={() => handleProductClick(product)}
+                                >
+                                  {/* 썸네일 */}
+                                  <div className="w-14 h-14 rounded overflow-hidden bg-gray-100 flex-shrink-0">
+                                    {product.thumbnail_url ? (
+                                      <img
+                                        src={product.thumbnail_url}
+                                        alt={product.option_name}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <Package className="w-7 h-7 text-gray-400" />
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* 옵션명 */}
+                                  <div className="w-48 flex-shrink-0">
+                                    <h4 className="text-sm font-medium text-gray-900 truncate">
+                                      {product.option_name}
+                                    </h4>
+                                  </div>
+
+                                  {/* 규격1 */}
+                                  <div className="w-24 flex-shrink-0 text-center">
+                                    <p className="text-sm text-gray-700">
+                                      {(product as any).spec_1 || '-'}
+                                    </p>
+                                  </div>
+
+                                  {/* 규격2 */}
+                                  <div className="w-24 flex-shrink-0 text-center">
+                                    <p className="text-sm text-gray-700">
+                                      {(product as any).spec_2 || '-'}
+                                    </p>
+                                  </div>
+
+                                  {/* 규격3 */}
+                                  <div className="w-24 flex-shrink-0 text-center">
+                                    <p className="text-sm text-gray-700">
+                                      {(product as any).spec_3 || '-'}
+                                    </p>
+                                  </div>
+
+                                  {/* 셀러공급가 */}
+                                  <div className="w-28 flex-shrink-0 text-right">
+                                    <p className="text-sm font-semibold text-gray-900">
+                                      {product.seller_supply_price?.toLocaleString() || '-'}원
+                                    </p>
+                                  </div>
+
+                                  {/* 배송비 */}
+                                  <div className="w-24 flex-shrink-0 text-right">
+                                    <p className="text-sm text-gray-700">
+                                      {product.출고비용 !== undefined ? `${product.출고비용.toLocaleString()}원` : '-'}
+                                    </p>
+                                  </div>
+
+                                  {/* 가격차트 버튼 */}
+                                  <div className="w-10 flex-shrink-0 flex justify-center">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleShowPriceChart(product);
+                                      }}
+                                      className="p-1.5 hover:bg-gray-200 rounded transition-colors"
+                                      title="가격 차트"
+                                    >
+                                      <TrendingUp className="w-4 h-4 text-blue-600" />
+                                    </button>
+                                  </div>
+
+                                  {/* 상태 */}
+                                  <div className="w-20 flex-shrink-0 flex justify-center">
+                                    {(() => {
+                                      const status = (product as any).status;
+                                      if (!status) return <span className="text-xs text-gray-400">-</span>;
+
+                                      const statusInfo = supplyStatuses.find(s => s.code === status);
+                                      if (!statusInfo) return <span className="text-xs text-gray-400">-</span>;
+
+                                      return (
+                                        <span
+                                          className="px-2 py-0.5 text-[10px] font-normal rounded-full text-white whitespace-nowrap"
+                                          style={{ backgroundColor: statusInfo.color }}
+                                        >
+                                          {statusInfo.name}
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
               );
-            })}
+            })()}
           </div>
         )}
       </div>

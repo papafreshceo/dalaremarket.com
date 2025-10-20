@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/Toast'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 import * as XLSX from 'xlsx'
+import { inheritCategoryToAllDescendants } from '@/lib/inheritance-utils'
 
 interface CategorySetting {
   id: string
@@ -23,6 +24,9 @@ interface CategorySetting {
   is_recommended: boolean | null
   has_image: boolean | null
   has_detail_page: boolean | null
+  shipping_deadline: number | null
+  season_start_date: string | null
+  season_end_date: string | null
   notes: string | null
   is_active: boolean
 }
@@ -168,7 +172,7 @@ export default function CategorySettingsPage() {
             continue
           }
 
-          const { error } = await supabase.from('category_settings').insert([{
+          const { data: insertedData, error } = await supabase.from('category_settings').insert([{
             expense_type: row.expense_type || null,
             category_1: row.category_1 || null,
             category_2: row.category_2 || null,
@@ -182,13 +186,21 @@ export default function CategorySettingsPage() {
             is_recommended: row.is_recommended || false,
             has_image: row.has_image || false,
             has_detail_page: row.has_detail_page || false,
+            shipping_deadline: row.shipping_deadline || null,
+            season_start_date: row.season_start_date || null,
+            season_end_date: row.season_end_date || null,
             notes: row.notes || null,
             is_active: true
-          }])
+          }]).select()
 
           if (error) {
             showToast(`카테고리 등록 실패: ${error.message}`, 'error')
             return
+          }
+
+          // 상속 실행 (전체 교체 모드)
+          if (insertedData && insertedData[0]) {
+            await inheritCategoryToAllDescendants(insertedData[0].id)
           }
 
           insertedKeys.add(key)
@@ -225,7 +237,7 @@ export default function CategorySettingsPage() {
               continue
             }
 
-            const { error } = await supabase.from('category_settings').insert([{
+            const { data: insertedData, error } = await supabase.from('category_settings').insert([{
               expense_type: row.expense_type || null,
               category_1: row.category_1 || null,
               category_2: row.category_2 || null,
@@ -239,13 +251,21 @@ export default function CategorySettingsPage() {
               is_recommended: row.is_recommended || false,
               has_image: row.has_image || false,
               has_detail_page: row.has_detail_page || false,
+              shipping_deadline: row.shipping_deadline || null,
+              season_start_date: row.season_start_date || null,
+              season_end_date: row.season_end_date || null,
               notes: row.notes || null,
               is_active: true
-            }])
+            }]).select()
 
             if (error) {
               showToast(`카테고리 등록 실패: ${error.message}`, 'error')
               return
+            }
+
+            // 상속 실행 (신규 등록된 카테고리)
+            if (insertedData && insertedData[0]) {
+              await inheritCategoryToAllDescendants(insertedData[0].id)
             }
 
             insertedKeys.add(key)
@@ -265,6 +285,9 @@ export default function CategorySettingsPage() {
               is_recommended: row.is_recommended || false,
               has_image: row.has_image || false,
               has_detail_page: row.has_detail_page || false,
+              shipping_deadline: row.shipping_deadline || null,
+              season_start_date: row.season_start_date || null,
+              season_end_date: row.season_end_date || null,
               notes: row.notes || null
             }).eq('id', row.id)
 
@@ -272,6 +295,9 @@ export default function CategorySettingsPage() {
               showToast(`카테고리 수정 실패: ${error.message}`, 'error')
               return
             }
+
+            // 상속 실행 (기존 카테고리 수정)
+            await inheritCategoryToAllDescendants(row.id)
           }
         }
       }
@@ -568,6 +594,25 @@ export default function CategorySettingsPage() {
       className: 'text-center',
       type: 'checkbox' as const
     },
+    {
+      key: 'shipping_deadline',
+      title: '발송기한(일)',
+      width: 100,
+      className: 'text-center',
+      type: 'number' as const
+    },
+    {
+      key: 'season_start_date',
+      title: '시즌시작(MM-DD)',
+      width: 130,
+      className: 'text-center'
+    },
+    {
+      key: 'season_end_date',
+      title: '시즌종료(MM-DD)',
+      width: 130,
+      className: 'text-center'
+    },
     { key: 'notes', title: '비고', width: 200, className: 'text-center' }
   ]
 
@@ -595,6 +640,9 @@ export default function CategorySettingsPage() {
                 '추천상품': cat.is_recommended ? 'Y' : 'N',
                 '이미지제공': cat.has_image ? 'Y' : 'N',
                 '상세페이지': cat.has_detail_page ? 'Y' : 'N',
+                '발송기한(일)': cat.shipping_deadline || '',
+                '시즌시작': cat.season_start_date || '',
+                '시즌종료': cat.season_end_date || '',
                 '비고': cat.notes || '',
                 '활성화': cat.is_active ? 'Y' : 'N'
               }))

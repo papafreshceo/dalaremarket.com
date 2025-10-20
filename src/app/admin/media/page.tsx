@@ -208,8 +208,9 @@ export default function MediaManagementPage() {
       console.log('품목 마스터 조회 시작...');
       const { data, error } = await supabase
         .from('category_settings')
-        .select('id, category_4, category_4_code')
+        .select('id, category_4, category_4_code, expense_type')
         .eq('is_active', true)
+        .eq('expense_type', '사입')
         .not('category_4', 'is', null)
         .order('category_4');
 
@@ -218,9 +219,19 @@ export default function MediaManagementPage() {
         throw error;
       }
 
-      console.log('품목 마스터 조회 완료:', data?.length, '개');
-      console.log('품목 코드 샘플:', data?.[0]?.category_4_code);
-      setProductCategories(data || []);
+      // 동일한 품목(category_4) 중복 제거
+      const uniqueCategories = data?.reduce((acc: any[], current) => {
+        const exists = acc.find(item => item.category_4 === current.category_4);
+        if (!exists) {
+          acc.push(current);
+        }
+        return acc;
+      }, []) || [];
+
+      console.log('품목 마스터 조회 완료 (사입 품목만):', data?.length, '개');
+      console.log('중복 제거 후:', uniqueCategories.length, '개');
+      console.log('품목 코드 샘플:', uniqueCategories[0]?.category_4_code);
+      setProductCategories(uniqueCategories);
     } catch (error) {
       console.error('품목 마스터 조회 오류:', error);
     }
@@ -367,6 +378,14 @@ export default function MediaManagementPage() {
   const handleUpdate = async () => {
     if (!editingImage) return;
 
+    console.log('=== 프론트엔드: 이미지 수정 시작 ===');
+    console.log('수정할 이미지:', editingImage);
+    console.log('외래 키:', {
+      category_4_id: (editingImage as any).category_4_id,
+      raw_material_id: (editingImage as any).raw_material_id,
+      option_product_id: (editingImage as any).option_product_id,
+    });
+
     try {
       const response = await fetch('/api/cloudinary/images', {
         method: 'PUT',
@@ -375,6 +394,7 @@ export default function MediaManagementPage() {
       });
 
       const result = await response.json();
+      console.log('API 응답:', result);
 
       if (result.success) {
         alert('수정 완료!');
@@ -1410,6 +1430,84 @@ export default function MediaManagementPage() {
                     className="object-contain"
                     sizes="(max-width: 768px) 100vw, 672px"
                   />
+                </div>
+
+                {/* 연결 정보 섹션 */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-blue-900 mb-3">상품/품목 연결 정보</h3>
+
+                  {/* 품목 선택 */}
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">품목 (Category 4)</label>
+                    <select
+                      value={(editingImage as any).category_4_id || ''}
+                      onChange={(e) => setEditingImage({
+                        ...editingImage,
+                        category_4_id: e.target.value || null,
+                        // 다른 외래 키 초기화
+                        raw_material_id: null,
+                        option_product_id: null
+                      } as any)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="">선택 안 함</option>
+                      {productCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.category_4}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 원물 선택 */}
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">원물</label>
+                    <select
+                      value={(editingImage as any).raw_material_id || ''}
+                      onChange={(e) => setEditingImage({
+                        ...editingImage,
+                        raw_material_id: e.target.value || null,
+                        // 다른 외래 키 초기화
+                        category_4_id: null,
+                        option_product_id: null
+                      } as any)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="">선택 안 함</option>
+                      {rawMaterials.map((material) => (
+                        <option key={material.id} value={material.id}>
+                          {material.material_name} ({material.material_code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 옵션상품 선택 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">옵션상품</label>
+                    <select
+                      value={(editingImage as any).option_product_id || ''}
+                      onChange={(e) => setEditingImage({
+                        ...editingImage,
+                        option_product_id: e.target.value || null,
+                        // 다른 외래 키 초기화
+                        category_4_id: null,
+                        raw_material_id: null
+                      } as any)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="">선택 안 함</option>
+                      {optionProducts.map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {product.option_name} ({product.option_code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <p className="text-xs text-blue-700 mt-3">
+                    💡 하나만 선택 가능합니다. 선택 시 다른 항목은 자동으로 해제됩니다.
+                  </p>
                 </div>
 
                 {/* 이미지 유형 */}

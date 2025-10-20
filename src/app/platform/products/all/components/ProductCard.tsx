@@ -45,7 +45,7 @@ export default function ProductCard({ product, onProductClick, onShowPriceChart 
           <img
             src={product.thumbnail_url}
             alt={product.option_name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover block"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
