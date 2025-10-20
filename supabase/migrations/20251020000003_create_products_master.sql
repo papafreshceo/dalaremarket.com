@@ -48,7 +48,7 @@ COMMENT ON COLUMN products_master.category_1 IS '대분류';
 COMMENT ON COLUMN products_master.category_2 IS '중분류';
 COMMENT ON COLUMN products_master.category_3 IS '소분류';
 COMMENT ON COLUMN products_master.category_4 IS '품목';
-COMMENT ON COLUMN products_master.category_4_code IS '품목코드';
+COMMENT ON COLUMN products_master.category_4_code IS '품목 코드';
 COMMENT ON COLUMN products_master.raw_material_status IS '원물상태 (예: 상, 중, 하)';
 COMMENT ON COLUMN products_master.shipping_deadline IS '발송기한 (일 단위)';
 COMMENT ON COLUMN products_master.season_start_date IS '시즌 시작일 (MM-DD 형식)';

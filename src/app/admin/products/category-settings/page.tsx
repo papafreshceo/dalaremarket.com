@@ -15,6 +15,7 @@ interface CategorySetting {
   category_2: string | null
   category_3: string | null
   category_4: string | null
+  category_5: string | null
   notes: string | null
 }
 
@@ -351,17 +352,18 @@ export default function CategorySettingsPage() {
   const columns = [
     {
       key: 'expense_type',
-      title: '대분류',
-      width: 120,
+      title: '지출유형',
+      width: 100,
       className: 'text-center',
       type: 'dropdown' as const,
       source: ['사입', '지출', '가공']
     },
-    { key: 'category_1', title: '중분류', width: 150, className: 'text-center' },
-    { key: 'category_2', title: '소분류', width: 150, className: 'text-center' },
-    { key: 'category_3', title: '품목', width: 150, className: 'text-center' },
-    { key: 'category_4', title: '품종', width: 150, className: 'text-center' },
-    { key: 'notes', title: '비고', width: 300, className: 'text-center' }
+    { key: 'category_1', title: '대분류', width: 120, className: 'text-center' },
+    { key: 'category_2', title: '중분류', width: 120, className: 'text-center' },
+    { key: 'category_3', title: '소분류', width: 120, className: 'text-center' },
+    { key: 'category_4', title: '품목', width: 120, className: 'text-center' },
+    { key: 'category_5', title: '품종', width: 120, className: 'text-center' },
+    { key: 'notes', title: '비고', width: 250, className: 'text-center' }
   ]
 
   return (
