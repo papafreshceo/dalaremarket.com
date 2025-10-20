@@ -35,12 +35,12 @@ CREATE TABLE IF NOT EXISTS products_master (
 );
 
 -- 인덱스 생성 (검색 성능 향상)
-CREATE INDEX idx_products_master_category_1 ON products_master(category_1);
-CREATE INDEX idx_products_master_category_2 ON products_master(category_2);
-CREATE INDEX idx_products_master_category_3 ON products_master(category_3);
-CREATE INDEX idx_products_master_category_4 ON products_master(category_4);
-CREATE INDEX idx_products_master_active ON products_master(is_active);
-CREATE INDEX idx_products_master_seller_supply ON products_master(seller_supply);
+CREATE INDEX IF NOT EXISTS idx_products_master_category_1 ON products_master(category_1);
+CREATE INDEX IF NOT EXISTS idx_products_master_category_2 ON products_master(category_2);
+CREATE INDEX IF NOT EXISTS idx_products_master_category_3 ON products_master(category_3);
+CREATE INDEX IF NOT EXISTS idx_products_master_category_4 ON products_master(category_4);
+CREATE INDEX IF NOT EXISTS idx_products_master_active ON products_master(is_active);
+CREATE INDEX IF NOT EXISTS idx_products_master_seller_supply ON products_master(seller_supply);
 
 -- 컬럼 설명 추가
 COMMENT ON TABLE products_master IS '농산물 품목 마스터 테이블 (사입 상품 전용)';
@@ -68,6 +68,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_products_master_updated_at ON products_master;
 CREATE TRIGGER trigger_products_master_updated_at
   BEFORE UPDATE ON products_master
   FOR EACH ROW
