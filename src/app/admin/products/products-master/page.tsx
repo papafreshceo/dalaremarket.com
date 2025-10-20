@@ -7,7 +7,7 @@ import { useToast } from '@/components/ui/Toast'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 import * as XLSX from 'xlsx'
-import { inheritProductMasterToAllDescendants } from '@/lib/inheritance-utils'
+import { inheritProductMasterToAllDescendants, linkAllProductMasters } from '@/lib/inheritance-utils'
 
 interface ProductMaster {
   id: string
@@ -219,6 +219,33 @@ export default function ProductsMasterPage() {
     showToast(`${indices.length}개 항목이 삭제되었습니다.`, 'success')
   }
 
+  const handleLinkAll = async () => {
+    const confirmed = await confirm(
+      '모든 품목 마스터를 원물/옵션상품과 매칭하시겠습니까?',
+      'category_4(품목명) 기준으로 자동 매칭됩니다.'
+    )
+
+    if (!confirmed) return
+
+    setLoading(true)
+    try {
+      const result = await linkAllProductMasters()
+      if (result.success) {
+        showToast(
+          `매칭 완료! ${result.productMastersCount}개 품목 → 원물 ${result.totalRawMaterials}개, 옵션상품 ${result.totalOptionProducts}개`,
+          'success'
+        )
+      } else {
+        showToast('매칭 중 오류가 발생했습니다.', 'error')
+      }
+    } catch (error) {
+      console.error('매칭 중 오류:', error)
+      showToast('매칭 중 오류가 발생했습니다.', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const columns = [
     { key: 'category_1', title: '대분류', width: 150, className: 'text-center' },
     { key: 'category_2', title: '중분류', width: 150, className: 'text-center' },
@@ -323,6 +350,16 @@ export default function ProductsMasterPage() {
       <div className="flex justify-between items-center">
         <div className="text-[16px] font-bold">품목 마스터</div>
         <div className="flex gap-2">
+          {/* 전체 매칭 버튼 */}
+          <Button
+            onClick={handleLinkAll}
+            variant="primary"
+            disabled={loading}
+            className="text-sm"
+          >
+            {loading ? '매칭 중...' : '전체 매칭'}
+          </Button>
+
           {/* 엑셀 다운로드 버튼 */}
           <button
             onClick={handleExcelDownload}

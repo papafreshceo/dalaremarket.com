@@ -176,7 +176,7 @@ export async function inheritRawMaterialToAllOptionProducts(rawMaterialId: strin
 }
 
 /**
- * 품목 마스터의 product_master_id로 원물 자동 연결
+ * 품목 마스터의 product_master_id로 원물과 옵션상품 자동 연결
  */
 export async function linkRawMaterialsToProductMaster(productMasterId: string) {
   const supabase = createClient()
@@ -184,7 +184,7 @@ export async function linkRawMaterialsToProductMaster(productMasterId: string) {
   // 1. 품목 마스터 정보 조회
   const { data: productMaster, error: masterError } = await supabase
     .from('products_master')
-    .select('category_3')
+    .select('category_4')
     .eq('id', productMasterId)
     .single()
 
@@ -193,18 +193,72 @@ export async function linkRawMaterialsToProductMaster(productMasterId: string) {
     return { success: false, error: masterError }
   }
 
-  // 2. category_3(품목) 기준으로 원물의 product_master_id 업데이트
-  const { error: updateError, count } = await supabase
+  // 2. category_4(품목명) 기준으로 원물의 product_master_id 업데이트
+  const { error: rawError, count: rawCount } = await supabase
     .from('raw_materials')
     .update({ product_master_id: productMasterId })
-    .eq('category_4', productMaster.category_3)
+    .eq('category_4', productMaster.category_4)
     .is('product_master_id', null) // 아직 연결되지 않은 원물만
 
-  if (updateError) {
-    console.error('Failed to link raw materials:', updateError)
-    return { success: false, error: updateError }
+  if (rawError) {
+    console.error('Failed to link raw materials:', rawError)
+    return { success: false, error: rawError }
   }
 
-  console.log(`✅ 원물 연결 완료: ${count || 0}개`)
-  return { success: true, linkedCount: count || 0 }
+  // 3. category_4(품목명) 기준으로 옵션상품의 product_master_id 업데이트
+  const { error: optionError, count: optionCount } = await supabase
+    .from('option_products')
+    .update({ product_master_id: productMasterId })
+    .eq('category_4', productMaster.category_4)
+    .is('product_master_id', null) // 아직 연결되지 않은 옵션상품만
+
+  if (optionError) {
+    console.error('Failed to link option products:', optionError)
+    return { success: false, error: optionError }
+  }
+
+  console.log(`✅ 매칭 완료: 원물 ${rawCount || 0}개, 옵션상품 ${optionCount || 0}개`)
+  return {
+    success: true,
+    rawMaterialsLinked: rawCount || 0,
+    optionProductsLinked: optionCount || 0
+  }
+}
+
+/**
+ * 모든 품목 마스터와 원물/옵션상품 일괄 매칭
+ */
+export async function linkAllProductMasters() {
+  const supabase = createClient()
+
+  // 모든 품목 마스터 조회
+  const { data: productMasters, error } = await supabase
+    .from('products_master')
+    .select('id, category_4')
+    .not('category_4', 'is', null)
+
+  if (error || !productMasters) {
+    console.error('Failed to fetch product masters:', error)
+    return { success: false, error }
+  }
+
+  let totalRawMaterials = 0
+  let totalOptionProducts = 0
+
+  // 각 품목 마스터에 대해 매칭 실행
+  for (const pm of productMasters) {
+    const result = await linkRawMaterialsToProductMaster(pm.id)
+    if (result.success) {
+      totalRawMaterials += result.rawMaterialsLinked || 0
+      totalOptionProducts += result.optionProductsLinked || 0
+    }
+  }
+
+  console.log(`✅ 전체 매칭 완료: ${productMasters.length}개 품목, 원물 ${totalRawMaterials}개, 옵션상품 ${totalOptionProducts}개`)
+  return {
+    success: true,
+    productMastersCount: productMasters.length,
+    totalRawMaterials,
+    totalOptionProducts
+  }
 }
