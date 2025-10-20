@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/Toast'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 import * as XLSX from 'xlsx'
+import { inheritProductMasterToAllDescendants } from '@/lib/inheritance-utils'
 
 interface ProductMaster {
   id: string
@@ -104,9 +105,12 @@ export default function ProductsMasterPage() {
 
   const handleSave = async () => {
     try {
+      let totalRawMaterials = 0
+      let totalOptionProducts = 0
+
       for (const row of tableData) {
-        // 최소한 category_4(품목)는 있어야 함
-        if (!row.category_4) {
+        // 최소한 category_3(품목)는 있어야 함
+        if (!row.category_3) {
           continue
         }
 
@@ -129,16 +133,21 @@ export default function ProductsMasterPage() {
           is_active: row.is_active !== null ? row.is_active : true
         }
 
+        let savedId: string | null = null
+
         if (!row.id || String(row.id).startsWith('temp_')) {
           // 신규 등록
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from('products_master')
             .insert([productData])
+            .select()
+            .single()
 
           if (error) {
             showToast(`품목 등록 실패: ${error.message}`, 'error')
             return
           }
+          savedId = data?.id
         } else {
           // 기존 데이터 수정
           const { error } = await supabase
@@ -150,11 +159,29 @@ export default function ProductsMasterPage() {
             showToast(`품목 수정 실패: ${error.message}`, 'error')
             return
           }
+          savedId = row.id
+        }
+
+        // 상속 실행: 품목 마스터 → 원물 → 옵션상품
+        if (savedId) {
+          const result = await inheritProductMasterToAllDescendants(savedId)
+          if (result.success) {
+            totalRawMaterials += result.rawMaterialsUpdated || 0
+            totalOptionProducts += result.optionProductsUpdated || 0
+          }
         }
       }
 
       await fetchProducts()
-      showToast('저장되었습니다.', 'success')
+
+      if (totalRawMaterials > 0 || totalOptionProducts > 0) {
+        showToast(
+          `저장 완료! 상속: 원물 ${totalRawMaterials}개, 옵션상품 ${totalOptionProducts}개`,
+          'success'
+        )
+      } else {
+        showToast('저장되었습니다.', 'success')
+      }
     } catch (error) {
       console.error('저장 중 오류:', error)
       showToast('저장 중 오류가 발생했습니다.', 'error')
