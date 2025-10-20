@@ -79,10 +79,10 @@ export default function AllProductsPage() {
         return;
       }
 
-      // 2. products_master 조회 (품목 정보 + 원물상태 + 셀러공급여부 + 배지정보 + 발송기한)
+      // 2. products_master 조회 (품목 정보 + 공급상태 + 셀러공급여부 + 배지정보 + 발송기한)
       const { data: productsMaster, error: masterError } = await supabase
         .from('products_master')
-        .select('id, category_1, category_2, category_3, raw_material_status, seller_supply, is_best, is_recommended, has_image, has_detail_page, shipping_deadline')
+        .select('id, category_1, category_2, category_3, supply_status, seller_supply, is_best, is_recommended, has_image, has_detail_page, shipping_deadline')
         .eq('is_active', true)
         .eq('seller_supply', true) // 셀러공급 품목만 조회
         .not('category_3', 'is', null); // category_3(품목)가 있는 것만
@@ -98,7 +98,7 @@ export default function AllProductsPage() {
           category_1: pm.category_1,
           category_2: pm.category_2,
           category_3: pm.category_3,
-          raw_material_status: pm.raw_material_status,
+          supply_status: pm.supply_status,
           is_best: pm.is_best,
           is_recommended: pm.is_recommended,
           has_image: pm.has_image,
@@ -159,8 +159,8 @@ export default function AllProductsPage() {
           return {
             ...product,
             thumbnail_url: thumbnailUrl,
-            // 품목의 원물상태 및 소분류 추가
-            category_raw_material_status: categoryInfo?.raw_material_status || null,
+            // 품목의 공급상태 및 소분류 추가
+            category_supply_status: categoryInfo?.supply_status || null,
             category_2: categoryInfo?.category_2 || null,
             category_seller_supply: !!categoryInfo, // 품목의 셀러공급 여부
             category_4_id: categoryId, // 품목 마스터 ID 추가
@@ -322,7 +322,7 @@ export default function AllProductsPage() {
               ).sort(([, productsA], [, productsB]) => {
                 // 첫 번째 정렬: 상태값 순서
                 const getOrder = (products: OptionProduct[]) => {
-                  const rawMaterialStatus = (products[0] as any).category_raw_material_status;
+                  const rawMaterialStatus = (products[0] as any).category_supply_status;
                   if (!rawMaterialStatus) return 999;
                   // name으로 비교
                   const statusInfo = supplyStatuses.find(s => s.name === rawMaterialStatus);
@@ -370,7 +370,7 @@ export default function AllProductsPage() {
                     const isExpanded = expandedGroups.has(itemName);
 
                     // 출하중 상태 확인
-                    const categoryStatus = (groupProducts[0] as any).category_raw_material_status;
+                    const categoryStatus = (groupProducts[0] as any).category_supply_status;
                     const isShipping = categoryStatus === '출하중';
 
                     // 배지 디버깅
@@ -473,7 +473,7 @@ export default function AllProductsPage() {
 
                             {/* 상태별 배지 (품목의 원물상태 표시) */}
                             {(() => {
-                              const categoryStatus = (groupProducts[0] as any).category_raw_material_status;
+                              const categoryStatus = (groupProducts[0] as any).category_supply_status;
                               if (!categoryStatus) return null;
 
                               // name으로 비교 (category_settings에 name으로 저장되어 있음)
@@ -574,7 +574,7 @@ export default function AllProductsPage() {
               ).sort(([, productsA], [, productsB]) => {
                 // 첫 번째 정렬: 상태값 순서
                 const getOrder = (products: OptionProduct[]) => {
-                  const rawMaterialStatus = (products[0] as any).category_raw_material_status;
+                  const rawMaterialStatus = (products[0] as any).category_supply_status;
                   if (!rawMaterialStatus) return 999;
                   const statusInfo = supplyStatuses.find(s => s.name === rawMaterialStatus);
                   return statusInfo?.display_order ?? 999;
@@ -621,7 +621,7 @@ export default function AllProductsPage() {
                     const isExpanded = expandedGroups.has(itemName);
 
                     // 출하중 상태 확인
-                    const categoryStatus = (groupProducts[0] as any).category_raw_material_status;
+                    const categoryStatus = (groupProducts[0] as any).category_supply_status;
                     const isShipping = categoryStatus === '출하중';
 
                     return (
@@ -715,7 +715,7 @@ export default function AllProductsPage() {
 
                             {/* 상태별 배지 (품목의 원물상태 표시) */}
                             {(() => {
-                              const categoryStatus = (groupProducts[0] as any).category_raw_material_status;
+                              const categoryStatus = (groupProducts[0] as any).category_supply_status;
                               if (!categoryStatus) return null;
 
                               const statusInfo = supplyStatuses.find(s => s.name === categoryStatus);

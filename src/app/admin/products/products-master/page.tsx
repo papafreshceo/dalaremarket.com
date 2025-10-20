@@ -16,7 +16,7 @@ interface ProductMaster {
   category_3: string | null
   category_4: string | null
   category_4_code: string | null
-  raw_material_status: string | null
+  supply_status: string | null
   shipping_deadline: number | null
   season_start_date: string | null
   season_end_date: string | null
@@ -70,10 +70,11 @@ export default function ProductsMasterPage() {
 
   const fetchSupplyStatuses = async () => {
     const { data, error } = await supabase
-      .from('supply_status')
+      .from('supply_status_settings')
       .select('code, name')
+      .eq('status_type', 'products')
       .eq('is_active', true)
-      .order('code')
+      .order('display_order')
 
     if (!error && data) {
       setSupplyStatuses(data)
@@ -120,7 +121,7 @@ export default function ProductsMasterPage() {
           category_3: row.category_3 || null,
           category_4: row.category_4 || null,
           category_4_code: row.category_4_code || null,
-          raw_material_status: row.raw_material_status || null,
+          supply_status: row.supply_status || null,
           shipping_deadline: row.shipping_deadline || null,
           season_start_date: formatSeasonDate(row.season_start_date),
           season_end_date: formatSeasonDate(row.season_end_date),
@@ -253,8 +254,8 @@ export default function ProductsMasterPage() {
     { key: 'category_4', title: '품목', width: 150, className: 'text-center' },
     { key: 'category_4_code', title: '품목코드', width: 120, className: 'text-center' },
     {
-      key: 'raw_material_status',
-      title: '원물상태',
+      key: 'supply_status',
+      title: '공급상태',
       width: 120,
       className: 'text-center',
       type: 'dropdown' as const,
@@ -325,7 +326,7 @@ export default function ProductsMasterPage() {
       '소분류': prod.category_3 || '',
       '품목': prod.category_4 || '',
       '품목코드': prod.category_4_code || '',
-      '원물상태': prod.raw_material_status || '',
+      '공급상태': prod.supply_status || '',
       '발송기한(일)': prod.shipping_deadline || '',
       '시즌시작': prod.season_start_date || '',
       '시즌종료': prod.season_end_date || '',
