@@ -186,13 +186,48 @@ export async function POST(request: NextRequest) {
       is_downloadable: isDownloadable,
     };
 
-    // 업로드 타입에 따라 관련 ID 추가
+    console.log('=== 이미지 업로드 - 대표이미지 설정 ===');
+    console.log('uploadType:', uploadType);
+    console.log('외래 키:', { rawMaterialId, optionProductId, category4Id });
+
+    // 업로드 타입에 따라 관련 ID 추가 및 기존 대표이미지 해제
+    // ⚠️ 중요: 외래 키가 실제로 존재할 때만 대표이미지로 설정
     if (uploadType === 'raw_material' && rawMaterialId) {
       insertData.raw_material_id = rawMaterialId;
+      insertData.is_representative = true; // 자동으로 대표이미지로 설정
+      console.log('원물 대표이미지로 설정:', rawMaterialId);
+
+      // 기존 대표이미지 해제
+      await supabase
+        .from('cloudinary_images')
+        .update({ is_representative: false })
+        .eq('raw_material_id', rawMaterialId);
+
     } else if (uploadType === 'option_product' && optionProductId) {
       insertData.option_product_id = optionProductId;
+      insertData.is_representative = true; // 자동으로 대표이미지로 설정
+      console.log('옵션상품 대표이미지로 설정:', optionProductId);
+
+      // 기존 대표이미지 해제
+      await supabase
+        .from('cloudinary_images')
+        .update({ is_representative: false })
+        .eq('option_product_id', optionProductId);
+
     } else if (uploadType === 'category_4' && category4Id) {
       insertData.category_4_id = category4Id;
+      insertData.is_representative = true; // 자동으로 대표이미지로 설정
+      console.log('품목 대표이미지로 설정:', category4Id);
+
+      // 기존 대표이미지 해제
+      await supabase
+        .from('cloudinary_images')
+        .update({ is_representative: false })
+        .eq('category_4_id', category4Id);
+    } else {
+      // 외래 키가 없으면 대표이미지로 설정하지 않음
+      insertData.is_representative = false;
+      console.log('외래 키 없음 - 대표이미지 아님');
     }
 
     const { data, error } = await supabase

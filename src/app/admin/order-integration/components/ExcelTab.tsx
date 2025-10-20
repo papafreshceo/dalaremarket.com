@@ -1297,7 +1297,11 @@ export default function ExcelTab() {
       quantity: data.quantity,
       orderCount: data.orderCount,
       markets: Array.from(data.markets)
-    })).sort((a, b) => a.optionName.localeCompare(b.optionName));
+    })).sort((a, b) => {
+      const nameA = String(a.optionName || '');
+      const nameB = String(b.optionName || '');
+      return nameA.localeCompare(nameB, 'ko-KR');
+    });
 
     setOptionStats(statsArray);
   };
@@ -1785,7 +1789,7 @@ export default function ExcelTab() {
           />
 
           {/* 옵션별 통계 테이블 */}
-          {optionStats.length > 0 && (
+          {optionStats && optionStats.length > 0 && (
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <h3 className="text-base font-semibold text-gray-900 mb-3">옵션별 통계</h3>
               <div className="overflow-x-auto">
@@ -1801,14 +1805,14 @@ export default function ExcelTab() {
                   </thead>
                   <tbody>
                     {optionStats.map((stat, index) => (
-                      <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                      <tr key={`stat-${stat.optionName}-${index}`} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="px-4 py-2 text-gray-600">{index + 1}</td>
                         <td className="px-4 py-2 text-gray-900 font-medium">{stat.optionName}</td>
                         <td className="px-4 py-2 text-center text-blue-600 font-semibold">{stat.quantity.toLocaleString()}</td>
                         <td className="px-4 py-2 text-center text-gray-600">{stat.orderCount.toLocaleString()}</td>
                         <td className="px-4 py-2">
                           <div className="flex gap-1 flex-wrap">
-                            {stat.markets.map((market, idx) => {
+                            {stat.markets && stat.markets.map((market, idx) => {
                               const template = marketTemplates.get(market.toLowerCase());
                               let marketColor = '#6B7280';
                               if (template?.color_rgb) {
@@ -1820,7 +1824,7 @@ export default function ExcelTab() {
                               }
                               return (
                                 <span
-                                  key={idx}
+                                  key={`market-${market}-${idx}`}
                                   className="px-2 py-0.5 rounded text-white text-xs font-medium"
                                   style={{ backgroundColor: marketColor }}
                                 >

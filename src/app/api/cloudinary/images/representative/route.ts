@@ -31,7 +31,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. 같은 품목(category_4, raw_material, option_product)의 다른 대표이미지들을 모두 해제합니다
+    // 2. 외래 키가 없으면 대표이미지로 설정할 수 없음
+    if (!image.category_4_id && !image.raw_material_id && !image.option_product_id) {
+      return NextResponse.json(
+        { success: false, error: '품목, 원물 또는 옵션상품이 연결되지 않은 이미지는 대표이미지로 설정할 수 없습니다.' },
+        { status: 400 }
+      );
+    }
+
+    // 3. 같은 품목(category_4, raw_material, option_product)의 다른 대표이미지들을 모두 해제합니다
     let clearConditions: any = {};
 
     if (image.category_4_id) {
@@ -43,18 +51,16 @@ export async function POST(request: NextRequest) {
     }
 
     // 기존 대표이미지 해제
-    if (Object.keys(clearConditions).length > 0) {
-      const { error: clearError } = await supabase
-        .from('cloudinary_images')
-        .update({ is_representative: false })
-        .match(clearConditions);
+    const { error: clearError } = await supabase
+      .from('cloudinary_images')
+      .update({ is_representative: false })
+      .match(clearConditions);
 
-      if (clearError) {
-        console.error('기존 대표이미지 해제 오류:', clearError);
-      }
+    if (clearError) {
+      console.error('기존 대표이미지 해제 오류:', clearError);
     }
 
-    // 3. 선택한 이미지를 대표이미지로 설정합니다
+    // 4. 선택한 이미지를 대표이미지로 설정합니다
     const { data: updatedImage, error: updateError } = await supabase
       .from('cloudinary_images')
       .update({ is_representative: true })

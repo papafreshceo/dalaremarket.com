@@ -69,12 +69,23 @@ export async function GET(request: NextRequest) {
 
 /**
  * PUT /api/cloudinary/images
- * 이미지 메타데이터 수정
+ * 이미지 메타데이터 수정 (외래 키 포함)
  */
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, title, description, category, tags, is_public, is_downloadable } = body;
+    const {
+      id,
+      title,
+      description,
+      category,
+      tags,
+      is_public,
+      is_downloadable,
+      option_product_id,
+      raw_material_id,
+      category_4_id
+    } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -84,31 +95,152 @@ export async function PUT(request: NextRequest) {
     }
 
     const supabase = await createClient();
+
+    // 외래 키 값 확인
+    const newOptionProductId = option_product_id || null;
+    const newRawMaterialId = raw_material_id || null;
+    const newCategory4Id = category_4_id || null;
+
+    console.log('=== 이미지 수정 시작 ===');
+    console.log('이미지 ID:', id);
+    console.log('새 외래 키:', { newOptionProductId, newRawMaterialId, newCategory4Id });
+
+    // 0. 먼저 기존 이미지 데이터 조회 (이전 외래 키 확인용)
+    const { data: oldImage, error: fetchError } = await supabase
+      .from('cloudinary_images')
+      .select('option_product_id, raw_material_id, category_4_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      console.error('기존 이미지 조회 실패:', fetchError);
+      return NextResponse.json(
+        { success: false, error: fetchError.message },
+        { status: 500 }
+      );
+    }
+
+    console.log('기존 외래 키:', {
+      oldOptionProductId: oldImage?.option_product_id,
+      oldRawMaterialId: oldImage?.raw_material_id,
+      oldCategory4Id: oldImage?.category_4_id
+    });
+
+    // 1. 먼저 현재 이미지를 업데이트 (외래 키 + 대표이미지 설정)
+    const hasAnyForeignKey = !!(newOptionProductId || newRawMaterialId || newCategory4Id);
+
+    const updateData: any = {
+      title,
+      description,
+      category,
+      tags,
+      is_public,
+      is_downloadable,
+      option_product_id: newOptionProductId,
+      raw_material_id: newRawMaterialId,
+      category_4_id: newCategory4Id,
+      updated_at: new Date().toISOString(),
+      // 외래 키가 하나라도 있으면 대표이미지로 설정, 없으면 해제
+      is_representative: hasAnyForeignKey,
+    };
+
+    console.log('대표이미지 설정:', hasAnyForeignKey ? '설정' : '해제');
+
+    console.log('현재 이미지 업데이트 데이터:', updateData);
+
     const { data, error } = await supabase
       .from('cloudinary_images')
-      .update({
-        title,
-        description,
-        category,
-        tags,
-        is_public,
-        is_downloadable,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
 
     if (error) {
+      console.error('현재 이미지 업데이트 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
       );
     }
 
+    console.log('현재 이미지 업데이트 완료:', data);
+
+    // 2. 대표이미지 해제 작업
+    console.log('대표이미지 해제 시작...');
+
+    // 2-1. 새로운 외래 키에 대한 다른 대표이미지 해제
+    if (newOptionProductId) {
+      console.log('새 옵션상품 대표이미지 해제:', newOptionProductId, '(현재 이미지 제외:', id, ')');
+      const { data: cleared, error: clearError } = await supabase
+        .from('cloudinary_images')
+        .update({ is_representative: false })
+        .eq('option_product_id', newOptionProductId)
+        .neq('id', id)
+        .select();
+
+      console.log('해제된 이미지 수:', cleared?.length || 0);
+      if (clearError) console.error('해제 오류:', clearError);
+    }
+
+    if (newRawMaterialId) {
+      console.log('새 원물 대표이미지 해제:', newRawMaterialId, '(현재 이미지 제외:', id, ')');
+      const { data: cleared, error: clearError } = await supabase
+        .from('cloudinary_images')
+        .update({ is_representative: false })
+        .eq('raw_material_id', newRawMaterialId)
+        .neq('id', id)
+        .select();
+
+      console.log('해제된 이미지 수:', cleared?.length || 0);
+      if (clearError) console.error('해제 오류:', clearError);
+    }
+
+    if (newCategory4Id) {
+      console.log('새 품목 대표이미지 해제:', newCategory4Id, '(현재 이미지 제외:', id, ')');
+      const { data: cleared, error: clearError } = await supabase
+        .from('cloudinary_images')
+        .update({ is_representative: false })
+        .eq('category_4_id', newCategory4Id)
+        .neq('id', id)
+        .select();
+
+      console.log('해제된 이미지 수:', cleared?.length || 0);
+      if (clearError) console.error('해제 오류:', clearError);
+    }
+
+    // 2-2. 이전 외래 키가 있었다면 해당 엔티티의 대표이미지도 해제 (외래 키가 변경된 경우)
+    if (oldImage?.option_product_id && oldImage.option_product_id !== newOptionProductId) {
+      console.log('이전 옵션상품 대표이미지 해제:', oldImage.option_product_id);
+      await supabase
+        .from('cloudinary_images')
+        .update({ is_representative: false })
+        .eq('option_product_id', oldImage.option_product_id);
+    }
+
+    if (oldImage?.raw_material_id && oldImage.raw_material_id !== newRawMaterialId) {
+      console.log('이전 원물 대표이미지 해제:', oldImage.raw_material_id);
+      await supabase
+        .from('cloudinary_images')
+        .update({ is_representative: false })
+        .eq('raw_material_id', oldImage.raw_material_id);
+    }
+
+    if (oldImage?.category_4_id && oldImage.category_4_id !== newCategory4Id) {
+      console.log('이전 품목 대표이미지 해제:', oldImage.category_4_id);
+      await supabase
+        .from('cloudinary_images')
+        .update({ is_representative: false })
+        .eq('category_4_id', oldImage.category_4_id);
+    }
+
+    console.log('=== 이미지 수정 완료 ===');
+
     return NextResponse.json({
       success: true,
       data,
+      message: newOptionProductId || newRawMaterialId || newCategory4Id
+        ? '외래 키가 설정되고 대표이미지로 지정되었습니다.'
+        : '외래 키가 해제되고 대표이미지에서 제외되었습니다.',
     });
   } catch (error: any) {
     console.error('이미지 수정 오류:', error);
