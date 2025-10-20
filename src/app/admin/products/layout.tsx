@@ -43,6 +43,11 @@ export default function ProductsLayout({ children }: { children: ReactNode }) {
       category: '상품 설정',
       items: [
         {
+          title: '품목 마스터',
+          description: '농산물 품목 마스터 관리',
+          href: '/admin/products/products-master'
+        },
+        {
           title: '카테고리 설정',
           description: '카테고리 조견표 관리',
           href: '/admin/products/category-settings'

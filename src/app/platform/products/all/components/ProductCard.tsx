@@ -40,31 +40,30 @@ export default function ProductCard({ product, onProductClick, onShowPriceChart 
       onClick={() => onProductClick(product)}
     >
       {/* 썸네일 이미지 */}
-      <div className="relative aspect-square bg-gray-100">
-        {product.thumbnail_url ? (
+      {product.thumbnail_url ? (
+        <div className="relative">
           <img
             src={product.thumbnail_url}
             alt={product.option_name}
-            className="w-full h-full object-cover block"
+            className="w-full aspect-square object-cover"
           />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Package2 className="w-12 h-12 text-gray-400" />
-          </div>
-        )}
-
-        {/* 가격 변동 그래프 버튼 */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onShowPriceChart(product);
-          }}
-          className="absolute top-1.5 right-1.5 bg-white/90 backdrop-blur-sm p-1.5 rounded-full shadow-md hover:bg-white transition-colors"
-          title="가격 변동 그래프"
-        >
-          <TrendingUp className="w-3 h-3 text-blue-600" />
-        </button>
-      </div>
+          {/* 가격 변동 그래프 버튼 */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onShowPriceChart(product);
+            }}
+            className="absolute top-1.5 right-1.5 bg-white/90 backdrop-blur-sm p-1.5 rounded-full shadow-md hover:bg-white transition-colors"
+            title="가격 변동 그래프"
+          >
+            <TrendingUp className="w-3 h-3 text-blue-600" />
+          </button>
+        </div>
+      ) : (
+        <div className="w-full aspect-square flex items-center justify-center bg-gray-100">
+          <Package2 className="w-12 h-12 text-gray-400" />
+        </div>
+      )}
 
       {/* 상품 정보 */}
       <div className="p-3">

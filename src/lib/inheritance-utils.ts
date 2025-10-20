@@ -106,7 +106,16 @@ export async function inheritCategoryToAllDescendants(categoryId: string) {
     return { success: false, error: categoryError }
   }
 
-  // 2. 품목 -> 원물 상속
+  // 2. 품목명으로 품목 이름 조회
+  const { data: categoryInfo } = await supabase
+    .from('category_settings')
+    .select('category_4')
+    .eq('id', categoryId)
+    .single()
+
+  if (!categoryInfo) return { success: false }
+
+  // 3. 품목 -> 원물 상속 (category_4 텍스트 필드로 매칭)
   const { error: rawMaterialError } = await supabase
     .from('raw_materials')
     .update({
@@ -114,13 +123,13 @@ export async function inheritCategoryToAllDescendants(categoryId: string) {
       season_start_date: category.season_start_date,
       season_end_date: category.season_end_date
     })
-    .eq('category_4_id', categoryId)
+    .eq('category_4', categoryInfo.category_4)
 
   if (rawMaterialError) {
     console.error('Failed to update raw materials:', rawMaterialError)
   }
 
-  // 3. 품목 -> 옵션상품 상속
+  // 4. 품목 -> 옵션상품 상속 (category_4 텍스트 필드로 매칭)
   const { error: optionProductError } = await supabase
     .from('option_products')
     .update({
@@ -128,7 +137,7 @@ export async function inheritCategoryToAllDescendants(categoryId: string) {
       season_start_date: category.season_start_date,
       season_end_date: category.season_end_date
     })
-    .eq('category_4_id', categoryId)
+    .eq('category_4', categoryInfo.category_4)
 
   if (optionProductError) {
     console.error('Failed to update option products:', optionProductError)

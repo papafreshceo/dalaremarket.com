@@ -56,19 +56,17 @@ export default function ProductDetailModal({ product, onClose, onShowPriceChart 
         <div className="flex flex-col md:flex-row gap-6">
           {/* 썸네일 */}
           <div className="w-full md:w-64 flex-shrink-0">
-            <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-              {product.thumbnail_url ? (
-                <img
-                  src={product.thumbnail_url}
-                  alt={product.option_name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Package2 className="w-20 h-20 text-gray-400" />
-                </div>
-              )}
-            </div>
+            {product.thumbnail_url ? (
+              <img
+                src={product.thumbnail_url}
+                alt={product.option_name}
+                className="w-full aspect-square object-cover rounded-lg"
+              />
+            ) : (
+              <div className="w-full aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
+                <Package2 className="w-20 h-20 text-gray-400" />
+              </div>
+            )}
           </div>
 
           {/* 기본 정보 */}

@@ -31,6 +31,26 @@ interface CategorySetting {
   is_active: boolean
 }
 
+// 날짜 포맷 변환 함수 (7-8 -> 07-08)
+function formatSeasonDate(dateStr: string | null): string | null {
+  if (!dateStr) return null
+  const trimmed = dateStr.trim()
+  if (!trimmed) return null
+
+  // 이미 MM-DD 형식인지 확인
+  if (/^\d{2}-\d{2}$/.test(trimmed)) return trimmed
+
+  // M-D 또는 MM-D 또는 M-DD 형식을 MM-DD로 변환
+  const parts = trimmed.split('-')
+  if (parts.length === 2) {
+    const month = parts[0].padStart(2, '0')
+    const day = parts[1].padStart(2, '0')
+    return `${month}-${day}`
+  }
+
+  return trimmed // 변환 실패 시 원본 반환
+}
+
 export default function CategorySettingsPage() {
   const { showToast } = useToast()
   const { confirm } = useConfirm()
@@ -115,9 +135,23 @@ export default function CategorySettingsPage() {
   }
 
   const handleDataChange = (newData: CategorySetting[]) => {
-    // Grid에서 변경된 데이터를 받아서 tableData 업데이트
-    // 필터링 여부와 관계없이 항상 전체 데이터 교체
-    setTableData(newData)
+    // Grid에서 변경된 데이터를 받아서 업데이트
+    // 필터 모드에 따라 처리
+    if (filterExpenseType === '전체') {
+      // 전체 모드: tableData 그대로 업데이트
+      setTableData(newData)
+    } else {
+      // 필터 모드: 변경된 데이터를 tableData에 병합
+      const updatedTableData = tableData.map(row => {
+        const found = newData.find(newRow => newRow.id === row.id)
+        return found || row
+      })
+      // 새로 추가된 행도 포함
+      const newRows = newData.filter(newRow =>
+        !tableData.some(row => row.id === newRow.id)
+      )
+      setTableData([...updatedTableData, ...newRows])
+    }
   }
 
   const handleSave = async () => {
@@ -187,8 +221,8 @@ export default function CategorySettingsPage() {
             has_image: row.has_image || false,
             has_detail_page: row.has_detail_page || false,
             shipping_deadline: row.shipping_deadline || null,
-            season_start_date: row.season_start_date || null,
-            season_end_date: row.season_end_date || null,
+            season_start_date: formatSeasonDate(row.season_start_date),
+            season_end_date: formatSeasonDate(row.season_end_date),
             notes: row.notes || null,
             is_active: true
           }]).select()
@@ -705,6 +739,13 @@ export default function CategorySettingsPage() {
                     '품종': 'category_5',
                     '원물상태': 'raw_material_status',
                     '셀러공급': 'seller_supply',
+                    '베스트': 'is_best',
+                    '추천상품': 'is_recommended',
+                    '이미지제공': 'has_image',
+                    '상세페이지': 'has_detail_page',
+                    '발송기한(일)': 'shipping_deadline',
+                    '시즌시작': 'season_start_date',
+                    '시즌종료': 'season_end_date',
                     '비고': 'notes',
                     '활성화': 'is_active'
                   }
@@ -717,8 +758,13 @@ export default function CategorySettingsPage() {
                       let value = row[key]
 
                       // Boolean 필드 처리 (Y/N -> boolean)
-                      if (englishKey === 'is_active' || englishKey === 'seller_supply') {
+                      if (['is_active', 'seller_supply', 'is_best', 'is_recommended', 'has_image', 'has_detail_page'].includes(englishKey)) {
                         value = value === 'Y' || value === true || value === 1
+                      }
+
+                      // 날짜 필드 포맷 변환 (1-2 -> 01-02)
+                      if (englishKey === 'season_start_date' || englishKey === 'season_end_date') {
+                        value = formatSeasonDate(value)
                       }
 
                       englishRow[englishKey] = value
