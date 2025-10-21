@@ -37,12 +37,27 @@ interface VendorCourierDefault {
   updated_at: string;
 }
 
+interface CourierSetting {
+  id: number;
+  courier_name: string;
+  courier_header: string;
+  order_number_header: string;
+  tracking_number_header: string;
+  display_order?: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function CourierSettingsPage() {
   const [templates, setTemplates] = useState<CourierTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<CourierTemplate | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [newCourierName, setNewCourierName] = useState('');
+
+  // courier_settings 관리
+  const [courierSettings, setCourierSettings] = useState<CourierSetting[]>([]);
+  const [newCourierSettingName, setNewCourierSettingName] = useState('');
 
   // 송장일괄등록 모달
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -66,6 +81,7 @@ export default function CourierSettingsPage() {
     fetchTemplates();
     fetchVendorDefaults();
     fetchCourierList();
+    fetchCourierSettings();
   }, []);
 
   const fetchTemplates = async () => {
@@ -110,6 +126,142 @@ export default function CourierSettingsPage() {
       }
     } catch (error) {
       console.error('택배사 목록 조회 오류:', error);
+    }
+  };
+
+  const fetchCourierSettings = async () => {
+    try {
+      const response = await fetch('/api/courier-settings');
+      const result = await response.json();
+      if (result.success && Array.isArray(result.data)) {
+        // display_order로 정렬
+        const sorted = result.data.sort((a: CourierSetting, b: CourierSetting) => {
+          const orderA = a.display_order ?? a.id;
+          const orderB = b.display_order ?? b.id;
+          return orderA - orderB;
+        });
+        setCourierSettings(sorted);
+      }
+    } catch (error) {
+      console.error('택배사 설정 조회 오류:', error);
+    }
+  };
+
+  const handleAddCourierSetting = async () => {
+    if (!newCourierSettingName.trim()) {
+      alert('택배사명을 입력해주세요.');
+      return;
+    }
+
+    try {
+      // 현재 최대 display_order 찾기
+      const maxOrder = courierSettings.reduce((max, s) => {
+        const order = s.display_order ?? s.id;
+        return order > max ? order : max;
+      }, 0);
+
+      const response = await fetch('/api/courier-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courier_name: newCourierSettingName.trim(),
+          courier_header: '택배사',
+          order_number_header: '주문번호',
+          tracking_number_header: '송장번호',
+          display_order: maxOrder + 1,
+        }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        await fetchCourierSettings();
+        setNewCourierSettingName('');
+        alert('택배사가 추가되었습니다.');
+      } else {
+        alert('추가 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('택배사 추가 오류:', error);
+      alert('추가 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleUpdateCourierSetting = async (setting: CourierSetting) => {
+    try {
+      const response = await fetch('/api/courier-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(setting),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        await fetchCourierSettings();
+        alert('수정되었습니다.');
+      } else {
+        alert('수정 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('택배사 수정 오류:', error);
+      alert('수정 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleDeleteCourierSetting = async (id: number) => {
+    if (!confirm('이 택배사 설정을 삭제하시겠습니까?')) return;
+
+    try {
+      const response = await fetch('/api/courier-settings', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        await fetchCourierSettings();
+        alert('삭제되었습니다.');
+      } else {
+        alert('삭제 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('택배사 삭제 오류:', error);
+      alert('삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleMoveCourierSetting = async (index: number, direction: 'up' | 'down') => {
+    const newSettings = [...courierSettings];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+
+    if (targetIndex < 0 || targetIndex >= newSettings.length) return;
+
+    // 스왑
+    [newSettings[index], newSettings[targetIndex]] = [newSettings[targetIndex], newSettings[index]];
+
+    // display_order 재설정
+    const updatedSettings = newSettings.map((setting, idx) => ({
+      ...setting,
+      display_order: idx + 1
+    }));
+
+    setCourierSettings(updatedSettings);
+
+    // 서버에 순서 업데이트
+    try {
+      await Promise.all(
+        updatedSettings.map(setting =>
+          fetch('/api/courier-settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(setting),
+          })
+        )
+      );
+    } catch (error) {
+      console.error('순서 저장 오류:', error);
+      alert('순서 저장 중 오류가 발생했습니다.');
+      await fetchCourierSettings(); // 원래대로 되돌리기
     }
   };
 
@@ -576,10 +728,85 @@ export default function CourierSettingsPage() {
         </div>
 
         <div className="grid grid-cols-12 gap-6">
-          {/* 왼쪽: 택배사 목록 */}
+          {/* 맨 왼쪽: 택배사 기본 설정 (드롭다운용) */}
+          <div className="col-span-2 bg-white rounded-lg border border-gray-200 p-4">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">택배사 목록</h2>
+            <p className="text-xs text-gray-600 mb-4">
+              드롭다운에 표시될 택배사
+            </p>
+
+            {/* 추가 폼 */}
+            <div className="mb-4">
+              <input
+                type="text"
+                value={newCourierSettingName}
+                onChange={(e) => setNewCourierSettingName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddCourierSetting()}
+                placeholder="택배사명"
+                className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 mb-2"
+              />
+              <button
+                onClick={handleAddCourierSetting}
+                className="w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center justify-center gap-1 text-sm"
+              >
+                <Plus className="w-4 h-4" />
+                추가
+              </button>
+            </div>
+
+            {/* 택배사 목록 */}
+            <div className="space-y-1 max-h-[700px] overflow-y-auto">
+              {courierSettings.length === 0 ? (
+                <div className="px-3 py-4 text-center text-sm text-gray-500">
+                  택배사 없음
+                </div>
+              ) : (
+                courierSettings.map((setting, index) => (
+                  <div key={setting.id} className="flex items-center gap-1 p-2 bg-gray-50 rounded hover:bg-gray-100">
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        onClick={() => handleMoveCourierSetting(index, 'up')}
+                        disabled={index === 0}
+                        className="p-0.5 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ArrowUp className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => handleMoveCourierSetting(index, 'down')}
+                        disabled={index === courierSettings.length - 1}
+                        className="p-0.5 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ArrowDown className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={setting.courier_name}
+                      onChange={(e) => {
+                        const updated = courierSettings.map(s =>
+                          s.id === setting.id ? { ...s, courier_name: e.target.value } : s
+                        );
+                        setCourierSettings(updated);
+                      }}
+                      onBlur={() => handleUpdateCourierSetting(setting)}
+                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={() => handleDeleteCourierSetting(setting.id)}
+                      className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* 중간: 엑셀 양식 템플릿 목록 */}
           <div className="col-span-3 bg-white rounded-lg border border-gray-200 p-4">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">택배사 목록</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-3">엑셀 양식 템플릿</h2>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -630,7 +857,7 @@ export default function CourierSettingsPage() {
           </div>
 
           {/* 오른쪽: 컬럼 매핑 설정 */}
-          <div className="col-span-9 bg-white rounded-lg border border-gray-200 p-6">
+          <div className="col-span-7 bg-white rounded-lg border border-gray-200 p-6">
             {selectedTemplate ? (
               <>
                 <div className="flex items-center justify-between mb-6">

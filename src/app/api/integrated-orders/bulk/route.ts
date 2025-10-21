@@ -39,11 +39,12 @@ export async function POST(request: NextRequest) {
     const marketBatchInfo: Record<string, { currentBatch: number; maxSeq: number }> = {};
 
     for (const marketName of marketNames) {
-      // 해당 마켓의 기존 최대 연번 조회 (market_check 컬럼 = "N1001" 형식)
+      // 해당 마켓의 오늘 날짜 기준 최대 연번 조회 (market_check 컬럼 = "N1001" 형식)
       const { data: maxMarketData } = await supabase
         .from('integrated_orders')
         .select('market_check')
         .eq('market_name', marketName)
+        .eq('sheet_date', today) // 오늘 날짜만 조회
         .eq('is_deleted', false)
         .not('market_check', 'is', null)
         .order('market_check', { ascending: false })
