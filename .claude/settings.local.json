@@ -68,7 +68,9 @@
       "Bash(del apply-category-fields-migration.js)",
       "Bash(if exist apply-category-fields-migration.js del /f apply-category-fields-migration.js)",
       "Bash(if exist migrate-to-products-master.js del /f migrate-to-products-master.js)",
-      "Bash(curl -s \"https://qxhpgjftkkcxdttgjkzj.supabase.co/rest/v1/courier_settings?select=id,courier_name&order=courier_name.asc\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4aHBnamZ0a2tjeGR0dGdqa3pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3MDQxNDAsImV4cCI6MjA1ODI4MDE0MH0.wXUEJ4KY3Gg-fHb6lCvwKrGOvWrGJlC2hvStD0uDBrs\")"
+      "Bash(curl -s \"https://qxhpgjftkkcxdttgjkzj.supabase.co/rest/v1/courier_settings?select=id,courier_name&order=courier_name.asc\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4aHBnamZ0a2tjeGR0dGdqa3pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3MDQxNDAsImV4cCI6MjA1ODI4MDE0MH0.wXUEJ4KY3Gg-fHb6lCvwKrGOvWrGJlC2hvStD0uDBrs\")",
+      "Bash(timeout 5 bash -c 'sleep 3')",
+      "Bash(npm uninstall react-window @types/react-window)"
     ],
     "deny": [],
     "ask": []

@@ -1935,7 +1935,13 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           </thead>
           <tbody>
             {filteredData.map((row, rowIndex) => (
-              <tr key={rowIndex}>
+              <tr
+                key={rowIndex}
+                style={{
+                  contentVisibility: 'auto',
+                  contain: 'layout style paint',
+                }}
+              >
                 {enableCheckbox && (
                   <td key="checkbox" className="border border-gray-200 px-2 py-1 text-center align-middle">
                     <input

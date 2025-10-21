@@ -144,11 +144,14 @@ export default function ExcelTab() {
     markets: string[];
   }[]>([]);
 
-  // 옵션상품, 마켓 템플릿, 표준 필드 로드
+  // 초기 데이터 병렬 로드 (성능 최적화)
   useEffect(() => {
-    loadOptionProducts();
-    loadMarketTemplates();
-    loadStandardFields();
+    // 3개 API를 병렬로 호출하여 로딩 시간 단축
+    Promise.all([
+      loadOptionProducts(),
+      loadMarketTemplates(),
+      loadStandardFields(),
+    ]);
   }, []);
 
   // marketTemplates와 columns가 로드되면 마켓 컬럼에 렌더러 추가

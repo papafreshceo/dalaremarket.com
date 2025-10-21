@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, memo, useCallback } from 'react';
 import { Search, Download, Filter, Calendar, RefreshCw, Upload, ChevronDown, ChevronUp } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import { Modal } from '@/components/ui/Modal';
@@ -132,6 +132,68 @@ interface OptionStats {
   취소완료_수량: number;
 }
 
+// 성능 최적화: StatCard 컴포넌트 메모이제이션
+const StatCard = memo(({
+  label,
+  value,
+  color,
+  isActive,
+  onClick
+}: {
+  label: string;
+  value: number;
+  color: string;
+  isActive: boolean;
+  onClick: () => void;
+}) => {
+  const colorClasses: Record<string, { border: string; text: string; hover: string }> = {
+    gray: { border: 'border-gray-900', text: 'text-gray-900', hover: 'hover:border-gray-400' },
+    purple: { border: 'border-purple-600', text: 'text-purple-600', hover: 'hover:border-purple-400' },
+    blue: { border: 'border-blue-600', text: 'text-blue-600', hover: 'hover:border-blue-400' },
+    yellow: { border: 'border-yellow-600', text: 'text-yellow-600', hover: 'hover:border-yellow-400' },
+    green: { border: 'border-green-600', text: 'text-green-600', hover: 'hover:border-green-400' },
+    orange: { border: 'border-orange-600', text: 'text-orange-600', hover: 'hover:border-orange-400' },
+    red: { border: 'border-red-600', text: 'text-red-600', hover: 'hover:border-red-400' },
+  };
+
+  const colors = colorClasses[color] || colorClasses.gray;
+
+  return (
+    <div
+      onClick={onClick}
+      className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all ${
+        isActive
+          ? `${colors.border} shadow-md`
+          : `border-gray-200 ${colors.hover}`
+      }`}
+    >
+      <div className="text-sm text-gray-600 mb-1">{label}</div>
+      <div className={`text-2xl font-semibold ${colors.text}`}>
+        {value.toLocaleString()}
+      </div>
+    </div>
+  );
+});
+
+StatCard.displayName = 'StatCard';
+
+// 커스텀 debounce 훅 (성능 최적화)
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 export default function SearchTab() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
@@ -245,47 +307,46 @@ export default function SearchTab() {
     };
   });
 
+  // 검색어 debounce 적용 (성능 최적화: 입력 후 300ms 대기)
+  const debouncedSearchKeyword = useDebounce(filters.searchKeyword, 300);
+
   // 일괄적용 택배사 선택값 상태
   const [bulkApplyValue, setBulkApplyValue] = useState('');
 
-  // 마켓 템플릿 먼저 로드한 후 표준 필드와 택배사 로드
+  // 초기 데이터 병렬 로드 (성능 최적화)
   useEffect(() => {
     const loadInitialData = async () => {
-      await loadMarketTemplates();
-      await loadStandardFields();
-      await loadCouriers();
-      await loadCSTypes();
+      // 4개 API를 병렬로 호출하여 로딩 시간 단축
+      await Promise.all([
+        loadMarketTemplates(),
+        loadStandardFields(),
+        loadCouriers(),
+        loadCSTypes(),
+      ]);
     };
     loadInitialData();
   }, []);
 
   // marketTemplates와 columns가 로드되면 마켓 컬럼과 주문번호 컬럼에 렌더러 추가
+  // 무한루프 방지: columns.length와 marketTemplates.size만 의존성으로 사용
   useEffect(() => {
-    if (columns.length > 0) {
-      let needsUpdate = false;
+    if (columns.length === 0) return;
 
-      // 마켓 컬럼 체크
-      const marketColumn = columns.find(c => c.key === 'market_name' || c.isMarketColumn);
-      const needsMarketRenderer = marketColumn && !marketColumn.renderer && marketTemplates.size > 0;
+    // 렌더러가 필요한지 체크
+    const marketColumn = columns.find(c => c.key === 'market_name' || c.isMarketColumn);
+    const orderNumberColumn = columns.find(c => c.key === 'order_number');
+    const quantityColumn = columns.find(c => c.isQuantityColumn);
+    const paymentDateColumn = columns.find(c => c.isPaymentDateColumn);
 
-      // 주문번호 컬럼 체크
-      const orderNumberColumn = columns.find(c => c.key === 'order_number');
-      const needsOrderNumberRenderer = orderNumberColumn && !orderNumberColumn.renderer;
+    const needsMarketRenderer = marketColumn && !marketColumn.renderer && marketTemplates.size > 0;
+    const needsOrderNumberRenderer = orderNumberColumn && !orderNumberColumn.renderer;
+    const needsQuantityRenderer = quantityColumn && !quantityColumn.renderer;
+    const needsPaymentDateRenderer = paymentDateColumn && !paymentDateColumn.renderer;
 
-      // 수량 컬럼 체크
-      const quantityColumn = columns.find(c => c.isQuantityColumn);
-      const needsQuantityRenderer = quantityColumn && !quantityColumn.renderer;
+    const needsUpdate = needsMarketRenderer || needsOrderNumberRenderer || needsQuantityRenderer || needsPaymentDateRenderer;
 
-      // 결제일 컬럼 체크
-      const paymentDateColumn = columns.find(c => c.isPaymentDateColumn);
-      const needsPaymentDateRenderer = paymentDateColumn && !paymentDateColumn.renderer;
-
-      if (needsMarketRenderer || needsOrderNumberRenderer || needsQuantityRenderer || needsPaymentDateRenderer) {
-        needsUpdate = true;
-      }
-
-      if (needsUpdate) {
-        const updatedColumns = columns.map((column) => {
+    if (needsUpdate) {
+      setColumns(prevColumns => prevColumns.map((column) => {
           // 마켓 컬럼 렌더러
           if ((column.key === 'market_name' || column.isMarketColumn) && !column.renderer && marketTemplates.size > 0) {
             return {
@@ -383,12 +444,10 @@ export default function SearchTab() {
           }
 
           return column;
-        });
-
-        setColumns(updatedColumns);
+        }));
       }
-    }
-  }, [marketTemplates, columns]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columns.length, marketTemplates.size]);
 
   const loadMarketTemplates = async () => {
     try {
@@ -643,189 +702,122 @@ export default function SearchTab() {
   };
 
   // 주문 조회
-  // 벤더사별 집계
-  const calculateVendorStats = (orderData: Order[]) => {
-    const statsMap = new Map<string, VendorStats>();
+  // 통합 통계 계산 함수 (성능 최적화: 단일 순회로 모든 통계 계산)
+  const calculateAllStats = (orderData: Order[]) => {
+    // Maps 초기화
+    const vendorMap = new Map<string, VendorStats>();
+    const sellerMap = new Map<string, SellerStats>();
+    const optionMap = new Map<string, OptionStats>();
+    const statusCounts: Record<string, number> = {};
 
+    // 단일 순회로 모든 통계 계산
     orderData.forEach((order) => {
-      const vendorName = order.vendor_name || '미지정';
-      if (!statsMap.has(vendorName)) {
-        statsMap.set(vendorName, {
-          shipping_source: vendorName,
-          접수_건수: 0,
-          접수_수량: 0,
-          결제완료_건수: 0,
-          결제완료_수량: 0,
-          상품준비중_건수: 0,
-          상품준비중_수량: 0,
-          발송완료_건수: 0,
-          발송완료_수량: 0,
-          취소요청_건수: 0,
-          취소요청_수량: 0,
-          취소완료_건수: 0,
-          취소완료_수량: 0,
-        });
-      }
-
-      const stats = statsMap.get(vendorName)!;
-      const status = order.shipping_status || '결제완료';
-      const quantity = Number(order.quantity) || 0;
-
-      if (status === '접수') {
-        stats.접수_건수 += 1;
-        stats.접수_수량 += quantity;
-      } else if (status === '결제완료') {
-        stats.결제완료_건수 += 1;
-        stats.결제완료_수량 += quantity;
-      } else if (status === '상품준비중') {
-        stats.상품준비중_건수 += 1;
-        stats.상품준비중_수량 += quantity;
-      } else if (status === '발송완료') {
-        stats.발송완료_건수 += 1;
-        stats.발송완료_수량 += quantity;
-      } else if (status === '취소요청') {
-        stats.취소요청_건수 += 1;
-        stats.취소요청_수량 += quantity;
-      } else if (status === '취소완료') {
-        stats.취소완료_건수 += 1;
-        stats.취소완료_수량 += quantity;
-      }
-    });
-
-    const statsArray = Array.from(statsMap.values());
-    statsArray.sort((a, b) => (b.접수_건수 + b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수) - (a.접수_건수 + a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수));
-    setVendorStats(statsArray);
-  };
-
-  // 셀러별 집계
-  const calculateSellerStats = (orderData: Order[]) => {
-    const statsMap = new Map<string, SellerStats>();
-
-    orderData.forEach((order) => {
-      const sellerId = order.seller_id || '미지정';
-      const sellerName = order.seller_name || '미지정';
-      if (!statsMap.has(sellerId)) {
-        statsMap.set(sellerId, {
-          seller_id: sellerId,
-          seller_name: sellerName,
-          총금액: 0,
-          입금확인: false,
-          접수_건수: 0,
-          접수_수량: 0,
-          결제완료_건수: 0,
-          결제완료_수량: 0,
-          상품준비중_건수: 0,
-          상품준비중_수량: 0,
-          발송완료_건수: 0,
-          발송완료_수량: 0,
-          취소요청_건수: 0,
-          취소요청_수량: 0,
-          환불예정액: 0,
-          환불처리일시: null,
-          취소완료_건수: 0,
-          취소완료_수량: 0,
-        });
-      }
-
-      const stats = statsMap.get(sellerId)!;
       const status = order.shipping_status || '결제완료';
       const quantity = Number(order.quantity) || 0;
       const supplyPrice = Number(order.seller_supply_price) || 0;
 
-      // payment_confirmed_at이 있으면 입금확인 토글 ON
-      if (order.payment_confirmed_at) {
-        stats.입금확인 = true;
-      }
+      // 1. 상태별 집계
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
 
-      // refund_processed_at이 있고 환불처리일시가 설정되지 않았으면 설정
-      if (order.refund_processed_at && !stats.환불처리일시) {
-        const date = new Date(order.refund_processed_at);
-        stats.환불처리일시 = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-      }
-
-      // 총금액: 접수 상태인 주문의 공급가 합계
-      if (status === '접수') {
-        stats.총금액 += supplyPrice;
-        stats.접수_건수 += 1;
-        stats.접수_수량 += quantity;
-      } else if (status === '결제완료') {
-        stats.결제완료_건수 += 1;
-        stats.결제완료_수량 += quantity;
-      } else if (status === '상품준비중') {
-        stats.상품준비중_건수 += 1;
-        stats.상품준비중_수량 += quantity;
-      } else if (status === '발송완료') {
-        stats.발송완료_건수 += 1;
-        stats.발송완료_수량 += quantity;
-      } else if (status === '취소요청') {
-        stats.취소요청_건수 += 1;
-        stats.취소요청_수량 += quantity;
-        // 환불예정액: 취소요청 상태 주문의 공급가 합계
-        stats.환불예정액 += supplyPrice;
-      } else if (status === '취소완료') {
-        stats.취소완료_건수 += 1;
-        stats.취소완료_수량 += quantity;
-      }
-    });
-
-    const statsArray = Array.from(statsMap.values());
-    statsArray.sort((a, b) => (b.접수_건수 + b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수) - (a.접수_건수 + a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수));
-    setSellerStats(statsArray);
-  };
-
-  // 옵션별 집계
-  const calculateOptionStats = (orderData: Order[]) => {
-    const statsMap = new Map<string, OptionStats>();
-
-    orderData.forEach((order) => {
-      const optionName = order.option_name || '미지정';
-      if (!statsMap.has(optionName)) {
-        statsMap.set(optionName, {
-          option_name: optionName,
-          접수_건수: 0,
-          접수_수량: 0,
-          결제완료_건수: 0,
-          결제완료_수량: 0,
-          상품준비중_건수: 0,
-          상품준비중_수량: 0,
-          발송완료_건수: 0,
-          발송완료_수량: 0,
-          취소요청_건수: 0,
-          취소요청_수량: 0,
-          취소완료_건수: 0,
-          취소완료_수량: 0,
+      // 2. 벤더사별 집계
+      const vendorName = order.vendor_name || '미지정';
+      if (!vendorMap.has(vendorName)) {
+        vendorMap.set(vendorName, {
+          shipping_source: vendorName,
+          접수_건수: 0, 접수_수량: 0,
+          결제완료_건수: 0, 결제완료_수량: 0,
+          상품준비중_건수: 0, 상품준비중_수량: 0,
+          발송완료_건수: 0, 발송완료_수량: 0,
+          취소요청_건수: 0, 취소요청_수량: 0,
+          취소완료_건수: 0, 취소완료_수량: 0,
         });
       }
+      const vendorStats = vendorMap.get(vendorName)!;
 
-      const stats = statsMap.get(optionName)!;
-      const status = order.shipping_status || '결제완료';
-      const quantity = Number(order.quantity) || 0;
+      // 3. 셀러별 집계
+      const sellerId = order.seller_id || '미지정';
+      const sellerName = order.seller_name || '미지정';
+      if (!sellerMap.has(sellerId)) {
+        sellerMap.set(sellerId, {
+          seller_id: sellerId,
+          seller_name: sellerName,
+          총금액: 0, 입금확인: false,
+          접수_건수: 0, 접수_수량: 0,
+          결제완료_건수: 0, 결제완료_수량: 0,
+          상품준비중_건수: 0, 상품준비중_수량: 0,
+          발송완료_건수: 0, 발송완료_수량: 0,
+          취소요청_건수: 0, 취소요청_수량: 0,
+          환불예정액: 0, 환불처리일시: null,
+          취소완료_건수: 0, 취소완료_수량: 0,
+        });
+      }
+      const sellerStats = sellerMap.get(sellerId)!;
 
+      if (order.payment_confirmed_at) sellerStats.입금확인 = true;
+      if (order.refund_processed_at && !sellerStats.환불처리일시) {
+        const date = new Date(order.refund_processed_at);
+        sellerStats.환불처리일시 = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+      }
+
+      // 4. 옵션별 집계
+      const optionName = order.option_name || '미지정';
+      if (!optionMap.has(optionName)) {
+        optionMap.set(optionName, {
+          option_name: optionName,
+          접수_건수: 0, 접수_수량: 0,
+          결제완료_건수: 0, 결제완료_수량: 0,
+          상품준비중_건수: 0, 상품준비중_수량: 0,
+          발송완료_건수: 0, 발송완료_수량: 0,
+          취소요청_건수: 0, 취소요청_수량: 0,
+          취소완료_건수: 0, 취소완료_수량: 0,
+        });
+      }
+      const optionStats = optionMap.get(optionName)!;
+
+      // 상태별 통계 업데이트 (통합)
       if (status === '접수') {
-        stats.접수_건수 += 1;
-        stats.접수_수량 += quantity;
+        vendorStats.접수_건수 += 1; vendorStats.접수_수량 += quantity;
+        sellerStats.접수_건수 += 1; sellerStats.접수_수량 += quantity;
+        sellerStats.총금액 += supplyPrice;
+        optionStats.접수_건수 += 1; optionStats.접수_수량 += quantity;
       } else if (status === '결제완료') {
-        stats.결제완료_건수 += 1;
-        stats.결제완료_수량 += quantity;
+        vendorStats.결제완료_건수 += 1; vendorStats.결제완료_수량 += quantity;
+        sellerStats.결제완료_건수 += 1; sellerStats.결제완료_수량 += quantity;
+        optionStats.결제완료_건수 += 1; optionStats.결제완료_수량 += quantity;
       } else if (status === '상품준비중') {
-        stats.상품준비중_건수 += 1;
-        stats.상품준비중_수량 += quantity;
+        vendorStats.상품준비중_건수 += 1; vendorStats.상품준비중_수량 += quantity;
+        sellerStats.상품준비중_건수 += 1; sellerStats.상품준비중_수량 += quantity;
+        optionStats.상품준비중_건수 += 1; optionStats.상품준비중_수량 += quantity;
       } else if (status === '발송완료') {
-        stats.발송완료_건수 += 1;
-        stats.발송완료_수량 += quantity;
+        vendorStats.발송완료_건수 += 1; vendorStats.발송완료_수량 += quantity;
+        sellerStats.발송완료_건수 += 1; sellerStats.발송완료_수량 += quantity;
+        optionStats.발송완료_건수 += 1; optionStats.발송완료_수량 += quantity;
       } else if (status === '취소요청') {
-        stats.취소요청_건수 += 1;
-        stats.취소요청_수량 += quantity;
+        vendorStats.취소요청_건수 += 1; vendorStats.취소요청_수량 += quantity;
+        sellerStats.취소요청_건수 += 1; sellerStats.취소요청_수량 += quantity;
+        sellerStats.환불예정액 += supplyPrice;
+        optionStats.취소요청_건수 += 1; optionStats.취소요청_수량 += quantity;
       } else if (status === '취소완료') {
-        stats.취소완료_건수 += 1;
-        stats.취소완료_수량 += quantity;
+        vendorStats.취소완료_건수 += 1; vendorStats.취소완료_수량 += quantity;
+        sellerStats.취소완료_건수 += 1; sellerStats.취소완료_수량 += quantity;
+        optionStats.취소완료_건수 += 1; optionStats.취소완료_수량 += quantity;
       }
     });
 
-    const statsArray = Array.from(statsMap.values());
-    // 옵션명 가나다순 정렬
-    statsArray.sort((a, b) => a.option_name.localeCompare(b.option_name, 'ko'));
-    setOptionStats(statsArray);
+    // 정렬 및 상태 업데이트
+    const vendorArray = Array.from(vendorMap.values());
+    vendorArray.sort((a, b) => (b.접수_건수 + b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수) - (a.접수_건수 + a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수));
+    setVendorStats(vendorArray);
+
+    const sellerArray = Array.from(sellerMap.values());
+    sellerArray.sort((a, b) => (b.접수_건수 + b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수) - (a.접수_건수 + a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수));
+    setSellerStats(sellerArray);
+
+    const optionArray = Array.from(optionMap.values());
+    optionArray.sort((a, b) => a.option_name.localeCompare(b.option_name, 'ko'));
+    setOptionStats(optionArray);
+
+    return statusCounts;
   };
 
   const fetchOrders = async () => {
@@ -855,12 +847,8 @@ export default function SearchTab() {
         setOrders(result.data || []);
         console.log('✅ Orders state updated:', result.data?.length);
 
-        // 통계 계산
-        const statusCounts = (result.data || []).reduce((acc: any, order: Order) => {
-          const status = order.shipping_status || '결제완료';
-          acc[status] = (acc[status] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
+        // 통합 통계 계산 (단일 순회로 모든 통계 계산 - 성능 최적화)
+        const statusCounts = calculateAllStats(result.data || []);
 
         console.log('📊 Status Counts:', statusCounts);
 
@@ -874,13 +862,6 @@ export default function SearchTab() {
           취소완료: statusCounts['취소완료'] || 0,
           환불완료: statusCounts['환불완료'] || 0,
         });
-
-        // 벤더사별 집계 계산
-        calculateVendorStats(result.data || []);
-        // 셀러별 집계 계산
-        calculateSellerStats(result.data || []);
-        // 옵션별 집계 계산
-        calculateOptionStats(result.data || []);
       } else {
         console.error('주문 조회 실패:', result.error);
         alert('주문 조회에 실패했습니다: ' + result.error);
@@ -913,52 +894,8 @@ export default function SearchTab() {
 
     setFilters(newFilters);
 
-    // 필터 변경 후 즉시 조회
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.append('startDate', newFilters.startDate);
-      params.append('endDate', newFilters.endDate);
-      params.append('dateType', newFilters.dateType);
-      if (newFilters.marketName) params.append('marketName', newFilters.marketName);
-      if (newFilters.searchKeyword) params.append('searchKeyword', newFilters.searchKeyword);
-      if (newFilters.shippingStatus) params.append('shippingStatus', newFilters.shippingStatus);
-      if (newFilters.vendorName) params.append('vendorName', newFilters.vendorName);
-      params.append('limit', '1000');
-
-      const response = await fetch(`/api/integrated-orders?${params}`);
-      const result = await response.json();
-
-      if (result.success) {
-        setOrders(result.data || []);
-
-        // 통계 계산
-        const statusCounts = (result.data || []).reduce((acc: any, order: Order) => {
-          const status = order.shipping_status || '결제완료';
-          acc[status] = (acc[status] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-
-        setStats({
-          total: result.data?.length || 0,
-          접수: statusCounts['접수'] || 0,
-          결제완료: statusCounts['결제완료'] || 0,
-          상품준비중: statusCounts['상품준비중'] || 0,
-          발송완료: statusCounts['발송완료'] || 0,
-          취소요청: statusCounts['취소요청'] || 0,
-          취소완료: statusCounts['취소완료'] || 0,
-          환불완료: statusCounts['환불완료'] || 0,
-        });
-
-        calculateVendorStats(result.data || []);
-        calculateSellerStats(result.data || []);
-        calculateOptionStats(result.data || []);
-      }
-    } catch (error) {
-      console.error('주문 조회 오류:', error);
-    } finally {
-      setLoading(false);
-    }
+    // 필터 변경 후 즉시 조회 (fetchOrders 재사용 - 중복 코드 제거)
+    await fetchOrders();
   };
 
   // 선택된 빠른 날짜 필터 확인 (한국 시간 기준)
@@ -2791,9 +2728,9 @@ export default function SearchTab() {
         return false;
       }
 
-      // 검색어 필터
-      if (filters.searchKeyword) {
-        const keyword = filters.searchKeyword.toLowerCase();
+      // 검색어 필터 (debounced - 성능 최적화)
+      if (debouncedSearchKeyword) {
+        const keyword = debouncedSearchKeyword.toLowerCase();
         const searchFields = [
           order.order_number,
           order.recipient_name,
