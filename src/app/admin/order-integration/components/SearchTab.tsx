@@ -177,23 +177,6 @@ const StatCard = memo(({
 
 StatCard.displayName = 'StatCard';
 
-// 커스텀 debounce 훅 (성능 최적화)
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
-
 export default function SearchTab() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
@@ -307,8 +290,8 @@ export default function SearchTab() {
     };
   });
 
-  // 검색어 debounce 적용 (성능 최적화: 입력 후 300ms 대기)
-  const debouncedSearchKeyword = useDebounce(filters.searchKeyword, 300);
+  // 검색어 debounce 제거 (즉시 반응)
+  // const debouncedSearchKeyword = useDebounce(filters.searchKeyword, 300);
 
   // 일괄적용 택배사 선택값 상태
   const [bulkApplyValue, setBulkApplyValue] = useState('');
@@ -2728,9 +2711,9 @@ export default function SearchTab() {
         return false;
       }
 
-      // 검색어 필터 (debounced - 성능 최적화)
-      if (debouncedSearchKeyword) {
-        const keyword = debouncedSearchKeyword.toLowerCase();
+      // 검색어 필터 (즉시 반응)
+      if (filters.searchKeyword) {
+        const keyword = filters.searchKeyword.toLowerCase();
         const searchFields = [
           order.order_number,
           order.recipient_name,
