@@ -684,123 +684,39 @@ export default function SearchTab() {
     }
   };
 
-  // 주문 조회
-  // 통합 통계 계산 함수 (성능 최적화: 단일 순회로 모든 통계 계산)
-  const calculateAllStats = (orderData: Order[]) => {
-    // Maps 초기화
-    const vendorMap = new Map<string, VendorStats>();
-    const sellerMap = new Map<string, SellerStats>();
-    const optionMap = new Map<string, OptionStats>();
-    const statusCounts: Record<string, number> = {};
+  // ✅ 개선: calculateAllStats 함수 제거 (이제 서버에서 계산)
 
-    // 단일 순회로 모든 통계 계산
-    orderData.forEach((order) => {
-      const status = order.shipping_status || '결제완료';
-      const quantity = Number(order.quantity) || 0;
-      const supplyPrice = Number(order.seller_supply_price) || 0;
+  // 🔄 개선: 통계와 주문 데이터를 별도 API로 병렬 조회
+  const fetchStats = async () => {
+    try {
+      const params = new URLSearchParams();
+      params.append('startDate', filters.startDate);
+      params.append('endDate', filters.endDate);
+      params.append('dateType', filters.dateType);
+      if (filters.marketName) params.append('marketName', filters.marketName);
+      if (filters.searchKeyword) params.append('searchKeyword', filters.searchKeyword);
+      // ✅ 중요: statusFilter도 통계 API에 전달 (연동 문제 해결)
+      if (statusFilter) params.append('shippingStatus', statusFilter);
+      else if (filters.shippingStatus) params.append('shippingStatus', filters.shippingStatus);
+      if (filters.vendorName) params.append('vendorName', filters.vendorName);
 
-      // 1. 상태별 집계
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
+      console.log('📊 통계 조회 시작:', Object.fromEntries(params));
 
-      // 2. 벤더사별 집계
-      const vendorName = order.vendor_name || '미지정';
-      if (!vendorMap.has(vendorName)) {
-        vendorMap.set(vendorName, {
-          shipping_source: vendorName,
-          접수_건수: 0, 접수_수량: 0,
-          결제완료_건수: 0, 결제완료_수량: 0,
-          상품준비중_건수: 0, 상품준비중_수량: 0,
-          발송완료_건수: 0, 발송완료_수량: 0,
-          취소요청_건수: 0, 취소요청_수량: 0,
-          취소완료_건수: 0, 취소완료_수량: 0,
-        });
+      const response = await fetch(`/api/integrated-orders/stats?${params}`);
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ 통계 조회 성공:', result.data.stats);
+        setStats(result.data.stats);
+        setVendorStats(result.data.vendorStats);
+        setSellerStats(result.data.sellerStats);
+        setOptionStats(result.data.optionStats);
+      } else {
+        console.error('통계 조회 실패:', result.error);
       }
-      const vendorStats = vendorMap.get(vendorName)!;
-
-      // 3. 셀러별 집계
-      const sellerId = order.seller_id || '미지정';
-      const sellerName = order.seller_name || '미지정';
-      if (!sellerMap.has(sellerId)) {
-        sellerMap.set(sellerId, {
-          seller_id: sellerId,
-          seller_name: sellerName,
-          총금액: 0, 입금확인: false,
-          접수_건수: 0, 접수_수량: 0,
-          결제완료_건수: 0, 결제완료_수량: 0,
-          상품준비중_건수: 0, 상품준비중_수량: 0,
-          발송완료_건수: 0, 발송완료_수량: 0,
-          취소요청_건수: 0, 취소요청_수량: 0,
-          환불예정액: 0, 환불처리일시: null,
-          취소완료_건수: 0, 취소완료_수량: 0,
-        });
-      }
-      const sellerStats = sellerMap.get(sellerId)!;
-
-      if (order.payment_confirmed_at) sellerStats.입금확인 = true;
-      if (order.refund_processed_at && !sellerStats.환불처리일시) {
-        const date = new Date(order.refund_processed_at);
-        sellerStats.환불처리일시 = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-      }
-
-      // 4. 옵션별 집계
-      const optionName = order.option_name || '미지정';
-      if (!optionMap.has(optionName)) {
-        optionMap.set(optionName, {
-          option_name: optionName,
-          접수_건수: 0, 접수_수량: 0,
-          결제완료_건수: 0, 결제완료_수량: 0,
-          상품준비중_건수: 0, 상품준비중_수량: 0,
-          발송완료_건수: 0, 발송완료_수량: 0,
-          취소요청_건수: 0, 취소요청_수량: 0,
-          취소완료_건수: 0, 취소완료_수량: 0,
-        });
-      }
-      const optionStats = optionMap.get(optionName)!;
-
-      // 상태별 통계 업데이트 (통합)
-      if (status === '접수') {
-        vendorStats.접수_건수 += 1; vendorStats.접수_수량 += quantity;
-        sellerStats.접수_건수 += 1; sellerStats.접수_수량 += quantity;
-        sellerStats.총금액 += supplyPrice;
-        optionStats.접수_건수 += 1; optionStats.접수_수량 += quantity;
-      } else if (status === '결제완료') {
-        vendorStats.결제완료_건수 += 1; vendorStats.결제완료_수량 += quantity;
-        sellerStats.결제완료_건수 += 1; sellerStats.결제완료_수량 += quantity;
-        optionStats.결제완료_건수 += 1; optionStats.결제완료_수량 += quantity;
-      } else if (status === '상품준비중') {
-        vendorStats.상품준비중_건수 += 1; vendorStats.상품준비중_수량 += quantity;
-        sellerStats.상품준비중_건수 += 1; sellerStats.상품준비중_수량 += quantity;
-        optionStats.상품준비중_건수 += 1; optionStats.상품준비중_수량 += quantity;
-      } else if (status === '발송완료') {
-        vendorStats.발송완료_건수 += 1; vendorStats.발송완료_수량 += quantity;
-        sellerStats.발송완료_건수 += 1; sellerStats.발송완료_수량 += quantity;
-        optionStats.발송완료_건수 += 1; optionStats.발송완료_수량 += quantity;
-      } else if (status === '취소요청') {
-        vendorStats.취소요청_건수 += 1; vendorStats.취소요청_수량 += quantity;
-        sellerStats.취소요청_건수 += 1; sellerStats.취소요청_수량 += quantity;
-        sellerStats.환불예정액 += supplyPrice;
-        optionStats.취소요청_건수 += 1; optionStats.취소요청_수량 += quantity;
-      } else if (status === '취소완료') {
-        vendorStats.취소완료_건수 += 1; vendorStats.취소완료_수량 += quantity;
-        sellerStats.취소완료_건수 += 1; sellerStats.취소완료_수량 += quantity;
-        optionStats.취소완료_건수 += 1; optionStats.취소완료_수량 += quantity;
-      }
-    });
-
-    // 정렬 및 상태 업데이트
-    const vendorArray = Array.from(vendorMap.values());
-    vendorArray.sort((a, b) => (b.접수_건수 + b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수) - (a.접수_건수 + a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수));
-    setVendorStats(vendorArray);
-
-    const sellerArray = Array.from(sellerMap.values());
-    sellerArray.sort((a, b) => (b.접수_건수 + b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수) - (a.접수_건수 + a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수));
-    setSellerStats(sellerArray);
-
-    const optionArray = Array.from(optionMap.values());
-    optionArray.sort((a, b) => a.option_name.localeCompare(b.option_name, 'ko'));
-    setOptionStats(optionArray);
-
-    return statusCounts;
+    } catch (error) {
+      console.error('통계 조회 오류:', error);
+    }
   };
 
   const fetchOrders = async () => {
@@ -812,42 +728,33 @@ export default function SearchTab() {
       params.append('dateType', filters.dateType);
       if (filters.marketName) params.append('marketName', filters.marketName);
       if (filters.searchKeyword) params.append('searchKeyword', filters.searchKeyword);
-      if (filters.shippingStatus) params.append('shippingStatus', filters.shippingStatus);
+      // ✅ 중요: statusFilter도 주문 조회 API에 전달 (테이블 필터링)
+      if (statusFilter) params.append('shippingStatus', statusFilter);
+      else if (filters.shippingStatus) params.append('shippingStatus', filters.shippingStatus);
       if (filters.vendorName) params.append('vendorName', filters.vendorName);
-      params.append('limit', '1000');
+      params.append('limit', '100');  // ✅ 성능 최적화: 1000 → 100
 
-      const response = await fetch(`/api/integrated-orders?${params}`);
-      const result = await response.json();
+      console.log('🔍 주문 조회 시작:', Object.fromEntries(params));
 
-      console.log('🔍 API Response:', {
-        success: result.success,
-        totalOrders: result.data?.length,
-        markets: [...new Set(result.data?.map((o: Order) => o.market_name))],
-        platformOrders: result.data?.filter((o: Order) => o.market_name === '플랫폼').length,
+      // ⚡ 주문 데이터와 통계를 병렬로 조회 (성능 최적화)
+      const [ordersResult, _] = await Promise.all([
+        fetch(`/api/integrated-orders?${params}`).then(r => r.json()),
+        fetchStats(), // 통계는 별도로 조회
+      ]);
+
+      console.log('🔍 주문 API 응답:', {
+        success: ordersResult.success,
+        totalOrders: ordersResult.data?.length,
+        markets: [...new Set(ordersResult.data?.map((o: Order) => o.market_name))],
+        platformOrders: ordersResult.data?.filter((o: Order) => o.market_name === '플랫폼').length,
       });
 
-      if (result.success) {
-        setOrders(result.data || []);
-        console.log('✅ Orders state updated:', result.data?.length);
-
-        // 통합 통계 계산 (단일 순회로 모든 통계 계산 - 성능 최적화)
-        const statusCounts = calculateAllStats(result.data || []);
-
-        console.log('📊 Status Counts:', statusCounts);
-
-        setStats({
-          total: result.data?.length || 0,
-          접수: statusCounts['접수'] || 0,
-          결제완료: statusCounts['결제완료'] || 0,
-          상품준비중: statusCounts['상품준비중'] || 0,
-          발송완료: statusCounts['발송완료'] || 0,
-          취소요청: statusCounts['취소요청'] || 0,
-          취소완료: statusCounts['취소완료'] || 0,
-          환불완료: statusCounts['환불완료'] || 0,
-        });
+      if (ordersResult.success) {
+        setOrders(ordersResult.data || []);
+        console.log('✅ Orders state updated:', ordersResult.data?.length);
       } else {
-        console.error('주문 조회 실패:', result.error);
-        alert('주문 조회에 실패했습니다: ' + result.error);
+        console.error('주문 조회 실패:', ordersResult.error);
+        alert('주문 조회에 실패했습니다: ' + ordersResult.error);
       }
     } catch (error) {
       console.error('주문 조회 오류:', error);
@@ -877,8 +784,69 @@ export default function SearchTab() {
 
     setFilters(newFilters);
 
-    // 필터 변경 후 즉시 조회 (fetchOrders 재사용 - 중복 코드 제거)
-    await fetchOrders();
+    // ✅ 수정: 업데이트된 필터로 즉시 조회 (상태 업데이트 대기 없이)
+    await fetchOrdersWithFilters(newFilters);
+  };
+
+  // 특정 필터로 주문 조회 (헬퍼 함수)
+  const fetchOrdersWithFilters = async (customFilters: SearchFilters) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('startDate', customFilters.startDate);
+      params.append('endDate', customFilters.endDate);
+      params.append('dateType', customFilters.dateType);
+      if (customFilters.marketName) params.append('marketName', customFilters.marketName);
+      if (customFilters.searchKeyword) params.append('searchKeyword', customFilters.searchKeyword);
+      if (statusFilter) params.append('shippingStatus', statusFilter);
+      else if (customFilters.shippingStatus) params.append('shippingStatus', customFilters.shippingStatus);
+      if (customFilters.vendorName) params.append('vendorName', customFilters.vendorName);
+      params.append('limit', '100');  // ✅ 성능 최적화: 1000 → 100
+
+      console.log('🔍 주문 조회 시작 (custom filters):', Object.fromEntries(params));
+
+      // 통계 조회도 같은 필터 사용
+      const statsParams = new URLSearchParams();
+      statsParams.append('startDate', customFilters.startDate);
+      statsParams.append('endDate', customFilters.endDate);
+      statsParams.append('dateType', customFilters.dateType);
+      if (customFilters.marketName) statsParams.append('marketName', customFilters.marketName);
+      if (customFilters.searchKeyword) statsParams.append('searchKeyword', customFilters.searchKeyword);
+      if (statusFilter) statsParams.append('shippingStatus', statusFilter);
+      else if (customFilters.shippingStatus) statsParams.append('shippingStatus', customFilters.shippingStatus);
+      if (customFilters.vendorName) statsParams.append('vendorName', customFilters.vendorName);
+
+      console.log('📊 통계 조회 시작 (custom filters):', Object.fromEntries(statsParams));
+
+      // 병렬 조회
+      const [ordersResult, statsResult] = await Promise.all([
+        fetch(`/api/integrated-orders?${params}`).then(r => r.json()),
+        fetch(`/api/integrated-orders/stats?${statsParams}`).then(r => r.json()),
+      ]);
+
+      if (ordersResult.success) {
+        setOrders(ordersResult.data || []);
+        console.log('✅ Orders state updated:', ordersResult.data?.length);
+      } else {
+        console.error('주문 조회 실패:', ordersResult.error);
+        alert('주문 조회에 실패했습니다: ' + ordersResult.error);
+      }
+
+      if (statsResult.success) {
+        console.log('✅ 통계 조회 성공:', statsResult.data.stats);
+        setStats(statsResult.data.stats);
+        setVendorStats(statsResult.data.vendorStats);
+        setSellerStats(statsResult.data.sellerStats);
+        setOptionStats(statsResult.data.optionStats);
+      } else {
+        console.error('통계 조회 실패:', statsResult.error);
+      }
+    } catch (error) {
+      console.error('조회 오류:', error);
+      alert('조회 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 선택된 빠른 날짜 필터 확인 (한국 시간 기준)
@@ -2670,77 +2638,30 @@ export default function SearchTab() {
     }
   };
 
-  // 상태 카드 클릭 핸들러
-  const handleStatusCardClick = (status: string | null) => {
+  // 상태 카드 클릭 핸들러 (개선: 클릭 시 데이터 재조회)
+  const handleStatusCardClick = async (status: string | null) => {
     if (statusFilter === status) {
       // 이미 선택된 카드를 다시 클릭하면 필터 해제
       setStatusFilter(null);
+      // 필터 해제 후 데이터 재조회
+      setTimeout(() => fetchOrders(), 0);
     } else {
       setStatusFilter(status);
+      // 필터 적용 후 데이터 재조회
+      setTimeout(() => fetchOrders(), 0);
     }
   };
 
-  // 필터링된 주문 데이터
+  // 필터링된 주문 데이터 (개선: 서버에서 이미 필터링됨, 클라이언트는 정렬만)
   const filteredOrders = useMemo(() => {
-    const filtered = orders.filter(order => {
-      // 날짜 필터
-      if (filters.startDate || filters.endDate) {
-        const orderDate = filters.dateType === 'payment'
-          ? order.payment_date
-          : order.sheet_date;
-
-        if (orderDate) {
-          const dateStr = orderDate.split('T')[0];
-          if (filters.startDate && dateStr < filters.startDate) return false;
-          if (filters.endDate && dateStr > filters.endDate) return false;
-        }
-      }
-
-      // 마켓명 필터
-      if (filters.marketName && order.market_name !== filters.marketName) {
-        return false;
-      }
-
-      // 발송상태 필터
-      if (filters.shippingStatus && order.shipping_status !== filters.shippingStatus) {
-        return false;
-      }
-
-      // 벤더사 필터
-      if (filters.vendorName && order.vendor_name !== filters.vendorName) {
-        return false;
-      }
-
-      // 검색어 필터 (즉시 반응)
-      if (filters.searchKeyword) {
-        const keyword = filters.searchKeyword.toLowerCase();
-        const searchFields = [
-          order.order_number,
-          order.recipient_name,
-          order.option_name,
-        ].filter(Boolean).map(field => String(field).toLowerCase());
-
-        if (!searchFields.some(field => field.includes(keyword))) {
-          return false;
-        }
-      }
-
-      // 상태카드 필터
-      if (statusFilter) {
-        const orderStatus = order.shipping_status || '결제완료';
-        if (orderStatus !== statusFilter) return false;
-      }
-
-      return true;
-    });
-
+    // ✅ 개선: 모든 필터링은 서버에서 처리되므로 클라이언트는 정렬만 수행
     // 정렬: 마켓 칼럼(field_13) 순서 (마켓이니셜+세자리연번)
-    return filtered.sort((a, b) => {
+    return orders.sort((a, b) => {
       const field13A = a.field_13 || '';
       const field13B = b.field_13 || '';
       return field13A.localeCompare(field13B);
     });
-  }, [orders, statusFilter, filters]);
+  }, [orders]);
 
   // 드롭다운 옵션 추출 (테이블 데이터 기준)
   const uniqueMarkets = useMemo(() => {
