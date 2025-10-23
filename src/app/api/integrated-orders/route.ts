@@ -29,7 +29,8 @@ export async function GET(request: NextRequest) {
     const onlyWithSeller = searchParams.get('onlyWithSeller') === 'true'; // seller_id가 있는 주문만
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '100');
-    const offset = (page - 1) * limit;
+    const offsetParam = searchParams.get('offset');
+    const offset = offsetParam ? parseInt(offsetParam) : (page - 1) * limit;
 
     // 기본 쿼리 (삭제되지 않은 주문만 조회)
     let query = supabase

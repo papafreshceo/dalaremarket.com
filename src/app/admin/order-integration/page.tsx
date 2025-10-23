@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Script from 'next/script';
 import { FileText, Search, Plus, FileSpreadsheet, MessageSquare, MoreHorizontal, RefreshCw } from 'lucide-react';
 import SearchTab from './components/SearchTab';
@@ -14,6 +14,7 @@ type Tab = 'search' | 'input' | 'excel' | 'cs' | 'etc';
 export default function OrderIntegrationPage() {
   const [activeTab, setActiveTab] = useState<Tab>('search');
   const [tabKey, setTabKey] = useState(0);
+  const [mounted, setMounted] = useState(false);
 
   const tabs = [
     { id: 'search' as Tab, label: '주문통합관리', icon: Search, color: '#2563eb' },
@@ -22,6 +23,10 @@ export default function OrderIntegrationPage() {
     { id: 'cs' as Tab, label: 'CS', icon: MessageSquare, color: '#ef4444' },
     { id: 'etc' as Tab, label: '기타', icon: MoreHorizontal, color: '#6b7280' },
   ];
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleRefresh = () => {
     // key 값을 변경하여 현재 탭 컴포넌트를 재마운트 (완전 초기화)
@@ -103,12 +108,21 @@ export default function OrderIntegrationPage() {
       </header>
 
       {/* 콘텐츠 */}
-      <main className="p-6">
-        {activeTab === 'search' && <SearchTab key={`search-${tabKey}`} />}
-        {activeTab === 'input' && <InputTab key={`input-${tabKey}`} />}
-        {activeTab === 'excel' && <ExcelTab key={`excel-${tabKey}`} />}
-        {activeTab === 'cs' && <CSTab key={`cs-${tabKey}`} />}
-        {activeTab === 'etc' && <EtcTab key={`etc-${tabKey}`} />}
+      <main className="p-6" suppressHydrationWarning>
+        {!mounted ? (
+          <div className="flex items-center justify-center py-20" suppressHydrationWarning>
+            <RefreshCw className="w-6 h-6 animate-spin text-gray-400 mr-2" />
+            <span className="text-gray-500">로딩중...</span>
+          </div>
+        ) : (
+          <>
+            {activeTab === 'search' && <SearchTab key={`search-${tabKey}`} />}
+            {activeTab === 'input' && <InputTab key={`input-${tabKey}`} />}
+            {activeTab === 'excel' && <ExcelTab key={`excel-${tabKey}`} />}
+            {activeTab === 'cs' && <CSTab key={`cs-${tabKey}`} />}
+            {activeTab === 'etc' && <EtcTab key={`etc-${tabKey}`} />}
+          </>
+        )}
       </main>
 
       {/* 로딩 오버레이 */}

@@ -29,6 +29,7 @@ interface EditableAdminGridProps<T = any> {
   onCopy?: (indices: number[]) => void
   onSelectionChange?: (indices: number[]) => void  // 선택된 행이 변경될 때 호출
   onModifiedChange?: (hasModifications: boolean) => void  // 수정 상태 변경 콜백
+  onScroll?: (event: React.UIEvent<HTMLDivElement>) => void  // 스크롤 이벤트 핸들러
   // 엑셀 업로드 자동 저장 (이 옵션들이 있으면 모달에서 바로 DB 저장)
   tableName?: string  // Supabase 테이블 이름 (있으면 엑셀 업로드 시 자동 저장)
   onDataReload?: () => Promise<void>  // 저장 완료 후 데이터 재조회 함수
@@ -38,6 +39,7 @@ interface EditableAdminGridProps<T = any> {
   height?: string
   rowHeight?: number
   showRowNumbers?: boolean
+  startIndex?: number  // 페이지네이션용 시작 인덱스 (기본값 0)
   enableFilter?: boolean
   enableSort?: boolean
   enableCSVExport?: boolean
@@ -68,6 +70,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   onCopy,
   onSelectionChange,
   onModifiedChange,
+  onScroll,
   tableName,
   onDataReload,
   validateRow,
@@ -76,6 +79,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   height = '900px',
   rowHeight = 26,
   showRowNumbers = true,
+  startIndex = 0,
   enableFilter = true,
   enableSort = true,
   enableCSVExport = true,
@@ -171,11 +175,13 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       if (data !== prevDataRef.current) {
         // 내부 업데이트로 인한 변경인 경우 무시
         if (isInternalUpdate.current) {
+          console.log('[EditableAdminGrid] Internal update detected, skipping reset')
           isInternalUpdate.current = false
           prevDataRef.current = data
           return
         }
 
+        console.log('[EditableAdminGrid] External data change detected, resetting modified state')
         const prevLength = prevDataRef.current.length
         const newLength = data.length
 
@@ -303,14 +309,56 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           }
           return
         } else if (e.key === 'Backspace' || e.key === 'Delete') {
-          // Backspace나 Delete 키를 누르면 셀 값을 비우고 편집 모드로 전환
+          // Backspace나 Delete 키를 누르면 셀 값을 바로 삭제 (편집 모드로 전환하지 않음)
+          console.log('[Global Delete] Delete key pressed')
           e.preventDefault()
           const column = columns.find(c => c.key === selectedCell.col)
           const row = gridData[selectedCell.row]
           if (column && !isReadOnly(column, row)) {
-            setIsKeyboardEdit(true)
-            setEditingCell(selectedCell)
-            setEditValue('')
+            console.log('[Global Delete] Column found, not readonly')
+            const newData = [...gridData]
+            newData[selectedCell.row] = {
+              ...newData[selectedCell.row],
+              [selectedCell.col]: column.type === 'number' ? null : ''
+            }
+
+            // 수정 추적
+            const cellKey = `${selectedCell.row}-${selectedCell.col}`
+            const isAddedOrCopied = addedRows.has(selectedCell.row) || copiedRows.has(selectedCell.row)
+            const newModifiedCells = new Set(modifiedCells)
+
+            if (!isAddedOrCopied) {
+              const originalValue = originalDataRef.current[selectedCell.row]?.[selectedCell.col]
+              const newValue = column.type === 'number' ? null : ''
+
+              // 원본 값이 존재하고(빈 값이 아니고) 삭제한 경우 무조건 수정으로 추적
+              const originalHasValue = originalValue !== null && originalValue !== undefined && originalValue !== ''
+
+              if (newValue === originalValue) {
+                newModifiedCells.delete(cellKey)
+              } else if (originalHasValue) {
+                // 원본에 값이 있었는데 삭제한 경우 반드시 추가
+                newModifiedCells.add(cellKey)
+              } else if (newValue !== originalValue) {
+                // 그 외 다른 경우도 추가
+                newModifiedCells.add(cellKey)
+              }
+            }
+
+            // 내부 업데이트 플래그 먼저 설정
+            console.log('[Global Delete] Setting isInternalUpdate to true, modifiedCells size:', newModifiedCells.size)
+            isInternalUpdate.current = true
+
+            // React 18의 자동 배칭을 활용하여 상태 업데이트
+            setModifiedCells(newModifiedCells)
+            setGridData(newData)
+            addToHistory(newData)
+
+            // 다음 틱에 콜백 실행 (상태 업데이트 완료 후)
+            setTimeout(() => {
+              console.log('[Global Delete] Calling onDataChange in setTimeout')
+              onDataChange?.(newData)
+            }, 0)
           }
           return
         }
@@ -355,33 +403,45 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
         processedValue = convertedValue === '' ? null : Number(convertedValue.replace(/,/g, ''))
       }
 
-      newData[selectedCell.row][selectedCell.col] = processedValue
+      // 현재 값 저장
+      const currentValue = newData[selectedCell.row][selectedCell.col]
+
+      // 새 값 설정
+      newData[selectedCell.row] = {
+        ...newData[selectedCell.row],
+        [selectedCell.col]: processedValue
+      }
 
       const cellKey = `${selectedCell.row}-${selectedCell.col}`
       const isAddedOrCopied = addedRows.has(selectedCell.row) || copiedRows.has(selectedCell.row)
 
-      if (!isAddedOrCopied) {
-        const originalValue = originalDataRef.current[selectedCell.row]?.[selectedCell.col]
-        if (processedValue === originalValue) {
-          newModifiedCells.delete(cellKey)
-        } else {
-          newModifiedCells.add(cellKey)
+      // 값이 실제로 변경되었는지 확인
+      if (currentValue !== processedValue) {
+        if (!isAddedOrCopied) {
+          const originalValue = originalDataRef.current[selectedCell.row]?.[selectedCell.col]
+          if (processedValue === originalValue) {
+            newModifiedCells.delete(cellKey)
+          } else {
+            newModifiedCells.add(cellKey)
+          }
         }
+        hasChanges = true
       }
-
-      hasChanges = true
     }
 
     if (hasChanges) {
-      // 히스토리 추가
-      const newHistory = history.slice(0, historyIndex + 1)
-      newHistory.push(JSON.parse(JSON.stringify(newData)))
-      setHistory(newHistory)
-      setHistoryIndex(newHistory.length - 1)
-
+      // 상태 업데이트 순서 보장
       setModifiedCells(newModifiedCells)
       setGridData(newData)
-      onDataChange?.(newData)
+
+      // 히스토리 추가
+      addToHistory(newData)
+
+      // 내부 업데이트 플래그 설정
+      if (onDataChange) {
+        isInternalUpdate.current = true
+        onDataChange(newData)
+      }
     }
   }
 
@@ -390,6 +450,10 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node
       if (containerRef.current && !containerRef.current.contains(target)) {
+        // 편집 중이던 내용 저장
+        if (editingCell) {
+          commitEdit()
+        }
         setSelectedCell(null)
         setEditingCell(null)
       }
@@ -397,7 +461,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [editingCell, editValue, gridData, columns, modifiedCells, addedRows, copiedRows])
 
   // 채우기 미리보기 업데이트
   useEffect(() => {
@@ -583,6 +647,11 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       return
     }
 
+    // 다른 셀을 클릭할 때 편집 중이던 내용 저장
+    if (editingCell && (editingCell.row !== rowIndex || editingCell.col !== columnKey)) {
+      commitEdit()
+    }
+
     const column = columns.find(col => col.key === columnKey)
     const row = gridData[rowIndex]
 
@@ -639,6 +708,12 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
   const handleDropdownArrowClick = (rowIndex: number, columnKey: string, currentValue: any, e: React.MouseEvent) => {
     e.stopPropagation()
+
+    // 다른 셀을 편집 중이면 저장
+    if (editingCell && (editingCell.row !== rowIndex || editingCell.col !== columnKey)) {
+      commitEdit()
+    }
+
     const column = columns.find(col => col.key === columnKey)
     const row = gridData[rowIndex]
 
@@ -650,6 +725,11 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   }
 
   const handleCellDoubleClick = (rowIndex: number, columnKey: string, currentValue: any) => {
+    // 다른 셀을 편집 중이면 저장
+    if (editingCell && (editingCell.row !== rowIndex || editingCell.col !== columnKey)) {
+      commitEdit()
+    }
+
     const column = columns.find(col => col.key === columnKey)
     const row = gridData[rowIndex]
     if (isReadOnly(column, row)) return
@@ -659,7 +739,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     setEditValue(currentValue ?? '')
   }
 
-  const commitEdit = (valueOverride?: any) => {
+  const commitEdit = useCallback((valueOverride?: any) => {
     if (!editingCell) return
 
     const newData = [...gridData]
@@ -723,12 +803,12 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
     setEditingCell(null)
     setIsKeyboardEdit(false)
-  }
+  }, [editingCell, editValue, gridData, columns, addedRows, copiedRows, modifiedCells, onDataChange, onCellEdit])
 
-  const cancelEdit = () => {
+  const cancelEdit = useCallback(() => {
     setIsKeyboardEdit(false)
     setEditingCell(null)
-  }
+  }, [])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -738,8 +818,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     } else if (e.key === 'Escape') {
       e.preventDefault()
       cancelEdit()
-    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      // 방향키 입력 시 편집 완료하고 셀 이동
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      // 상하 방향키: 편집 완료하고 셀 이동
       e.preventDefault()
       e.stopPropagation() // 전역 이벤트 핸들러로 버블링 방지
 
@@ -779,30 +859,175 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           }
         }
 
+        // 내부 업데이트 플래그 먼저 설정
+        isInternalUpdate.current = true
+
         setModifiedCells(newModifiedCells)
-        addToHistory(newData)
         setGridData(newData)
+        addToHistory(newData)
+
         onDataChange?.(newData)
         onCellEdit?.(editingCell.row, editingCell.col, processedValue)
       }
 
       // 방향키에 따라 셀 이동
       let newRow = editingCell.row
-      let newColIndex = columns.findIndex(c => c.key === editingCell.col)
 
       if (e.key === 'ArrowUp') {
         newRow = Math.max(0, editingCell.row - 1)
       } else if (e.key === 'ArrowDown') {
         newRow = Math.min(gridData.length - 1, editingCell.row + 1)
-      } else if (e.key === 'ArrowLeft') {
-        newColIndex = Math.max(0, newColIndex - 1)
-      } else if (e.key === 'ArrowRight') {
-        newColIndex = Math.min(columns.length - 1, newColIndex + 1)
       }
 
       setEditingCell(null)
       setIsKeyboardEdit(false)
-      setSelectedCell({ row: newRow, col: columns[newColIndex].key })
+      setSelectedCell({ row: newRow, col: editingCell.col })
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      // 좌우 방향키: 편집 모드에서는 커서 이동만 허용
+      const column = columns.find(col => col.key === editingCell?.col)
+
+      if (column?.type === 'dropdown' || column?.type === 'checkbox') {
+        // 드롭다운/체크박스는 좌우 방향키로 셀 이동
+        e.preventDefault()
+        e.stopPropagation()
+
+        if (!editingCell) return
+
+        // 현재 편집 내용 커밋
+        const newData = [...gridData]
+
+        let processedValue: any = editValue
+        if (column?.type === 'checkbox') {
+          processedValue = editValue === 'true' || editValue === true
+        }
+
+        const oldValue = newData[editingCell.row][editingCell.col]
+
+        // 값이 변경된 경우에만 처리
+        if (oldValue !== processedValue) {
+          newData[editingCell.row] = {
+            ...newData[editingCell.row],
+            [editingCell.col]: processedValue
+          }
+
+          const cellKey = `${editingCell.row}-${editingCell.col}`
+          const newModifiedCells = new Set(modifiedCells)
+          const rowIndex = editingCell.row
+          const isAddedOrCopied = addedRows.has(rowIndex) || copiedRows.has(rowIndex)
+
+          if (!isAddedOrCopied) {
+            const originalValue = originalDataRef.current[rowIndex]?.[editingCell.col]
+            if (processedValue === originalValue) {
+              newModifiedCells.delete(cellKey)
+            } else {
+              newModifiedCells.add(cellKey)
+            }
+          }
+
+          // 내부 업데이트 플래그 먼저 설정
+          isInternalUpdate.current = true
+
+          setModifiedCells(newModifiedCells)
+          setGridData(newData)
+          addToHistory(newData)
+
+          onDataChange?.(newData)
+          onCellEdit?.(editingCell.row, editingCell.col, processedValue)
+        }
+
+        // 좌우 셀 이동
+        let newColIndex = columns.findIndex(c => c.key === editingCell.col)
+
+        if (e.key === 'ArrowLeft') {
+          newColIndex = Math.max(0, newColIndex - 1)
+        } else if (e.key === 'ArrowRight') {
+          newColIndex = Math.min(columns.length - 1, newColIndex + 1)
+        }
+
+        setEditingCell(null)
+        setIsKeyboardEdit(false)
+        setSelectedCell({ row: editingCell.row, col: columns[newColIndex].key })
+      } else {
+        // 일반 텍스트/숫자 입력: 커서가 끝에 있을 때만 셀 이동
+        if (!editingCell) return
+
+        const input = inputRef.current as HTMLInputElement
+        if (!input) return
+
+        const cursorPos = input.selectionStart ?? 0
+        const textLength = editValue.length
+
+        let shouldMoveCell = false
+
+        if (e.key === 'ArrowLeft' && cursorPos === 0) {
+          // 커서가 맨 앞에 있을 때 왼쪽 방향키
+          shouldMoveCell = true
+        } else if (e.key === 'ArrowRight' && cursorPos === textLength) {
+          // 커서가 맨 뒤에 있을 때 오른쪽 방향키
+          shouldMoveCell = true
+        }
+
+        if (shouldMoveCell) {
+          e.preventDefault()
+          e.stopPropagation()
+
+          // 현재 편집 내용 커밋
+          const newData = [...gridData]
+          const column = columns.find(col => col.key === editingCell.col)
+
+          let processedValue: any = editValue
+          if (column?.type === 'number') {
+            processedValue = editValue === '' ? null : Number(editValue)
+          }
+
+          const oldValue = newData[editingCell.row][editingCell.col]
+
+          if (oldValue !== processedValue) {
+            newData[editingCell.row] = {
+              ...newData[editingCell.row],
+              [editingCell.col]: processedValue
+            }
+
+            const cellKey = `${editingCell.row}-${editingCell.col}`
+            const newModifiedCells = new Set(modifiedCells)
+            const rowIndex = editingCell.row
+            const isAddedOrCopied = addedRows.has(rowIndex) || copiedRows.has(rowIndex)
+
+            if (!isAddedOrCopied) {
+              const originalValue = originalDataRef.current[rowIndex]?.[editingCell.col]
+              if (processedValue === originalValue) {
+                newModifiedCells.delete(cellKey)
+              } else {
+                newModifiedCells.add(cellKey)
+              }
+            }
+
+            // 내부 업데이트 플래그 먼저 설정
+            isInternalUpdate.current = true
+
+            setModifiedCells(newModifiedCells)
+            setGridData(newData)
+            addToHistory(newData)
+
+            onDataChange?.(newData)
+            onCellEdit?.(editingCell.row, editingCell.col, processedValue)
+          }
+
+          // 좌우 셀 이동
+          let newColIndex = columns.findIndex(c => c.key === editingCell.col)
+
+          if (e.key === 'ArrowLeft') {
+            newColIndex = Math.max(0, newColIndex - 1)
+          } else if (e.key === 'ArrowRight') {
+            newColIndex = Math.min(columns.length - 1, newColIndex + 1)
+          }
+
+          setEditingCell(null)
+          setIsKeyboardEdit(false)
+          setSelectedCell({ row: editingCell.row, col: columns[newColIndex].key })
+        }
+        // 커서가 중간에 있으면 기본 동작(커서 이동) 허용
+      }
     }
   }
 
@@ -1423,73 +1648,199 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     const value = displayRow[column.key]
     const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === column.key
     const isNumberCol = isNumberColumn(column.key)
+    const displayValue = isNumberColumn(column.key) ? formatNumberWithComma(value) : (value ?? '')
 
-    if (isEditing) {
-      if (column.type === 'dropdown' && column.source) {
-        return (
-          <select
-            ref={inputRef as React.RefObject<HTMLSelectElement>}
-            value={editValue}
-            onChange={(e) => {
-              const newValue = e.target.value
-              setEditValue(newValue)
-              // 값 선택 후 즉시 커밋 (새 값을 직접 전달)
-              setTimeout(() => commitEdit(newValue), 0)
-            }}
-            onKeyDown={handleKeyDown}
-            className="w-full h-full px-2 py-1 border-none outline-none bg-transparent text-[13px] text-center"
-            style={{ fontSize: '13px', margin: 0 }}
-          >
-            <option value="">선택</option>
-            {column.source.map(option => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-        )
-      } else if (column.type === 'checkbox') {
-        return (
-          <div className="flex items-center justify-center h-full">
-            <input
-              type="checkbox"
-              checked={editValue === 'true' || editValue === true}
-              readOnly
-              className="w-4 h-4"
-            />
-          </div>
-        )
-      } else {
-        return (
+    // 선택된 셀 또는 편집 중인 셀에 input 렌더링 (한글 입력 지원)
+    const shouldShowInput = (isSelected || isEditing) && !isReadOnly(column, row) &&
+                            column.type !== 'checkbox' && column.type !== 'dropdown'
+
+    if (isEditing && column.type === 'dropdown' && column.source) {
+      return (
+        <select
+          ref={inputRef as React.RefObject<HTMLSelectElement>}
+          value={editValue}
+          onChange={(e) => {
+            const newValue = e.target.value
+            setEditValue(newValue)
+            // 값 선택 후 즉시 커밋 (새 값을 직접 전달)
+            setTimeout(() => commitEdit(newValue), 0)
+          }}
+          onKeyDown={handleKeyDown}
+          className="w-full h-full px-2 py-1 border-none outline-none bg-transparent text-[13px] text-center"
+          style={{ fontSize: '13px', margin: 0 }}
+        >
+          <option value="">선택</option>
+          {column.source.map(option => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      )
+    }
+
+    if (isEditing && column.type === 'checkbox') {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <input
+            type="checkbox"
+            checked={!!editValue && editValue !== 'false'}
+            readOnly
+            className="w-4 h-4"
+          />
+        </div>
+      )
+    }
+
+    // 일반 텍스트/숫자 입력 (선택 또는 편집 모드)
+    if (shouldShowInput) {
+      return (
+        <>
+          {!isEditing && <span style={{ fontSize: '13px', position: 'relative', zIndex: 1, pointerEvents: 'none' }}>{displayValue}</span>}
           <input
             ref={inputRef as React.RefObject<HTMLInputElement>}
             type="text"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={() => commitEdit()}
-            onKeyDown={handleKeyDown}
-            onCompositionStart={(e) => {
-              // IME 조합 시작 (한글 입력 시작)
-              e.stopPropagation()
+            value={isEditing ? editValue : ''}
+            onChange={(e) => {
+              if (isEditing) {
+                setEditValue(e.target.value)
+              }
+            }}
+            onBlur={() => {
+              if (isEditing) {
+                commitEdit()
+              }
+            }}
+            onKeyDown={(e) => {
+              if (isEditing) {
+                handleKeyDown(e)
+              } else {
+                // 선택 모드에서의 키 처리
+                if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                  e.preventDefault()
+                  e.stopPropagation() // 전역 핸들러로 전달 방지
+
+                  // 직접 셀 이동 처리
+                  let newRow = rowIndex
+                  let newColIndex = columns.findIndex(c => c.key === column.key)
+
+                  if (e.key === 'ArrowUp') {
+                    newRow = Math.max(0, rowIndex - 1)
+                  } else if (e.key === 'ArrowDown') {
+                    newRow = Math.min(gridData.length - 1, rowIndex + 1)
+                  } else if (e.key === 'ArrowLeft') {
+                    newColIndex = Math.max(0, newColIndex - 1)
+                  } else if (e.key === 'ArrowRight') {
+                    newColIndex = Math.min(columns.length - 1, newColIndex + 1)
+                  }
+
+                  setSelectedCell({ row: newRow, col: columns[newColIndex].key })
+                } else if (e.key === 'Enter') {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsKeyboardEdit(false)
+                  setEditingCell({ row: rowIndex, col: column.key })
+                  setEditValue(value ?? '')
+                } else if (e.key === 'Backspace' || e.key === 'Delete') {
+                  e.preventDefault()
+                  e.stopPropagation()
+
+                  // 값을 바로 삭제 (편집 모드로 전환하지 않음)
+                  const newData = [...gridData]
+                  newData[rowIndex] = {
+                    ...newData[rowIndex],
+                    [column.key]: column.type === 'number' ? null : ''
+                  }
+
+                  // 수정 추적
+                  const cellKey = `${rowIndex}-${column.key}`
+                  const isAddedOrCopied = addedRows.has(rowIndex) || copiedRows.has(rowIndex)
+                  const newModifiedCells = new Set(modifiedCells)
+
+                  if (!isAddedOrCopied) {
+                    const originalValue = originalDataRef.current[rowIndex]?.[column.key]
+                    const newValue = column.type === 'number' ? null : ''
+
+                    // 원본 값이 존재하고(빈 값이 아니고) 삭제한 경우 무조건 수정으로 추적
+                    const originalHasValue = originalValue !== null && originalValue !== undefined && originalValue !== ''
+
+                    if (newValue === originalValue) {
+                      newModifiedCells.delete(cellKey)
+                    } else if (originalHasValue) {
+                      // 원본에 값이 있었는데 삭제한 경우 반드시 추가
+                      newModifiedCells.add(cellKey)
+                    } else if (newValue !== originalValue) {
+                      // 그 외 다른 경우도 추가
+                      newModifiedCells.add(cellKey)
+                    }
+                  }
+
+                  // 내부 업데이트 플래그 먼저 설정
+                  isInternalUpdate.current = true
+
+                  // React 18의 자동 배칭을 활용하여 상태 업데이트
+                  setModifiedCells(newModifiedCells)
+                  setGridData(newData)
+                  addToHistory(newData)
+
+                  // 다음 틱에 콜백 실행 (상태 업데이트 완료 후)
+                  setTimeout(() => {
+                    onDataChange?.(newData)
+                  }, 0)
+                }
+              }
+            }}
+            onCompositionStart={() => {
+              // IME 조합 시작 - 편집 모드로 전환
+              if (!isEditing) {
+                setIsKeyboardEdit(true)
+                setEditingCell({ row: rowIndex, col: column.key })
+                setEditValue('')
+              }
             }}
             onCompositionUpdate={(e) => {
-              // IME 조합 중
+              // IME 조합 중 - 값 업데이트
               e.stopPropagation()
+              if (isEditing) {
+                setEditValue((e.target as HTMLInputElement).value)
+              }
             }}
             onCompositionEnd={(e) => {
-              // IME 조합 완료 (한글 입력 완료)
+              // IME 조합 완료
               e.stopPropagation()
-              setEditValue((e.target as HTMLInputElement).value)
+              const inputValue = (e.target as HTMLInputElement).value
+              if (isEditing) {
+                setEditValue(inputValue)
+              } else if (inputValue) {
+                // 선택 모드에서 조합 완료 시 편집 모드로 전환
+                setIsKeyboardEdit(true)
+                setEditingCell({ row: rowIndex, col: column.key })
+                setEditValue(inputValue)
+              }
             }}
-            className={`w-full h-full px-2 py-1 border-none outline-none bg-transparent resize-none overflow-hidden ${
-              isNumberCol ? 'text-right' : 'text-center'
-            }`}
+            onInput={(e) => {
+              // 조합 중이 아닌 경우 (영어, 숫자 등)
+              const nativeEvent = e.nativeEvent as InputEvent
+              if (!nativeEvent.isComposing && !isEditing) {
+                const inputValue = (e.target as HTMLInputElement).value
+                if (inputValue) {
+                  setIsKeyboardEdit(true)
+                  setEditingCell({ row: rowIndex, col: column.key })
+                  setEditValue(inputValue)
+                }
+              }
+            }}
+            className={`absolute inset-0 w-full h-full px-2 py-1 border-none outline-none resize-none overflow-hidden ${
+              isEditing ? 'bg-transparent' : 'bg-transparent text-transparent caret-transparent'
+            } ${isNumberCol ? 'text-right' : 'text-center'}`}
             style={{
               fontSize: '13px',
               margin: 0,
-              lineHeight: 'normal'
+              lineHeight: 'normal',
+              zIndex: isEditing ? 1 : 2
             }}
+            autoFocus
           />
-        )
-      }
+        </>
+      )
     }
 
     if (column.renderer) {
@@ -1554,11 +1905,14 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       )
     }
 
-    const displayValue = isNumberColumn(column.key) ? formatNumberWithComma(value) : (value ?? '')
+    // 객체인 경우 안전하게 처리
+    const safeDisplayValue = typeof displayValue === 'object' && displayValue !== null
+      ? JSON.stringify(displayValue)
+      : displayValue
 
     return (
       <>
-        <span style={{ fontSize: '13px' }}>{displayValue}</span>
+        <span style={{ fontSize: '13px' }}>{safeDisplayValue}</span>
         {isSelected && !isReadOnly(column, row) && (
           <div
             className="absolute bottom-0 right-0 w-3 h-3 bg-blue-600 z-30"
@@ -1795,6 +2149,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
         className="overflow-x-auto overflow-y-auto bg-surface border-b border-gray-200"
         style={{ maxHeight: height }}
         onPaste={handlePaste}
+        onScroll={onScroll}
         tabIndex={0}
       >
         <table ref={tableRef} className="border-collapse" style={{ fontSize: '13px', borderSpacing: 0, tableLayout: 'auto', minWidth: '100%' }}>
@@ -1954,7 +2309,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                 )}
                 {showRowNumbers && (
                   <td key="row-number" className="border border-gray-200 px-2 py-1 text-xs text-center align-middle text-text-tertiary">
-                    {rowIndex + 1}
+                    {startIndex + rowIndex + 1}
                   </td>
                 )}
                 {columns.map((column, colIdx) => {

@@ -116,10 +116,9 @@ export default function MaterialMatchingPage() {
 
   const fetchCategorySettings = async () => {
     const { data, error } = await supabase
-      .from('category_settings')
+      .from('products_master')
       .select('category_4')
       .eq('is_active', true)
-      .eq('expense_type', '사입') // 지출유형이 '사입'인 것만
       .not('category_4', 'is', null)
       .order('category_4')
 
@@ -476,17 +475,17 @@ export default function MaterialMatchingPage() {
     try {
       setSaving(true)
 
-      // category_settings에서 품목으로 조회
-      const { data: categorySettings, error: fetchError } = await supabase
-        .from('category_settings')
+      // products_master에서 품목으로 조회
+      const { data: productMaster, error: fetchError } = await supabase
+        .from('products_master')
         .select('category_1, category_2, category_3, category_4, category_5')
         .eq('category_4', targetCategory4)
         .eq('is_active', true)
         .limit(1)
         .single()
 
-      if (fetchError || !categorySettings) {
-        showToast(`품목 "${targetCategory4}"에 대한 카테고리 설정을 찾을 수 없습니다`, 'error')
+      if (fetchError || !productMaster) {
+        showToast(`품목 "${targetCategory4}"에 대한 품목 마스터를 찾을 수 없습니다`, 'error')
         return
       }
 
@@ -494,11 +493,11 @@ export default function MaterialMatchingPage() {
       const { error: updateError } = await supabase
         .from('option_products')
         .update({
-          category_1: categorySettings.category_1,
-          category_2: categorySettings.category_2,
-          category_3: categorySettings.category_3,
-          category_4: categorySettings.category_4,
-          category_5: categorySettings.category_5
+          category_1: productMaster.category_1,
+          category_2: productMaster.category_2,
+          category_3: productMaster.category_3,
+          category_4: productMaster.category_4,
+          category_5: productMaster.category_5
         })
         .eq('id', selectedProduct.id)
 
@@ -560,7 +559,7 @@ export default function MaterialMatchingPage() {
             .eq('id', productId)
         }
       } else {
-        // 원물 매칭이 없으면 옵션상품의 category_4로 category_settings에서 직접 조회
+        // 원물 매칭이 없으면 옵션상품의 category_4로 products_master에서 직접 조회
         const { data: product } = await supabase
           .from('option_products')
           .select('category_4')
@@ -568,23 +567,23 @@ export default function MaterialMatchingPage() {
           .single()
 
         if (product?.category_4) {
-          const { data: categorySettings } = await supabase
-            .from('category_settings')
+          const { data: productMaster } = await supabase
+            .from('products_master')
             .select('category_1, category_2, category_3, category_4, category_5')
             .eq('category_4', product.category_4)
             .eq('is_active', true)
             .limit(1)
             .single()
 
-          if (categorySettings) {
+          if (productMaster) {
             await supabase
               .from('option_products')
               .update({
-                category_1: categorySettings.category_1,
-                category_2: categorySettings.category_2,
-                category_3: categorySettings.category_3,
-                category_4: categorySettings.category_4,
-                category_5: categorySettings.category_5
+                category_1: productMaster.category_1,
+                category_2: productMaster.category_2,
+                category_3: productMaster.category_3,
+                category_4: productMaster.category_4,
+                category_5: productMaster.category_5
               })
               .eq('id', productId)
           }

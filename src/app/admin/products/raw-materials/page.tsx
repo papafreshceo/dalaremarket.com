@@ -20,6 +20,7 @@ interface Supplier {
   phone?: string
   email?: string
   address?: string
+  partner_type?: string
   is_active: boolean
 }
 interface RawMaterial {
@@ -68,6 +69,7 @@ export default function RawMaterialsManagementPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [supplyStatuses, setSupplyStatuses] = useState<SupplyStatus[]>([])
   const [categorySettings, setCategorySettings] = useState<any[]>([]) // 카테고리 설정 데이터
+  const [productMasters, setProductMasters] = useState<any[]>([]) // 품목마스터 데이터
 
   const [stats, setStats] = useState({ totalMaterials: 0, shippingMaterials: 0, seasonEndMaterials: 0, todayPriceUpdates: 0, unregisteredCategories: 0 })
 
@@ -98,6 +100,11 @@ export default function RawMaterialsManagementPage() {
 
   // 원물별 가격 및 날짜
   const [materialPrices, setMaterialPrices] = useState<Record<string, {price: string, date: string}>>({})
+
+  // 원물 등록 모달용 state
+  const [materialCount, setMaterialCount] = useState<number>(1)
+  const [materialRows, setMaterialRows] = useState<any[]>([])
+  const [selectedProductMasterId, setSelectedProductMasterId] = useState<string>('')
 
   // 시세분석 필터 데이터
   const [priceAnalysisForm, setPriceAnalysisForm] = useState({
@@ -251,7 +258,7 @@ export default function RawMaterialsManagementPage() {
   const fetchAll = async () => {
     setLoading(true)
     try {
-      await Promise.all([fetchMaterials(), fetchSuppliers(), fetchSupplyStatuses(), fetchCategorySettings()])
+      await Promise.all([fetchMaterials(), fetchSuppliers(), fetchSupplyStatuses(), fetchCategorySettings(), fetchProductMasters()])
     } finally { setLoading(false) }
   }
 
@@ -263,56 +270,57 @@ export default function RawMaterialsManagementPage() {
   }
 
   const fetchMaterials = async () => {
-    // raw_materials 테이블에서 직접 조회하고 supplier name은 JOIN으로 가져오기
-    const { data } = await supabase
-      .from('raw_materials')
-      .select(`
-        *,
-        supplier:partners!main_supplier_id(name)
-      `)
-      .order('material_code', { ascending: true })
+    try {
+      // raw_materials 테이블에서 직접 조회하고 supplier name은 JOIN으로 가져오기
+      const { data } = await supabase
+        .from('raw_materials')
+        .select(`
+          *,
+          supplier:partners!main_supplier_id(name)
+        `)
+        .order('material_code', { ascending: true })
 
-    if (data) {
-      // 품목별 원물상태 조회
-      const { data: categories } = await supabase
-        .from('category_settings')
-        .select('category_4, raw_material_status')
-        .eq('is_active', true)
-        .not('category_4', 'is', null)
+      if (data) {
+        // 품목마스터에서 공급상태 조회
+        let productMasterStatusMap = new Map()
 
-      const categoryStatusMap = new Map(
-        (categories || []).map(cat => [cat.category_4, cat.raw_material_status])
-      )
+        try {
+          const { data: productMasters } = await supabase
+            .from('products_master')
+            .select('id, category_4, supply_status')
+            .eq('is_active', true)
+            .not('category_4', 'is', null)
 
-      // 상태 코드 -> 한글 이름 매핑
-      const { data: statuses } = await supabase
-        .from('supply_status_settings')
-        .select('code, name')
-        .eq('status_type', 'raw_material')
-        .eq('is_active', true)
-
-      const statusNameMap = new Map(
-        (statuses || []).map(s => [s.code, s.name])
-      )
-
-      // supplier name을 supplier_name 필드로 매핑하고 supplier 객체는 제거
-      // 품목의 원물상태를 supply_status로 무조건 사용 (개별 설정 불가)
-      const mapped = data.map(row => {
-        const { supplier, ...rest } = row
-        const categoryStatus = categoryStatusMap.get(row.category_4)
-        const statusName = categoryStatus ? (statusNameMap.get(categoryStatus) || categoryStatus) : null
-
-        return {
-          ...rest,
-          supplier_name: supplier?.name || null,
-          // 무조건 품목의 raw_material_status 사용 (한글명)
-          supply_status: statusName
+          // category_4 기준으로 매핑
+          productMasterStatusMap = new Map(
+            (productMasters || []).map(pm => [pm.category_4, pm.supply_status])
+          )
+        } catch (err) {
+          console.warn('Failed to fetch products_master:', err)
         }
-      })
-      setMaterials(mapped)
-      setFilteredMaterials(mapped)
-      setGridData(mapped) // EditableAdminGrid 데이터 초기화
-      captureSnapshot(mapped) // 스냅샷 갱신
+
+        // supplier name을 supplier_name 필드로 매핑하고 supplier 객체는 제거
+        // 품목마스터의 공급상태를 supply_status로 사용
+        const mapped = data.map(row => {
+          const { supplier, ...rest } = row
+          // 품목마스터에서 공급상태 가져오기 (category_4 매칭)
+          const masterStatus = productMasterStatusMap.get(row.category_4)
+
+          return {
+            ...rest,
+            supplier_name: supplier?.name || null,
+            // 품목마스터의 supply_status 사용 (없으면 원본 유지)
+            supply_status: masterStatus || rest.supply_status
+          }
+        })
+        setMaterials(mapped)
+        setFilteredMaterials(mapped)
+        setGridData(mapped) // EditableAdminGrid 데이터 초기화
+        captureSnapshot(mapped) // 스냅샷 갱신
+      }
+    } catch (err) {
+      console.error('Failed to fetch materials:', err)
+      throw err
     }
   }
   const fetchSuppliers = async () => {
@@ -326,6 +334,24 @@ export default function RawMaterialsManagementPage() {
   const fetchCategorySettings = async () => {
     const { data } = await supabase.from('category_settings').select('*').eq('is_active', true)
     if (data) setCategorySettings(data)
+  }
+  const fetchProductMasters = async () => {
+    const { data, error } = await supabase
+      .from('products_master')
+      .select('id, category_1, category_2, category_3, category_4, supply_status')
+      .eq('is_active', true)
+      .not('category_4', 'is', null)
+      .order('category_1, category_2, category_3, category_4')
+
+    if (error) {
+      console.error('Failed to fetch products_master:', error)
+      return
+    }
+
+    if (data) {
+      console.log('Products master loaded:', data.length)
+      setProductMasters(data)
+    }
   }
 
   // 카테고리 설정에 등록되어 있는지 확인하는 함수
@@ -773,33 +799,46 @@ export default function RawMaterialsManagementPage() {
 
   // EditableAdminGrid의 데이터 변경을 처리하는 핸들러
   const handleGridDataChange = (newData: RawMaterial[]) => {
+    console.log('[RawMaterials] handleGridDataChange called')
+
     // supplier_name 처리: 드롭다운에서 supplier name이 변경되면 supplier_id를 찾아서 업데이트
+    let hasChanges = false
     const processedData = newData.map(item => {
-      const updated = { ...item }
       // main_supplier_id가 supplier name인 경우 (드롭다운에서 선택한 경우)
-      if (typeof updated.main_supplier_id === 'string' && !updated.main_supplier_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-        const supplierName = updated.main_supplier_id
+      if (typeof item.main_supplier_id === 'string' && !item.main_supplier_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        hasChanges = true
+        const supplierName = item.main_supplier_id
         const supplier = suppliers.find(s => s.name === supplierName)
-        updated.main_supplier_id = supplier?.id || null
-        updated.supplier_name = supplierName
+        return {
+          ...item,
+          main_supplier_id: supplier?.id || null,
+          supplier_name: supplierName
+        }
       }
-      return updated
+      return item
     })
 
-    setGridData(processedData)
+    // 실제 변경이 있을 때만 새 배열 설정, 없으면 원본 유지
+    const finalData = hasChanges ? processedData : newData
+    console.log('[RawMaterials] hasChanges:', hasChanges, 'same reference:', finalData === newData)
+    setGridData(finalData)
+
     // gridData의 변경사항을 materials에 반영 (새로 추가된 행도 포함)
-    setMaterials(prevMaterials => {
-      const updatedMap = new Map(processedData.map(item => [item.id, item]))
-      const existingIds = new Set(prevMaterials.map(m => m.id))
+    // 단, gridData와 동일한 참조를 유지하기 위해 조건부로만 업데이트
+    if (hasChanges || finalData.some(item => item.id.startsWith('temp_'))) {
+      setMaterials(prevMaterials => {
+        const updatedMap = new Map(finalData.map(item => [item.id, item]))
+        const existingIds = new Set(prevMaterials.map(m => m.id))
 
-      // 기존 행 업데이트
-      const updated = prevMaterials.map(item => updatedMap.get(item.id) || item)
+        // 기존 행 업데이트
+        const updated = prevMaterials.map(item => updatedMap.get(item.id) || item)
 
-      // 새로 추가된 행 추가 (temp_로 시작하는 ID)
-      const newItems = processedData.filter(item => !existingIds.has(item.id))
+        // 새로 추가된 행 추가 (temp_로 시작하는 ID)
+        const newItems = finalData.filter(item => !existingIds.has(item.id))
 
-      return [...updated, ...newItems]
-    })
+        return [...updated, ...newItems]
+      })
+    }
   }
 
   // EditableAdminGrid가 복사/붙여넣기/되돌리기를 모두 처리하므로 여기서는 제거
@@ -878,6 +917,7 @@ export default function RawMaterialsManagementPage() {
         category_4: m.category_4 || null,
         category_5: m.category_5 || null,
         standard_unit: m.standard_unit || 'kg',
+        standard_quantity: m.standard_quantity != null ? Number(m.standard_quantity) : 1,
         supply_status: resolveStatusName(m.supply_status) || m.supply_status || '출하중',
         main_supplier_id: m.main_supplier_id || null,
         unit_quantity: m.unit_quantity != null ? Number(m.unit_quantity) : null,
@@ -888,6 +928,7 @@ export default function RawMaterialsManagementPage() {
         season_end_date: m.season_end_date || null,
         color_code: m.color_code || null,
       }))
+      console.log('Saving rows:', rows)
       const { error: upErr } = await supabase.from('raw_materials').upsert(rows, { onConflict: 'id' })
       if (upErr) throw upErr
 
@@ -902,7 +943,7 @@ export default function RawMaterialsManagementPage() {
         .map(m => ({
           material_id: m.id,
           price: Number(m.latest_price),
-          unit_quantity: m.unit_quantity ? Number(m.unit_quantity) : null,
+          unit_quantity: m.unit_quantity ? Number(m.unit_quantity) : (m.standard_quantity || 1),
           effective_date: today,
           price_type: 'PURCHASE'
         }))
@@ -914,8 +955,11 @@ export default function RawMaterialsManagementPage() {
       // 저장 성공 → 스냅샷 갱신
       showToast('저장되었습니다.', 'success')
       await fetchMaterials()
-    } catch (e) {
-      console.error(e); showToast('저장 중 오류가 발생했습니다.', 'error')
+    } catch (e: any) {
+      console.error('Save error:', e)
+      console.error('Error details:', e?.message, e?.details, e?.hint, e?.code)
+      const errorMsg = e?.message || e?.details || '저장 중 오류가 발생했습니다.'
+      showToast(errorMsg, 'error')
     }
   }
 
@@ -970,7 +1014,129 @@ export default function RawMaterialsManagementPage() {
     setMaterialPrices({})
     setPriceHistoryData([])
     setShowChart(false)
+    // 원물 등록 모달 초기화
+    setMaterialCount(1)
+    setMaterialRows([])
+    setSelectedProductMasterId('')
   }
+
+  // 원물 행 생성
+  const handleGenerateMaterialRows = () => {
+    if (!selectedProductMasterId) {
+      showToast('품목을 먼저 선택해주세요.', 'error')
+      return
+    }
+
+    const selected = productMasters.find(pm => pm.id === selectedProductMasterId)
+    if (!selected) return
+
+    const rows = Array.from({ length: materialCount }, (_, i) => ({
+      id: `temp_${Date.now()}_${i}`,
+      material_code: '',
+      material_name: '',
+      category_1: selected.category_1,
+      category_2: selected.category_2,
+      category_3: selected.category_3,
+      category_4: selected.category_4,
+      category_5: null,
+      standard_quantity: 1,
+      standard_unit: 'kg',
+      supply_status: selected.supply_status || '출하중',
+      main_supplier_id: null,
+      latest_price: null,
+      unit_quantity: null,
+      last_trade_date: null,
+      season: null,
+      season_start_date: null,
+      season_peak_date: null,
+      season_end_date: null
+    }))
+
+    setMaterialRows(rows)
+  }
+
+  // 원물 등록 처리
+  const handleRegisterMaterial = async () => {
+    if (materialRows.length === 0) {
+      showToast('원물 행을 먼저 생성해주세요.', 'error')
+      return
+    }
+
+    // 필수 필드 검증
+    const invalidRows = materialRows.filter(row => !row.material_code || !row.material_name)
+    if (invalidRows.length > 0) {
+      showToast('모든 원물의 코드와 명칭을 입력해주세요.', 'error')
+      return
+    }
+
+    try {
+      const insertData = materialRows.map(row => ({
+        material_code: row.material_code,
+        material_name: row.material_name,
+        category_1: row.category_1,
+        category_2: row.category_2,
+        category_3: row.category_3,
+        category_4: row.category_4,
+        category_5: row.category_5,
+        standard_unit: row.standard_unit || 'kg',
+        standard_quantity: 1,
+        supply_status: row.supply_status || '출하중',
+        main_supplier_id: row.main_supplier_id || null,
+        latest_price: row.latest_price ? Number(String(row.latest_price).replace(/,/g, '')) : null,
+        unit_quantity: row.unit_quantity ? Number(row.unit_quantity) : null,
+        last_trade_date: row.last_trade_date || null,
+        season: row.season || null,
+        season_start_date: row.season_start_date || null,
+        season_peak_date: row.season_peak_date || null,
+        season_end_date: row.season_end_date || null,
+        is_active: true
+      }))
+
+      const { error } = await supabase.from('raw_materials').insert(insertData)
+
+      if (error) throw error
+
+      showToast(`${materialRows.length}건의 원물이 등록되었습니다.`, 'success')
+      closeModal()
+      await fetchMaterials()
+    } catch (error: any) {
+      console.error('원물 등록 오류:', error)
+      showToast(error.message || '원물 등록 중 오류가 발생했습니다.', 'error')
+    }
+  }
+
+  // 원물 행 업데이트
+  const updateMaterialRow = (index: number, field: string, value: any) => {
+    setMaterialRows(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], [field]: value }
+      return updated
+    })
+  }
+
+  // 농가/도매 거래처만 필터링
+  const [partnerTypes, setPartnerTypes] = useState<string[]>([])
+
+  useEffect(() => {
+    const fetchPartnerTypes = async () => {
+      const { data } = await supabase
+        .from('partners')
+        .select('partner_type')
+        .not('partner_type', 'is', null)
+
+      if (data) {
+        const uniqueTypes = Array.from(new Set(data.map(p => p.partner_type).filter(Boolean)))
+        setPartnerTypes(uniqueTypes as string[])
+      }
+    }
+    if (suppliers.length > 0) {
+      fetchPartnerTypes()
+    }
+  }, [suppliers])
+
+  const partnerSuppliers = suppliers.filter(s =>
+    s.partner_type === '농가' || s.partner_type === '도매'
+  )
 
   const handleDeleteRow = async (rowIndex: number) => {
     setDeleteConfirm({ rowIndex })
@@ -1674,7 +1840,195 @@ export default function RawMaterialsManagementPage() {
           </div>
         </Modal>
       )}
-      {modalType === 'material-register' && (<Modal isOpen={true} onClose={closeModal} title="원물등록관리" size="xl"><div className="space-y-4"><p className="text-gray-600">원물 등록 및 관리 기능이 구현될 예정입니다.</p></div></Modal>)}
+      {modalType === 'material-register' && (
+        <Modal
+          isOpen={true}
+          onClose={closeModal}
+          title="원물등록"
+          size="2xl"
+          footer={
+            <>
+              <Button variant="ghost" onClick={closeModal}>취소</Button>
+              <Button variant="primary" onClick={handleRegisterMaterial}>등록</Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            {/* Step 1: 품목 선택 */}
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="block text-xs text-gray-600 mb-1">1. 품목 선택 {productMasters.length > 0 && `(${productMasters.length}개)`}</label>
+                <select
+                  value={selectedProductMasterId}
+                  onChange={(e) => setSelectedProductMasterId(e.target.value)}
+                  className="w-full border rounded px-2 py-1.5 text-sm"
+                >
+                  <option value="">품목 선택...</option>
+                  {productMasters.map(pm => (
+                    <option key={pm.id} value={pm.id}>
+                      {[pm.category_1, pm.category_2, pm.category_3, pm.category_4].filter(Boolean).join(' / ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-20">
+                <label className="block text-xs text-gray-600 mb-1">2. 개수</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={materialCount}
+                  onChange={(e) => setMaterialCount(Math.max(1, Math.min(10, Number(e.target.value))))}
+                  className="w-full border rounded px-2 py-1.5 text-sm text-center"
+                />
+              </div>
+              <Button variant="primary" size="sm" onClick={handleGenerateMaterialRows}>
+                3. 행생성
+              </Button>
+            </div>
+
+            {/* Step 2: 원물 입력 테이블 */}
+            {materialRows.length > 0 && (
+              <div className="border rounded overflow-auto max-h-[60vh]">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-2 py-1 border text-center w-8">#</th>
+                      <th className="px-2 py-1 border text-center w-24">원물코드*</th>
+                      <th className="px-2 py-1 border text-center w-24">원물명*</th>
+                      <th className="px-2 py-1 border text-center w-20">품종</th>
+                      <th className="px-2 py-1 border text-center w-16">표준량</th>
+                      <th className="px-2 py-1 border text-center w-16">표준규격</th>
+                      <th className="px-2 py-1 border text-center w-20">상태</th>
+                      <th className="px-2 py-1 border text-center w-24">주거래처</th>
+                      <th className="px-2 py-1 border text-center w-20">최근시세</th>
+                      <th className="px-2 py-1 border text-center w-20">최근거래</th>
+                      <th className="px-2 py-1 border text-center w-16">시즌</th>
+                      <th className="px-2 py-1 border text-center w-16">시작일</th>
+                      <th className="px-2 py-1 border text-center w-16">종료일</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {materialRows.map((row, idx) => (
+                      <tr key={row.id}>
+                        <td className="px-2 py-1 border text-center text-gray-500">{idx + 1}</td>
+                        <td className="px-1 py-1 border">
+                          <input
+                            type="text"
+                            value={row.material_code}
+                            onChange={(e) => updateMaterialRow(idx, 'material_code', e.target.value)}
+                            className="w-full px-1 py-0.5 text-xs border-0 focus:ring-1 focus:ring-blue-500 rounded"
+                            placeholder="코드"
+                          />
+                        </td>
+                        <td className="px-1 py-1 border">
+                          <input
+                            type="text"
+                            value={row.material_name}
+                            onChange={(e) => updateMaterialRow(idx, 'material_name', e.target.value)}
+                            className="w-full px-1 py-0.5 text-xs border-0 focus:ring-1 focus:ring-blue-500 rounded"
+                            placeholder="명칭"
+                          />
+                        </td>
+                        <td className="px-1 py-1 border">
+                          <input
+                            type="text"
+                            value={row.category_5 || ''}
+                            onChange={(e) => updateMaterialRow(idx, 'category_5', e.target.value)}
+                            className="w-full px-1 py-0.5 text-xs text-center border-0 focus:ring-1 focus:ring-blue-500 rounded"
+                            placeholder="품종"
+                          />
+                        </td>
+                        <td className="px-1 py-1 border">
+                          <input
+                            type="number"
+                            value={row.standard_quantity || ''}
+                            onChange={(e) => updateMaterialRow(idx, 'standard_quantity', e.target.value ? Number(e.target.value) : null)}
+                            className="w-full px-1 py-0.5 text-xs text-center border-0 focus:ring-1 focus:ring-blue-500 rounded"
+                            placeholder="1"
+                          />
+                        </td>
+                        <td className="px-1 py-1 border">
+                          <input
+                            type="text"
+                            value={row.standard_unit}
+                            onChange={(e) => updateMaterialRow(idx, 'standard_unit', e.target.value)}
+                            className="w-full px-1 py-0.5 text-xs text-center border-0 focus:ring-1 focus:ring-blue-500 rounded"
+                          />
+                        </td>
+                        <td className="px-1 py-1 border">
+                          <div className="w-full px-1 py-0.5 text-xs text-center text-gray-500 bg-gray-50">
+                            {row.supply_status}
+                          </div>
+                        </td>
+                        <td className="px-1 py-1 border">
+                          <select
+                            value={row.main_supplier_id || ''}
+                            onChange={(e) => updateMaterialRow(idx, 'main_supplier_id', e.target.value)}
+                            className="w-full px-1 py-0.5 text-xs border-0 focus:ring-1 focus:ring-blue-500 rounded"
+                          >
+                            <option value="">-</option>
+                            {partnerSuppliers.map(s => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-1 py-1 border">
+                          <input
+                            type="text"
+                            value={row.latest_price ? Number(String(row.latest_price).replace(/,/g, '')).toLocaleString() : ''}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/,/g, '')
+                              updateMaterialRow(idx, 'latest_price', val ? Number(val) : null)
+                            }}
+                            className="w-full px-1 py-0.5 text-xs text-right border-0 focus:ring-1 focus:ring-blue-500 rounded"
+                            placeholder="0"
+                          />
+                        </td>
+                        <td className="px-1 py-1 border">
+                          <input
+                            type="date"
+                            value={row.last_trade_date || ''}
+                            onChange={(e) => updateMaterialRow(idx, 'last_trade_date', e.target.value)}
+                            className="w-full px-1 py-0.5 text-xs border-0 focus:ring-1 focus:ring-blue-500 rounded"
+                          />
+                        </td>
+                        <td className="px-1 py-1 border">
+                          <input
+                            type="text"
+                            value={row.season || ''}
+                            onChange={(e) => updateMaterialRow(idx, 'season', e.target.value)}
+                            className="w-full px-1 py-0.5 text-xs text-center border-0 focus:ring-1 focus:ring-blue-500 rounded"
+                            placeholder="봄"
+                          />
+                        </td>
+                        <td className="px-1 py-1 border">
+                          <input
+                            type="text"
+                            value={row.season_start_date || ''}
+                            onChange={(e) => updateMaterialRow(idx, 'season_start_date', e.target.value)}
+                            className="w-full px-1 py-0.5 text-xs text-center border-0 focus:ring-1 focus:ring-blue-500 rounded"
+                            placeholder="03-01"
+                          />
+                        </td>
+                        <td className="px-1 py-1 border">
+                          <input
+                            type="text"
+                            value={row.season_end_date || ''}
+                            onChange={(e) => updateMaterialRow(idx, 'season_end_date', e.target.value)}
+                            className="w-full px-1 py-0.5 text-xs text-center border-0 focus:ring-1 focus:ring-blue-500 rounded"
+                            placeholder="05-31"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
       {modalType === 'price-record' && (
         <Modal
           isOpen={true}

@@ -11,6 +11,19 @@ import { ConfirmProvider } from '@/components/ui/ConfirmModal'
 import { LogoutButton } from '@/components/ui/LogoutButton'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { FloatingHtmlBuilder } from '@/components/admin/FloatingHtmlBuilder'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+// React Query 클라이언트 설정
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5분간 데이터를 fresh로 간주
+      gcTime: 1000 * 60 * 30, // 30분간 캐시 유지
+      refetchOnWindowFocus: false, // 윈도우 포커스 시 자동 refetch 비활성화
+      retry: 1, // 실패 시 1회만 재시도
+    },
+  },
+})
 
 export default function AdminLayout({
   children,
@@ -226,9 +239,10 @@ export default function AdminLayout({
   }
 
   return (
-    <ToastProvider>
-      <ConfirmProvider>
-        <div className="flex flex-col h-screen bg-background">
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <ConfirmProvider>
+          <div className="flex flex-col h-screen bg-background">
       {/* 헤더 */}
       <header className="h-16 bg-surface border-b border-border shadow-sm z-50">
         <div className="h-full px-4 lg:px-6 flex items-center justify-between">
@@ -404,13 +418,14 @@ export default function AdminLayout({
         </main>
       </div>
     </div>
-      </ConfirmProvider>
+        </ConfirmProvider>
 
-      {/* 플로팅 HTML 생성기 */}
-      <FloatingHtmlBuilder
-        isOpen={showHtmlBuilder}
-        onClose={() => setShowHtmlBuilder(false)}
-      />
-    </ToastProvider>
+        {/* 플로팅 HTML 생성기 */}
+        <FloatingHtmlBuilder
+          isOpen={showHtmlBuilder}
+          onClose={() => setShowHtmlBuilder(false)}
+        />
+      </ToastProvider>
+    </QueryClientProvider>
   )
 }

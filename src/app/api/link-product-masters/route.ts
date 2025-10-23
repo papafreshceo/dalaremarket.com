@@ -20,7 +20,7 @@ export async function POST() {
     // 모든 품목 마스터 조회
     const { data: productMasters, error } = await supabase
       .from('products_master')
-      .select('id, category_4')
+      .select('id, category_4, supply_status, season_start_date, season_end_date')
       .not('category_4', 'is', null)
 
     if (error || !productMasters) {
@@ -44,7 +44,12 @@ export async function POST() {
         for (const raw of rawMaterials) {
           const { error: rawError } = await supabase
             .from('raw_materials')
-            .update({ product_master_id: pm.id })
+            .update({
+              product_master_id: pm.id,
+              supply_status: pm.supply_status,
+              season_start_date: pm.season_start_date,
+              season_end_date: pm.season_end_date
+            })
             .eq('id', raw.id)
 
           if (!rawError) totalRawMaterials++

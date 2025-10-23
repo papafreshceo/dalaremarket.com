@@ -72,7 +72,13 @@
       "Bash(timeout 5 bash -c 'sleep 3')",
       "Bash(npm uninstall react-window @types/react-window)",
       "Bash(if exist \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\apply-stats-migration.js\" del /f \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\apply-stats-migration.js\")",
-      "Bash(timeout 15 bash:*)"
+      "Bash(timeout 15 bash:*)",
+      "Bash(timeout 20 bash:*)",
+      "Bash(timeout 10 bash -c 'sleep 3 && curl -s -o /dev/null -w \"\"%{http_code}\"\" http://localhost:3005/admin/order-integration')",
+      "Bash(npx next dev)",
+      "Bash(timeout 30 bash:*)",
+      "Bash(curl:*)",
+      "Bash(timeout 10 bash:*)"
     ],
     "deny": [],
     "ask": []

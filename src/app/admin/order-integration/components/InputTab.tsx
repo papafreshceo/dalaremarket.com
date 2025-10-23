@@ -63,6 +63,16 @@ interface OptionProduct {
   naver_free_shipping_price?: number;
 }
 
+interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  customer_types: string[];
+  recipient_name?: string;
+  recipient_phone?: string;
+  road_address?: string;
+}
+
 export default function InputTab() {
   // 폼 데이터
   const [formData, setFormData] = useState<OrderFormData>({
@@ -128,6 +138,14 @@ export default function InputTab() {
   // 옵션명 드롭다운 상태
   const [activeDropdown, setActiveDropdown] = useState<{ sectionId: string; productId: string } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // 단골고객 선택 모달
+  const [showCustomerSelectModal, setShowCustomerSelectModal] = useState<{
+    show: boolean;
+    sectionId: string | null;
+  }>({ show: false, sectionId: null });
+  const [regularCustomers, setRegularCustomers] = useState<any[]>([]);
+  const [customerSearchKeyword, setCustomerSearchKeyword] = useState('');
 
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
@@ -314,9 +332,17 @@ export default function InputTab() {
       // Daum Postcode 팝업 바로 열기
       new (window as any).daum.Postcode({
         oncomplete: function (data: any) {
+          console.log('📍 Daum Postcode API 응답:', data);
+
+          // 아파트명이 있으면 도로명주소에 포함
+          let roadAddressWithBuilding = data.roadAddress;
+          if (data.buildingName) {
+            roadAddressWithBuilding += ` (${data.buildingName})`;
+          }
+
           // 선택한 주소 저장
           setSelectedAddress({
-            roadAddress: data.roadAddress,
+            roadAddress: roadAddressWithBuilding,
             jibunAddress: data.jibunAddress,
             zonecode: data.zonecode,
           });
@@ -451,6 +477,12 @@ export default function InputTab() {
         return section;
       }),
     });
+  };
+
+  // 주문자 정보에서 단골고객 불러오기
+  const openCustomerModalForBuyer = () => {
+    setShowCustomerSelectModal({ show: true, sectionId: 'buyer' }); // 특별한 ID 사용
+    fetchRegularCustomers();
   };
 
   // 상품 추가
@@ -636,12 +668,34 @@ export default function InputTab() {
       // DB 저장용 데이터 생성 (각 상품을 개별 행으로)
       const ordersToSave: any[] = [];
 
-      formData.recipientSections.forEach((section) => {
-        // 같은 수령인의 상품들은 같은 주문번호를 사용
-        const orderNumber = generateOrderNumber();
+      console.log('📦 저장할 수령인 섹션 수:', formData.recipientSections.length);
 
-        section.products.forEach((product) => {
-          ordersToSave.push({
+      // 각 수령인별 주문번호를 미리 생성 (동시 호출 시 중복 방지)
+      const orderNumbers: string[] = [];
+      let currentSequence = todaySequence; // 현재 sequence를 로컬 변수로 복사
+
+      for (let i = 0; i < formData.recipientSections.length; i++) {
+        const utcTime = getCurrentTimeUTC();
+        const timestamp = utcTime.replace(/[-:TZ.]/g, '').substring(2, 14);
+        const seq = String(currentSequence).padStart(3, '0');
+        orderNumbers.push(`PH${timestamp}${seq}`);
+        currentSequence++; // 로컬 변수 증가
+      }
+
+      // state 업데이트는 마지막에 한 번만
+      setTodaySequence(currentSequence);
+      localStorage.setItem('phoneOrderSequence', String(currentSequence));
+
+      console.log('🔢 생성된 주문번호 목록:', orderNumbers);
+
+      formData.recipientSections.forEach((section, sectionIndex) => {
+        // 같은 수령인의 상품들은 같은 주문번호를 사용
+        const orderNumber = orderNumbers[sectionIndex];
+
+        console.log(`📋 수령인 ${sectionIndex + 1}: ${section.recipient_name}, 상품 ${section.products.length}개, 주문번호: ${orderNumber}`);
+
+        section.products.forEach((product, productIndex) => {
+          const orderData = {
             market_name: '전화주문',
             order_number: orderNumber, // 같은 수령인의 모든 상품은 같은 주문번호 사용
             buyer_name: formData.buyer_name,
@@ -663,9 +717,15 @@ export default function InputTab() {
             })(),
             shipping_status: '접수',
             registered_by: currentUser, // 접수자 정보 추가
-          });
+          };
+
+          console.log(`  ✅ 상품 ${productIndex + 1}: ${product.optionName} x ${product.quantity}`);
+          ordersToSave.push(orderData);
         });
       });
+
+      console.log('💾 총 저장할 주문 수:', ordersToSave.length);
+      console.log('📤 API로 전송할 데이터:', ordersToSave);
 
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'POST',
@@ -697,26 +757,33 @@ export default function InputTab() {
 
   // 테이블에서 주문 삭제 (DB에서 삭제)
   const handleDeleteOrder = async (orderId: string) => {
+    console.log('🗑️ 삭제 버튼 클릭됨, 주문 ID:', orderId);
+
     if (!confirm('이 주문을 삭제하시겠습니까?')) {
+      console.log('❌ 사용자가 삭제 취소');
       return;
     }
 
     try {
-      const response = await fetch(`/api/integrated-orders/${orderId}`, {
+      console.log('📤 삭제 API 호출 시작...');
+      const response = await fetch(`/api/integrated-orders?id=${orderId}`, {
         method: 'DELETE',
       });
 
       const result = await response.json();
+      console.log('📥 삭제 API 응답:', result);
 
       if (result.success) {
         alert('주문이 삭제되었습니다.');
+        console.log('✅ 주문 삭제 성공, 목록 다시 로드 시작...');
         // DB에서 저장된 주문 다시 로드
         await loadSavedOrders();
       } else {
+        console.error('❌ 삭제 실패:', result.error);
         alert(`삭제 실패: ${result.error}`);
       }
     } catch (error) {
-      console.error('주문 삭제 실패:', error);
+      console.error('❌ 주문 삭제 실패:', error);
       alert('주문 삭제 중 오류가 발생했습니다.');
     }
   };
@@ -731,7 +798,10 @@ export default function InputTab() {
       readOnly: true,
       renderer: (value: any, row: any) => (
         <button
-          onClick={() => handleDeleteOrder(row.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDeleteOrder(row.id);
+          }}
           className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
           title="삭제"
         >
@@ -780,17 +850,101 @@ export default function InputTab() {
     });
   }, [savedOrders]);
 
+  // 단골고객 조회
+  const fetchRegularCustomers = async (searchKeyword: string = '') => {
+    try {
+      const params = new URLSearchParams({
+        customerType: 'regular',
+      });
+      if (searchKeyword) {
+        params.append('searchKeyword', searchKeyword);
+      }
+
+      const response = await fetch(`/api/customers?${params}`);
+      const result = await response.json();
+
+      if (result.success) {
+        setRegularCustomers(result.data);
+      }
+    } catch (error) {
+      console.error('단골고객 조회 오류:', error);
+    }
+  };
+
+  // 단골고객 선택 시 정보 자동 입력
+  const handleSelectCustomer = (customer: any) => {
+    const sectionId = showCustomerSelectModal.sectionId;
+    if (!sectionId) return;
+
+    // 주문자 정보에서 호출된 경우
+    if (sectionId === 'buyer') {
+      setFormData({
+        ...formData,
+        buyer_name: customer.name,
+        buyer_phone: customer.phone,
+        recipientSections: formData.recipientSections.map((section, index) => {
+          // 첫 번째 섹션에 고객의 배송지 정보 자동 입력
+          if (index === 0) {
+            let fullAddress = '';
+            if (customer.road_address) {
+              fullAddress = customer.road_address;
+            }
+            return {
+              ...section,
+              recipient_name: customer.recipient_name || customer.name,
+              recipient_phone: customer.recipient_phone || customer.phone,
+              recipient_address: fullAddress,
+              sameAsBuyer: false,
+            };
+          }
+          return section;
+        }),
+      });
+    } else {
+      // 수령인 정보 업데이트 (기존 로직)
+      updateRecipientSection(sectionId, 'recipient_name', customer.recipient_name || customer.name);
+      updateRecipientSection(sectionId, 'recipient_phone', customer.recipient_phone || customer.phone);
+
+      // 주소 조합
+      let fullAddress = '';
+      if (customer.road_address) {
+        fullAddress = customer.road_address;
+      }
+      updateRecipientSection(sectionId, 'recipient_address', fullAddress);
+    }
+
+    // 모달 닫기
+    setShowCustomerSelectModal({ show: false, sectionId: null });
+    setCustomerSearchKeyword('');
+  };
+
+  // 모달이 열릴 때 단골고객 목록 조회
+  useEffect(() => {
+    if (showCustomerSelectModal.show) {
+      fetchRegularCustomers();
+    }
+  }, [showCustomerSelectModal.show]);
+
   return (
     <div className="space-y-4 pb-20">
       {/* 하나의 큰 섹션으로 묶기 */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 relative">
-        {/* 초기화 버튼 - 우측 상단 */}
-        <button
-          onClick={resetForm}
-          className="absolute top-4 right-4 px-3 py-1.5 text-xs border border-gray-300 bg-white text-gray-700 rounded hover:bg-gray-50"
-        >
-          초기화
-        </button>
+        {/* 우측 상단 버튼들 */}
+        <div className="absolute top-4 right-4 flex gap-2">
+          <button
+            onClick={openCustomerModalForBuyer}
+            className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+            type="button"
+          >
+            단골고객 불러오기
+          </button>
+          <button
+            onClick={resetForm}
+            className="px-3 py-1.5 text-xs border border-gray-300 bg-white text-gray-700 rounded hover:bg-gray-50"
+          >
+            초기화
+          </button>
+        </div>
 
         {/* 섹션 1: 주문자 정보 */}
         <div className="mb-6">
@@ -859,6 +1013,17 @@ export default function InputTab() {
                 </button>
               )}
             </div>
+          </div>
+
+          {/* 단골고객 선택 버튼 */}
+          <div className="mb-2">
+            <button
+              onClick={() => setShowCustomerSelectModal({ show: true, sectionId: section.id })}
+              className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+              type="button"
+            >
+              단골고객 선택
+            </button>
           </div>
 
           {/* 라벨 행 - 전체 */}
@@ -1291,6 +1456,88 @@ export default function InputTab() {
               </div>
             </>
           )}
+        </div>
+      </Modal>
+
+      {/* 단골고객 선택 모달 */}
+      <Modal
+        isOpen={showCustomerSelectModal.show}
+        onClose={() => {
+          setShowCustomerSelectModal({ show: false, sectionId: null });
+          setCustomerSearchKeyword('');
+        }}
+        title="단골고객 선택"
+      >
+        <div className="space-y-4">
+          {/* 검색 */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={customerSearchKeyword}
+              onChange={(e) => setCustomerSearchKeyword(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  fetchRegularCustomers(customerSearchKeyword);
+                }
+              }}
+              placeholder="이름, 전화번호 검색"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded"
+            />
+            <button
+              onClick={() => fetchRegularCustomers(customerSearchKeyword)}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              검색
+            </button>
+          </div>
+
+          {/* 고객 목록 */}
+          <div className="max-h-96 overflow-auto border border-gray-200 rounded">
+            {regularCustomers.length === 0 ? (
+              <p className="text-center text-gray-500 py-10">등록된 단골고객이 없습니다.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2 text-left">이름</th>
+                    <th className="px-4 py-2 text-left">전화번호</th>
+                    <th className="px-4 py-2 text-left">수령인</th>
+                    <th className="px-4 py-2 text-left">배송지</th>
+                    <th className="px-4 py-2 text-center">선택</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {regularCustomers.map((customer) => (
+                    <tr key={customer.id} className="border-b hover:bg-gray-50">
+                      <td className="px-4 py-2">{customer.name}</td>
+                      <td className="px-4 py-2">{customer.phone}</td>
+                      <td className="px-4 py-2">{customer.recipient_name || '-'}</td>
+                      <td className="px-4 py-2">
+                        {customer.road_address ? (
+                          <div className="text-xs">
+                            <div>{customer.road_address}</div>
+                            {customer.detail_address && (
+                              <div className="text-gray-500">{customer.detail_address}</div>
+                            )}
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        <button
+                          onClick={() => handleSelectCustomer(customer)}
+                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
+                        >
+                          선택
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       </Modal>
     </div>
