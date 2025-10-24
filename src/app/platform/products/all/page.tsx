@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Grid, List, TrendingUp, Calendar, Package, ChevronDown, ChevronUp } from 'lucide-react';
+import { Grid, List, TrendingUp, Calendar, Package, ChevronDown, ChevronUp, Image, FileImage, Eye } from 'lucide-react';
 import ProductCard from './components/ProductCard';
 import ProductGrid from './components/ProductGrid';
 import ProductDetailModal from './components/ProductDetailModal';
@@ -39,6 +39,7 @@ export default function AllProductsPage() {
   const [showPriceChart, setShowPriceChart] = useState(false);
   const [priceChartProduct, setPriceChartProduct] = useState<OptionProduct | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory2, setSelectedCategory2] = useState<string>('all'); // 카테고리2 필터
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [supplyStatuses, setSupplyStatuses] = useState<Array<{code: string; name: string; color: string; display_order: number}>>([]);
   const [showImageGallery, setShowImageGallery] = useState(false);
@@ -203,6 +204,10 @@ export default function AllProductsPage() {
       console.log('조회된 상품 수:', productsWithThumbnail.length);
       console.log('옵션상품 대표이미지 수:', optionImageMap.size);
       console.log('품목 대표이미지 수:', newCategoryImageMap.size);
+      console.log('🎯 시즌 날짜 샘플:', {
+        season_start: productsWithThumbnail[0]?.season_start_date,
+        season_end: productsWithThumbnail[0]?.season_end_date
+      });
       console.log('샘플 상품:', {
         option_name: productsWithThumbnail[0]?.option_name,
         category_4: productsWithThumbnail[0]?.category_4,
@@ -229,10 +234,26 @@ export default function AllProductsPage() {
     setShowPriceChart(true);
   };
 
-  const filteredProducts = products.filter(product =>
-    product.option_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.option_code?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // 카테고리2 필터링 적용
+  const filteredProducts = products.filter(product => {
+    // 검색어 필터
+    const matchesSearch = product.option_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.option_code?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // 카테고리2 필터
+    const matchesCategory = selectedCategory2 === 'all' ||
+      (product as any).category_2 === selectedCategory2;
+
+    return matchesSearch && matchesCategory;
+  });
+
+  // 카테고리2 목록 추출 (중복 제거)
+  const category2List = Array.from(new Set(
+    products
+      .map(p => (p as any).category_2)
+      .filter(Boolean)
+      .sort()
+  ));
 
   const toggleGroup = (itemName: string) => {
     const newExpanded = new Set(expandedGroups);
@@ -301,6 +322,33 @@ export default function AllProductsPage() {
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* 카테고리2 필터 */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedCategory2('all')}
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                selectedCategory2 === 'all'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              전체
+            </button>
+            {category2List.map((category2) => (
+              <button
+                key={category2}
+                onClick={() => setSelectedCategory2(category2)}
+                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                  selectedCategory2 === category2
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {category2}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -396,13 +444,13 @@ export default function AllProductsPage() {
                     return (
                       <div
                         key={itemName}
-                        className={`bg-white rounded-lg shadow-sm overflow-hidden ${
+                        className={`bg-white rounded-lg shadow-sm ${
                           isShipping ? 'animate-shipping' : 'border border-gray-200'
                         }`}
                       >
                         {/* 그룹 헤더 */}
                         <div
-                          className="px-6 py-2 hover:bg-gray-50 transition-colors cursor-pointer"
+                          className="px-6 py-2 hover:bg-gray-50 transition-colors cursor-pointer overflow-visible relative"
                           onClick={() => toggleGroup(itemName)}
                         >
                           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
@@ -435,23 +483,8 @@ export default function AllProductsPage() {
                               </div>
                             </div>
 
-                            {/* 중앙: 발송기한 + 시즌밴드 */}
+                            {/* 중앙: 시즌밴드 */}
                             <div className="text-left flex items-center gap-6">
-                              {/* 발송기한 */}
-                              <div className="text-gray-600 flex-shrink-0" style={{ fontSize: '13px', minWidth: '100px' }}>
-                                {(() => {
-                                  const shippingDeadline = (groupProducts[0] as any).shipping_deadline;
-                                  if (shippingDeadline) {
-                                    return (
-                                      <>
-                                        발송기한 <span className="font-medium">{shippingDeadline}일</span>
-                                      </>
-                                    );
-                                  }
-                                  return <span>&nbsp;</span>;
-                                })()}
-                              </div>
-
                               {/* 시즌밴드 */}
                               <div className="flex-1 max-w-xs">
                                 <SeasonBand
@@ -466,16 +499,17 @@ export default function AllProductsPage() {
                             {/* 배지 */}
                             <div className="flex items-center gap-1.5">
                               {(groupProducts[0] as any).is_best && (
-                                <span className="px-2 py-0.5 text-xs font-normal border border-gray-400 text-gray-600 rounded">
+                                <span className="px-1.5 py-0.5 text-[11px] font-normal border border-gray-400 text-gray-600 rounded">
                                   BEST
                                 </span>
                               )}
                               {(groupProducts[0] as any).is_recommended && (
-                                <span className="px-2 py-0.5 text-xs font-normal border border-gray-400 text-gray-600 rounded">
+                                <span className="px-1.5 py-0.5 text-[11px] font-normal border border-gray-400 text-gray-600 rounded">
                                   추천
                                 </span>
                               )}
-                              {(groupProducts[0] as any).has_image && (
+                              {/* 상세보기 버튼 */}
+                              {((groupProducts[0] as any).has_image || (groupProducts[0] as any).has_detail_page) && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -486,40 +520,47 @@ export default function AllProductsPage() {
                                     });
                                     setShowImageGallery(true);
                                   }}
-                                  className="px-2 py-0.5 text-xs font-normal border border-gray-400 text-gray-600 rounded hover:bg-gray-100 transition-colors"
+                                  className="flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-normal border border-gray-400 text-gray-600 rounded hover:bg-gray-100 transition-colors"
                                 >
-                                  이미지
+                                  <Eye className="w-3 h-3" />
+                                  상세보기
                                 </button>
                               )}
+                              {/* 상태별 배지 (품목 마스터 상태 표시) */}
+                              {(() => {
+                                const categoryStatus = (groupProducts[0] as any).category_supply_status;
+
+                                if (!categoryStatus) return null;
+
+                                // name으로 비교 (products_master의 supply_status와 매칭)
+                                const statusInfo = supplyStatuses.find(s => s.name === categoryStatus);
+                                if (!statusInfo) return null;
+
+                                return (
+                                  <span
+                                    className="px-1.5 py-0.5 text-[11px] font-normal border rounded"
+                                    style={{
+                                      borderColor: statusInfo.color,
+                                      color: statusInfo.color
+                                    }}
+                                  >
+                                    {statusInfo.name}
+                                  </span>
+                                );
+                              })()}
+                              {/* 이미지 아이콘 */}
+                              {(groupProducts[0] as any).has_image && (
+                                <div className="text-gray-600" title="일반 이미지 있음">
+                                  <Image className="w-4 h-4" />
+                                </div>
+                              )}
+                              {/* 상세페이지 이미지 아이콘 */}
                               {(groupProducts[0] as any).has_detail_page && (
-                                <span className="px-2 py-0.5 text-xs font-normal border border-gray-400 text-gray-600 rounded">
-                                  상세페이지
-                                </span>
+                                <div className="text-blue-600" title="상세페이지 이미지 있음">
+                                  <FileImage className="w-4 h-4" />
+                                </div>
                               )}
                             </div>
-
-                            {/* 상태별 배지 (품목 마스터 상태 표시) */}
-                            {(() => {
-                              const categoryStatus = (groupProducts[0] as any).category_supply_status;
-
-                              if (!categoryStatus) return null;
-
-                              // name으로 비교 (products_master의 supply_status와 매칭)
-                              const statusInfo = supplyStatuses.find(s => s.name === categoryStatus);
-                              if (!statusInfo) return null;
-
-                              return (
-                                <span
-                                  className="px-2 py-0.5 text-xs font-normal border rounded"
-                                  style={{
-                                    borderColor: statusInfo.color,
-                                    color: statusInfo.color
-                                  }}
-                                >
-                                  {statusInfo.name}
-                                </span>
-                              );
-                            })()}
                             {/* 기존 옵션상품별 상태 배지 (주석 처리) */}
                             <div className="hidden flex gap-2">
                               {Object.entries(
@@ -569,7 +610,7 @@ export default function AllProductsPage() {
 
                         {/* 그룹 컨텐츠 */}
                         {isExpanded && (
-                          <div className="border-t border-gray-200 bg-gray-50 p-4 pl-12">
+                          <div className="border-t border-gray-200 bg-gray-50 p-4 pl-12 overflow-hidden">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                               {groupProducts.map((product) => (
                                 <ProductCard
@@ -659,13 +700,13 @@ export default function AllProductsPage() {
                     return (
                       <div
                         key={itemName}
-                        className={`bg-white rounded-lg shadow-sm overflow-hidden ${
+                        className={`bg-white rounded-lg shadow-sm ${
                           isShipping ? 'animate-shipping' : 'border border-gray-200'
                         }`}
                       >
                         {/* 그룹 헤더 */}
                         <div
-                          className="px-6 py-2 hover:bg-gray-50 transition-colors cursor-pointer"
+                          className="px-6 py-2 hover:bg-gray-50 transition-colors cursor-pointer overflow-visible relative"
                           onClick={() => toggleGroup(itemName)}
                         >
                           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
@@ -698,23 +739,8 @@ export default function AllProductsPage() {
                               </div>
                             </div>
 
-                            {/* 중앙: 발송기한 + 시즌밴드 */}
+                            {/* 중앙: 시즌밴드 */}
                             <div className="text-left flex items-center gap-6">
-                              {/* 발송기한 */}
-                              <div className="text-gray-600 flex-shrink-0" style={{ fontSize: '13px', minWidth: '100px' }}>
-                                {(() => {
-                                  const shippingDeadline = (groupProducts[0] as any).shipping_deadline;
-                                  if (shippingDeadline) {
-                                    return (
-                                      <>
-                                        발송기한 <span className="font-medium">{shippingDeadline}일</span>
-                                      </>
-                                    );
-                                  }
-                                  return <span>&nbsp;</span>;
-                                })()}
-                              </div>
-
                               {/* 시즌밴드 */}
                               <div className="flex-1 max-w-xs">
                                 <SeasonBand
@@ -729,16 +755,29 @@ export default function AllProductsPage() {
                             {/* 배지 */}
                             <div className="flex items-center gap-1.5">
                               {(groupProducts[0] as any).is_best && (
-                                <span className="px-2 py-0.5 text-xs font-normal border border-gray-400 text-gray-600 rounded">
+                                <span className="px-1.5 py-0.5 text-[11px] font-normal border border-gray-400 text-gray-600 rounded">
                                   BEST
                                 </span>
                               )}
                               {(groupProducts[0] as any).is_recommended && (
-                                <span className="px-2 py-0.5 text-xs font-normal border border-gray-400 text-gray-600 rounded">
+                                <span className="px-1.5 py-0.5 text-[11px] font-normal border border-gray-400 text-gray-600 rounded">
                                   추천
                                 </span>
                               )}
+                              {/* 이미지 아이콘 */}
                               {(groupProducts[0] as any).has_image && (
+                                <div className="text-gray-600" title="일반 이미지 있음">
+                                  <Image className="w-4 h-4" />
+                                </div>
+                              )}
+                              {/* 상세페이지 이미지 아이콘 */}
+                              {(groupProducts[0] as any).has_detail_page && (
+                                <div className="text-blue-600" title="상세페이지 이미지 있음">
+                                  <FileImage className="w-4 h-4" />
+                                </div>
+                              )}
+                              {/* 상세보기 버튼 */}
+                              {((groupProducts[0] as any).has_image || (groupProducts[0] as any).has_detail_page) && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -749,19 +788,15 @@ export default function AllProductsPage() {
                                     });
                                     setShowImageGallery(true);
                                   }}
-                                  className="px-2 py-0.5 text-xs font-normal border border-gray-400 text-gray-600 rounded hover:bg-gray-100 transition-colors"
+                                  className="flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-normal border border-gray-400 text-gray-600 rounded hover:bg-gray-100 transition-colors"
                                 >
-                                  이미지
+                                  <Eye className="w-3 h-3" />
+                                  상세보기
                                 </button>
-                              )}
-                              {(groupProducts[0] as any).has_detail_page && (
-                                <span className="px-2 py-0.5 text-xs font-normal border border-gray-400 text-gray-600 rounded">
-                                  상세페이지
-                                </span>
                               )}
                             </div>
 
-                            {/* 상태별 배지 (품목의 원물상태 표시) */}
+                            {/* 상태별 배지 (품목 마스터 상태 표시) */}
                             {(() => {
                               const categoryStatus = (groupProducts[0] as any).category_supply_status;
                               if (!categoryStatus) return null;
@@ -771,8 +806,11 @@ export default function AllProductsPage() {
 
                               return (
                                 <span
-                                  className="px-2 py-0.5 font-medium rounded-full text-white"
-                                  style={{ backgroundColor: statusInfo.color, fontSize: '13px' }}
+                                  className="px-1.5 py-0.5 text-[11px] font-normal border rounded"
+                                  style={{
+                                    borderColor: statusInfo.color,
+                                    color: statusInfo.color
+                                  }}
                                 >
                                   {statusInfo.name}
                                 </span>

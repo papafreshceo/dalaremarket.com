@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Upload, Search, Filter, Download, Trash2, Edit2, Eye, EyeOff, Image as ImageIcon, Grid, List, Copy, Check, Folder, ChevronRight, ChevronDown, Code, ArrowUp, ArrowDown, X, Plus } from 'lucide-react';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
+import { compressImages } from '@/lib/image-compression';
 
 interface CloudinaryImage {
   id: string;
@@ -22,6 +23,7 @@ interface CloudinaryImage {
   is_public: boolean;
   is_downloadable: boolean;
   is_representative?: boolean;
+  image_type?: 'general' | 'detail_page';
   view_count: number;
   download_count: number;
   created_at: string;
@@ -54,6 +56,7 @@ export default function MediaManagementPage() {
 
   // 필터 상태
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedImageType, setSelectedImageType] = useState<'all' | 'general' | 'detail_page'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
@@ -73,6 +76,8 @@ export default function MediaManagementPage() {
     tags: '',
     is_public: true, // 공개 여부 (플랫폼 사용자에게 보임)
     is_downloadable: true, // 다운로드 가능 여부 (플랫폼 사용자가 다운로드 가능)
+    overwrite: true, // 덮어쓰기 옵션 (기본값: true)
+    image_type: 'general' as 'general' | 'detail_page', // 이미지 타입
     raw_material_id: '',
     option_product_id: '',
     category_4_id: '',
@@ -266,20 +271,33 @@ export default function MediaManagementPage() {
 
       const uploadedUrls: string[] = [];
 
+      // 이미지 파일 압축 (10MB 초과 시 자동 압축)
+      console.log('이미지 압축 시작...');
+      const compressedFiles = await compressImages(uploadForm.files, {
+        maxWidth: 1920,
+        maxHeight: 1920,
+        quality: 0.85,
+        maxSizeMB: 10,
+      });
+      console.log('이미지 압축 완료');
+
       // 여러 파일을 순차적으로 업로드
-      for (let i = 0; i < uploadForm.files.length; i++) {
-        const file = uploadForm.files[i];
-        setUploadProgress({ current: i + 1, total: uploadForm.files.length });
+      for (let i = 0; i < compressedFiles.length; i++) {
+        const file = compressedFiles[i];
+        const originalFile = uploadForm.files[i];
+        setUploadProgress({ current: i + 1, total: compressedFiles.length });
 
         const formData = new FormData();
         formData.append('file', file);
         formData.append('category', uploadForm.category);
-        // 파일이 여러개일 경우 각 파일명을 제목으로 사용
-        formData.append('title', uploadForm.files.length === 1 ? uploadForm.title : file.name);
+        // 파일이 여러개일 경우 각 원본 파일명을 제목으로 사용
+        formData.append('title', uploadForm.files.length === 1 ? uploadForm.title : originalFile.name);
         formData.append('description', uploadForm.description);
         formData.append('tags', uploadForm.tags);
         formData.append('is_public', uploadForm.is_public.toString());
         formData.append('is_downloadable', uploadForm.is_downloadable.toString());
+        formData.append('overwrite', (uploadForm.overwrite ?? true).toString()); // 덮어쓰기 옵션 (기본값: true)
+        formData.append('image_type', uploadForm.image_type || 'general'); // 이미지 타입
         formData.append('upload_type', uploadType);
         formData.append('root_folder', rootFolder); // 루트 폴더 추가
 
@@ -296,26 +314,29 @@ export default function MediaManagementPage() {
           body: formData,
         });
 
-        const result = await response.json();
+        // 응답이 JSON이 아닐 경우 처리
+        let result;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          result = await response.json();
+        } else {
+          const text = await response.text();
+          console.error('서버 응답 오류 (HTML):', text.substring(0, 500));
+          throw new Error(`서버 오류가 발생했습니다. (상태 코드: ${response.status})`);
+        }
 
         console.log('업로드 응답:', response.status, result);
 
         if (result.success) {
           uploadedUrls.push(result.data.secure_url);
         } else {
-          // 중복 오류 처리
-          if (result.duplicate) {
-            const dupType = result.duplicate.type === 'hash' ? '동일한 내용의 파일' : '같은 이름의 파일';
-            const existingFile = result.duplicate.existingFile;
-            const message = `파일 "${file.name}":\n\n${dupType}이 이미 존재합니다.\n\n기존 파일: ${existingFile.filename}\n경로: ${existingFile.cloudinary_id}\n\n계속 업로드하시겠습니까?`;
-
-            if (!confirm(message)) {
-              // 업로드 중단
+          console.error('업로드 실패 상세:', result);
+          alert(`파일 "${originalFile.name}" 업로드 실패: ` + result.error);
+          // 오류 발생 시 계속 진행할지 물어봄
+          if (compressedFiles.length > 1 && i < compressedFiles.length - 1) {
+            if (!confirm('다음 파일을 계속 업로드하시겠습니까?')) {
               break;
             }
-          } else {
-            console.error('업로드 실패 상세:', result);
-            alert(`파일 "${file.name}" 업로드 실패: ` + result.error);
           }
         }
       }
@@ -360,6 +381,8 @@ export default function MediaManagementPage() {
       tags: '',
       is_public: true,
       is_downloadable: true,
+      overwrite: true, // 덮어쓰기 기본값
+      image_type: 'general', // 이미지 타입 기본값
       raw_material_id: '',
       option_product_id: '',
       category_4_id: '',
@@ -774,8 +797,43 @@ export default function MediaManagementPage() {
             </div>
           )}
 
-          {/* 전체 선택 버튼 */}
-          <div className="flex justify-end">
+          {/* 이미지 타입 필터 + 전체 선택 버튼 */}
+          <div className="flex justify-between items-center">
+            {/* 이미지 타입 필터 */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSelectedImageType('all')}
+                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                  selectedImageType === 'all'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                전체
+              </button>
+              <button
+                onClick={() => setSelectedImageType('general')}
+                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                  selectedImageType === 'general'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                일반 이미지
+              </button>
+              <button
+                onClick={() => setSelectedImageType('detail_page')}
+                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                  selectedImageType === 'detail_page'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                상세페이지
+              </button>
+            </div>
+
+            {/* 전체 선택 버튼 */}
             <button
               onClick={toggleSelectAll}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
@@ -785,7 +843,9 @@ export default function MediaManagementPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {images.map((image) => (
+            {images
+              .filter(image => selectedImageType === 'all' || image.image_type === selectedImageType)
+              .map((image) => (
               <div
                 key={image.id}
                 className={`bg-white rounded-lg shadow hover:shadow-lg transition-shadow overflow-hidden ${
@@ -810,11 +870,14 @@ export default function MediaManagementPage() {
                       onClick={(e) => e.stopPropagation()}
                     />
                   </div>
-                  <div className="absolute top-2 right-2 flex gap-1">
+                  <div className="absolute top-2 right-2 flex flex-col gap-1">
                     {image.is_public ? (
                       <span className="bg-green-500 text-white px-2 py-1 rounded text-xs">공개</span>
                     ) : (
                       <span className="bg-gray-500 text-white px-2 py-1 rounded text-xs">비공개</span>
+                    )}
+                    {image.image_type === 'detail_page' && (
+                      <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium">상세페이지</span>
                     )}
                   </div>
                 </div>
@@ -898,7 +961,9 @@ export default function MediaManagementPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {images.map((image) => (
+              {images
+                .filter(image => selectedImageType === 'all' || image.image_type === selectedImageType)
+                .map((image) => (
                 <tr key={image.id} className="hover:bg-gray-50">
                   {/* 선택 라디오 버튼 */}
                   <td className="px-2 py-3">
@@ -1289,9 +1354,42 @@ export default function MediaManagementPage() {
                     )}
                   </div>
 
+                  {/* 이미지 타입 (일반 / 상세페이지) */}
+                  {(uploadType === 'category_4' || uploadType === 'option_product') && (
+                    <div>
+                      <label className="block text-[14px] font-medium text-gray-700 mb-2">이미지 용도</label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="image_type"
+                            value="general"
+                            checked={uploadForm.image_type === 'general'}
+                            onChange={(e) => setUploadForm({ ...uploadForm, image_type: e.target.value as 'general' | 'detail_page' })}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-[14px]">일반 이미지</span>
+                          <span className="text-[12px] text-gray-500">(썸네일, 대표이미지 등)</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="image_type"
+                            value="detail_page"
+                            checked={uploadForm.image_type === 'detail_page'}
+                            onChange={(e) => setUploadForm({ ...uploadForm, image_type: e.target.value as 'general' | 'detail_page' })}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-[14px] text-blue-600 font-medium">상세페이지</span>
+                          <span className="text-[12px] text-gray-500">(셀러 다운로드용)</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
                   {/* 이미지 유형 */}
                   <div>
-                    <label className="block text-[14px] font-medium text-gray-700 mb-2">이미지 유형</label>
+                    <label className="block text-[14px] font-medium text-gray-700 mb-2">이미지 카테고리</label>
                     <select
                       value={uploadForm.category}
                       onChange={(e) => setUploadForm({ ...uploadForm, category: e.target.value })}
@@ -1351,7 +1449,7 @@ export default function MediaManagementPage() {
                         <span className="ml-2 text-[12px] text-gray-500">(전용 폴더는 자동으로 비공개/다운로드 불가)</span>
                       )}
                     </label>
-                    <div className="flex gap-4">
+                    <div className="flex flex-wrap gap-4">
                       <label className={`flex items-center gap-2 whitespace-nowrap ${rootFolder === 'papafresh' ? 'opacity-50' : ''}`}>
                         <input
                           type="checkbox"
@@ -1374,6 +1472,17 @@ export default function MediaManagementPage() {
                         />
                         <span className="text-[14px]">
                           다운로드 가능 (플랫폼 사용자가 다운로드 가능)
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-2 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={uploadForm.overwrite ?? true}
+                          onChange={(e) => setUploadForm({ ...uploadForm, overwrite: e.target.checked })}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-[14px] text-orange-600 font-medium">
+                          중복 파일 덮어쓰기
                         </span>
                       </label>
                     </div>

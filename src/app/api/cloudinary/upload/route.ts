@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
     const tags = formData.get('tags') as string; // 콤마로 구분된 태그
     const isPublic = formData.get('is_public') === 'true';
     const isDownloadable = formData.get('is_downloadable') === 'true';
+    const overwrite = formData.get('overwrite') === 'true'; // 덮어쓰기 옵션
+    const imageType = (formData.get('image_type') as string) || 'general'; // 이미지 타입
 
     // 업로드 타입별 ID 정보
     const uploadType = formData.get('upload_type') as string;
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
       .eq('file_hash', fileHash)
       .maybeSingle();
 
-    if (hashDuplicate) {
+    if (hashDuplicate && !overwrite) {
       return NextResponse.json(
         {
           success: false,
@@ -62,6 +64,13 @@ export async function POST(request: NextRequest) {
         },
         { status: 409 }
       );
+    }
+
+    // 덮어쓰기 모드: 해시 중복 파일 삭제
+    if (hashDuplicate && overwrite) {
+      console.log('덮어쓰기 모드: 해시 중복 파일 삭제', hashDuplicate.cloudinary_id);
+      await cloudinary.uploader.destroy(hashDuplicate.cloudinary_id);
+      await supabase.from('cloudinary_images').delete().eq('id', hashDuplicate.id);
     }
 
     // Cloudinary 폴더 경로 결정
@@ -123,7 +132,7 @@ export async function POST(request: NextRequest) {
       .ilike('cloudinary_id', `${folderPath}/%`)
       .maybeSingle();
 
-    if (filenameDuplicate) {
+    if (filenameDuplicate && !overwrite) {
       return NextResponse.json(
         {
           success: false,
@@ -136,6 +145,13 @@ export async function POST(request: NextRequest) {
         },
         { status: 409 }
       );
+    }
+
+    // 덮어쓰기 모드: 파일명 중복 파일 삭제
+    if (filenameDuplicate && overwrite) {
+      console.log('덮어쓰기 모드: 파일명 중복 파일 삭제', filenameDuplicate.cloudinary_id);
+      await cloudinary.uploader.destroy(filenameDuplicate.cloudinary_id);
+      await supabase.from('cloudinary_images').delete().eq('id', filenameDuplicate.id);
     }
 
     // Cloudinary에 업로드 (이미지 최적화 옵션 포함)
@@ -183,6 +199,7 @@ export async function POST(request: NextRequest) {
       tags: tags ? tags.split(',').map(t => t.trim()) : [],
       is_public: isPublic,
       is_downloadable: isDownloadable,
+      image_type: imageType, // 이미지 타입 추가
     };
 
     console.log('=== 이미지 업로드 - 대표이미지 설정 ===');

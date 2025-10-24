@@ -296,17 +296,37 @@ export default function ProductsMasterPage() {
     },
     {
       key: 'has_image',
-      title: '이미지제공',
+      title: '이미지Y/N',
       width: 100,
       className: 'text-center',
-      type: 'checkbox' as const
+      type: 'checkbox' as const,
+      renderer: (value: any) => (
+        <div className="flex items-center justify-center gap-2">
+          <input type="checkbox" checked={!!value} readOnly className="w-4 h-4" />
+          {value && (
+            <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded border border-gray-300">
+              이미지
+            </span>
+          )}
+        </div>
+      )
     },
     {
       key: 'has_detail_page',
-      title: '상세페이지',
-      width: 100,
+      title: '상세페이지Y/N',
+      width: 120,
       className: 'text-center',
-      type: 'checkbox' as const
+      type: 'checkbox' as const,
+      renderer: (value: any) => (
+        <div className="flex items-center justify-center gap-2">
+          <input type="checkbox" checked={!!value} readOnly className="w-4 h-4" />
+          {value && (
+            <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded border border-blue-300">
+              상세페이지
+            </span>
+          )}
+        </div>
+      )
     },
     { key: 'notes', title: '비고', width: 200, className: 'text-center' }
   ]

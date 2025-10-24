@@ -4,6 +4,21 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, Button, Input, Select, Badge, Modal, Tabs } from '@/components/ui'
+import { Loader2, ArrowRight } from 'lucide-react'
+
+type AnimationStyle =
+  | 'pulse_dot'           // 옵션 1: 펄스 도트
+  | 'rotating_ring'       // 옵션 2: 회전 링
+  | 'slide_bar'           // 옵션 3: 슬라이드 바
+  | 'pulse_icon'          // 옵션 4: 펄스 아이콘
+  | 'wave_effect'         // 옵션 5: 파동 효과
+  | 'bouncing_dots'       // 옵션 6: 깜박이는 도트 3개
+  | 'icon_only'           // 옵션 7: 아이콘만
+  | 'pulse_background'    // 옵션 8: 펄스 배경
+  | 'spinner'             // 옵션 9: 스피너
+  | 'minimal_dot'         // 옵션 10: 미니멀 도트
+  | 'arrow_flow'          // 옵션 11: 화살표 이동
+  | 'icon_with_dot';      // 옵션 12: 아이콘+도트
 
 interface SupplyStatus {
   id: string
@@ -13,6 +28,7 @@ interface SupplyStatus {
   color: string
   display_order: number
   is_active: boolean
+  animation_style?: AnimationStyle
   created_at?: string
   updated_at?: string
 }
@@ -29,10 +45,147 @@ export default function SupplyStatusSettingsPage() {
     name: '',
     color: '#10B981',
     display_order: 0,
-    is_active: true
+    is_active: true,
+    animation_style: 'minimal_dot'
   })
 
   const supabase = createClient()
+
+  // 애니메이션 스타일 옵션
+  const animationOptions = [
+    { value: 'pulse_dot', label: '펄스 도트' },
+    { value: 'rotating_ring', label: '회전 링' },
+    { value: 'slide_bar', label: '슬라이드 바' },
+    { value: 'pulse_icon', label: '펄스 아이콘' },
+    { value: 'wave_effect', label: '파동 효과' },
+    { value: 'bouncing_dots', label: '도트 3개' },
+    { value: 'icon_only', label: '아이콘만' },
+    { value: 'pulse_background', label: '펄스 배경' },
+    { value: 'spinner', label: '스피너' },
+    { value: 'minimal_dot', label: '미니멀 도트' },
+    { value: 'arrow_flow', label: '화살표' },
+    { value: 'icon_with_dot', label: '아이콘+도트' },
+  ]
+
+  // 애니메이션 미리보기 렌더링
+  const renderAnimationPreview = (style: string, color: string) => {
+    const baseColor = color || '#10B981';
+
+    switch (style) {
+      case 'pulse_dot':
+        return (
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <div className="w-2 h-2 rounded-full animate-ping absolute" style={{ backgroundColor: baseColor, opacity: 0.4 }} />
+              <div className="w-2 h-2 rounded-full relative" style={{ backgroundColor: baseColor }} />
+            </div>
+            <span className="text-xs" style={{ color: baseColor }}>샘플</span>
+          </div>
+        );
+      case 'rotating_ring':
+        return (
+          <div className="flex items-center gap-2">
+            <div className="relative w-4 h-4">
+              <div className="absolute inset-0 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: `${baseColor} transparent transparent transparent` }} />
+            </div>
+            <span className="text-xs" style={{ color: baseColor }}>샘플</span>
+          </div>
+        );
+      case 'slide_bar':
+        return (
+          <div className="flex items-center gap-2">
+            <div className="relative w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div className="absolute h-full w-1/2 rounded-full animate-slide" style={{ backgroundColor: baseColor }} />
+            </div>
+            <span className="text-xs" style={{ color: baseColor }}>샘플</span>
+          </div>
+        );
+      case 'pulse_icon':
+        return (
+          <div className="flex items-center gap-2">
+            <div className="animate-pulse">
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: baseColor }} />
+            </div>
+            <span className="text-xs" style={{ color: baseColor }}>샘플</span>
+          </div>
+        );
+      case 'wave_effect':
+        return (
+          <div className="flex items-center gap-2">
+            <div className="relative w-4 h-4 flex items-center justify-center">
+              <div className="absolute w-full h-full rounded-full animate-ping" style={{ backgroundColor: baseColor, opacity: 0.3 }} />
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: baseColor }} />
+            </div>
+            <span className="text-xs" style={{ color: baseColor }}>샘플</span>
+          </div>
+        );
+      case 'bouncing_dots':
+        return (
+          <div className="flex items-center gap-2">
+            <div className="flex gap-0.5">
+              <div className="w-1 h-1 rounded-full animate-bounce" style={{ backgroundColor: baseColor, animationDelay: '0s' }} />
+              <div className="w-1 h-1 rounded-full animate-bounce" style={{ backgroundColor: baseColor, animationDelay: '0.2s' }} />
+              <div className="w-1 h-1 rounded-full animate-bounce" style={{ backgroundColor: baseColor, animationDelay: '0.4s' }} />
+            </div>
+            <span className="text-xs" style={{ color: baseColor }}>샘플</span>
+          </div>
+        );
+      case 'icon_only':
+        return (
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded" style={{ backgroundColor: baseColor }} />
+            <span className="text-xs" style={{ color: baseColor }}>샘플</span>
+          </div>
+        );
+      case 'pulse_background':
+        return (
+          <div className="px-2 py-0.5 rounded-full animate-pulse" style={{ backgroundColor: `${baseColor}20` }}>
+            <span className="text-xs font-medium" style={{ color: baseColor }}>샘플</span>
+          </div>
+        );
+      case 'spinner':
+        return (
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-3 h-3 animate-spin" style={{ color: baseColor }} />
+            <span className="text-xs" style={{ color: baseColor }}>샘플</span>
+          </div>
+        );
+      case 'minimal_dot':
+        return (
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <div className="w-1.5 h-1.5 rounded-full animate-ping absolute" style={{ backgroundColor: baseColor, opacity: 0.5 }} />
+              <div className="w-1.5 h-1.5 rounded-full relative" style={{ backgroundColor: baseColor }} />
+            </div>
+            <span className="text-xs" style={{ color: baseColor }}>샘플</span>
+          </div>
+        );
+      case 'arrow_flow':
+        return (
+          <div className="flex items-center gap-2">
+            <div className="flex gap-0.5 animate-pulse">
+              <ArrowRight className="w-2.5 h-2.5" style={{ color: baseColor }} />
+              <ArrowRight className="w-2.5 h-2.5" style={{ color: baseColor, opacity: 0.6 }} />
+              <ArrowRight className="w-2.5 h-2.5" style={{ color: baseColor, opacity: 0.3 }} />
+            </div>
+            <span className="text-xs" style={{ color: baseColor }}>샘플</span>
+          </div>
+        );
+      case 'icon_with_dot':
+        return (
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <div className="w-1.5 h-1.5 rounded-full animate-ping absolute -top-0.5 -right-0.5" style={{ backgroundColor: baseColor, opacity: 0.6 }} />
+              <div className="w-1.5 h-1.5 rounded-full absolute -top-0.5 -right-0.5" style={{ backgroundColor: baseColor }} />
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: baseColor, opacity: 0.7 }} />
+            </div>
+            <span className="text-xs" style={{ color: baseColor }}>샘플</span>
+          </div>
+        );
+      default:
+        return <span className="text-xs text-gray-400">미리보기 없음</span>;
+    }
+  }
 
   // 20가지 색상 옵션
   const colorOptions = [
@@ -438,41 +591,60 @@ export default function SupplyStatusSettingsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 색상 선택
               </label>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="flex flex-wrap gap-2">
                 {colorOptions.map(option => (
                   <button
                     key={option.value}
                     onClick={() => setFormData({...formData, color: option.value})}
-                    className={`p-3 rounded-lg border-2 transition-all ${
-                      formData.color === option.value 
-                        ? 'border-blue-500 scale-110' 
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${
+                      formData.color === option.value
+                        ? 'border-blue-500 ring-2 ring-blue-200'
+                        : 'border-white hover:border-gray-300'
+                    }`}
+                    style={{ backgroundColor: option.value }}
+                    title={option.label}
+                  />
+                ))}
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <div
+                  className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+                  style={{ backgroundColor: formData.color }}
+                />
+                <span className="text-xs text-gray-500">
+                  {colorOptions.find(o => o.value === formData.color)?.label || formData.color}
+                </span>
+              </div>
+            </div>
+
+            {/* 애니메이션 스타일 선택 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                애니메이션 스타일
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {animationOptions.map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => setFormData({...formData, animation_style: option.value as AnimationStyle})}
+                    className={`flex items-center justify-between p-2 rounded-lg border-2 transition-all ${
+                      formData.animation_style === option.value
+                        ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
-                    title={option.label}
                   >
-                    <div 
-                      className="w-full h-8 rounded"
-                      style={{ backgroundColor: option.value }}
-                    />
-                    <span className="text-xs mt-1 block text-center">
-                      {option.label}
-                    </span>
+                    <span className="text-xs font-medium text-gray-700">{option.label}</span>
+                    <div className="ml-2">
+                      {renderAnimationPreview(option.value, formData.color || '#10B981')}
+                    </div>
                   </button>
                 ))}
               </div>
-              <div className="mt-3 flex items-center gap-2">
-                <span className="text-sm text-gray-600">선택된 색상:</span>
-                <div 
-                  className="w-20 h-8 rounded border-2"
-                  style={{ 
-                    backgroundColor: formData.color,
-                    borderColor: formData.color
-                  }}
-                />
-                <span className="text-xs text-gray-500">{formData.color}</span>
+              <div className="mt-2 text-xs text-gray-500">
+                선택된 스타일: <span className="font-medium">{animationOptions.find(o => o.value === formData.animation_style)?.label}</span>
               </div>
             </div>
-            
+
             <Input
               label="표시 순서"
               type="number"
@@ -483,6 +655,19 @@ export default function SupplyStatusSettingsPage() {
           </div>
         </Modal>
       )}
+      <style jsx global>{`
+        @keyframes slide {
+          0%, 100% {
+            left: 0;
+          }
+          50% {
+            left: 50%;
+          }
+        }
+        .animate-slide {
+          animation: slide 1.5s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   )
 }
