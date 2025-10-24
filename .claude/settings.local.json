@@ -78,7 +78,8 @@
       "Bash(npx next dev)",
       "Bash(timeout 30 bash:*)",
       "Bash(curl:*)",
-      "Bash(timeout 10 bash:*)"
+      "Bash(timeout 10 bash:*)",
+      "Bash(timeout 10 curl:*)"
     ],
     "deny": [],
     "ask": []

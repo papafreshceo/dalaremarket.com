@@ -7,7 +7,7 @@ import { Card, Button, Input, Select, Badge, Modal, Tabs } from '@/components/ui
 
 interface SupplyStatus {
   id: string
-  status_type: 'raw_material' | 'optional_product'
+  status_type: 'product' | 'option_products'
   code: string
   name: string
   color: string
@@ -18,13 +18,13 @@ interface SupplyStatus {
 }
 
 export default function SupplyStatusSettingsPage() {
-  const [activeTab, setActiveTab] = useState<'raw_material' | 'optional_product'>('raw_material')
+  const [activeTab, setActiveTab] = useState<'product' | 'option_products'>('product')
   const [statuses, setStatuses] = useState<SupplyStatus[]>([])
   const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingStatus, setEditingStatus] = useState<SupplyStatus | null>(null)
   const [formData, setFormData] = useState<Partial<SupplyStatus>>({
-    status_type: 'raw_material',
+    status_type: 'product',
     code: '',
     name: '',
     color: '#10B981',
@@ -72,19 +72,19 @@ export default function SupplyStatusSettingsPage() {
 
     if (!error && data) {
       setStatuses(data)
-      // 원물 상태 기본값 체크 및 생성
-      if (data.length === 0 && activeTab === 'raw_material') {
-        await initializeRawMaterialStatuses()
+      // 품목 상태 기본값 체크 및 생성
+      if (data.length === 0 && activeTab === 'product') {
+        await initializeProductStatuses()
         fetchStatuses()
       }
     }
     setLoading(false)
   }
 
-  const initializeRawMaterialStatuses = async () => {
+  const initializeProductStatuses = async () => {
     const defaultStatuses = [
-      { 
-        status_type: 'raw_material',
+      {
+        status_type: 'product' as const,
         code: 'SHIPPING',
         name: '출하중',
         color: '#10B981',
@@ -92,7 +92,7 @@ export default function SupplyStatusSettingsPage() {
         is_active: true
       },
       {
-        status_type: 'raw_material',
+        status_type: 'product' as const,
         code: 'SEASON_END',
         name: '시즌종료',
         color: '#F59E0B',
@@ -113,15 +113,26 @@ export default function SupplyStatusSettingsPage() {
         status_type: activeTab
       }
 
+      console.log('💾 저장 시도:', dataToSave);
+
+      let result;
       if (editingStatus) {
-        await supabase
+        result = await supabase
           .from('supply_status_settings')
           .update(dataToSave)
           .eq('id', editingStatus.id)
       } else {
-        await supabase
+        result = await supabase
           .from('supply_status_settings')
           .insert([dataToSave])
+      }
+
+      console.log('💾 저장 결과:', result);
+
+      if (result.error) {
+        console.error('❌ 저장 오류:', result.error);
+        alert(`저장 실패: ${result.error.message}`);
+        return;
       }
 
       setModalOpen(false)
@@ -228,7 +239,7 @@ export default function SupplyStatusSettingsPage() {
 
   // 탭 변경 핸들러
   const handleTabChange = (value: string) => {
-    setActiveTab(value as 'raw_material' | 'optional_product')
+    setActiveTab(value as 'product' | 'option_products')
   }
 
   return (
@@ -237,7 +248,7 @@ export default function SupplyStatusSettingsPage() {
       <div>
         <div className="text-[16px] font-bold text-gray-900">공급상태 설정</div>
         <p className="mt-1 text-sm text-gray-600">
-          원물 및 옵션상품의 공급상태를 관리합니다
+          품목 및 옵션상품의 공급상태를 관리합니다
         </p>
       </div>
 
@@ -245,19 +256,19 @@ export default function SupplyStatusSettingsPage() {
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
           <button
-            onClick={() => handleTabChange('raw_material')}
+            onClick={() => handleTabChange('product')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'raw_material'
+              activeTab === 'product'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            원물 상태
+           품목 상태
           </button>
           <button
-            onClick={() => handleTabChange('optional_product')}
+            onClick={() => handleTabChange('option_products')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'optional_product'
+              activeTab === 'option_products'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
@@ -271,7 +282,7 @@ export default function SupplyStatusSettingsPage() {
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <div className="text-[14px] font-medium">
-            {activeTab === 'raw_material' ? '원물 상태 목록' : '옵션상품 상태 목록'}
+            {activeTab === 'product' ? '품목 상태 목록' : '옵션상품 상태 목록'}
           </div>
           <Button onClick={() => {
             setFormData({

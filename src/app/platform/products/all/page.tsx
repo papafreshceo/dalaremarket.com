@@ -8,6 +8,7 @@ import ProductGrid from './components/ProductGrid';
 import ProductDetailModal from './components/ProductDetailModal';
 import PriceChartModal from './components/PriceChartModal';
 import ImageGalleryModal from './components/ImageGalleryModal';
+import SeasonBand from './components/SeasonBand';
 
 interface OptionProduct {
   id: number;
@@ -52,15 +53,18 @@ export default function AllProductsPage() {
   }, []);
 
   const fetchSupplyStatuses = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('supply_status_settings')
       .select('code, name, color, display_order')
-      .eq('status_type', 'raw_material') // 품목의 원물상태 표시
+      .eq('status_type', 'product') // 품목 마스터 상태 표시
       .eq('is_active', true)
       .order('display_order');
 
+    console.log('🔍 Supply Status Settings 조회:', { data, error });
+
     if (data) {
       setSupplyStatuses(data);
+      console.log('✅ Supply Statuses 설정됨:', data);
     }
   };
 
@@ -79,13 +83,13 @@ export default function AllProductsPage() {
         return;
       }
 
-      // 2. products_master 조회 (품목 정보 + 공급상태 + 셀러공급여부 + 배지정보 + 발송기한)
+      // 2. products_master 조회 (품목 정보 + 공급상태 + 셀러공급여부 + 배지정보 + 발송기한 + 시즌)
       const { data: productsMaster, error: masterError } = await supabase
         .from('products_master')
-        .select('id, category_1, category_2, category_3, supply_status, seller_supply, is_best, is_recommended, has_image, has_detail_page, shipping_deadline')
+        .select('id, category_1, category_2, category_3, category_4, supply_status, seller_supply, is_best, is_recommended, has_image, has_detail_page, shipping_deadline, season_start_date, season_end_date')
         .eq('is_active', true)
         .eq('seller_supply', true) // 셀러공급 품목만 조회
-        .not('category_3', 'is', null); // category_3(품목)가 있는 것만
+        .not('category_4', 'is', null); // category_4(품목)가 있는 것만
 
       if (masterError) {
         console.error('품목 마스터 조회 오류:', masterError);
@@ -98,18 +102,21 @@ export default function AllProductsPage() {
           category_1: pm.category_1,
           category_2: pm.category_2,
           category_3: pm.category_3,
+          category_4: pm.category_4,
           supply_status: pm.supply_status,
           is_best: pm.is_best,
           is_recommended: pm.is_recommended,
           has_image: pm.has_image,
           has_detail_page: pm.has_detail_page,
-          shipping_deadline: pm.shipping_deadline
+          shipping_deadline: pm.shipping_deadline,
+          season_start_date: pm.season_start_date,
+          season_end_date: pm.season_end_date
         }])
       );
 
       // 품목 마스터 ID -> 품목명 맵핑 (대표이미지 매핑용)
       const categoryIdToNameMap = new Map(
-        (productsMaster || []).map(pm => [pm.id, pm.category_3])
+        (productsMaster || []).map(pm => [pm.id, pm.category_4])
       );
 
       // 3. 대표이미지 조회 (옵션상품 기준 + 품목 기준)
@@ -122,6 +129,9 @@ export default function AllProductsPage() {
         console.error('대표이미지 조회 오류:', imgError);
       }
 
+      console.log('대표이미지 조회 결과:', representativeImages?.length, '개');
+      console.log('샘플 대표이미지:', representativeImages?.[0]);
+
       // 4. 옵션상품별 대표이미지 맵핑 (option_product_id 기준)
       const optionImageMap = new Map(
         (representativeImages || [])
@@ -129,16 +139,21 @@ export default function AllProductsPage() {
           .map(img => [img.option_product_id, img.secure_url])
       );
 
+      console.log('옵션상품 이미지 맵:', optionImageMap.size, '개');
+
       // 5. 품목별 대표이미지 맵핑 (category_4_id -> category_4 이름으로 변환)
       const newCategoryImageMap = new Map(
         (representativeImages || [])
           .filter(img => img.category_4_id)
           .map(img => {
             const categoryName = categoryIdToNameMap.get(img.category_4_id);
+            console.log('품목 이미지 매핑:', img.category_4_id, '->', categoryName);
             return [categoryName, img.secure_url];
           })
           .filter(([categoryName]) => categoryName) // 품목명이 있는 것만
       );
+
+      console.log('품목 이미지 맵:', newCategoryImageMap.size, '개');
 
       // 상태로 저장 (카드보기에서 품목 썸네일 표시용)
       setCategoryImageMap(newCategoryImageMap);
@@ -150,11 +165,11 @@ export default function AllProductsPage() {
         .map(product => {
           // 옵션상품의 product_master_id로 품목 마스터 정보 찾기
           const categoryInfo = categoryMap.get(product.product_master_id);
-          const categoryId = categoryInfo?.id;
+          const category4Name = categoryInfo?.category_4;
 
           // 썸네일 우선순위: 옵션상품 대표이미지 > 품목 대표이미지
           const thumbnailUrl = optionImageMap.get(product.id) ||
-            (categoryId ? newCategoryImageMap.get(categoryId) : null) || null;
+            (category4Name ? newCategoryImageMap.get(category4Name) : null) || null;
 
           return {
             ...product,
@@ -162,15 +177,20 @@ export default function AllProductsPage() {
             // 품목의 공급상태 및 소분류 추가
             category_supply_status: categoryInfo?.supply_status || null,
             category_2: categoryInfo?.category_2 || null,
+            category_3: categoryInfo?.category_3 || null,
+            category_4: categoryInfo?.category_4 || null,
             category_seller_supply: !!categoryInfo, // 품목의 셀러공급 여부
-            category_4_id: categoryId, // 품목 마스터 ID 추가
+            category_4_id: categoryInfo?.id, // 품목 마스터 ID 추가
             // 배지 정보 추가
             is_best: categoryInfo?.is_best || false,
             is_recommended: categoryInfo?.is_recommended || false,
             has_image: categoryInfo?.has_image || false,
             has_detail_page: categoryInfo?.has_detail_page || false,
             // 발송기한 추가 (임시: 데이터 없으면 3일로 설정)
-            shipping_deadline: categoryInfo?.shipping_deadline || 3
+            shipping_deadline: categoryInfo?.shipping_deadline || 3,
+            // 시즌 날짜 추가
+            season_start_date: categoryInfo?.season_start_date || null,
+            season_end_date: categoryInfo?.season_end_date || null
           };
         })
         .filter(product => {
@@ -182,10 +202,10 @@ export default function AllProductsPage() {
 
       console.log('조회된 상품 수:', productsWithThumbnail.length);
       console.log('옵션상품 대표이미지 수:', optionImageMap.size);
-      console.log('품목 대표이미지 수:', categoryImageMap.size);
+      console.log('품목 대표이미지 수:', newCategoryImageMap.size);
       console.log('샘플 상품:', {
         option_name: productsWithThumbnail[0]?.option_name,
-        category_3: productsWithThumbnail[0]?.category_3,
+        category_4: productsWithThumbnail[0]?.category_4,
         product_master_id: productsWithThumbnail[0]?.product_master_id,
         thumbnail_url: productsWithThumbnail[0]?.thumbnail_url,
         shipping_deadline: productsWithThumbnail[0]?.shipping_deadline
@@ -312,32 +332,32 @@ export default function AllProductsPage() {
             {(() => {
               const groupedData = Object.entries(
                 filteredProducts.reduce((groups, product) => {
-                  const itemName = product.category_3 || '기타'; // 품목명으로 그룹핑
+                  const itemName = product.category_4 || '기타'; // 품목명(category_4)으로 그룹핑
                   if (!groups[itemName]) {
                     groups[itemName] = [];
                   }
                   groups[itemName].push(product);
                   return groups;
                 }, {} as Record<string, OptionProduct[]>)
-              ).sort(([, productsA], [, productsB]) => {
-                // 첫 번째 정렬: 상태값 순서
+              ).sort(([itemNameA, productsA], [itemNameB, productsB]) => {
+                // 1순위: 상태값 순서 (출하중 > 출하임박 > 시즌종료)
                 const getOrder = (products: OptionProduct[]) => {
                   const rawMaterialStatus = (products[0] as any).category_supply_status;
                   if (!rawMaterialStatus) return 999;
-                  // name으로 비교
                   const statusInfo = supplyStatuses.find(s => s.name === rawMaterialStatus);
                   return statusInfo?.display_order ?? 999;
                 };
                 const orderDiff = getOrder(productsA) - getOrder(productsB);
+                if (orderDiff !== 0) return orderDiff;
 
-                // 상태값이 같으면 두 번째 정렬: 소분류(category_2) 가나다 순
-                if (orderDiff === 0) {
-                  const category2A = (productsA[0] as any).category_2 || '';
-                  const category2B = (productsB[0] as any).category_2 || '';
-                  return category2A.localeCompare(category2B, 'ko');
-                }
+                // 2순위: 카테고리3 (소분류) 가나다 순
+                const category3A = (productsA[0] as any).category_3 || '';
+                const category3B = (productsB[0] as any).category_3 || '';
+                const category3Diff = category3A.localeCompare(category3B, 'ko');
+                if (category3Diff !== 0) return category3Diff;
 
-                return orderDiff;
+                // 3순위: 카테고리4 (품목) 가나다 순
+                return itemNameA.localeCompare(itemNameB, 'ko');
               });
 
               const groupKeys = groupedData.map(([key]) => key);
@@ -365,22 +385,13 @@ export default function AllProductsPage() {
                   </div>
 
                   {groupedData.map(([itemName, groupProducts]) => {
-                    const category2 = (groupProducts[0] as any).category_2 || '';
-                    const displayTitle = category2 ? `${category2}/${itemName}` : itemName;
+                    const category3 = (groupProducts[0] as any).category_3 || '';
+                    const category4 = itemName; // category_4 (품목)
                     const isExpanded = expandedGroups.has(itemName);
 
                     // 출하중 상태 확인
                     const categoryStatus = (groupProducts[0] as any).category_supply_status;
                     const isShipping = categoryStatus === '출하중';
-
-                    // 배지 디버깅
-                    const firstProduct = groupProducts[0] as any;
-                    console.log(`품목 "${itemName}" 배지:`, {
-                      is_best: firstProduct.is_best,
-                      is_recommended: firstProduct.is_recommended,
-                      has_image: firstProduct.has_image,
-                      has_detail_page: firstProduct.has_detail_page
-                    });
 
                     return (
                       <div
@@ -390,13 +401,13 @@ export default function AllProductsPage() {
                         }`}
                       >
                         {/* 그룹 헤더 */}
-                        <div className="px-6 py-2 hover:bg-gray-50 transition-colors">
+                        <div
+                          className="px-6 py-2 hover:bg-gray-50 transition-colors cursor-pointer"
+                          onClick={() => toggleGroup(itemName)}
+                        >
                           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
                             {/* 왼쪽: 썸네일 + 품목정보 */}
-                            <button
-                              onClick={() => toggleGroup(itemName)}
-                              className="flex items-center gap-3"
-                            >
+                            <div className="flex items-center gap-3">
                               {/* 품목 대표이미지 썸네일 */}
                               {(() => {
                                 const categoryThumbnail = categoryImageMap.get(itemName);
@@ -413,25 +424,41 @@ export default function AllProductsPage() {
                               })()}
                               <div className="text-left">
                                 <div className="flex items-baseline gap-2">
-                                  <h3 className="font-semibold text-gray-900" style={{ fontSize: '18px' }}>{displayTitle}</h3>
+                                  <h3 className="font-semibold text-gray-900">
+                                    {category3 && (
+                                      <span style={{ fontSize: '13px', fontWeight: 'normal' }}>{category3}/ </span>
+                                    )}
+                                    <span style={{ fontSize: '18px' }}>{category4}</span>
+                                  </h3>
                                   <p className="text-gray-500" style={{ fontSize: '13px' }}>{groupProducts.length}개 옵션상품</p>
                                 </div>
                               </div>
-                            </button>
+                            </div>
 
-                            {/* 중앙: 발송기한 */}
-                            <div className="text-left">
-                              {(() => {
-                                const shippingDeadline = (groupProducts[0] as any).shipping_deadline;
-                                if (shippingDeadline) {
-                                  return (
-                                    <div className="text-gray-600" style={{ fontSize: '13px' }}>
-                                      발송기한 <span className="font-medium">{shippingDeadline}일</span>
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              })()}
+                            {/* 중앙: 발송기한 + 시즌밴드 */}
+                            <div className="text-left flex items-center gap-6">
+                              {/* 발송기한 */}
+                              <div className="text-gray-600 flex-shrink-0" style={{ fontSize: '13px', minWidth: '100px' }}>
+                                {(() => {
+                                  const shippingDeadline = (groupProducts[0] as any).shipping_deadline;
+                                  if (shippingDeadline) {
+                                    return (
+                                      <>
+                                        발송기한 <span className="font-medium">{shippingDeadline}일</span>
+                                      </>
+                                    );
+                                  }
+                                  return <span>&nbsp;</span>;
+                                })()}
+                              </div>
+
+                              {/* 시즌밴드 */}
+                              <div className="flex-1 max-w-xs">
+                                <SeasonBand
+                                  seasonStart={(groupProducts[0] as any).season_start_date}
+                                  seasonEnd={(groupProducts[0] as any).season_end_date}
+                                />
+                              </div>
                             </div>
 
                             {/* 오른쪽: 배지 + 펼치기 버튼 */}
@@ -471,19 +498,23 @@ export default function AllProductsPage() {
                               )}
                             </div>
 
-                            {/* 상태별 배지 (품목의 원물상태 표시) */}
+                            {/* 상태별 배지 (품목 마스터 상태 표시) */}
                             {(() => {
                               const categoryStatus = (groupProducts[0] as any).category_supply_status;
+
                               if (!categoryStatus) return null;
 
-                              // name으로 비교 (category_settings에 name으로 저장되어 있음)
+                              // name으로 비교 (products_master의 supply_status와 매칭)
                               const statusInfo = supplyStatuses.find(s => s.name === categoryStatus);
                               if (!statusInfo) return null;
 
                               return (
                                 <span
-                                  className="px-2 py-0.5 font-medium rounded-full text-white"
-                                  style={{ backgroundColor: statusInfo.color, fontSize: '13px' }}
+                                  className="px-2 py-0.5 text-xs font-normal border rounded"
+                                  style={{
+                                    borderColor: statusInfo.color,
+                                    color: statusInfo.color
+                                  }}
                                 >
                                   {statusInfo.name}
                                 </span>
@@ -571,8 +602,8 @@ export default function AllProductsPage() {
                   groups[itemName].push(product);
                   return groups;
                 }, {} as Record<string, OptionProduct[]>)
-              ).sort(([, productsA], [, productsB]) => {
-                // 첫 번째 정렬: 상태값 순서
+              ).sort(([itemNameA, productsA], [itemNameB, productsB]) => {
+                // 1순위: 상태값 순서 (출하중 > 출하임박 > 시즌종료)
                 const getOrder = (products: OptionProduct[]) => {
                   const rawMaterialStatus = (products[0] as any).category_supply_status;
                   if (!rawMaterialStatus) return 999;
@@ -580,15 +611,16 @@ export default function AllProductsPage() {
                   return statusInfo?.display_order ?? 999;
                 };
                 const orderDiff = getOrder(productsA) - getOrder(productsB);
+                if (orderDiff !== 0) return orderDiff;
 
-                // 상태값이 같으면 두 번째 정렬: 소분류 가나다 순
-                if (orderDiff === 0) {
-                  const category3A = (productsA[0] as any).category_3 || '';
-                  const category3B = (productsB[0] as any).category_3 || '';
-                  return category3A.localeCompare(category3B, 'ko');
-                }
+                // 2순위: 카테고리3 (소분류) 가나다 순
+                const category3A = (productsA[0] as any).category_3 || '';
+                const category3B = (productsB[0] as any).category_3 || '';
+                const category3Diff = category3A.localeCompare(category3B, 'ko');
+                if (category3Diff !== 0) return category3Diff;
 
-                return orderDiff;
+                // 3순위: 카테고리4 (품목) 가나다 순
+                return itemNameA.localeCompare(itemNameB, 'ko');
               });
 
               const groupKeys = groupedData.map(([key]) => key);
@@ -616,8 +648,8 @@ export default function AllProductsPage() {
                   </div>
 
                   {groupedData.map(([itemName, groupProducts]) => {
-                    const category2 = (groupProducts[0] as any).category_2 || '';
-                    const displayTitle = category2 ? `${category2}/${itemName}` : itemName;
+                    const category3 = (groupProducts[0] as any).category_3 || '';
+                    const category4 = itemName; // category_4 (품목)
                     const isExpanded = expandedGroups.has(itemName);
 
                     // 출하중 상태 확인
@@ -632,13 +664,13 @@ export default function AllProductsPage() {
                         }`}
                       >
                         {/* 그룹 헤더 */}
-                        <div className="px-6 py-2 hover:bg-gray-50 transition-colors">
+                        <div
+                          className="px-6 py-2 hover:bg-gray-50 transition-colors cursor-pointer"
+                          onClick={() => toggleGroup(itemName)}
+                        >
                           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
                             {/* 왼쪽: 썸네일 + 품목정보 */}
-                            <button
-                              onClick={() => toggleGroup(itemName)}
-                              className="flex items-center gap-3"
-                            >
+                            <div className="flex items-center gap-3">
                               {/* 품목 대표이미지 썸네일 */}
                               {(() => {
                                 const categoryThumbnail = categoryImageMap.get(itemName);
@@ -655,25 +687,41 @@ export default function AllProductsPage() {
                               })()}
                               <div className="text-left">
                                 <div className="flex items-baseline gap-2">
-                                  <h3 className="font-semibold text-gray-900" style={{ fontSize: '18px' }}>{displayTitle}</h3>
+                                  <h3 className="font-semibold text-gray-900">
+                                    {category3 && (
+                                      <span style={{ fontSize: '13px', fontWeight: 'normal' }}>{category3}/ </span>
+                                    )}
+                                    <span style={{ fontSize: '18px' }}>{category4}</span>
+                                  </h3>
                                   <p className="text-gray-500" style={{ fontSize: '13px' }}>{groupProducts.length}개 옵션상품</p>
                                 </div>
                               </div>
-                            </button>
+                            </div>
 
-                            {/* 중앙: 발송기한 */}
-                            <div className="text-left">
-                              {(() => {
-                                const shippingDeadline = (groupProducts[0] as any).shipping_deadline;
-                                if (shippingDeadline) {
-                                  return (
-                                    <div className="text-gray-600" style={{ fontSize: '13px' }}>
-                                      발송기한 <span className="font-medium">{shippingDeadline}일</span>
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              })()}
+                            {/* 중앙: 발송기한 + 시즌밴드 */}
+                            <div className="text-left flex items-center gap-6">
+                              {/* 발송기한 */}
+                              <div className="text-gray-600 flex-shrink-0" style={{ fontSize: '13px', minWidth: '100px' }}>
+                                {(() => {
+                                  const shippingDeadline = (groupProducts[0] as any).shipping_deadline;
+                                  if (shippingDeadline) {
+                                    return (
+                                      <>
+                                        발송기한 <span className="font-medium">{shippingDeadline}일</span>
+                                      </>
+                                    );
+                                  }
+                                  return <span>&nbsp;</span>;
+                                })()}
+                              </div>
+
+                              {/* 시즌밴드 */}
+                              <div className="flex-1 max-w-xs">
+                                <SeasonBand
+                                  seasonStart={(groupProducts[0] as any).season_start_date}
+                                  seasonEnd={(groupProducts[0] as any).season_end_date}
+                                />
+                              </div>
                             </div>
 
                             {/* 오른쪽: 배지 + 펼치기 버튼 */}

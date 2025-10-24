@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       if (uploadType === 'category_4' && category4Id) {
         // 품목 단위: {rootFolder}/{품목코드}/
         const { data: category } = await supabase
-          .from('category_settings')
+          .from('products_master')
           .select('category_4_code')
           .eq('id', category4Id)
           .single();
@@ -84,17 +84,16 @@ export async function POST(request: NextRequest) {
         // 옵션상품 단위: {rootFolder}/{품목코드}/{옵션상품코드}/
         const { data: optionProduct } = await supabase
           .from('option_products')
-          .select('option_code, category_4')
+          .select('option_code, product_master_id')
           .eq('id', optionProductId)
           .single();
 
-        if (optionProduct) {
-          // 옵션상품의 품목으로 품목코드 조회
+        if (optionProduct?.product_master_id) {
+          // 옵션상품의 품목 마스터로 품목코드 조회
           const { data: category } = await supabase
-            .from('category_settings')
+            .from('products_master')
             .select('category_4_code')
-            .eq('category_4', optionProduct.category_4)
-            .eq('is_active', true)
+            .eq('id', optionProduct.product_master_id)
             .single();
 
           if (category?.category_4_code && optionProduct.option_code) {
@@ -238,10 +237,12 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('DB 저장 오류:', error);
+      console.error('에러 상세:', JSON.stringify(error, null, 2));
+      console.error('저장하려던 데이터:', JSON.stringify(insertData, null, 2));
       // Cloudinary에서 삭제 (롤백)
       await cloudinary.uploader.destroy(uploadResult.public_id);
       return NextResponse.json(
-        { success: false, error: 'DB 저장 실패' },
+        { success: false, error: `DB 저장 실패: ${error.message || error.code || 'Unknown error'}`, details: error },
         { status: 500 }
       );
     }

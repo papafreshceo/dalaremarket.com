@@ -71,7 +71,7 @@ export default function ProductsMasterPage() {
     const { data, error } = await supabase
       .from('supply_status_settings')
       .select('code, name')
-      .eq('status_type', 'products')
+      .eq('status_type', 'product')
       .eq('is_active', true)
       .order('display_order')
 
@@ -181,13 +181,24 @@ export default function ProductsMasterPage() {
 
       await fetchProducts()
 
-      if (totalRawMaterials > 0 || totalOptionProducts > 0) {
-        showToast(
-          `저장 완료! 상속: 원물 ${totalRawMaterials}개, 옵션상품 ${totalOptionProducts}개`,
-          'success'
-        )
+      // 저장 후 전체 매칭 실행
+      const matchResponse = await fetch('/api/link-product-masters', {
+        method: 'POST'
+      })
+      const matchResult = await matchResponse.json()
+
+      if (matchResult.success) {
+        setMatchResult(matchResult)
+        setShowMatchResultModal(true)
       } else {
-        showToast('저장되었습니다.', 'success')
+        if (totalRawMaterials > 0 || totalOptionProducts > 0) {
+          showToast(
+            `저장 완료! 상속: 원물 ${totalRawMaterials}개, 옵션상품 ${totalOptionProducts}개`,
+            'success'
+          )
+        } else {
+          showToast('저장되었습니다.', 'success')
+        }
       }
     } catch (error) {
       console.error('저장 중 오류:', error)
@@ -226,37 +237,8 @@ export default function ProductsMasterPage() {
     showToast(`${indices.length}개 항목이 삭제되었습니다.`, 'success')
   }
 
-  const handleLinkAll = async () => {
-    const confirmed = await confirm(
-      '모든 품목 마스터를 원물/옵션상품과 매칭하시겠습니까?',
-      'category_4(품목명) 기준으로 자동 매칭됩니다.'
-    )
-
-    if (!confirmed) return
-
-    setLoading(true)
-    try {
-      const response = await fetch('/api/link-product-masters', {
-        method: 'POST'
-      })
-      const result = await response.json()
-
-      if (result.success) {
-        showToast(
-          `매칭 완료! ${result.productMastersCount}개 품목 → 원물 ${result.totalRawMaterials}개, 옵션상품 ${result.totalOptionProducts}개`,
-          'success'
-        )
-        fetchProducts() // 데이터 다시 로드
-      } else {
-        showToast('매칭 중 오류가 발생했습니다.', 'error')
-      }
-    } catch (error) {
-      console.error('매칭 중 오류:', error)
-      showToast('매칭 중 오류가 발생했습니다.', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const [showMatchResultModal, setShowMatchResultModal] = useState(false)
+  const [matchResult, setMatchResult] = useState<any>(null)
 
   const columns = [
     { key: 'category_1', title: '대분류', width: 150, className: 'text-center' },
@@ -362,16 +344,6 @@ export default function ProductsMasterPage() {
       <div className="flex justify-between items-center">
         <div className="text-[16px] font-bold">품목 마스터</div>
         <div className="flex gap-2">
-          {/* 전체 매칭 버튼 */}
-          <Button
-            onClick={handleLinkAll}
-            variant="primary"
-            disabled={loading}
-            className="text-sm"
-          >
-            {loading ? '매칭 중...' : '전체 매칭'}
-          </Button>
-
           {/* 엑셀 다운로드 버튼 */}
           <button
             onClick={handleExcelDownload}
@@ -395,6 +367,80 @@ export default function ProductsMasterPage() {
         enableAddRow
         loading={loading}
       />
+
+      {/* 전체 매칭 결과 모달 */}
+      <Modal
+        isOpen={showMatchResultModal}
+        onClose={() => setShowMatchResultModal(false)}
+        title="전체 매칭 완료"
+        size="md"
+      >
+        {matchResult && (
+          <div className="space-y-4">
+            <div className="text-center py-4">
+              <div className="text-2xl font-bold text-green-600 mb-2">
+                매칭이 완료되었습니다
+              </div>
+              <div className="text-sm text-gray-500">
+                총 {matchResult.productMastersCount}개 품목 마스터 기준
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {/* 원물 매칭 결과 */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                <div className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                  원물 매칭 결과
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">새로 매칭:</span>
+                    <span className="font-semibold text-green-600">
+                      {matchResult.newRawMaterials}건
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">이미 매칭됨:</span>
+                    <span className="font-semibold text-gray-600">
+                      {matchResult.alreadyLinkedRawMaterials}건
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 옵션상품 매칭 결과 */}
+              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+                <div className="font-semibold text-purple-900 dark:text-purple-100 mb-2">
+                  옵션상품 매칭 결과
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">새로 매칭:</span>
+                    <span className="font-semibold text-green-600">
+                      {matchResult.newOptionProducts}건
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">이미 매칭됨:</span>
+                    <span className="font-semibold text-gray-600">
+                      {matchResult.alreadyLinkedOptionProducts}건
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-center pt-4">
+              <Button
+                onClick={() => setShowMatchResultModal(false)}
+                className="px-6"
+              >
+                확인
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

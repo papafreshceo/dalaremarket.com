@@ -84,7 +84,7 @@ export default function MediaManagementPage() {
   // 원물/옵션상품/품목 목록
   const [rawMaterials, setRawMaterials] = useState<any[]>([]);
   const [optionProducts, setOptionProducts] = useState<any[]>([]);
-  const [productCategories, setProductCategories] = useState<Array<{id: string, category_4: string}>>([]);
+  const [productCategories, setProductCategories] = useState<Array<{id: string, category_1?: string, category_2?: string, category_3?: string, category_4: string, category_4_code?: string}>>([]);
 
   // 수정 모달
   const [editingImage, setEditingImage] = useState<CloudinaryImage | null>(null);
@@ -207,31 +207,19 @@ export default function MediaManagementPage() {
     try {
       console.log('품목 마스터 조회 시작...');
       const { data, error } = await supabase
-        .from('category_settings')
-        .select('id, category_4, category_4_code, expense_type')
+        .from('products_master')
+        .select('id, category_1, category_2, category_3, category_4, category_4_code')
         .eq('is_active', true)
-        .eq('expense_type', '사입')
         .not('category_4', 'is', null)
-        .order('category_4');
+        .order('category_1, category_2, category_3, category_4');
 
       if (error) {
         console.error('품목 마스터 조회 에러:', error);
         throw error;
       }
 
-      // 동일한 품목(category_4) 중복 제거
-      const uniqueCategories = data?.reduce((acc: any[], current) => {
-        const exists = acc.find(item => item.category_4 === current.category_4);
-        if (!exists) {
-          acc.push(current);
-        }
-        return acc;
-      }, []) || [];
-
-      console.log('품목 마스터 조회 완료 (사입 품목만):', data?.length, '개');
-      console.log('중복 제거 후:', uniqueCategories.length, '개');
-      console.log('품목 코드 샘플:', uniqueCategories[0]?.category_4_code);
-      setProductCategories(uniqueCategories);
+      console.log('품목 마스터 조회 완료:', data?.length, '개');
+      setProductCategories(data || []);
     } catch (error) {
       console.error('품목 마스터 조회 오류:', error);
     }
@@ -310,6 +298,8 @@ export default function MediaManagementPage() {
 
         const result = await response.json();
 
+        console.log('업로드 응답:', response.status, result);
+
         if (result.success) {
           uploadedUrls.push(result.data.secure_url);
         } else {
@@ -324,6 +314,7 @@ export default function MediaManagementPage() {
               break;
             }
           } else {
+            console.error('업로드 실패 상세:', result);
             alert(`파일 "${file.name}" 업로드 실패: ` + result.error);
           }
         }
@@ -1216,7 +1207,7 @@ export default function MediaManagementPage() {
                             <option value="">품목을 선택하세요</option>
                             {productCategories.map((cat) => (
                               <option key={cat.id} value={cat.id}>
-                                {cat.category_4}
+                                {[cat.category_1, cat.category_2, cat.category_3, cat.category_4].filter(Boolean).join(' / ')}
                               </option>
                             ))}
                           </select>
@@ -1453,7 +1444,7 @@ export default function MediaManagementPage() {
                       <option value="">선택 안 함</option>
                       {productCategories.map((cat) => (
                         <option key={cat.id} value={cat.id}>
-                          {cat.category_4}
+                          {[cat.category_1, cat.category_2, cat.category_3, cat.category_4].filter(Boolean).join(' / ')}
                         </option>
                       ))}
                     </select>

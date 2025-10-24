@@ -57,7 +57,7 @@ export default function ItemRegistrationModal({
 
   const fetchCategorySettings = async () => {
     const { data } = await supabase
-      .from('category_settings')
+      .from('products_master')
       .select('*')
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -67,21 +67,15 @@ export default function ItemRegistrationModal({
 
   // 대분류 옵션 가져오기
   const getCategory1Options = () => {
-    const filtered = categorySettings.filter(c => {
-      if (activeTab === 'variety') return c.expense_type === '사입'
-      if (activeTab === 'expense') return c.expense_type === '지출'
-      return false
-    })
-    const uniqueValues = [...new Set(filtered.map(c => c.category_1).filter(Boolean))]
+    // products_master는 모두 '사입' 품목이므로 activeTab에 관계없이 전체 표시
+    const uniqueValues = [...new Set(categorySettings.map(c => c.category_1).filter(Boolean))]
     return uniqueValues.sort()
   }
 
   // 중분류 옵션 가져오기
   const getCategory2Options = (category1: string) => {
     if (!category1) return []
-    const filtered = categorySettings.filter(c =>
-      c.expense_type === formData.expense_type && c.category_1 === category1
-    )
+    const filtered = categorySettings.filter(c => c.category_1 === category1)
     const uniqueValues = [...new Set(filtered.map(c => c.category_2).filter(Boolean))]
     return uniqueValues.sort()
   }

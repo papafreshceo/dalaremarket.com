@@ -328,11 +328,12 @@ export default function RawMaterialsManagementPage() {
     if (data) setSuppliers(data)
   }
   const fetchSupplyStatuses = async () => {
-    const { data } = await supabase.from('supply_status_settings').select('*').eq('status_type', 'raw_material').eq('is_active', true).order('display_order')
+    // 원물은 품목 마스터의 상태를 상속받으므로 product 타입 조회
+    const { data } = await supabase.from('supply_status_settings').select('*').eq('status_type', 'product').eq('is_active', true).order('display_order')
     if (data) setSupplyStatuses(data)
   }
   const fetchCategorySettings = async () => {
-    const { data } = await supabase.from('category_settings').select('*').eq('is_active', true)
+    const { data } = await supabase.from('products_master').select('*').eq('is_active', true)
     if (data) setCategorySettings(data)
   }
   const fetchProductMasters = async () => {
@@ -1227,8 +1228,7 @@ export default function RawMaterialsManagementPage() {
       key: 'supply_status',
       title: '상태',
       width: 90,
-      type: 'dropdown' as const,
-      source: supplyStatuses.map(s => s.name),
+      readOnly: true, // 품목 마스터에서 상속받으므로 수정 불가
       renderer: (value: any, row: RawMaterial) => {
         if (!row.supply_status) return ''
         const st = supplyStatuses.find(s => s.name === row.supply_status)
@@ -1835,8 +1835,8 @@ export default function RawMaterialsManagementPage() {
               <input value={formData.material_name || ''} onChange={(e)=>setFormData({...formData, material_name: e.target.value})} className="w-full border rounded px-2 py-1 text-sm text-center"/></div>
             <div><label className="block text-xs text-gray-500 mb-1">표준단위</label>
               <input value={formData.standard_unit || 'kg'} onChange={(e)=>setFormData({...formData, standard_unit: e.target.value})} className="w-full border rounded px-2 py-1 text-sm text-center"/></div>
-            <div><label className="block text-xs text-gray-500 mb-1">공급상태</label>
-              <input value={formData.supply_status || '출하중'} onChange={(e)=>setFormData({...formData, supply_status: e.target.value})} className="w-full border rounded px-2 py-1 text-sm text-center" placeholder="출하중"/></div>
+            <div><label className="block text-xs text-gray-500 mb-1">공급상태 (품목 마스터에서 자동 상속)</label>
+              <input value={formData.supply_status || ''} readOnly disabled className="w-full border rounded px-2 py-1 text-sm text-center bg-gray-100 cursor-not-allowed" placeholder="품목 마스터 연동 후 자동 설정"/></div>
           </div>
         </Modal>
       )}
