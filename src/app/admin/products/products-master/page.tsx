@@ -107,14 +107,37 @@ export default function ProductsMasterPage() {
     try {
       let totalRawMaterials = 0
       let totalOptionProducts = 0
+      let skippedRows: string[] = []
+      let duplicateRows: string[] = []
 
       for (const row of tableData) {
-        // 최소한 category_3(품목)는 있어야 함
-        if (!row.category_3) {
+        // 최소한 category_4(품목)는 있어야 함
+        if (!row.category_4) {
+          console.log('⚠️ category_4가 없어서 건너뜀:', row);
+          skippedRows.push(`${row.category_1 || ''} > ${row.category_2 || ''} > ${row.category_3 || ''} (품목명 없음)`)
           continue
         }
 
-        const productData = {
+        // 중복 검사: 신규 등록 시에만
+        if (!row.id || String(row.id).startsWith('temp_')) {
+          const { data: existingData, error: checkError } = await supabase
+            .from('products_master')
+            .select('id')
+            .eq('category_1', row.category_1 || null)
+            .eq('category_2', row.category_2 || null)
+            .eq('category_3', row.category_3 || null)
+            .eq('category_4', row.category_4)
+            .limit(1)
+
+          if (!checkError && existingData && existingData.length > 0) {
+            const duplicatePath = `${row.category_1 || ''} > ${row.category_2 || ''} > ${row.category_3 || ''} > ${row.category_4}`
+            duplicateRows.push(duplicatePath)
+            console.log('⚠️ 중복된 품목:', duplicatePath)
+            continue
+          }
+        }
+
+        const productData: any = {
           category_1: row.category_1 || null,
           category_2: row.category_2 || null,
           category_3: row.category_3 || null,
@@ -127,10 +150,16 @@ export default function ProductsMasterPage() {
           seller_supply: row.seller_supply !== null ? row.seller_supply : true,
           is_best: row.is_best || false,
           is_recommended: row.is_recommended || false,
-          has_image: row.has_image || false,
-          has_detail_page: row.has_detail_page || false,
           notes: row.notes || null,
           is_active: row.is_active !== null ? row.is_active : true
+        }
+
+        // has_image, has_detail_page는 DB 컬럼이 존재하는 경우에만 포함
+        if (row.has_image !== undefined) {
+          productData.has_image = row.has_image || false
+        }
+        if (row.has_detail_page !== undefined) {
+          productData.has_detail_page = row.has_detail_page || false
         }
 
         let savedId: string | null = null
@@ -144,8 +173,15 @@ export default function ProductsMasterPage() {
             .single()
 
           if (error) {
+            // 중복 에러 처리
+            if (error.code === '23505' || error.message.includes('duplicate') || error.message.includes('unique')) {
+              const duplicatePath = `${row.category_1 || ''} > ${row.category_2 || ''} > ${row.category_3 || ''} > ${row.category_4}`
+              duplicateRows.push(duplicatePath)
+              console.log('⚠️ 등록 중 중복 발견:', duplicatePath)
+              continue
+            }
             showToast(`품목 등록 실패: ${error.message}`, 'error')
-            return
+            continue
           }
           savedId = data?.id
         } else {
@@ -158,8 +194,19 @@ export default function ProductsMasterPage() {
 
           if (error) {
             console.error('업데이트 에러 상세:', error)
-            showToast(`품목 수정 실패: ${error.message}`, 'error')
-            return
+            console.error('전송한 데이터:', productData)
+            console.error('행 ID:', row.id)
+
+            // 중복 에러 처리
+            if (error.code === '23505' || error.message.includes('duplicate') || error.message.includes('unique')) {
+              const duplicatePath = `${row.category_1 || ''} > ${row.category_2 || ''} > ${row.category_3 || ''} > ${row.category_4}`
+              duplicateRows.push(duplicatePath)
+              console.log('⚠️ 업데이트 중 중복 발견:', duplicatePath)
+              continue
+            }
+
+            showToast(`품목 수정 실패: ${error.message} (${error.code})`, 'error')
+            continue
           }
           savedId = row.id
         }
@@ -187,18 +234,45 @@ export default function ProductsMasterPage() {
       })
       const matchResult = await matchResponse.json()
 
+      // 중복 및 스킵 알림
+      if (duplicateRows.length > 0) {
+        const duplicateMessage = duplicateRows.length > 3
+          ? `${duplicateRows.slice(0, 3).join('\n')}\n... 외 ${duplicateRows.length - 3}개`
+          : duplicateRows.join('\n')
+
+        await confirm({
+          title: '⚠️ 중복된 품목이 있습니다',
+          message: `다음 품목은 이미 존재하여 건너뛰었습니다:\n\n${duplicateMessage}`,
+          confirmText: '확인',
+          showCancel: false
+        })
+      }
+
+      if (skippedRows.length > 0) {
+        const skipMessage = skippedRows.length > 3
+          ? `${skippedRows.slice(0, 3).join('\n')}\n... 외 ${skippedRows.length - 3}개`
+          : skippedRows.join('\n')
+
+        await confirm({
+          title: '⚠️ 건너뛴 행이 있습니다',
+          message: `다음 행은 품목명이 없어 저장되지 않았습니다:\n\n${skipMessage}`,
+          confirmText: '확인',
+          showCancel: false
+        })
+      }
+
       if (matchResult.success) {
         setMatchResult(matchResult)
         setShowMatchResultModal(true)
       } else {
+        let message = '저장되었습니다.'
         if (totalRawMaterials > 0 || totalOptionProducts > 0) {
-          showToast(
-            `저장 완료! 상속: 원물 ${totalRawMaterials}개, 옵션상품 ${totalOptionProducts}개`,
-            'success'
-          )
-        } else {
-          showToast('저장되었습니다.', 'success')
+          message = `저장 완료! 상속: 원물 ${totalRawMaterials}개, 옵션상품 ${totalOptionProducts}개`
         }
+        if (duplicateRows.length > 0 || skippedRows.length > 0) {
+          message += ` (중복: ${duplicateRows.length}개, 건너뜀: ${skippedRows.length}개)`
+        }
+        showToast(message, 'success')
       }
     } catch (error) {
       console.error('저장 중 오류:', error)
@@ -299,10 +373,8 @@ export default function ProductsMasterPage() {
       title: '이미지Y/N',
       width: 100,
       className: 'text-center',
-      type: 'checkbox' as const,
       renderer: (value: any) => (
-        <div className="flex items-center justify-center gap-2">
-          <input type="checkbox" checked={!!value} readOnly className="w-4 h-4" />
+        <div className="flex items-center justify-center">
           {value && (
             <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded border border-gray-300">
               이미지
@@ -316,10 +388,8 @@ export default function ProductsMasterPage() {
       title: '상세페이지Y/N',
       width: 120,
       className: 'text-center',
-      type: 'checkbox' as const,
       renderer: (value: any) => (
-        <div className="flex items-center justify-center gap-2">
-          <input type="checkbox" checked={!!value} readOnly className="w-4 h-4" />
+        <div className="flex items-center justify-center">
           {value && (
             <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded border border-blue-300">
               상세페이지
@@ -385,6 +455,7 @@ export default function ProductsMasterPage() {
         onDelete={handleDelete}
         enableRowSelection
         enableAddRow
+        enableCopy
         loading={loading}
       />
 

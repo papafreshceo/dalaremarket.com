@@ -774,7 +774,20 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
     if (!isAddedOrCopied) {
       // 원본 데이터와 비교
-      if (processedValue === originalValue) {
+      const isValueChanged = processedValue !== originalValue
+
+      // 디버깅용 로그
+      if (column?.type === 'dropdown') {
+        console.log('[Dropdown 변경]', {
+          column: editingCell.col,
+          processedValue,
+          originalValue,
+          isValueChanged,
+          cellKey
+        })
+      }
+
+      if (!isValueChanged) {
         // 원래 값으로 돌아간 경우 modifiedCells에서 제거
         newModifiedCells.delete(cellKey)
       } else {
