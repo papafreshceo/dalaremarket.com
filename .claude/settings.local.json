@@ -89,7 +89,8 @@
       "Bash(if exist test-market-upload-flow.js del /f test-market-upload-flow.js)",
       "Bash(npx next dev:*)",
       "Bash(if exist .next rmdir /s /q .next)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

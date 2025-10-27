@@ -409,7 +409,7 @@ export default function WinWinPage() {
           margin: '0 auto',
           padding: '0 20px',
           display: 'grid',
-          gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth >= 900 ? 'repeat(2, 1fr)' : '1fr',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
           gap: '20px',
           marginBottom: '36px'
         }}>
@@ -490,7 +490,7 @@ export default function WinWinPage() {
             margin: '0 auto',
             padding: '0 20px 70px',
             display: 'grid',
-            gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth >= 900 ? '1fr 400px' : '1fr',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
             gap: '20px'
           }}>
             {/* 좌측: 로케이션 선택 */}
@@ -1417,7 +1417,7 @@ export default function WinWinPage() {
             {/* 가격 플랜 카드 */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth >= 900 ? 'repeat(3, 1fr)' : '1fr',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
               gap: '20px',
               marginBottom: '32px'
             }}>
