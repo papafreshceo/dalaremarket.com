@@ -10,6 +10,8 @@ import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC, formatDateTimeForDisplay } from '@/lib/date';
+import MarketFileUploadModal from '../modals/MarketFileUploadModal';
+import OptionValidationModal from '../modals/OptionValidationModal';
 
 interface OrderRegistrationTabProps {
   isMobile: boolean;
@@ -33,6 +35,7 @@ interface OrderRegistrationTabProps {
   endDate: Date | null;
   setEndDate: (date: Date | null) => void;
   onRefresh?: () => void;
+  userId: string;
   userEmail: string;
 }
 
@@ -58,6 +61,7 @@ export default function OrderRegistrationTab({
   endDate,
   setEndDate,
   onRefresh,
+  userId,
   userEmail
 }: OrderRegistrationTabProps) {
 
@@ -69,6 +73,14 @@ export default function OrderRegistrationTab({
 
   // 마켓송장파일 모달 상태
   const [showMarketInvoiceModal, setShowMarketInvoiceModal] = useState(false);
+
+  // 마켓파일 업로드 모달 상태
+  const [showMarketFileUploadModal, setShowMarketFileUploadModal] = useState(false);
+
+  // 옵션 검증 모달 상태 (발주확정 전 검증용)
+  const [showOptionValidationModal, setShowOptionValidationModal] = useState(false);
+  const [validatedOrders, setValidatedOrders] = useState<any[]>([]);
+  const [optionProductsMap, setOptionProductsMap] = useState<Map<string, any>>(new Map());
 
   // Modal 상태 관리
   const [modalState, setModalState] = useState<{
@@ -1607,7 +1619,8 @@ export default function OrderRegistrationTab({
     preparing: '상품 발송을 준비를 하고 있습니다. 공급자가 발주서와 입금내역을 확인하고 상품을 준비/포장 하고 있는 주문건입니다. 취소 요청은 공급자의 승인이 필요합니다.',
     cancelRequested: '입금완료 및 발주확정한 주문건 중에서 판매자가 취소를 요청한 주문건 입니다. 공급자 확인 및 승인이 필요합니다. 반드시 별도의 연락을 주셔야 합니다.',
     shipped: '상품 발송을 완료한 단계. 송장번호를 다운로드 하실 수 있으며, 어떠한 경우라도 취소와 환불이 불가능합니다.',
-    cancelled: '취소 요청건이 정상적으로 처리되어 발주 취소가 정상적으로 처리된 주문건입니다.'
+    cancelled: '취소 요청건이 정상적으로 처리되어 발주 취소가 정상적으로 처리된 주문건입니다.',
+    refunded: '취소 완료된 주문건 중 환불이 완료된 주문건입니다. 공급자가 환불 처리를 완료한 상태로, 모든 거래가 종료되었습니다.'
   };
 
   return (
@@ -1640,8 +1653,8 @@ export default function OrderRegistrationTab({
                 borderRadius: '8px',
                 cursor: 'pointer',
                 position: 'relative',
-                background: '#fff',
-                border: isSelected ? `1px solid ${config.color}` : '1px solid #e5e7eb',
+                background: 'var(--color-surface)',
+                border: isSelected ? `1px solid ${config.color}` : '1px solid var(--color-border)',
                 boxShadow: isSelected ? `0 4px 12px ${config.color}30` : '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
                 transition: 'all 0.2s ease'
               }}
@@ -1680,33 +1693,34 @@ export default function OrderRegistrationTab({
               {showTooltip && (
                 <div style={{
                   position: 'absolute',
-                  bottom: 'calc(100% + 12px)',
+                  top: 'calc(100% + 12px)',
                   left: isLastCard ? 'auto' : '0',
                   right: isLastCard ? '0' : 'auto',
                   background: `linear-gradient(135deg, ${config.color}15 0%, ${config.color}25 100%)`,
                   backdropFilter: 'blur(10px)',
                   padding: '16px 24px',
                   borderRadius: '12px',
-                  boxShadow: '0 12px 32px rgba(0,0,0,0.2)',
-                  zIndex: 10000,
+                  boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
+                  zIndex: 99999,
                   maxWidth: '600px',
                   minWidth: '450px',
                   fontSize: '13px',
                   lineHeight: '1.6',
-                  color: '#1f2937',
+                  color: 'var(--color-text)',
                   pointerEvents: 'none',
-                  whiteSpace: 'normal'
+                  whiteSpace: 'normal',
+                  border: '1px solid var(--color-border)'
                 }}>
                   <div style={{
                     position: 'absolute',
-                    bottom: '-6px',
+                    top: '-6px',
                     left: isLastCard ? 'auto' : '24px',
                     right: isLastCard ? '24px' : 'auto',
                     width: 0,
                     height: 0,
                     borderLeft: '8px solid transparent',
                     borderRight: '8px solid transparent',
-                    borderTop: `8px solid ${config.color}20`
+                    borderBottom: `8px solid ${config.color}20`
                   }} />
                   {statusDescriptions[stat.status]}
                 </div>
@@ -1754,16 +1768,17 @@ export default function OrderRegistrationTab({
             }}
             style={{
               padding: '4px 12px',
-              border: '1px solid #d1d5db',
+              border: '1px solid var(--color-border)',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px',
-              background: '#fff',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text)',
               cursor: 'pointer',
               transition: 'all 0.2s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
-            onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-surface)'}
           >
             오늘
           </button>
@@ -1777,16 +1792,17 @@ export default function OrderRegistrationTab({
             }}
             style={{
               padding: '4px 12px',
-              border: '1px solid #d1d5db',
+              border: '1px solid var(--color-border)',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px',
-              background: '#fff',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text)',
               cursor: 'pointer',
               transition: 'all 0.2s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
-            onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-surface)'}
           >
             7일
           </button>
@@ -1800,16 +1816,17 @@ export default function OrderRegistrationTab({
             }}
             style={{
               padding: '4px 12px',
-              border: '1px solid #d1d5db',
+              border: '1px solid var(--color-border)',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px',
-              background: '#fff',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text)',
               cursor: 'pointer',
               transition: 'all 0.2s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
-            onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-surface)'}
           >
             30일
           </button>
@@ -1823,16 +1840,17 @@ export default function OrderRegistrationTab({
             }}
             style={{
               padding: '4px 12px',
-              border: '1px solid #d1d5db',
+              border: '1px solid var(--color-border)',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px',
-              background: '#fff',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text)',
               cursor: 'pointer',
               transition: 'all 0.2s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
-            onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-surface)'}
           >
             90일
           </button>
@@ -1855,6 +1873,27 @@ export default function OrderRegistrationTab({
 
         {/* 발주서 관리 버튼들 - 우측 */}
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => setShowMarketFileUploadModal(true)}
+            className="bg-purple hover:bg-purple-hover"
+            style={{
+              padding: '6px 16px',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              height: '28px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Upload size={14} />
+            마켓파일 업로드
+          </button>
           <button
             onClick={() => setShowUploadModal(true)}
             className="bg-primary hover:bg-primary-hover"
@@ -1904,23 +1943,23 @@ export default function OrderRegistrationTab({
       <div style={{
         marginBottom: '16px',
         padding: '16px',
-        background: '#fff',
+        background: 'var(--color-surface)',
         borderRadius: '8px',
-        border: '1px solid #e5e7eb',
+        border: '1px solid var(--color-border)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
         <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
           <div>
-            <span style={{ fontSize: '13px', color: '#6b7280', marginRight: '8px' }}>주문건수:</span>
-            <span style={{ fontSize: '18px', fontWeight: '700', color: '#111827' }}>
+            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>주문건수:</span>
+            <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-text)' }}>
               {orderSummary.count.toLocaleString()}건
             </span>
           </div>
           <div>
-            <span style={{ fontSize: '13px', color: '#6b7280', marginRight: '8px' }}>공급가 합계:</span>
-            <span style={{ fontSize: '18px', fontWeight: '700', color: '#2563eb' }}>
+            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>공급가 합계:</span>
+            <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-primary)' }}>
               {orderSummary.totalSupplyPrice.toLocaleString()}원
             </span>
           </div>
@@ -1932,49 +1971,74 @@ export default function OrderRegistrationTab({
               return;
             }
 
-            showModal(
-              'confirm',
-              '발주 확정',
-              `${filteredOrders.length}건의 주문을 발주 확정하시겠습니까?\n입금 완료 후 이 버튼을 눌러주세요.`,
-              async () => {
-                try {
-                  const { createClient } = await import('@/lib/supabase/client');
-                  const supabase = createClient();
+            // 옵션명 검증 시작
+            try {
+              const { createClient } = await import('@/lib/supabase/client');
+              const supabase = createClient();
 
-                  // 각 주문에 발주번호 생성 및 업데이트
-                  const now = getCurrentTimeUTC();
-                  for (let i = 0; i < filteredOrders.length; i++) {
-                    const order = filteredOrders[i];
-                    const orderNo = generateOrderNumber(userEmail, i + 1);
+              // 모든 옵션명 수집 (중복 제거)
+              const uniqueOptionNames = [...new Set(filteredOrders.map(order => order.products).filter(Boolean))];
 
-                    const { error } = await supabase
-                      .from('integrated_orders')
-                      .update({
-                        shipping_status: '발주서확정',
-                        order_number: orderNo,
-                        confirmed_at: now
-                      })
-                      .eq('id', order.id);
+              console.log('🔍 옵션명 검증 시작:', uniqueOptionNames);
 
-                    if (error) {
-                      console.error('발주확정 오류:', error);
-                      showModal('alert', '오류', `발주 확정 중 오류가 발생했습니다: ${error.message}`);
-                      return;
-                    }
-                  }
+              // option_products에서 공급단가 조회
+              const { data: optionProducts, error: optionError} = await supabase
+                .from('option_products')
+                .select('option_name, option_code, seller_supply_price')
+                .in('option_name', uniqueOptionNames);
 
-                  showModal('alert', '완료', `${filteredOrders.length}건의 주문이 발주 확정되었습니다.`, () => {
-                    // 주문 목록 새로고침
-                    if (onRefresh) {
-                      onRefresh();
-                    }
-                  });
-                } catch (error) {
-                  console.error('발주확정 오류:', error);
-                  showModal('alert', '오류', '발주 확정 중 오류가 발생했습니다.');
-                }
+              if (optionError) {
+                console.error('❌ 옵션명 조회 오류:', optionError);
+              } else {
+                console.log('✅ 옵션명으로 조회된 데이터:', optionProducts);
               }
-            );
+
+              console.log('💰 최종 조회된 옵션상품:', optionProducts);
+
+              // 옵션상품 Map 저장 (옵션명 소문자 키로 저장)
+              const productMap = new Map<string, any>();
+              (optionProducts || []).forEach((product: any) => {
+                if (product.option_name) {
+                  const key = product.option_name.trim().toLowerCase();
+                  productMap.set(key, product);
+                }
+              });
+              setOptionProductsMap(productMap);
+
+              // 검증 모달용 주문 데이터 준비
+              const utcTime = getCurrentTimeUTC();
+              const ordersForValidation = filteredOrders.map((order, index) => ({
+                index,
+                orderNumber: order.orderNumber || '',
+                orderer: order.orderer || '',
+                ordererPhone: order.ordererPhone || '',
+                recipient: order.recipient || '',
+                recipientPhone: order.recipientPhone || '',
+                address: order.address || '',
+                deliveryMessage: order.deliveryMessage || '',
+                optionName: order.products || '',
+                optionCode: '',
+                quantity: String(order.quantity || 1),
+                specialRequest: order.specialRequest || '',
+                // DB 저장용 메타데이터 (검증 후 사용)
+                _metadata: {
+                  id: order.id, // 기존 주문 ID (업데이트용)
+                  sheet_date: order.date?.split('T')[0] || utcTime.split('T')[0],
+                  seller_id: userId,
+                  created_by: userId,
+                  market_name: order.marketName || '플랫폼',
+                  payment_date: utcTime.split('T')[0],
+                  shipping_status: '발주서확정'
+                }
+              }));
+
+              // 검증 모달 표시
+              setValidatedOrders(ordersForValidation);
+              setShowOptionValidationModal(true);
+            } catch (error) {
+              console.error('옵션명 검증 오류:', error);
+              showModal('alert', '오류', '옵션명 검증 중 오류가 발생했습니다.');
+            }
           }}
           style={{
             padding: '12px 24px',
@@ -2341,6 +2405,75 @@ export default function OrderRegistrationTab({
           </div>
         </div>
       </Modal>
+
+      {/* 마켓파일 업로드 모달 */}
+      <MarketFileUploadModal
+        show={showMarketFileUploadModal}
+        onClose={() => setShowMarketFileUploadModal(false)}
+        onOrdersUploaded={() => {
+          if (onRefresh) {
+            onRefresh();
+          }
+        }}
+        userId={userId}
+        userEmail={userEmail}
+      />
+
+      {/* 옵션 검증 모달 (발주확정용) */}
+      <OptionValidationModal
+        show={showOptionValidationModal}
+        onClose={() => setShowOptionValidationModal(false)}
+        orders={validatedOrders}
+        onSave={async (validatedOrders: any[]) => {
+          try {
+            const { createClient } = await import('@/lib/supabase/client');
+            const supabase = createClient();
+
+            // 각 주문에 발주번호 생성 및 업데이트
+            const now = getCurrentTimeUTC();
+            for (let i = 0; i < validatedOrders.length; i++) {
+              const order = validatedOrders[i];
+              const orderNo = generateOrderNumber(userEmail, i + 1);
+              const quantity = parseInt(order.quantity) || 1;
+              const unitPrice = order.unitPrice || 0;
+              const supplyPrice = order.supplyPrice || (unitPrice * quantity);
+
+              const { error } = await supabase
+                .from('integrated_orders')
+                .update({
+                  shipping_status: '발주서확정',
+                  order_number: orderNo,
+                  confirmed_at: now,
+                  option_name: order.optionName, // 수정된 옵션명
+                  seller_supply_price: unitPrice,
+                  settlement_amount: supplyPrice
+                })
+                .eq('id', order._metadata.id);
+
+              if (error) {
+                console.error('발주확정 오류:', error);
+                showModal('alert', '오류', `발주 확정 중 오류가 발생했습니다: ${error.message}`);
+                return;
+              }
+            }
+
+            setShowOptionValidationModal(false);
+            setValidatedOrders([]);
+            setOptionProductsMap(new Map());
+
+            showModal('alert', '완료', `${validatedOrders.length}건의 주문이 발주 확정되었습니다.`, () => {
+              // 주문 목록 새로고침
+              if (onRefresh) {
+                onRefresh();
+              }
+            });
+          } catch (error) {
+            console.error('발주확정 오류:', error);
+            showModal('alert', '오류', '발주 확정 중 오류가 발생했습니다.');
+          }
+        }}
+        optionProducts={optionProductsMap}
+      />
     </div>
   );
 }

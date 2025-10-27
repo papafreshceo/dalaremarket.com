@@ -750,16 +750,16 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1">
                     <input
                       type="number"
-                      value={row.standard_quantity}
-                      onChange={(e) => updateOptionRow(row.id, 'standard_quantity', e.target.value)}
+                      value={optionData.standard_quantity}
+                      onChange={(e) => setOptionData({ ...optionData, standard_quantity: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px]"
                     />
                   </td>
                   <td className="border px-1 py-1">
                     <input
                       type="text"
-                      value={row.standard_unit}
-                      onChange={(e) => updateOptionRow(row.id, 'standard_unit', e.target.value)}
+                      value={optionData.standard_unit}
+                      onChange={(e) => setOptionData({ ...optionData, standard_unit: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px]"
                     />
                   </td>
@@ -767,8 +767,8 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1">
                     <input
                       type="number"
-                      value={row.raw_material_cost}
-                      onChange={(e) => updateOptionRow(row.id, 'raw_material_cost', e.target.value)}
+                      value={optionData.raw_material_cost}
+                      onChange={(e) => setOptionData({ ...optionData, raw_material_cost: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px] text-right"
                       placeholder="0"
                     />
@@ -776,8 +776,8 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1">
                     <input
                       type="number"
-                      value={row.packaging_box_price}
-                      onChange={(e) => updateOptionRow(row.id, 'packaging_box_price', e.target.value)}
+                      value={optionData.packaging_box_price}
+                      onChange={(e) => setOptionData({ ...optionData, packaging_box_price: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px] text-right"
                       placeholder="0"
                     />
@@ -785,8 +785,8 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1">
                     <input
                       type="number"
-                      value={row.pack_price}
-                      onChange={(e) => updateOptionRow(row.id, 'pack_price', e.target.value)}
+                      value={optionData.pack_price}
+                      onChange={(e) => setOptionData({ ...optionData, pack_price: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px] text-right"
                       placeholder="0"
                     />
@@ -794,8 +794,8 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1">
                     <input
                       type="number"
-                      value={row.bag_vinyl_price}
-                      onChange={(e) => updateOptionRow(row.id, 'bag_vinyl_price', e.target.value)}
+                      value={optionData.bag_vinyl_price}
+                      onChange={(e) => setOptionData({ ...optionData, bag_vinyl_price: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px] text-right"
                       placeholder="0"
                     />
@@ -803,8 +803,8 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1">
                     <input
                       type="number"
-                      value={row.cushioning_price}
-                      onChange={(e) => updateOptionRow(row.id, 'cushioning_price', e.target.value)}
+                      value={optionData.cushioning_price}
+                      onChange={(e) => setOptionData({ ...optionData, cushioning_price: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px] text-right"
                       placeholder="0"
                     />
@@ -812,8 +812,8 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1">
                     <input
                       type="number"
-                      value={row.sticker_price}
-                      onChange={(e) => updateOptionRow(row.id, 'sticker_price', e.target.value)}
+                      value={optionData.sticker_price}
+                      onChange={(e) => setOptionData({ ...optionData, sticker_price: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px] text-right"
                       placeholder="0"
                     />
@@ -821,8 +821,8 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1">
                     <input
                       type="number"
-                      value={row.ice_pack_price}
-                      onChange={(e) => updateOptionRow(row.id, 'ice_pack_price', e.target.value)}
+                      value={optionData.ice_pack_price}
+                      onChange={(e) => setOptionData({ ...optionData, ice_pack_price: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px] text-right"
                       placeholder="0"
                     />
@@ -830,8 +830,8 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1">
                     <input
                       type="number"
-                      value={row.other_material_price}
-                      onChange={(e) => updateOptionRow(row.id, 'other_material_price', e.target.value)}
+                      value={optionData.other_material_price}
+                      onChange={(e) => setOptionData({ ...optionData, other_material_price: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px] text-right"
                       placeholder="0"
                     />
@@ -839,8 +839,8 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1">
                     <input
                       type="number"
-                      value={row.labor_cost}
-                      onChange={(e) => updateOptionRow(row.id, 'labor_cost', e.target.value)}
+                      value={optionData.labor_cost}
+                      onChange={(e) => setOptionData({ ...optionData, labor_cost: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px] text-right"
                       placeholder="0"
                     />
@@ -848,8 +848,8 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1">
                     <input
                       type="number"
-                      value={row.seller_supply_price}
-                      onChange={(e) => updateOptionRow(row.id, 'seller_supply_price', e.target.value)}
+                      value={optionData.seller_supply_price}
+                      onChange={(e) => setOptionData({ ...optionData, seller_supply_price: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px] text-right"
                       placeholder="0"
                     />
@@ -857,16 +857,16 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1">
                     <input
                       type="number"
-                      value={row.seller_margin_rate}
-                      onChange={(e) => updateOptionRow(row.id, 'seller_margin_rate', e.target.value)}
+                      value={optionData.seller_margin_rate}
+                      onChange={(e) => setOptionData({ ...optionData, seller_margin_rate: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px]"
                     />
                   </td>
                   <td className="border px-1 py-1">
                     <input
                       type="number"
-                      value={row.shipping_fee}
-                      onChange={(e) => updateOptionRow(row.id, 'shipping_fee', e.target.value)}
+                      value={optionData.shipping_fee}
+                      onChange={(e) => setOptionData({ ...optionData, shipping_fee: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px] text-right"
                       placeholder="0"
                     />
@@ -874,8 +874,8 @@ export default function RegisterOptionProductPage() {
                   {/* 거래처 */}
                   <td className="border px-1 py-1">
                     <select
-                      value={row.supplier_id}
-                      onChange={(e) => updateOptionRow(row.id, 'supplier_id', e.target.value)}
+                      value={optionData.supplier_id}
+                      onChange={(e) => setOptionData({ ...optionData, supplier_id: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px]"
                     >
                       <option value="">선택</option>
@@ -886,8 +886,8 @@ export default function RegisterOptionProductPage() {
                   </td>
                   <td className="border px-1 py-1">
                     <select
-                      value={row.shipping_vendor_id}
-                      onChange={(e) => updateOptionRow(row.id, 'shipping_vendor_id', e.target.value)}
+                      value={optionData.shipping_vendor_id}
+                      onChange={(e) => setOptionData({ ...optionData, shipping_vendor_id: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px]"
                     >
                       <option value="">선택</option>
@@ -898,8 +898,8 @@ export default function RegisterOptionProductPage() {
                   </td>
                   <td className="border px-1 py-1">
                     <select
-                      value={row.invoice_entity}
-                      onChange={(e) => updateOptionRow(row.id, 'invoice_entity', e.target.value)}
+                      value={optionData.invoice_entity}
+                      onChange={(e) => setOptionData({ ...optionData, invoice_entity: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px]"
                     >
                       <option value="">선택</option>
@@ -910,8 +910,8 @@ export default function RegisterOptionProductPage() {
                   </td>
                   <td className="border px-1 py-1">
                     <select
-                      value={row.vendor_id}
-                      onChange={(e) => updateOptionRow(row.id, 'vendor_id', e.target.value)}
+                      value={optionData.vendor_id}
+                      onChange={(e) => setOptionData({ ...optionData, vendor_id: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px]"
                     >
                       <option value="">선택</option>
@@ -922,8 +922,8 @@ export default function RegisterOptionProductPage() {
                   </td>
                   <td className="border px-1 py-1">
                     <select
-                      value={row.status}
-                      onChange={(e) => updateOptionRow(row.id, 'status', e.target.value)}
+                      value={optionData.status}
+                      onChange={(e) => setOptionData({ ...optionData, status: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px]"
                     >
                       <option value="">선택</option>
@@ -936,24 +936,24 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1">
                     <input
                       type="date"
-                      value={row.season_start_date}
-                      onChange={(e) => updateOptionRow(row.id, 'season_start_date', e.target.value)}
+                      value={optionData.season_start_date}
+                      onChange={(e) => setOptionData({ ...optionData, season_start_date: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px]"
                     />
                   </td>
                   <td className="border px-1 py-1">
                     <input
                       type="date"
-                      value={row.season_end_date}
-                      onChange={(e) => updateOptionRow(row.id, 'season_end_date', e.target.value)}
+                      value={optionData.season_end_date}
+                      onChange={(e) => setOptionData({ ...optionData, season_end_date: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px]"
                     />
                   </td>
                   <td className="border px-1 py-1">
                     <input
                       type="text"
-                      value={row.season}
-                      onChange={(e) => updateOptionRow(row.id, 'season', e.target.value)}
+                      value={optionData.season}
+                      onChange={(e) => setOptionData({ ...optionData, season: e.target.value })}
                       className="w-full px-1 py-1 border-0 bg-transparent text-[11px]"
                     />
                   </td>
@@ -961,32 +961,32 @@ export default function RegisterOptionProductPage() {
                   <td className="border px-1 py-1 text-center">
                     <input
                       type="checkbox"
-                      checked={row.is_seller_supply}
-                      onChange={(e) => updateOptionRow(row.id, 'is_seller_supply', e.target.checked)}
+                      checked={optionData.is_seller_supply}
+                      onChange={(e) => setOptionData({ ...optionData, is_seller_supply: e.target.checked })}
                       className="w-4 h-4"
                     />
                   </td>
                   <td className="border px-1 py-1 text-center">
                     <input
                       type="checkbox"
-                      checked={row.is_best}
-                      onChange={(e) => updateOptionRow(row.id, 'is_best', e.target.checked)}
+                      checked={optionData.is_best}
+                      onChange={(e) => setOptionData({ ...optionData, is_best: e.target.checked })}
                       className="w-4 h-4"
                     />
                   </td>
                   <td className="border px-1 py-1 text-center">
                     <input
                       type="checkbox"
-                      checked={row.is_recommended}
-                      onChange={(e) => updateOptionRow(row.id, 'is_recommended', e.target.checked)}
+                      checked={optionData.is_recommended}
+                      onChange={(e) => setOptionData({ ...optionData, is_recommended: e.target.checked })}
                       className="w-4 h-4"
                     />
                   </td>
                   <td className="border px-1 py-1 text-center">
                     <input
                       type="checkbox"
-                      checked={row.has_detail_page}
-                      onChange={(e) => updateOptionRow(row.id, 'has_detail_page', e.target.checked)}
+                      checked={optionData.has_detail_page}
+                      onChange={(e) => setOptionData({ ...optionData, has_detail_page: e.target.checked })}
                       className="w-4 h-4"
                     />
                   </td>
@@ -1328,8 +1328,8 @@ export default function RegisterOptionProductPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-5xl max-h-[80vh] flex flex-col">
             <div className="p-4 border-b flex items-center justify-between">
               <div>
-                <h3 className="text-[14px] font-semibold">카테고리 선택</h3>
-                <p className="text-[14px] text-gray-500 mt-1">위탁 생산 상품의 경우 카테고리를 선택하세요</p>
+                <h3 className="text-[16px] font-semibold">카테고리 선택</h3>
+                <p className="text-[12px] text-gray-500 mt-1">위탁 생산 상품의 경우 카테고리를 선택하세요</p>
               </div>
               <button
                 onClick={() => setShowCategorySelector(false)}
@@ -1340,9 +1340,9 @@ export default function RegisterOptionProductPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto">
-              <table className="w-full">
+              <table className="w-full text-[14px]">
                 <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                  <tr className="text-[14px]">
+                  <tr>
                     <th className="px-4 py-3 text-left font-semibold">대분류</th>
                     <th className="px-4 py-3 text-left font-semibold">중분류</th>
                     <th className="px-4 py-3 text-left font-semibold">소분류</th>
@@ -1353,14 +1353,14 @@ export default function RegisterOptionProductPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {productsMaster.length === 0 ? (
-                    <tr className="text-[14px]">
+                    <tr>
                       <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
                         등록된 카테고리가 없습니다
                       </td>
                     </tr>
                   ) : (
                     productsMaster.map((category) => (
-                      <tr key={category.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 text-[14px]">
+                      <tr key={category.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-4 py-3">{category.category_1 || '-'}</td>
                         <td className="px-4 py-3">{category.category_2 || '-'}</td>
                         <td className="px-4 py-3">{category.category_3 || '-'}</td>

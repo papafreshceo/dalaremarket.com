@@ -1,6 +1,6 @@
 'use client';
 
-import { X, TrendingUp, Calendar, MapPin, Truck, Package2, DollarSign, Tag } from 'lucide-react';
+import { X, TrendingUp, MapPin, Truck, Package2, DollarSign, Tag } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 
 interface OptionProduct {
@@ -9,15 +9,13 @@ interface OptionProduct {
   option_code?: string;
   seller_supply_price?: number;
   market_price?: number;
-  season_start?: string;
-  season_end?: string;
-  출고?: string;
-  송장?: string;
-  벤더사?: string;
-  발송지명?: string;
-  발송지주소?: string;
-  발송지연락처?: string;
-  출고비용?: number;
+  shipping_entity?: string;
+  invoice_entity?: string;
+  shipping_vendor_id?: string;
+  shipping_location_name?: string;
+  shipping_location_address?: string;
+  shipping_location_contact?: string;
+  shipping_cost?: number;
   thumbnail_url?: string;
   created_at?: string;
   updated_at?: string;
@@ -121,26 +119,6 @@ export default function ProductDetailModal({ product, onClose, onShowPriceChart 
 
         <hr className="border-gray-200" />
 
-        {/* 시즌 정보 */}
-        {(product.season_start || product.season_end) && (
-          <div className="bg-green-50 p-4 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <Calendar className="w-5 h-5 text-green-600" />
-              <h4 className="font-semibold text-green-900">시즌 정보</h4>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div>
-                <span className="text-green-700 font-medium">시작일:</span>
-                <span className="ml-2 text-green-900">{formatDate(product.season_start)}</span>
-              </div>
-              <div>
-                <span className="text-green-700 font-medium">종료일:</span>
-                <span className="ml-2 text-green-900">{formatDate(product.season_end)}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* 배송 정보 */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <div className="flex items-center gap-2 mb-3">
@@ -148,57 +126,57 @@ export default function ProductDetailModal({ product, onClose, onShowPriceChart 
             <h4 className="font-semibold text-gray-900">배송 정보</h4>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-            {product.벤더사 && (
+            {product.shipping_vendor_id && (
               <div>
                 <span className="text-gray-600 font-medium">벤더사:</span>
-                <span className="ml-2 text-gray-900">{product.벤더사}</span>
+                <span className="ml-2 text-gray-900">{product.shipping_vendor_id}</span>
               </div>
             )}
-            {product.출고 && (
+            {product.shipping_entity && (
               <div>
                 <span className="text-gray-600 font-medium">출고:</span>
-                <span className="ml-2 text-gray-900">{product.출고}</span>
+                <span className="ml-2 text-gray-900">{product.shipping_entity}</span>
               </div>
             )}
-            {product.송장 && (
+            {product.invoice_entity && (
               <div>
                 <span className="text-gray-600 font-medium">송장:</span>
-                <span className="ml-2 text-gray-900">{product.송장}</span>
+                <span className="ml-2 text-gray-900">{product.invoice_entity}</span>
               </div>
             )}
-            {product.출고비용 && (
+            {product.shipping_cost && (
               <div>
                 <span className="text-gray-600 font-medium">출고비용:</span>
-                <span className="ml-2 text-gray-900">{formatPrice(product.출고비용)}</span>
+                <span className="ml-2 text-gray-900">{formatPrice(product.shipping_cost)}</span>
               </div>
             )}
           </div>
         </div>
 
         {/* 발송지 정보 */}
-        {(product.발송지명 || product.발송지주소 || product.발송지연락처) && (
+        {(product.shipping_location_name || product.shipping_location_address || product.shipping_location_contact) && (
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="flex items-center gap-2 mb-3">
               <MapPin className="w-5 h-5 text-gray-700" />
               <h4 className="font-semibold text-gray-900">발송지 정보</h4>
             </div>
             <div className="space-y-2 text-sm">
-              {product.발송지명 && (
+              {product.shipping_location_name && (
                 <div>
                   <span className="text-gray-600 font-medium">발송지명:</span>
-                  <span className="ml-2 text-gray-900">{product.발송지명}</span>
+                  <span className="ml-2 text-gray-900">{product.shipping_location_name}</span>
                 </div>
               )}
-              {product.발송지주소 && (
+              {product.shipping_location_address && (
                 <div>
                   <span className="text-gray-600 font-medium">주소:</span>
-                  <span className="ml-2 text-gray-900">{product.발송지주소}</span>
+                  <span className="ml-2 text-gray-900">{product.shipping_location_address}</span>
                 </div>
               )}
-              {product.발송지연락처 && (
+              {product.shipping_location_contact && (
                 <div>
                   <span className="text-gray-600 font-medium">연락처:</span>
-                  <span className="ml-2 text-gray-900">{product.발송지연락처}</span>
+                  <span className="ml-2 text-gray-900">{product.shipping_location_contact}</span>
                 </div>
               )}
             </div>

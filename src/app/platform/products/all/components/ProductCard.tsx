@@ -8,12 +8,11 @@ interface OptionProduct {
   option_code?: string;
   seller_supply_price?: number;
   market_price?: number;
-  season_start?: string;
-  season_end?: string;
-  출고?: string;
-  송장?: string;
-  벤더사?: string;
-  발송지명?: string;
+  shipping_entity?: string;
+  invoice_entity?: string;
+  shipping_vendor_id?: string;
+  shipping_location_name?: string;
+  shipping_cost?: number;
   thumbnail_url?: string;
 }
 
@@ -93,11 +92,11 @@ export default function ProductCard({ product, onProductClick, onShowPriceChart 
               {formatPrice(product.seller_supply_price)}
             </span>
           </div>
-          {product.출고비용 && (
+          {product.shipping_cost && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-500">택배비</span>
               <span className="text-xs text-gray-700">
-                {formatPrice(product.출고비용)}
+                {formatPrice(product.shipping_cost)}
               </span>
             </div>
           )}

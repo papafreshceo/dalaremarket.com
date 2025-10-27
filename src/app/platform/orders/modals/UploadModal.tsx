@@ -37,11 +37,12 @@ export default function UploadModal({
       zIndex: 1000
     }}>
       <div style={{
-        background: '#ffffff',
+        background: 'var(--color-surface)',
         borderRadius: '16px',
         width: '500px',
         maxWidth: '90%',
-        padding: '32px'
+        padding: '32px',
+        border: '1px solid var(--color-border)'
       }}>
         <div style={{
           display: 'flex',
@@ -52,7 +53,7 @@ export default function UploadModal({
           <h2 style={{
             fontSize: '20px',
             fontWeight: '600',
-            color: '#212529',
+            color: 'var(--color-text)',
             margin: 0
           }}>
             발주서 엑셀 업로드
@@ -63,7 +64,7 @@ export default function UploadModal({
               background: 'none',
               border: 'none',
               fontSize: '24px',
-              color: '#6c757d',
+              color: 'var(--color-text-secondary)',
               cursor: 'pointer',
               padding: 0
             }}
@@ -78,20 +79,20 @@ export default function UploadModal({
           onDragOver={handleDrag}
           onDrop={handleDrop}
           style={{
-            border: `2px dashed ${dragActive ? '#2563eb' : '#dee2e6'}`,
+            border: `2px dashed ${dragActive ? '#2563eb' : 'var(--color-border)'}`,
             borderRadius: '12px',
             padding: '48px 32px',
             textAlign: 'center',
-            background: dragActive ? '#eff6ff' : '#fafafa',
+            background: dragActive ? '#eff6ff' : 'var(--color-surface-hover)',
             transition: 'all 0.2s'
           }}
         >
-          <svg width="48" height="48" viewBox="0 0 24 24" stroke="#6c757d" strokeWidth="1.5" fill="none" style={{ margin: '0 auto 20px' }}>
+          <svg width="48" height="48" viewBox="0 0 24 24" stroke="var(--color-text-secondary)" strokeWidth="1.5" fill="none" style={{ margin: '0 auto 20px' }}>
             <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
           </svg>
           <p style={{
             fontSize: '16px',
-            color: '#212529',
+            color: 'var(--color-text)',
             marginBottom: '8px',
             fontWeight: '500'
           }}>
@@ -99,7 +100,7 @@ export default function UploadModal({
           </p>
           <p style={{
             fontSize: '14px',
-            color: '#6c757d',
+            color: 'var(--color-text-secondary)',
             marginBottom: '20px'
           }}>
             아래 버튼을 클릭하여 선택하세요
@@ -128,7 +129,7 @@ export default function UploadModal({
           </button>
           <p style={{
             fontSize: '12px',
-            color: '#6c757d',
+            color: 'var(--color-text-secondary)',
             marginTop: '20px'
           }}>
             * .xlsx, .xls 파일만 업로드 가능합니다

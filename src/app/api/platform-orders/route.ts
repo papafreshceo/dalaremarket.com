@@ -1,10 +1,18 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { enrichOrderWithOptionInfo, enrichOrdersWithOptionInfo } from '@/lib/order-utils';
+import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
+import { applyOptionMappingToOrdersServer } from '@/lib/option-mapping-utils';
 
 /**
  * POST /api/platform-orders
- * 플랫폼 셀러 주문 등록 (단건 또는 다수)
+ *
+ * 플랫폼 셀러 주문 등록 API (마켓파일 업로드용)
+ *
+ * 처리 흐름:
+ * 1. 사용자 인증 확인
+ * 2. 옵션명 매핑 적용 (사용자 설정 기준)
+ * 3. 옵션 상품 정보 조회 및 매핑 (공급단가, 발송정보 등)
+ * 4. DB 저장
  */
 export async function POST(request: NextRequest) {
   try {
@@ -25,8 +33,8 @@ export async function POST(request: NextRequest) {
     const isMultiple = Array.isArray(body.orders);
 
     if (isMultiple) {
-      // 다건 처리 (엑셀 업로드)
-      const { orders } = body;
+      // 다건 처리 (마켓파일 업로드)
+      let { orders } = body;
 
       if (!orders || orders.length === 0) {
         return NextResponse.json(
@@ -35,7 +43,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 옵션 상품 정보 자동 매핑
+      // 1단계: 옵션명 매핑 적용 (사용자 설정 기준)
+      orders = await applyOptionMappingToOrdersServer(orders, user.id);
+
+      // 2단계: 옵션 상품 정보 자동 매핑 (공급단가, 발송정보 등)
       const ordersWithInfo = await enrichOrdersWithOptionInfo(orders);
 
       // DB에 일괄 저장
@@ -45,7 +56,7 @@ export async function POST(request: NextRequest) {
         .select();
 
       if (error) {
-        console.error('❌ 주문 일괄 저장 실패:', error);
+        console.error('[platform-orders] 주문 저장 실패:', error);
         return NextResponse.json(
           { success: false, error: error.message },
           { status: 500 }
@@ -75,8 +86,9 @@ export async function POST(request: NextRequest) {
         orderData.seller_id = user.id;
       }
 
-      // 옵션 상품 정보 자동 매핑
-      const orderWithInfo = await enrichOrderWithOptionInfo(orderData);
+      // 옵션 상품 정보 자동 매핑 (단건용)
+      const ordersWithInfo = await enrichOrdersWithOptionInfo([orderData]);
+      const orderWithInfo = ordersWithInfo[0];
 
       // DB에 저장
       const { data, error } = await supabase
@@ -86,7 +98,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (error) {
-        console.error('❌ 주문 저장 실패:', error);
+        console.error('[platform-orders] 주문 저장 실패:', error);
         return NextResponse.json(
           { success: false, error: error.message },
           { status: 500 }

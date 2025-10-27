@@ -30,6 +30,7 @@ interface EditableAdminGridProps<T = any> {
   onSelectionChange?: (indices: number[]) => void  // 선택된 행이 변경될 때 호출
   onModifiedChange?: (hasModifications: boolean) => void  // 수정 상태 변경 콜백
   onScroll?: (event: React.UIEvent<HTMLDivElement>) => void  // 스크롤 이벤트 핸들러
+  forceModified?: boolean  // 외부에서 강제로 수정 상태 표시 (토글 버튼 등)
   // 엑셀 업로드 자동 저장 (이 옵션들이 있으면 모달에서 바로 DB 저장)
   tableName?: string  // Supabase 테이블 이름 (있으면 엑셀 업로드 시 자동 저장)
   onDataReload?: () => Promise<void>  // 저장 완료 후 데이터 재조회 함수
@@ -71,6 +72,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   onSelectionChange,
   onModifiedChange,
   onScroll,
+  forceModified = false,
   tableName,
   onDataReload,
   validateRow,
@@ -96,6 +98,10 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   const [gridData, setGridData] = useState<T[]>([])
   const [editingCell, setEditingCell] = useState<CellPosition | null>(null)
   const [selectedCell, setSelectedCell] = useState<CellPosition | null>(null)
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set()) // 다중 셀 선택 (row-col 형식)
+  const [isDragging, setIsDragging] = useState(false) // 드래그 중 여부
+  const [dragStartCell, setDragStartCell] = useState<CellPosition | null>(null) // 드래그 시작 셀
+  const [hasDragged, setHasDragged] = useState(false) // 실제로 드래그 했는지 여부 (클릭과 구분)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
   const [resizingColumn, setResizingColumn] = useState<string | null>(null)
   const [resizeStartX, setResizeStartX] = useState<number>(0)
@@ -312,39 +318,76 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           // Backspace나 Delete 키를 누르면 셀 값을 바로 삭제 (편집 모드로 전환하지 않음)
           console.log('[Global Delete] Delete key pressed')
           e.preventDefault()
-          const column = columns.find(c => c.key === selectedCell.col)
-          const row = gridData[selectedCell.row]
-          if (column && !isReadOnly(column, row)) {
-            console.log('[Global Delete] Column found, not readonly')
-            const newData = [...gridData]
-            newData[selectedCell.row] = {
-              ...newData[selectedCell.row],
-              [selectedCell.col]: column.type === 'number' ? null : ''
-            }
 
-            // 수정 추적
-            const cellKey = `${selectedCell.row}-${selectedCell.col}`
-            const isAddedOrCopied = addedRows.has(selectedCell.row) || copiedRows.has(selectedCell.row)
-            const newModifiedCells = new Set(modifiedCells)
+          const newData = [...gridData]
+          const newModifiedCells = new Set(modifiedCells)
+          let hasChanges = false
 
-            if (!isAddedOrCopied) {
-              const originalValue = originalDataRef.current[selectedCell.row]?.[selectedCell.col]
-              const newValue = column.type === 'number' ? null : ''
+          // 다중 셀 선택이 있는 경우
+          if (selectedCells.size > 0) {
+            console.log('[Global Delete] Multiple cells selected:', selectedCells.size)
+            selectedCells.forEach(cellKey => {
+              const [rowStr, colKey] = cellKey.split('-')
+              const rowIndex = parseInt(rowStr)
+              const column = columns.find(c => c.key === colKey)
+              const row = gridData[rowIndex]
 
-              // 원본 값이 존재하고(빈 값이 아니고) 삭제한 경우 무조건 수정으로 추적
-              const originalHasValue = originalValue !== null && originalValue !== undefined && originalValue !== ''
+              if (column && !isReadOnly(column, row)) {
+                const emptyValue = column.type === 'number' ? null : ''
+                newData[rowIndex] = {
+                  ...newData[rowIndex],
+                  [colKey]: emptyValue
+                }
 
-              if (newValue === originalValue) {
-                newModifiedCells.delete(cellKey)
-              } else if (originalHasValue) {
-                // 원본에 값이 있었는데 삭제한 경우 반드시 추가
-                newModifiedCells.add(cellKey)
-              } else if (newValue !== originalValue) {
-                // 그 외 다른 경우도 추가
-                newModifiedCells.add(cellKey)
+                // 수정 추적
+                const isAddedOrCopied = addedRows.has(rowIndex) || copiedRows.has(rowIndex)
+                if (!isAddedOrCopied) {
+                  const originalValue = originalDataRef.current[rowIndex]?.[colKey]
+                  const originalHasValue = originalValue !== null && originalValue !== undefined && originalValue !== ''
+
+                  if (emptyValue === originalValue) {
+                    newModifiedCells.delete(cellKey)
+                  } else if (originalHasValue || emptyValue !== originalValue) {
+                    newModifiedCells.add(cellKey)
+                  }
+                }
+                hasChanges = true
               }
-            }
+            })
+          }
+          // 단일 셀 선택인 경우
+          else if (selectedCell) {
+            const column = columns.find(c => c.key === selectedCell.col)
+            const row = gridData[selectedCell.row]
+            if (column && !isReadOnly(column, row)) {
+              console.log('[Global Delete] Single cell, column found, not readonly')
+              newData[selectedCell.row] = {
+                ...newData[selectedCell.row],
+                [selectedCell.col]: column.type === 'number' ? null : ''
+              }
 
+              // 수정 추적
+              const cellKey = `${selectedCell.row}-${selectedCell.col}`
+              const isAddedOrCopied = addedRows.has(selectedCell.row) || copiedRows.has(selectedCell.row)
+
+              if (!isAddedOrCopied) {
+                const originalValue = originalDataRef.current[selectedCell.row]?.[selectedCell.col]
+                const newValue = column.type === 'number' ? null : ''
+                const originalHasValue = originalValue !== null && originalValue !== undefined && originalValue !== ''
+
+                if (newValue === originalValue) {
+                  newModifiedCells.delete(cellKey)
+                } else if (originalHasValue) {
+                  newModifiedCells.add(cellKey)
+                } else if (newValue !== originalValue) {
+                  newModifiedCells.add(cellKey)
+                }
+              }
+              hasChanges = true
+            }
+          }
+
+          if (hasChanges) {
             // 내부 업데이트 플래그 먼저 설정
             console.log('[Global Delete] Setting isInternalUpdate to true, modifiedCells size:', newModifiedCells.size)
             isInternalUpdate.current = true
@@ -487,6 +530,22 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       setFillPreviewData(null)
     }
   }, [fillStartCell, hoverCell, gridData])
+
+  // 드래그 선택 종료
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(false)
+        setDragStartCell(null)
+        // hasDragged는 handleCellClick에서 초기화
+      }
+    }
+
+    if (isDragging) {
+      document.addEventListener('mouseup', handleMouseUp)
+      return () => document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging])
 
   // 채우기 핸들 드래그
   useEffect(() => {
@@ -640,7 +699,78 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     setHistoryIndex(newHistory.length - 1)
   }
 
+  // 셀에서 마우스 다운 시작
+  const handleCellMouseDown = (rowIndex: number, columnKey: string, e: React.MouseEvent) => {
+    // 텍스트 선택이 있으면 무시
+    const selection = window.getSelection()
+    if (selection && selection.toString().length > 0) {
+      return
+    }
+
+    // 편집 중이면 무시
+    if (editingCell) {
+      return
+    }
+
+    const column = columns.find(col => col.key === columnKey)
+    const row = gridData[rowIndex]
+
+    // 체크박스나 readOnly 셀은 드래그 선택 불가
+    if (column?.type === 'checkbox' || isReadOnly(column, row)) {
+      return
+    }
+
+    // Ctrl/Shift 키 없이만 드래그 시작
+    if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      e.preventDefault() // 기본 동작 방지
+      setIsDragging(true)
+      setHasDragged(false)
+      setDragStartCell({ row: rowIndex, col: columnKey })
+      setSelectedCell({ row: rowIndex, col: columnKey })
+      setSelectedCells(new Set([`${rowIndex}-${columnKey}`]))
+    }
+  }
+
+  // 드래그 중 셀 위로 마우스 이동
+  const handleCellMouseEnter = (rowIndex: number, columnKey: string) => {
+    if (!isDragging || !dragStartCell) {
+      return
+    }
+
+    // 시작 셀과 다른 셀로 이동했으면 드래그로 간주
+    if (dragStartCell.row !== rowIndex || dragStartCell.col !== columnKey) {
+      setHasDragged(true)
+    }
+
+    // 드래그 범위 계산
+    const startRow = Math.min(dragStartCell.row, rowIndex)
+    const endRow = Math.max(dragStartCell.row, rowIndex)
+    const startColIdx = Math.min(
+      columns.findIndex(c => c.key === dragStartCell.col),
+      columns.findIndex(c => c.key === columnKey)
+    )
+    const endColIdx = Math.max(
+      columns.findIndex(c => c.key === dragStartCell.col),
+      columns.findIndex(c => c.key === columnKey)
+    )
+
+    const newSelectedCells = new Set<string>()
+    for (let r = startRow; r <= endRow; r++) {
+      for (let c = startColIdx; c <= endColIdx; c++) {
+        newSelectedCells.add(`${r}-${columns[c].key}`)
+      }
+    }
+
+    setSelectedCells(newSelectedCells)
+  }
+
   const handleCellClick = (rowIndex: number, columnKey: string, currentValue: any, e: React.MouseEvent) => {
+    // 드래그 후 클릭은 무시 (드래그 선택만 적용)
+    if (hasDragged) {
+      setHasDragged(false)
+      return
+    }
+
     // 텍스트 선택이 있으면 클릭 이벤트 무시
     const selection = window.getSelection()
     if (selection && selection.toString().length > 0) {
@@ -654,6 +784,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
     const column = columns.find(col => col.key === columnKey)
     const row = gridData[rowIndex]
+    const cellKey = `${rowIndex}-${columnKey}`
 
     // 체크박스는 클릭 한 번에 즉시 토글
     if (column?.type === 'checkbox' && !isReadOnly(column, row)) {
@@ -665,7 +796,6 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       }
 
       // 수정 추적
-      const cellKey = `${rowIndex}-${columnKey}`
       const isAddedOrCopied = addedRows.has(rowIndex) || copiedRows.has(rowIndex)
       const newModifiedCells = new Set(modifiedCells)
 
@@ -694,6 +824,51 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
       return
     }
+
+    // Ctrl+클릭: 다중 셀 선택 토글
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault()
+      const newSelectedCells = new Set(selectedCells)
+
+      if (newSelectedCells.has(cellKey)) {
+        newSelectedCells.delete(cellKey)
+      } else {
+        newSelectedCells.add(cellKey)
+      }
+
+      setSelectedCells(newSelectedCells)
+      setSelectedCell({ row: rowIndex, col: columnKey })
+      return
+    }
+
+    // Shift+클릭: 범위 선택
+    if (e.shiftKey && selectedCell) {
+      e.preventDefault()
+      const newSelectedCells = new Set<string>()
+
+      const startRow = Math.min(selectedCell.row, rowIndex)
+      const endRow = Math.max(selectedCell.row, rowIndex)
+      const startColIdx = Math.min(
+        columns.findIndex(c => c.key === selectedCell.col),
+        columns.findIndex(c => c.key === columnKey)
+      )
+      const endColIdx = Math.max(
+        columns.findIndex(c => c.key === selectedCell.col),
+        columns.findIndex(c => c.key === columnKey)
+      )
+
+      for (let r = startRow; r <= endRow; r++) {
+        for (let c = startColIdx; c <= endColIdx; c++) {
+          newSelectedCells.add(`${r}-${columns[c].key}`)
+        }
+      }
+
+      setSelectedCells(newSelectedCells)
+      return
+    }
+
+    // 일반 클릭: 다중 선택 해제
+    setSelectedCells(new Set())
 
     // 이미 선택된 셀을 다시 클릭하면 편집 모드 활성화 (드롭다운 제외)
     if (selectedCell?.row === rowIndex && selectedCell?.col === columnKey && !isReadOnly(column, row) && column?.type !== 'dropdown') {
@@ -1564,6 +1739,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     const rowId = getRowId(row)
     const isRowSelected = selectedRowIds.has(rowId)
     const cellKey = `${rowIndex}-${columnKey}`
+    const isMultiSelected = selectedCells.has(cellKey) // 다중 셀 선택 여부
     const isModified = modifiedCells.has(cellKey)
     const isAdded = addedRows.has(rowIndex)
     const isCopied = copiedRows.has(rowIndex)
@@ -1603,9 +1779,13 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       classes += 'text-blue-600 dark:text-blue-500 '
     }
 
-    // 선택된 셀
+    // 선택된 셀 (단일 선택이 우선순위 높음)
     if (isSelected) {
       classes += 'ring-2 ring-blue-500 ring-inset z-20 bg-blue-100 '
+    }
+    // 다중 셀 선택
+    else if (isMultiSelected) {
+      classes += 'ring-1 ring-blue-400 ring-inset z-10 bg-blue-50 '
     }
     // 채우기 범위
     else if (isFillRange) {
@@ -1652,7 +1832,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     }
 
     return classes.trim()
-  }, [selectedCell, modifiedCells, addedRows, copiedRows, hoverCell, fillStartCell, fillPreviewData, selectedRowIds, getRowId])
+  }, [selectedCell, selectedCells, modifiedCells, addedRows, copiedRows, hoverCell, fillStartCell, fillPreviewData, selectedRowIds, getRowId])
 
   const renderCell = (row: T, column: Column<T>, rowIndex: number) => {
     const isEditing = editingCell?.row === rowIndex && editingCell?.col === column.key
@@ -2128,9 +2308,9 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           {onSave && (
             <button
               onClick={handleSaveClick}
-              disabled={modifiedCount === 0 && addedRows.size === 0 && copiedRows.size === 0}
+              disabled={!forceModified && modifiedCount === 0 && addedRows.size === 0 && copiedRows.size === 0}
               className={`px-2 py-1 rounded text-xs ${
-                modifiedCount > 0 || addedRows.size > 0 || copiedRows.size > 0
+                forceModified || modifiedCount > 0 || addedRows.size > 0 || copiedRows.size > 0
                   ? 'bg-primary text-white hover:bg-primary-hover'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
@@ -2339,13 +2519,20 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                         width: width,
                         minWidth: width,
                         maxWidth: width,
-                        userSelect: 'text',
+                        userSelect: isDragging ? 'none' : 'text',
                         ...customStyle
                       }}
+                      onMouseDown={(e) => handleCellMouseDown(rowIndex, column.key, e)}
                       onClick={(e) => handleCellClick(rowIndex, column.key, row[column.key], e)}
                       onDoubleClick={() => handleCellDoubleClick(rowIndex, column.key, row[column.key])}
-                      onMouseEnter={() => setHoverCell({ row: rowIndex, col: column.key })}
-                      onMouseLeave={() => !fillStartCell && setHoverCell(null)}
+                      onMouseEnter={() => {
+                        if (isDragging) {
+                          handleCellMouseEnter(rowIndex, column.key)
+                        } else {
+                          setHoverCell({ row: rowIndex, col: column.key })
+                        }
+                      }}
+                      onMouseLeave={() => !fillStartCell && !isDragging && setHoverCell(null)}
                     >
                       {renderCell(row, column, rowIndex)}
                     </td>

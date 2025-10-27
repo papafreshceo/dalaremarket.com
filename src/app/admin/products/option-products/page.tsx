@@ -46,10 +46,10 @@ interface OptionProduct {
   target_margin_amount?: number | null  // 목표 직판마진액
   margin_calculation_type?: 'rate' | 'amount' | '마진율' | '마진액' | null
   average_material_price?: number | null  // 사용원물 평균가
-  calculated_material_cost?: number | null  // 원물원가 (계산값)
   raw_material_partner?: string | null  // 원물거래처 ID
   shipping_entity?: string | null  // 출고 (출고처 ID)
   shipping_vendor_id?: string | null  // 벤더사 ID
+  shipping_additional_quantity?: number | null  // 택배비 부가수량
   created_at?: string
   [key: string]: any
 }
@@ -85,6 +85,8 @@ export default function OptionProductsManagementPage() {
   const [modalType, setModalType] = useState<string | null>(null)
   const [verificationResults, setVerificationResults] = useState<any>(null)
   const [gridKey, setGridKey] = useState(0) // Grid 강제 리렌더링용
+  const [hasToggleChanges, setHasToggleChanges] = useState(false) // 토글 버튼 변경사항
+  const [isSaving, setIsSaving] = useState(false) // 저장 중 상태
 
   // 엑셀 업로드 모달
   const [excelUploadModal, setExcelUploadModal] = useState<{ data: any[], mode: 'replace' | 'merge' | null } | null>(null)
@@ -115,10 +117,36 @@ export default function OptionProductsManagementPage() {
       : marginCalcTypeRaw === '마진액' ? 'amount'
       : marginCalcTypeRaw || 'rate'
 
-    // 0. 원물비용 계산 (원물가 × 표준수량)
-    const averageMaterialPrice = Number(item.average_material_price) || 0
-    const standardQuantity = Number(item.standard_quantity) || 0
-    const rawMaterialCost = averageMaterialPrice * standardQuantity
+    // 0. 원물가 및 원물비용 계산
+    // 원물가: 연결된 원물들의 평균 시세
+    // 원물비용: 원물가 × (옵션상품 사용량 / 원물 표준량)
+
+    const enrichedMaterials = item.enriched_materials || []
+    const optionStandardQty = Number(item.standard_quantity) || 0
+
+    let totalMaterialPrice = 0
+    let materialCount = 0
+    let rawMaterialCost = 0
+
+    if (optionStandardQty > 0 && enrichedMaterials.length > 0) {
+      enrichedMaterials.forEach((m: any) => {
+        const materialLatestPrice = Number(m.latest_price) || 0
+        const materialStandardQty = Number(m.standard_quantity) || 0
+
+        if (materialLatestPrice > 0) {
+          totalMaterialPrice += materialLatestPrice
+          materialCount++
+        }
+
+        // 각 원물별 원물비용 계산 후 합산
+        if (materialStandardQty > 0 && materialLatestPrice > 0) {
+          rawMaterialCost += (optionStandardQty / materialStandardQty) * materialLatestPrice
+        }
+      })
+    }
+
+    // 평균 원물가 계산
+    const averageMaterialPrice = materialCount > 0 ? Math.round(totalMaterialPrice / materialCount) : 0
 
     // 1. 총원가 계산 (무조건 자동, 택배비 제외)
     const totalCost = (
@@ -209,6 +237,7 @@ export default function OptionProductsManagementPage() {
     }
 
     return {
+      average_material_price: averageMaterialPrice,
       raw_material_cost: Math.round(rawMaterialCost),
       total_cost: totalCost,
       seller_supply_price: sellerSupplyPrice,
@@ -250,9 +279,8 @@ export default function OptionProductsManagementPage() {
     labor_cost: '인건비',
 
     // 원가
-    raw_material_cost: '원물비용',
     average_material_price: '원물가',
-    calculated_material_cost: '원물비용',
+    raw_material_cost: '원물비용',
     total_material_cost: '총자재비',
     total_cost: '총원가',
     material_cost_policy: '원물가정책',
@@ -272,7 +300,6 @@ export default function OptionProductsManagementPage() {
     shipping_cost: '상품출고비용',
     shipping_fee: '택배비',
     shipping_additional_quantity: '택배비 부가수량',
-    additional_quantity: '부가수량',
 
     // 셀러공급
     is_seller_supply: '셀러공급Y/N',
@@ -302,16 +329,7 @@ export default function OptionProductsManagementPage() {
     thumbnail_url: '썸네일',
     description: '설명',
     notes: '비고',
-    is_best: '베스트Y/N',
-    is_recommended: '추천상품Y/N',
-    has_detail_page: '상세페이지제공',
-    has_images: '이미지제공',
     misc_cost: '기타비용',
-
-    // 사용 옵션명
-    option_name_1: '옵션명1',
-    option_name_2: '옵션명2',
-    option_name_3: '옵션명3',
   }
 
   const FIELD_ORDER = [
@@ -325,14 +343,14 @@ export default function OptionProductsManagementPage() {
     'packaging_box_price','pack_price','bag_vinyl_price','cushioning_price','sticker_price','ice_pack_price','other_material_price','labor_cost',
 
     // 원가
-    'raw_material_cost','total_material_cost','total_cost','material_cost_policy','fixed_material_cost',
+    'average_material_price','raw_material_cost','total_material_cost','total_cost','material_cost_policy','fixed_material_cost',
 
     // 거래처 및 출고
     'raw_material_partner','shipping_entity','invoice_entity','shipping_vendor_id',
     'shipping_location_name','shipping_location_address','shipping_location_contact','shipping_deadline',
 
     // 택배비 및 부가
-    'shipping_cost','shipping_fee','additional_quantity','misc_cost',
+    'shipping_cost','shipping_fee','shipping_additional_quantity','misc_cost',
 
     // 셀러공급
     'is_seller_supply',
@@ -344,29 +362,48 @@ export default function OptionProductsManagementPage() {
     'coupang_price_mode','coupang_paid_shipping_price','coupang_free_shipping_price',
 
     // 상태 및 기타
-    'status','thumbnail_url','description','notes',
-    'is_best','is_recommended','has_detail_page','has_images',
-
-    // 사용 옵션명
-    'option_name_1','option_name_2','option_name_3'
+    'status','description','notes'
   ]
 
-  // 뷰 모드별 표시 컬럼
+  // 뷰 모드별 표시 컬럼 (FIELD_ORDER에서 필요한 것만 필터링)
   const getVisibleFields = (mode: string) => {
     switch(mode) {
-      case 'basic':
-        return ['thumbnail_url','option_code','option_name','specification_1','standard_quantity','standard_unit','total_cost','shipping_fee','seller_supply_price','status']
-      case 'cost':
-        return ['option_code','option_name','raw_material_cost','packaging_box_price','pack_price','bag_vinyl_price','cushioning_price','sticker_price','ice_pack_price','other_material_price','labor_cost','misc_cost','total_material_cost','total_cost','shipping_cost','shipping_fee','seller_supply_price','status']
-      case 'price':
-        return ['option_code','option_name','total_cost','shipping_fee','seller_supply_price','naver_paid_shipping_price','naver_free_shipping_price','coupang_paid_shipping_price','coupang_free_shipping_price','status']
-      case 'supply_policy':
-        return ['option_code','option_name','average_material_price','calculated_material_cost','total_cost','shipping_fee','seller_supply_price_mode','target_seller_margin_rate','seller_supply_price','seller_margin_rate','seller_margin_amount','status']
-      case 'direct_policy':
-        return ['option_code','option_name','total_cost','seller_supply_price','margin_calculation_type','target_margin_rate','target_margin_amount','naver_price_mode','naver_paid_shipping_price','naver_free_shipping_price','naver_margin_display','coupang_price_mode','coupang_paid_shipping_price','coupang_free_shipping_price','coupang_margin_display']
-      case 'shipping':
-        return ['option_code','option_name','raw_material_partner','shipping_entity','shipping_vendor_id','invoice_entity','shipping_location_name','shipping_location_address','shipping_location_contact','shipping_deadline','total_cost','shipping_cost','shipping_fee','seller_supply_price','status']
-      case 'full':
+      case 'basic': // 간단히: 기본 정보만
+        return FIELD_ORDER.filter(f =>
+          ['option_code','option_name','category_1','category_2','category_3','category_4','category_5',
+           'specification_1','standard_quantity','standard_unit','total_cost','shipping_fee','seller_supply_price','status'].includes(f)
+        )
+      case 'cost': // 원가: 원가 관련
+        return FIELD_ORDER.filter(f =>
+          ['option_code','option_name','average_material_price','raw_material_cost',
+           'packaging_box_price','pack_price','bag_vinyl_price','cushioning_price','sticker_price','ice_pack_price','other_material_price','labor_cost','misc_cost',
+           'total_material_cost','total_cost','shipping_cost','shipping_fee','status'].includes(f)
+        )
+      case 'price': // 가격: 판매가 관련
+        return FIELD_ORDER.filter(f =>
+          ['option_code','option_name','total_cost','shipping_fee',
+           'seller_supply_price','naver_paid_shipping_price','naver_free_shipping_price',
+           'coupang_paid_shipping_price','coupang_free_shipping_price','status'].includes(f)
+        )
+      case 'supply_policy': // 공급가정책: 셀러공급가 관련
+        return FIELD_ORDER.filter(f =>
+          ['option_code','option_name','average_material_price','raw_material_cost','total_cost','shipping_fee',
+           'seller_supply_price_mode','target_seller_margin_rate','seller_supply_price','seller_margin_rate','seller_margin_amount','status'].includes(f)
+        )
+      case 'direct_policy': // 직판가정책: 네이버/쿠팡 관련
+        return FIELD_ORDER.filter(f =>
+          ['option_code','option_name','total_cost','seller_supply_price',
+           'margin_calculation_type','target_margin_rate','target_margin_amount',
+           'naver_price_mode','naver_paid_shipping_price','naver_free_shipping_price','naver_margin_display',
+           'coupang_price_mode','coupang_paid_shipping_price','coupang_free_shipping_price','coupang_margin_display','status'].includes(f)
+        )
+      case 'shipping': // 발송: 배송 관련
+        return FIELD_ORDER.filter(f =>
+          ['option_code','option_name','raw_material_partner','shipping_entity','shipping_vendor_id','invoice_entity',
+           'shipping_location_name','shipping_location_address','shipping_location_contact','shipping_deadline',
+           'total_cost','shipping_cost','shipping_fee','seller_supply_price','status'].includes(f)
+        )
+      case 'full': // 전체: 모든 필드
       default:
         return FIELD_ORDER
     }
@@ -420,7 +457,7 @@ export default function OptionProductsManagementPage() {
       case 'shipping_fee':
       case 'total_material_cost':
       case 'fixed_material_cost':
-      case 'additional_quantity':
+      case 'shipping_additional_quantity':
       case 'seller_supply_price':
       case 'naver_paid_shipping_price':
       case 'naver_free_shipping_price':
@@ -564,28 +601,6 @@ export default function OptionProductsManagementPage() {
             )
           }
 
-          // 사용원물 평균가 계산
-          const materialPrices = enrichedMaterials
-            .map(m => Number(m.latest_price) || 0)
-            .filter(price => price > 0)
-          const averageMaterialPrice = materialPrices.length > 0
-            ? Math.round(materialPrices.reduce((sum, p) => sum + p, 0) / materialPrices.length)
-            : null
-
-          // 원물원가 계산: (옵션 standard_quantity / 원물 standard_quantity) × 원물 latest_price
-          const optionStandardQty = Number(product.standard_quantity) || 0
-          let calculatedMaterialCost = 0
-
-          if (optionStandardQty > 0) {
-            enrichedMaterials.forEach(m => {
-              const materialStandardQty = Number(m.standard_quantity) || 0
-              const materialPrice = Number(m.latest_price) || 0
-              if (materialStandardQty > 0 && materialPrice > 0) {
-                calculatedMaterialCost += (optionStandardQty / materialStandardQty) * materialPrice
-              }
-            })
-          }
-
           // 대표 원물 (사용량이 가장 많은 원물, 같으면 첫 번째 원물)의 카테고리 사용
           const primaryMaterial = enrichedMaterials.length > 0
             ? enrichedMaterials.reduce((prev, current) => {
@@ -600,7 +615,8 @@ export default function OptionProductsManagementPage() {
           return {
             ...product,
             vendor_name: product.vendor?.name || null,
-            // 사용원물 정보 추가
+            // 사용원물 정보 추가 (calculatePrices에서 사용)
+            enriched_materials: enrichedMaterials,
             used_materials: enrichedMaterials,
             // 사용원물1, 2, 3 (표시용)
             used_material_1: enrichedMaterials[0]?.material_name || '',
@@ -612,10 +628,6 @@ export default function OptionProductsManagementPage() {
             category_3: primaryMaterial?.category_3 || null,
             category_4: primaryMaterial?.category_4 || null,
             category_5: primaryMaterial?.category_5 || null,
-            // 사용원물 평균가
-            average_material_price: averageMaterialPrice,
-            // 원물원가 (계산값)
-            calculated_material_cost: calculatedMaterialCost > 0 ? Math.round(calculatedMaterialCost) : null,
             // 원물거래처 (사용량이 가장 많은 원물의 거래처)
             raw_material_partner: primaryMaterial?.main_supplier_id || null,
             raw_material_partner_name: primaryMaterial?.supplier?.name || null
@@ -629,9 +641,16 @@ export default function OptionProductsManagementPage() {
         ...calculatePrices(product)
       }))
 
-      console.log('🔵 최종 productsWithCalculations:', productsWithCalculations.length, '개')
-      setProducts(productsWithCalculations)
-      setFilteredProducts(productsWithCalculations)
+      // 옵션코드 순으로 정렬
+      const sortedProducts = productsWithCalculations.sort((a, b) => {
+        const codeA = a.option_code || ''
+        const codeB = b.option_code || ''
+        return codeA.localeCompare(codeB)
+      })
+
+      console.log('🔵 최종 productsWithCalculations:', sortedProducts.length, '개')
+      setProducts(sortedProducts)
+      setFilteredProducts(sortedProducts)
     } else {
       console.log('🔴 data가 없음')
     }
@@ -716,6 +735,13 @@ export default function OptionProductsManagementPage() {
       )
     }
 
+    // 옵션코드 순으로 정렬
+    f.sort((a, b) => {
+      const codeA = a.option_code || ''
+      const codeB = b.option_code || ''
+      return codeA.localeCompare(codeB)
+    })
+
     setFilteredProducts(f)
     setSelectedRows(new Set())
     setSelectAll(false)
@@ -781,11 +807,14 @@ export default function OptionProductsManagementPage() {
 
   const handleSave = async () => {
     try {
+      setIsSaving(true)
+
       // 유효한 행만 필터링 (id가 있고 필수 필드가 있는 행)
       const validRows = filteredProducts.filter(p => p.id && (p.option_code || p.option_name))
 
       if (validRows.length === 0) {
         showToast('저장할 데이터가 없습니다.', 'warning')
+        setIsSaving(false)
         return
       }
 
@@ -840,6 +869,9 @@ export default function OptionProductsManagementPage() {
           }
         }
 
+        // 🔥 자동 모드일 때 계산값 적용
+        const calculatedPrices = calculatePrices(p)
+
         return {
           id: p.id,
           option_code: p.option_code || null,
@@ -877,7 +909,10 @@ export default function OptionProductsManagementPage() {
           target_seller_margin_rate: p.target_seller_margin_rate != null
             ? Math.min(Number(p.target_seller_margin_rate), 999) // 최대 999%로 제한
             : null,
-          seller_supply_price: p.seller_supply_price != null ? Number(p.seller_supply_price) : null,
+          // 🔥 자동 모드면 계산값 사용, 수동 모드면 현재값 사용
+          seller_supply_price: (sellerPriceMode === '자동' || sellerPriceMode === 'auto')
+            ? (calculatedPrices.seller_supply_price != null ? Number(calculatedPrices.seller_supply_price) : null)
+            : (p.seller_supply_price != null ? Number(p.seller_supply_price) : null),
           // seller_margin_rate와 seller_margin_amount는 계산값이므로 제외 (readOnly)
           margin_calculation_type: marginCalcType,
           target_margin_rate: p.target_margin_rate != null
@@ -885,11 +920,21 @@ export default function OptionProductsManagementPage() {
             : null,
           target_margin_amount: p.target_margin_amount != null ? Number(p.target_margin_amount) : null,
           naver_price_mode: naverPriceMode,
-          naver_paid_shipping_price: p.naver_paid_shipping_price != null ? Number(p.naver_paid_shipping_price) : null,
-          naver_free_shipping_price: p.naver_free_shipping_price != null ? Number(p.naver_free_shipping_price) : null,
+          // 🔥 네이버 자동 모드면 계산값 사용
+          naver_paid_shipping_price: (naverPriceMode === '자동' || naverPriceMode === 'auto')
+            ? (calculatedPrices.naver_paid_shipping_price != null ? Number(calculatedPrices.naver_paid_shipping_price) : null)
+            : (p.naver_paid_shipping_price != null ? Number(p.naver_paid_shipping_price) : null),
+          naver_free_shipping_price: (naverPriceMode === '자동' || naverPriceMode === 'auto')
+            ? (calculatedPrices.naver_free_shipping_price != null ? Number(calculatedPrices.naver_free_shipping_price) : null)
+            : (p.naver_free_shipping_price != null ? Number(p.naver_free_shipping_price) : null),
           coupang_price_mode: coupangPriceMode,
-          coupang_paid_shipping_price: p.coupang_paid_shipping_price != null ? Number(p.coupang_paid_shipping_price) : null,
-          coupang_free_shipping_price: p.coupang_free_shipping_price != null ? Number(p.coupang_free_shipping_price) : null,
+          // 🔥 쿠팡 자동 모드면 계산값 사용
+          coupang_paid_shipping_price: (coupangPriceMode === '자동' || coupangPriceMode === 'auto')
+            ? (calculatedPrices.coupang_paid_shipping_price != null ? Number(calculatedPrices.coupang_paid_shipping_price) : null)
+            : (p.coupang_paid_shipping_price != null ? Number(p.coupang_paid_shipping_price) : null),
+          coupang_free_shipping_price: (coupangPriceMode === '자동' || coupangPriceMode === 'auto')
+            ? (calculatedPrices.coupang_free_shipping_price != null ? Number(calculatedPrices.coupang_free_shipping_price) : null)
+            : (p.coupang_free_shipping_price != null ? Number(p.coupang_free_shipping_price) : null),
           status: resolveStatusCode(p.status) || p.status || 'PREPARING',
         }
       })
@@ -909,16 +954,149 @@ export default function OptionProductsManagementPage() {
       // Grid 강제 리렌더링 - 히스토리 초기화
       setGridKey(prev => prev + 1)
 
+      // 토글 변경사항 초기화
+      setHasToggleChanges(false)
+
       // 저장 후 계산 검증 (개발 모드에서만)
       if (process.env.NODE_ENV === 'development') {
         await verifyPriceCalculations(beforeSave)
       }
+
+      setIsSaving(false)
     } catch (e) {
       console.error('Save error:', e)
       console.error('Error message:', (e as any)?.message)
       console.error('Error details:', (e as any)?.details)
       console.error('Error hint:', (e as any)?.hint)
       showToast('저장 중 오류가 발생했습니다.', 'error')
+      setIsSaving(false)
+    }
+  }
+
+  // 가격 동기화 (자동 모드인 항목만 계산값으로 업데이트)
+  const handleSyncPrices = async () => {
+    try {
+      setIsSaving(true)
+
+      // 자동 모드인 옵션상품만 필터링
+      const autoModeProducts = products.filter(p =>
+        p.id &&
+        (p.seller_supply_price_mode === '자동' || p.seller_supply_price_mode === 'auto' ||
+         p.naver_price_mode === '자동' || p.naver_price_mode === 'auto' ||
+         p.coupang_price_mode === '자동' || p.coupang_price_mode === 'auto')
+      )
+
+      console.log('🔄 자동 모드 옵션상품:', autoModeProducts.length, '개')
+      console.log('🔄 첫 번째 옵션:', autoModeProducts[0])
+
+      if (autoModeProducts.length === 0) {
+        showToast('자동 모드인 옵션상품이 없습니다.', 'warning')
+        setIsSaving(false)
+        return
+      }
+
+      // 변경 전 상태 저장 (검증용)
+      const beforeSync = new Map(autoModeProducts.map(p => [
+        p.id,
+        {
+          option_code: p.option_code,
+          option_name: p.option_name,
+          seller_supply_price_mode: p.seller_supply_price_mode,
+          naver_price_mode: p.naver_price_mode,
+          coupang_price_mode: p.coupang_price_mode,
+          seller_supply_price: p.seller_supply_price,
+          naver_paid_shipping_price: p.naver_paid_shipping_price,
+          naver_free_shipping_price: p.naver_free_shipping_price,
+          coupang_paid_shipping_price: p.coupang_paid_shipping_price,
+          coupang_free_shipping_price: p.coupang_free_shipping_price
+        }
+      ]))
+
+      // UI에 표시된 가격을 그대로 DB에 저장 (2단계 업데이트)
+      const rows = autoModeProducts.map(async p => {
+        const priceData = {
+          seller_supply_price: p.seller_supply_price != null ? Number(p.seller_supply_price) : null,
+          naver_paid_shipping_price: p.naver_paid_shipping_price != null ? Number(p.naver_paid_shipping_price) : null,
+          naver_free_shipping_price: p.naver_free_shipping_price != null ? Number(p.naver_free_shipping_price) : null,
+          coupang_paid_shipping_price: p.coupang_paid_shipping_price != null ? Number(p.coupang_paid_shipping_price) : null,
+          coupang_free_shipping_price: p.coupang_free_shipping_price != null ? Number(p.coupang_free_shipping_price) : null
+        }
+
+        console.log(`🔧 [${p.option_name}] 1단계: 모드를 수동으로 변경`)
+
+        // 1단계: 모드를 '수동'으로 변경 (트리거 비활성화)
+        await supabase
+          .from('option_products')
+          .update({
+            seller_supply_price_mode: '수동',
+            naver_price_mode: '수동',
+            coupang_price_mode: '수동'
+          })
+          .eq('id', p.id)
+
+        console.log(`💰 [${p.option_name}] 2단계: 가격 업데이트`, priceData)
+
+        // 2단계: 가격 업데이트
+        await supabase
+          .from('option_products')
+          .update(priceData)
+          .eq('id', p.id)
+
+        console.log(`🔄 [${p.option_name}] 3단계: 모드를 자동으로 복원`)
+
+        // 3단계: 모드를 원래대로 복원 (자동)
+        return supabase
+          .from('option_products')
+          .update({
+            seller_supply_price_mode: p.seller_supply_price_mode,
+            naver_price_mode: p.naver_price_mode,
+            coupang_price_mode: p.coupang_price_mode
+          })
+          .eq('id', p.id)
+          .select()
+      })
+
+      // 모든 UPDATE 쿼리를 병렬로 실행
+      const results = await Promise.all(rows)
+
+      console.log('✅ UPDATE 결과:', results.length, '개')
+
+      // 에러 체크
+      const errors = results.filter(r => r.error)
+      if (errors.length > 0) {
+        console.error('❌ Sync errors:', errors)
+        throw new Error(`${errors.length}개 항목 업데이트 실패`)
+      }
+
+      // UPDATE된 데이터 확인
+      results.forEach(r => {
+        if (r.data && r.data.length > 0) {
+          const updated = r.data[0]
+          console.log(`✅ DB 업데이트 확인 [${updated.option_name}]:`, {
+            seller_supply_price: updated.seller_supply_price,
+            naver_paid: updated.naver_paid_shipping_price,
+            naver_free: updated.naver_free_shipping_price
+          })
+        }
+      })
+
+      console.log('✅ 모든 UPDATE 성공')
+
+      // 데이터 다시 불러오기
+      await fetchProducts()
+
+      // Grid 강제 리렌더링
+      setGridKey(prev => prev + 1)
+
+      // 검증 모달 표시
+      await verifyPriceCalculations(beforeSync)
+
+      setIsSaving(false)
+      showToast(`${autoModeProducts.length}개 옵션상품의 가격이 동기화되었습니다.`, 'success')
+    } catch (e) {
+      console.error('Sync error:', e)
+      showToast('가격 동기화 중 오류가 발생했습니다.', 'error')
+      setIsSaving(false)
     }
   }
 
@@ -1084,9 +1262,16 @@ export default function OptionProductsManagementPage() {
       }
     }
 
+    // 옵션코드 알파벳 순으로 정렬
+    const sortedResults = results.sort((a, b) => {
+      const codeA = a.optionCode || ''
+      const codeB = b.optionCode || ''
+      return codeA.localeCompare(codeB)
+    })
+
     setVerificationResults({
-      allChanges: results,
-      hasChanges: results.length > 0
+      allChanges: sortedResults,
+      hasChanges: sortedResults.length > 0
     })
   }
 
@@ -1124,7 +1309,7 @@ export default function OptionProductsManagementPage() {
               // 가상 필드 제거 (프론트엔드에서 추가한 필드들)
               const virtualFields = [
                 'vendor_name', 'used_material_1', 'used_material_2', 'used_material_3',
-                'used_materials', 'category_1', 'category_2', 'category_3', 'category_4', 'category_5',
+                'used_materials', 'enriched_materials', 'category_1', 'category_2', 'category_3', 'category_4', 'category_5',
                 'average_material_price', 'calculated_material_cost', 'seller_margin_rate',
                 'seller_margin_amount', 'target_margin_amount', 'margin_calculation_type',
                 'total_material_cost', 'total_cost', 'vendor', 'raw_material_partner_name'
@@ -1433,6 +1618,17 @@ export default function OptionProductsManagementPage() {
             <div className="flex items-center gap-3">
               {/* 버튼들 */}
               <button
+                onClick={handleSyncPrices}
+                className="bg-purple-600 text-white px-3 rounded hover:bg-purple-700 transition-colors flex items-center gap-2"
+                style={{ fontSize: '14px', height: '32px' }}
+                title="자동 모드 가격 동기화"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                가격 동기화
+              </button>
+              <button
                 onClick={() => router.push('/admin/products/option-products/create')}
                 className="bg-blue-600 text-white px-3 rounded hover:bg-blue-700 transition-colors"
                 style={{ fontSize: '14px', height: '32px' }}
@@ -1446,6 +1642,17 @@ export default function OptionProductsManagementPage() {
         <EditableAdminGrid
           key={gridKey}
           data={filteredProducts}
+          onDataChange={(newData) => {
+            // EditableAdminGrid에서 데이터가 변경될 때 호출
+            setFilteredProducts(newData)
+
+            // products 전체도 업데이트
+            setProducts(prev => {
+              const updatedMap = new Map(newData.map(p => [p.id, p]))
+              return prev.map(p => updatedMap.get(p.id) || p)
+            })
+          }}
+          forceModified={hasToggleChanges}
           columns={(() => {
             const visibleFields = getVisibleFields(viewMode)
             return visibleFields.map(field => ({
@@ -1457,12 +1664,13 @@ export default function OptionProductsManagementPage() {
                 : field === 'status' ? 90
                 : 110,
               type: ['packaging_box_price', 'pack_price', 'bag_vinyl_price', 'cushioning_price', 'sticker_price', 'ice_pack_price', 'other_material_price',
-                     'raw_material_cost', 'labor_cost', 'misc_cost', 'shipping_fee', 'total_material_cost', 'fixed_material_cost', 'additional_quantity',
+                     'raw_material_cost', 'labor_cost', 'misc_cost', 'shipping_fee', 'total_material_cost', 'fixed_material_cost', 'shipping_additional_quantity',
                      'seller_supply_price', 'naver_paid_shipping_price', 'naver_free_shipping_price', 'coupang_paid_shipping_price',
                      'coupang_free_shipping_price', 'standard_quantity', 'seller_margin_rate', 'target_seller_margin_rate', 'target_margin_rate', 'target_margin_amount'].includes(field) ? 'number' as const
-                : ['material_cost_policy', 'margin_calculation_type', 'status', 'standard_unit', 'shipping_entity', 'invoice_entity', 'shipping_vendor_id'].includes(field) ? 'dropdown' as const
+                : ['material_cost_policy', 'seller_supply_price_mode', 'naver_price_mode', 'coupang_price_mode', 'margin_calculation_type', 'status', 'standard_unit', 'shipping_entity', 'invoice_entity', 'shipping_vendor_id'].includes(field) ? 'dropdown' as const
                 : 'text' as const,
               source: field === 'material_cost_policy' ? ['자동', '고정']
+                : field === 'seller_supply_price_mode' || field === 'naver_price_mode' || field === 'coupang_price_mode' ? ['자동', '수동']
                 : field === 'margin_calculation_type' ? ['마진율', '마진액']
                 : field === 'status' ? supplyStatuses.map(s => s.name)
                 : field === 'standard_unit' ? ['kg', 'g', 'box', '개', 'L', 'ml']
@@ -1491,25 +1699,7 @@ export default function OptionProductsManagementPage() {
               }) : undefined,
               align: ['material_cost_policy', 'seller_supply_price_mode', 'naver_price_mode', 'coupang_price_mode', 'margin_calculation_type', 'seller_margin_rate', 'target_seller_margin_rate', 'target_margin_rate'].includes(field) ? 'center' as const : undefined,
               renderer: field === 'thumbnail_url' ? (value: any, _row: OptionProduct) => {
-                if (!value) return <div style={{ width: '60px', height: '60px', backgroundColor: '#F3F4F6', borderRadius: '4px' }} />
-                return (
-                  <img
-                    src={value}
-                    alt="썸네일"
-                    style={{
-                      width: '60px',
-                      height: '60px',
-                      objectFit: 'cover',
-                      borderRadius: '4px',
-                      border: '1px solid #E5E7EB'
-                    }}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none'
-                      const parent = (e.target as HTMLImageElement).parentElement
-                      if (parent) parent.innerHTML = '<div style="width: 60px; height: 60px; background-color: #F3F4F6; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #9CA3AF;">이미지 없음</div>'
-                    }}
-                  />
-                )
+                return <div style={{ width: '60px', height: '60px' }} />
               } : field === 'target_seller_margin_rate' ? (value: any, row: OptionProduct) => {
                 const mode = (row as any).seller_supply_price_mode
                 const isReadOnly = mode === 'manual' || mode === '수동'
@@ -1566,17 +1756,24 @@ export default function OptionProductsManagementPage() {
                           const newValue = isAuto ? '수동' : '자동'
                           // 데이터 직접 업데이트
                           const newData = [...filteredProducts]
-                          newData[rowIndex] = { ...newData[rowIndex], [field]: newValue }
+                          const updatedRow = { ...newData[rowIndex], [field]: newValue }
+                          newData[rowIndex] = updatedRow
+
+                          // filteredProducts 업데이트
+                          setFilteredProducts(newData)
 
                           // products 전체 업데이트
                           setProducts(prev => {
                             const updated = [...prev]
-                            const productIndex = updated.findIndex(p => p.id === newData[rowIndex].id)
+                            const productIndex = updated.findIndex(p => p.id === updatedRow.id)
                             if (productIndex !== -1) {
                               updated[productIndex] = { ...updated[productIndex], [field]: newValue }
                             }
                             return updated
                           })
+
+                          // 🔥 토글 변경사항 표시
+                          setHasToggleChanges(true)
                         }}
                         className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
                           isAuto
@@ -1589,7 +1786,7 @@ export default function OptionProductsManagementPage() {
                     </div>
                   )
                 }
-                : field === 'margin_calculation_type' ? (value: any, _row: OptionProduct, rowIndex: number) => {
+                : field === 'margin_calculation_type' ? (value: any, row: OptionProduct, rowIndex: number) => {
                   const isRate = value === 'rate' || value === '마진율'
                   return (
                     <div className="flex items-center justify-center h-full w-full">
@@ -1599,17 +1796,24 @@ export default function OptionProductsManagementPage() {
                           const newValue = isRate ? '마진액' : '마진율'
                           // 데이터 직접 업데이트
                           const newData = [...filteredProducts]
-                          newData[rowIndex] = { ...newData[rowIndex], [field]: newValue }
+                          const updatedRow = { ...newData[rowIndex], [field]: newValue }
+                          newData[rowIndex] = updatedRow
+
+                          // filteredProducts 업데이트
+                          setFilteredProducts(newData)
 
                           // products 전체 업데이트
                           setProducts(prev => {
                             const updated = [...prev]
-                            const productIndex = updated.findIndex(p => p.id === newData[rowIndex].id)
+                            const productIndex = updated.findIndex(p => p.id === updatedRow.id)
                             if (productIndex !== -1) {
                               updated[productIndex] = { ...updated[productIndex], [field]: newValue }
                             }
                             return updated
                           })
+
+                          // 🔥 토글 변경사항 표시
+                          setHasToggleChanges(true)
                         }}
                         className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
                           isRate
@@ -1778,6 +1982,41 @@ export default function OptionProductsManagementPage() {
         </Modal>
       )}
 
+      {/* 저장 중 모달 */}
+      {isSaving && (
+        <Modal
+          isOpen={true}
+          onClose={() => {}}
+          title="💾 저장 중..."
+          size="md"
+        >
+          <div className="flex flex-col items-center justify-center py-8 space-y-6">
+            {/* 스피너 애니메이션 */}
+            <div className="relative w-20 h-20">
+              <div className="absolute inset-0 border-4 border-blue-200 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-transparent border-t-blue-600 rounded-full animate-spin"></div>
+            </div>
+
+            {/* 진행 상태 텍스트 */}
+            <div className="text-center space-y-2">
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                처리 중...
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                자동 모드 가격 계산 및 DB 업데이트 중입니다.
+              </p>
+            </div>
+
+            {/* 진행바 */}
+            <div className="w-full max-w-xs">
+              <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-600 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {/* 저장 변경사항 모달 */}
       {verificationResults && (
         <Modal
@@ -1801,11 +2040,15 @@ export default function OptionProductsManagementPage() {
                       📦 {item.optionCode} - {item.optionName}
                     </div>
                     <div className="space-y-2">
-                      {item.changes.map((change: string, changeIdx: number) => (
+                      {item.changes.map((change: any, changeIdx: number) => (
                         <div key={changeIdx} className="flex items-start gap-3 text-sm">
-                          <span className="text-blue-500 dark:text-blue-400">•</span>
+                          <span className={`${
+                            change.type === 'validation' ? 'text-red-500 dark:text-red-400' :
+                            change.type === 'price' ? 'text-green-500 dark:text-green-400' :
+                            'text-blue-500 dark:text-blue-400'
+                          }`}>•</span>
                           <span className="text-gray-800 dark:text-gray-200 flex-1">
-                            {change}
+                            <strong>{change.label}:</strong> {change.beforeValue} → {change.afterValue}
                           </span>
                         </div>
                       ))}
@@ -2165,11 +2408,17 @@ export default function OptionProductsManagementPage() {
                   console.log(`📤 전체 ${dataToUpsert.length}개 데이터를 업로드...`)
 
                   // id가 DB에 실제로 존재하는지 확인하여 분리
-                  const dataWithId = dataToUpsert.filter((item: any) => item.id && existingIdSet.has(item.id))
+                  const dataWithId = dataToUpsert
+                    .filter((item: any) => item.id && existingIdSet.has(item.id))
+                    .map((item: any) => {
+                      // enriched_materials 필드 제거 (계산 필드이므로 DB에 저장하지 않음)
+                      const { enriched_materials: _removed1, ...cleanItem } = item
+                      return cleanItem
+                    })
                   const dataWithoutId = dataToUpsert.filter((item: any) => !item.id || !existingIdSet.has(item.id))
                     .map((item: any) => {
-                      // id가 없거나, DB에 없는 id면 제거
-                      const { id: _removed, ...itemWithoutId } = item
+                      // id가 없거나, DB에 없는 id면 제거, enriched_materials도 제거
+                      const { id: _removed, enriched_materials: _removed2, ...itemWithoutId } = item
                       return itemWithoutId
                     })
 

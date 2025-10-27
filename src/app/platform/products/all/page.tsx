@@ -16,15 +16,13 @@ interface OptionProduct {
   option_code?: string;
   seller_supply_price?: number;
   market_price?: number;
-  season_start?: string;
-  season_end?: string;
-  출고?: string;
-  송장?: string;
-  벤더사?: string;
-  발송지명?: string;
-  발송지주소?: string;
-  발송지연락처?: string;
-  출고비용?: number;
+  shipping_entity?: string;
+  invoice_entity?: string;
+  shipping_vendor_id?: string;
+  shipping_location_name?: string;
+  shipping_location_address?: string;
+  shipping_location_contact?: string;
+  shipping_cost?: number;
   thumbnail_url?: string;
   created_at?: string;
   updated_at?: string;
@@ -893,7 +891,7 @@ export default function AllProductsPage() {
                                   {/* 배송비 */}
                                   <div className="w-24 flex-shrink-0 text-right">
                                     <p className="text-sm text-gray-700">
-                                      {product.출고비용 !== undefined ? `${product.출고비용.toLocaleString()}원` : '-'}
+                                      {product.shipping_cost !== undefined ? `${product.shipping_cost.toLocaleString()}원` : '-'}
                                     </p>
                                   </div>
 

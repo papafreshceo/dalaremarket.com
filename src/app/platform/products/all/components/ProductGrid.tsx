@@ -8,15 +8,13 @@ interface OptionProduct {
   option_code?: string;
   seller_supply_price?: number;
   market_price?: number;
-  season_start?: string;
-  season_end?: string;
-  출고?: string;
-  송장?: string;
-  벤더사?: string;
-  발송지명?: string;
-  발송지주소?: string;
-  발송지연락처?: string;
-  출고비용?: number;
+  shipping_entity?: string;
+  invoice_entity?: string;
+  shipping_vendor_id?: string;
+  shipping_location_name?: string;
+  shipping_location_address?: string;
+  shipping_location_contact?: string;
+  shipping_cost?: number;
 }
 
 interface ProductGridProps {
@@ -73,12 +71,6 @@ export default function ProductGrid({ products, onProductClick, onShowPriceChart
                 택배비
               </th>
               <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                시즌 시작
-              </th>
-              <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                시즌 종료
-              </th>
-              <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 발송기한
               </th>
               <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -130,13 +122,7 @@ export default function ProductGrid({ products, onProductClick, onShowPriceChart
                   {formatPrice(product.seller_supply_price)}
                 </td>
                 <td className="px-3 py-3 text-sm text-right text-gray-700">
-                  {formatPrice(product.출고비용)}
-                </td>
-                <td className="px-3 py-3 text-sm text-center text-gray-600">
-                  {formatDate(product.season_start)}
-                </td>
-                <td className="px-3 py-3 text-sm text-center text-gray-600">
-                  {formatDate(product.season_end)}
+                  {formatPrice(product.shipping_cost)}
                 </td>
                 <td className="px-3 py-3 text-sm text-center text-gray-600">
                   {(product as any).shipping_deadline || '-'}

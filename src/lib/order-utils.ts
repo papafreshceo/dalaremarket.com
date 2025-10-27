@@ -16,123 +16,83 @@ export interface OptionProductInfo {
 }
 
 /**
- * 옵션명을 기준으로 option_products 테이블에서 상품 정보를 조회하여 반환
- *
- * @param optionName - 조회할 옵션명
- * @returns 옵션 상품 정보 객체 (없으면 빈 객체)
- */
-export async function getOptionProductInfo(optionName: string): Promise<OptionProductInfo> {
-  if (!optionName || optionName.trim() === '') {
-    console.log('⚠️ [getOptionProductInfo] 옵션명이 비어있음');
-    return {};
-  }
-
-  try {
-    const supabase = await createClient();
-
-    console.log(`🔍 [getOptionProductInfo] 옵션명 조회: "${optionName}"`);
-
-    // 벤더 정보를 포함하여 조회 (shipping_vendor_id → partners 조인)
-    const { data, error } = await supabase
-      .from('option_products')
-      .select(`
-        seller_supply_price,
-        shipping_entity,
-        invoice_entity,
-        shipping_location_name,
-        shipping_location_address,
-        shipping_location_contact,
-        shipping_cost,
-        shipping_vendor:partners!shipping_vendor_id(name)
-      `)
-      .eq('option_name', optionName.trim())
-      .single();
-
-    if (error) {
-      // 데이터가 없는 경우는 에러로 처리하지 않음
-      if (error.code === 'PGRST116') {
-        console.log(`❌ [getOptionProductInfo] 옵션명 "${optionName}"에 해당하는 상품 정보가 없습니다.`);
-        return {};
-      }
-
-      console.error('❌ [getOptionProductInfo] 옵션 상품 정보 조회 실패:', error);
-      return {};
-    }
-
-    console.log(`✅ [getOptionProductInfo] 조회 성공:`, data);
-
-    // null 값들을 제거하고 실제 값만 반환
-    // option_products의 컬럼명 → integrated_orders의 컬럼명으로 매핑
-    const result: OptionProductInfo = {};
-
-    if (data?.seller_supply_price !== null && data?.seller_supply_price !== undefined) {
-      result.seller_supply_price = data.seller_supply_price;
-    }
-    // shipping_entity → shipping_source로 매핑
-    if (data?.shipping_entity) result.shipping_source = data.shipping_entity;
-    // invoice_entity → invoice_issuer로 매핑
-    if (data?.invoice_entity) result.invoice_issuer = data.invoice_entity;
-    // shipping_vendor 조인 결과 → vendor_name으로 매핑
-    if (data?.shipping_vendor?.name) result.vendor_name = data.shipping_vendor.name;
-    if (data?.shipping_location_name) result.shipping_location_name = data.shipping_location_name;
-    if (data?.shipping_location_address) result.shipping_location_address = data.shipping_location_address;
-    if (data?.shipping_location_contact) result.shipping_location_contact = data.shipping_location_contact;
-    if (data?.shipping_cost !== null && data?.shipping_cost !== undefined) {
-      result.shipping_cost = data.shipping_cost;
-    }
-
-    console.log(`📦 [getOptionProductInfo] 최종 매핑 결과:`, result);
-    return result;
-  } catch (error) {
-    console.error('getOptionProductInfo 오류:', error);
-    return {};
-  }
-}
-
-/**
- * 주문 데이터에 옵션 상품 정보를 자동으로 매핑
- *
- * @param orderData - 주문 데이터 (option_name 필드 필수)
- * @returns 옵션 상품 정보가 추가된 주문 데이터
- */
-export async function enrichOrderWithOptionInfo<T extends { option_name: string }>(
-  orderData: T
-): Promise<T & OptionProductInfo> {
-  const optionInfo = await getOptionProductInfo(orderData.option_name);
-
-  return {
-    ...orderData,
-    ...optionInfo
-  };
-}
-
-/**
  * 여러 주문 데이터에 옵션 상품 정보를 일괄 매핑
  *
- * @param ordersData - 주문 데이터 배열
+ * 처리 흐름:
+ * 1. 중복 옵션명 제거 후 일괄 조회
+ * 2. option_products 테이블에서 공급단가 및 발송 정보 조회
+ * 3. 각 주문에 옵션 정보 매핑
+ * 4. 정산금액(공급단가 × 수량) 자동 계산
+ *
+ * @param ordersData - 주문 데이터 배열 (option_name 필드 필수)
  * @returns 옵션 상품 정보가 추가된 주문 데이터 배열
  */
-export async function enrichOrdersWithOptionInfo<T extends { option_name: string }>(
+export async function enrichOrdersWithOptionInfo<T extends { option_name: string; quantity?: string | number }>(
   ordersData: T[]
-): Promise<Array<T & OptionProductInfo>> {
-  // 성능 최적화: 중복된 옵션명 제거하여 한번만 조회
-  const uniqueOptionNames = [...new Set(ordersData.map(order => order.option_name))];
+): Promise<Array<T & OptionProductInfo & { settlement_amount?: number }>> {
+  const supabase = await createClient();
 
-  // 옵션명별 정보를 미리 조회하여 캐시
+  // 중복 제거: 동일 옵션명은 한번만 조회
+  const uniqueOptionNames = [...new Set(ordersData.map(order => order.option_name).filter(Boolean))];
+
+  // option_products 테이블에서 옵션 정보 일괄 조회
+  const { data: optionProducts, error } = await supabase
+    .from('option_products')
+    .select('option_name, option_code, seller_supply_price, shipping_entity, invoice_entity, shipping_location_name, shipping_location_address, shipping_location_contact, shipping_cost')
+    .in('option_name', uniqueOptionNames);
+
+  if (error) {
+    console.error('[enrichOrdersWithOptionInfo] 옵션 상품 조회 실패:', error);
+  }
+
+  // 옵션명별 정보 맵 생성 (빠른 조회를 위해)
   const optionInfoMap = new Map<string, OptionProductInfo>();
+  if (optionProducts) {
+    optionProducts.forEach(product => {
+      if (product.option_name) {
+        optionInfoMap.set(product.option_name, {
+          seller_supply_price: product.seller_supply_price,
+          shipping_source: product.shipping_entity,        // 필드명 매핑
+          invoice_issuer: product.invoice_entity,          // 필드명 매핑
+          shipping_location_name: product.shipping_location_name,
+          shipping_location_address: product.shipping_location_address,
+          shipping_location_contact: product.shipping_location_contact,
+          shipping_cost: product.shipping_cost
+        });
+      }
+    });
+  }
 
-  await Promise.all(
-    uniqueOptionNames.map(async (optionName) => {
-      const info = await getOptionProductInfo(optionName);
-      optionInfoMap.set(optionName, info);
-    })
-  );
+  // 각 주문에 옵션 정보 매핑 및 정산금액 계산
+  return ordersData.map(order => {
+    const optionInfo = optionInfoMap.get(order.option_name) || {};
 
-  // 각 주문에 캐시된 정보 매핑
-  return ordersData.map(order => ({
-    ...order,
-    ...optionInfoMap.get(order.option_name)
-  }));
+    // 이미 클라이언트에서 값이 있으면 덮어쓰지 않음
+    const hasExistingPrice = 'seller_supply_price' in order && order.seller_supply_price !== undefined && order.seller_supply_price !== null;
+    const hasExistingSettlement = 'settlement_amount' in order && order.settlement_amount !== undefined && order.settlement_amount !== null;
+
+    // 정산금액 = 공급단가 × 수량 (기존 값이 없을 때만 계산)
+    let settlement_amount: number | undefined;
+    if (!hasExistingSettlement && optionInfo.seller_supply_price && order.quantity) {
+      const unitPrice = typeof optionInfo.seller_supply_price === 'string'
+        ? parseFloat(optionInfo.seller_supply_price)
+        : optionInfo.seller_supply_price;
+      const qty = typeof order.quantity === 'string'
+        ? parseInt(order.quantity)
+        : order.quantity;
+
+      if (!isNaN(unitPrice) && !isNaN(qty)) {
+        settlement_amount = unitPrice * qty;
+      }
+    }
+
+    return {
+      ...order,
+      // 기존 값이 없을 때만 optionInfo의 값 사용
+      ...(hasExistingPrice ? {} : optionInfo),
+      ...(settlement_amount !== undefined && { settlement_amount })
+    };
+  });
 }
 
 /**

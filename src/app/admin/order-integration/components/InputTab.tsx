@@ -171,8 +171,6 @@ export default function InputTab() {
   // DB에서 저장된 주문 불러오기 ('전화주문'이면서 '접수' 상태인 주문)
   const loadSavedOrders = async () => {
     try {
-      console.log('🔄 주문 로드 시작...');
-
       // 최근 30일 날짜 계산 (한국 시간 기준)
       const now = new Date();
       const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
@@ -185,21 +183,14 @@ export default function InputTab() {
         `/api/integrated-orders?market_name=전화주문&shippingStatus=접수&startDate=${startDate}&endDate=${endDate}&dateType=sheet&limit=10000`
       );
       if (!response.ok) {
-        console.error('❌ 주문 로드 실패:', response.status);
+        console.error('주문 로드 실패:', response.status);
         return;
       }
 
       const result = await response.json();
-      console.log('📦 API 응답:', result);
 
       if (result.success) {
-        console.log('✅ 접수 주문 수:', result.data.length);
-        console.log('📋 주문 상태:', result.data.map((o: any) => ({ id: o.id, status: o.shipping_status })));
-
         const filteredOrders = result.data;
-
-        console.log('🔍 필터링된 접수 주문 수:', filteredOrders.length);
-        console.log('📝 필터링된 주문:', filteredOrders);
 
         // DB 데이터를 SavedOrder 형식으로 변환
         const ordersMap = new Map<string, SavedOrder>();
@@ -251,12 +242,10 @@ export default function InputTab() {
         });
 
         const finalOrders = Array.from(ordersMap.values());
-        console.log('🎯 최종 SavedOrder 개수:', finalOrders.length);
-        console.log('🎯 최종 SavedOrder 데이터:', finalOrders);
         setSavedOrders(finalOrders);
       }
     } catch (error) {
-      console.error('❌ 주문 로드 실패:', error);
+      console.error('주문 로드 실패:', error);
     }
   };
 
@@ -299,7 +288,6 @@ export default function InputTab() {
       if (result.success) {
         const products = result.data;
         setOptionProducts(products);
-        console.log('✅ 옵션 상품 로드 완료:', products.length, '개');
       }
     } catch (error) {
       console.error('옵션 상품 로드 실패:', error);
@@ -332,8 +320,6 @@ export default function InputTab() {
       // Daum Postcode 팝업 바로 열기
       new (window as any).daum.Postcode({
         oncomplete: function (data: any) {
-          console.log('📍 Daum Postcode API 응답:', data);
-
           // 아파트명이 있으면 도로명주소에 포함
           let roadAddressWithBuilding = data.roadAddress;
           if (data.buildingName) {
@@ -668,13 +654,17 @@ export default function InputTab() {
       // DB 저장용 데이터 생성 (각 상품을 개별 행으로)
       const ordersToSave: any[] = [];
 
-      console.log('📦 저장할 수령인 섹션 수:', formData.recipientSections.length);
+      // 총 주문 건수 (상품별로 개별 주문번호 생성)
+      let totalProductCount = 0;
+      formData.recipientSections.forEach((section) => {
+        totalProductCount += section.products.length;
+      });
 
-      // 각 수령인별 주문번호를 미리 생성 (동시 호출 시 중복 방지)
+      // 각 상품별로 주문번호를 미리 생성 (동시 호출 시 중복 방지)
       const orderNumbers: string[] = [];
       let currentSequence = todaySequence; // 현재 sequence를 로컬 변수로 복사
 
-      for (let i = 0; i < formData.recipientSections.length; i++) {
+      for (let i = 0; i < totalProductCount; i++) {
         const utcTime = getCurrentTimeUTC();
         const timestamp = utcTime.replace(/[-:TZ.]/g, '').substring(2, 14);
         const seq = String(currentSequence).padStart(3, '0');
@@ -686,18 +676,17 @@ export default function InputTab() {
       setTodaySequence(currentSequence);
       localStorage.setItem('phoneOrderSequence', String(currentSequence));
 
-      console.log('🔢 생성된 주문번호 목록:', orderNumbers);
+      let orderNumberIndex = 0; // 주문번호 배열 인덱스
 
       formData.recipientSections.forEach((section, sectionIndex) => {
-        // 같은 수령인의 상품들은 같은 주문번호를 사용
-        const orderNumber = orderNumbers[sectionIndex];
-
-        console.log(`📋 수령인 ${sectionIndex + 1}: ${section.recipient_name}, 상품 ${section.products.length}개, 주문번호: ${orderNumber}`);
-
         section.products.forEach((product, productIndex) => {
+          // 각 상품마다 고유한 주문번호 사용
+          const orderNumber = orderNumbers[orderNumberIndex];
+          orderNumberIndex++;
+
           const orderData = {
             market_name: '전화주문',
-            order_number: orderNumber, // 같은 수령인의 모든 상품은 같은 주문번호 사용
+            order_number: orderNumber, // 각 상품마다 고유한 주문번호 사용
             buyer_name: formData.buyer_name,
             buyer_phone: formData.buyer_phone,
             recipient_name: section.recipient_name,
@@ -719,13 +708,9 @@ export default function InputTab() {
             registered_by: currentUser, // 접수자 정보 추가
           };
 
-          console.log(`  ✅ 상품 ${productIndex + 1}: ${product.optionName} x ${product.quantity}`);
           ordersToSave.push(orderData);
         });
       });
-
-      console.log('💾 총 저장할 주문 수:', ordersToSave.length);
-      console.log('📤 API로 전송할 데이터:', ordersToSave);
 
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'POST',
@@ -738,15 +723,13 @@ export default function InputTab() {
       const result = await response.json();
 
       if (result.success) {
-        console.log('✅ 주문 저장 성공!', result);
         alert(`${ordersToSave.length}건의 주문이 등록되었습니다.`);
         // 폼 초기화
         resetForm();
         // DB에서 저장된 주문 다시 로드
-        console.log('🔄 저장 후 주문 다시 로드 시작...');
         await loadSavedOrders();
       } else {
-        console.error('❌ 주문 저장 실패:', result.error);
+        console.error('주문 저장 실패:', result.error);
         alert(`등록 실패: ${result.error}`);
       }
     } catch (error) {
@@ -757,33 +740,27 @@ export default function InputTab() {
 
   // 테이블에서 주문 삭제 (DB에서 삭제)
   const handleDeleteOrder = async (orderId: string) => {
-    console.log('🗑️ 삭제 버튼 클릭됨, 주문 ID:', orderId);
-
     if (!confirm('이 주문을 삭제하시겠습니까?')) {
-      console.log('❌ 사용자가 삭제 취소');
       return;
     }
 
     try {
-      console.log('📤 삭제 API 호출 시작...');
       const response = await fetch(`/api/integrated-orders?id=${orderId}`, {
         method: 'DELETE',
       });
 
       const result = await response.json();
-      console.log('📥 삭제 API 응답:', result);
 
       if (result.success) {
         alert('주문이 삭제되었습니다.');
-        console.log('✅ 주문 삭제 성공, 목록 다시 로드 시작...');
         // DB에서 저장된 주문 다시 로드
         await loadSavedOrders();
       } else {
-        console.error('❌ 삭제 실패:', result.error);
+        console.error('삭제 실패:', result.error);
         alert(`삭제 실패: ${result.error}`);
       }
     } catch (error) {
-      console.error('❌ 주문 삭제 실패:', error);
+      console.error('주문 삭제 실패:', error);
       alert('주문 삭제 중 오류가 발생했습니다.');
     }
   };

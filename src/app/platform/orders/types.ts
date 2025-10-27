@@ -49,4 +49,13 @@ export interface StatsData {
   bgGradient: string;
 }
 
-export type Tab = '대시보드' | '발주서등록' | '모바일등록' | '정산관리';
+export type Tab = '대시보드' | '발주서등록' | '모바일등록' | '정산관리' | '옵션명매핑';
+
+export interface OptionMapping {
+  id: number;
+  seller_id: string;
+  user_option_name: string;
+  site_option_name: string;
+  created_at: string;
+  updated_at: string;
+}

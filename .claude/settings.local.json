@@ -82,7 +82,11 @@
       "Bash(timeout 10 curl:*)",
       "Bash(timeout 5 curl:*)",
       "Bash(if exist apply-animation-migration.js del /f apply-animation-migration.js)",
-      "Bash(del apply-animation-migration.js)"
+      "Bash(del apply-animation-migration.js)",
+      "Bash(if exist test-mapping-data.js del /f test-mapping-data.js)",
+      "Bash(del:*)",
+      "Bash(if exist \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\test-mapping-data.js\" del /f \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\test-mapping-data.js\")",
+      "Bash(if exist test-market-upload-flow.js del /f test-market-upload-flow.js)"
     ],
     "deny": [],
     "ask": []

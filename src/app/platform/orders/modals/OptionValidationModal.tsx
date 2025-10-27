@@ -314,18 +314,19 @@ export default function OptionValidationModal({
       padding: '20px'
     }}>
       <div style={{
-        background: '#ffffff',
+        background: 'var(--color-surface)',
         borderRadius: '16px',
         width: '1200px',
         maxWidth: '95%',
         maxHeight: '90vh',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        border: '1px solid var(--color-border)'
       }}>
         {/* 헤더 */}
         <div style={{
           padding: '24px',
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid var(--color-border)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
@@ -334,17 +335,17 @@ export default function OptionValidationModal({
             <h2 style={{
               fontSize: '20px',
               fontWeight: '600',
-              color: '#212529',
+              color: 'var(--color-text)',
               margin: '0 0 8px 0'
             }}>
               옵션명 검증
             </h2>
             <p style={{
               fontSize: '14px',
-              color: '#6c757d',
+              color: 'var(--color-text-secondary)',
               margin: 0
             }}>
-              옵션상품 DB와 매칭하여 공급단가를 자동으로 적용합니다
+              매칭에 실패한 옵션명을 수정해주세요. 좌측 메뉴의 <strong>옵션명매핑</strong> 탭에서 미리 설정해두시면 다음부터는 수정작업 없이 바로 등록이 가능합니다.
             </p>
           </div>
           <button
@@ -353,7 +354,7 @@ export default function OptionValidationModal({
               background: 'none',
               border: 'none',
               fontSize: '24px',
-              color: '#6c757d',
+              color: 'var(--color-text-secondary)',
               cursor: 'pointer',
               padding: 0
             }}
@@ -365,26 +366,26 @@ export default function OptionValidationModal({
         {/* 통계 */}
         <div style={{
           padding: '20px 24px',
-          background: '#f9fafb',
-          borderBottom: '1px solid #e5e7eb',
+          background: 'var(--color-surface-hover)',
+          borderBottom: '1px solid var(--color-border)',
           display: 'flex',
           gap: '24px',
           alignItems: 'center'
         }}>
           <div>
-            <span style={{ fontSize: '13px', color: '#6b7280' }}>총 주문:</span>
-            <span style={{ fontSize: '18px', fontWeight: '700', color: '#111827', marginLeft: '8px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>총 주문:</span>
+            <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-text)', marginLeft: '8px' }}>
               {stats.total}건
             </span>
           </div>
           <div>
-            <span style={{ fontSize: '13px', color: '#6b7280' }}>매칭 성공:</span>
+            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>매칭 성공:</span>
             <span style={{ fontSize: '18px', fontWeight: '700', color: '#059669', marginLeft: '8px' }}>
               {stats.matched}건
             </span>
           </div>
           <div>
-            <span style={{ fontSize: '13px', color: '#6b7280' }}>매칭 실패:</span>
+            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>매칭 실패:</span>
             <span style={{ fontSize: '18px', fontWeight: '700', color: '#dc2626', marginLeft: '8px' }}>
               {stats.unmatched}건
             </span>
@@ -431,8 +432,8 @@ export default function OptionValidationModal({
         {showBulkEdit && (
           <div style={{
             padding: '16px 24px',
-            background: '#eff6ff',
-            borderBottom: '1px solid #dbeafe'
+            background: 'var(--color-surface-hover)',
+            borderBottom: '1px solid var(--color-border)'
           }}>
             <div style={{
               display: 'flex',
@@ -448,12 +449,14 @@ export default function OptionValidationModal({
                 style={{
                   flex: 1,
                   padding: '8px 12px',
-                  border: '1px solid #d1d5db',
+                  border: '1px solid var(--color-border)',
                   borderRadius: '6px',
-                  fontSize: '13px'
+                  fontSize: '13px',
+                  background: 'var(--color-surface)',
+                  color: 'var(--color-text)'
                 }}
               />
-              <span style={{ color: '#6b7280' }}>→</span>
+              <span style={{ color: 'var(--color-text-secondary)' }}>→</span>
               <input
                 type="text"
                 placeholder="새 옵션명"
@@ -462,9 +465,11 @@ export default function OptionValidationModal({
                 style={{
                   flex: 1,
                   padding: '8px 12px',
-                  border: '1px solid #d1d5db',
+                  border: '1px solid var(--color-border)',
                   borderRadius: '6px',
-                  fontSize: '13px'
+                  fontSize: '13px',
+                  background: 'var(--color-surface)',
+                  color: 'var(--color-text)'
                 }}
               />
               <button
@@ -492,7 +497,7 @@ export default function OptionValidationModal({
                 alignItems: 'center',
                 flexWrap: 'wrap'
               }}>
-                <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginRight: '4px' }}>
                   추천 옵션명:
                 </span>
                 {recommendedOptions.slice(1, 5).map((option, index) => (
@@ -501,9 +506,9 @@ export default function OptionValidationModal({
                     onClick={() => setBulkEditTo(option)}
                     style={{
                       padding: '6px 12px',
-                      background: bulkEditTo === option ? '#2563eb' : '#ffffff',
-                      color: bulkEditTo === option ? '#ffffff' : '#374151',
-                      border: '1px solid #d1d5db',
+                      background: bulkEditTo === option ? '#2563eb' : 'var(--color-surface)',
+                      color: bulkEditTo === option ? '#ffffff' : 'var(--color-text)',
+                      border: '1px solid var(--color-border)',
                       borderRadius: '6px',
                       fontSize: '12px',
                       cursor: 'pointer',
@@ -522,7 +527,8 @@ export default function OptionValidationModal({
         <div style={{
           flex: 1,
           overflow: 'auto',
-          padding: '16px 24px'
+          padding: '16px 24px',
+          background: 'var(--color-surface-hover)'
         }}>
           <table style={{
             width: '100%',
@@ -532,24 +538,24 @@ export default function OptionValidationModal({
             <thead style={{
               position: 'sticky',
               top: 0,
-              background: '#f9fafb',
+              background: 'var(--color-surface-hover)',
               zIndex: 1
             }}>
               <tr>
-                <th style={{ padding: '12px 8px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: '600', color: '#374151' }}>상태</th>
-                <th style={{ padding: '12px 8px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: '600', color: '#374151' }}>주문번호</th>
-                <th style={{ padding: '12px 8px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: '600', color: '#374151' }}>옵션명</th>
-                <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid #e5e7eb', fontWeight: '600', color: '#374151' }}>수량</th>
-                <th style={{ padding: '12px 8px', textAlign: 'right', borderBottom: '2px solid #e5e7eb', fontWeight: '600', color: '#374151' }}>공급단가</th>
-                <th style={{ padding: '12px 8px', textAlign: 'right', borderBottom: '2px solid #e5e7eb', fontWeight: '600', color: '#374151' }}>공급가</th>
-                <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid #e5e7eb', fontWeight: '600', color: '#374151' }}>수정</th>
+                <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>상태</th>
+                <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>주문번호</th>
+                <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>옵션명</th>
+                <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>수량</th>
+                <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>공급단가</th>
+                <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>공급가</th>
+                <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>수정</th>
               </tr>
             </thead>
             <tbody>
               {validatedOrders.map((order, index) => (
                 <tr key={index} style={{
-                  borderBottom: '1px solid #f3f4f6',
-                  background: order.matchStatus === 'matched' ? '#f0fdf4' : '#fef2f2'
+                  borderBottom: '1px solid var(--color-border)',
+                  background: 'transparent'
                 }}>
                   <td style={{ padding: '12px 8px' }}>
                     {order.matchStatus === 'matched' ? (
@@ -558,7 +564,7 @@ export default function OptionValidationModal({
                       <AlertCircle size={18} color="#dc2626" />
                     )}
                   </td>
-                  <td style={{ padding: '12px 8px', color: '#374151' }}>{order.orderNumber}</td>
+                  <td style={{ padding: '12px 8px', color: 'var(--color-text)' }}>{order.orderNumber}</td>
                   <td style={{ padding: '12px 8px' }}>
                     {editingIndex === index ? (
                       <div style={{ display: 'flex', gap: '8px' }}>
@@ -569,9 +575,11 @@ export default function OptionValidationModal({
                           style={{
                             flex: 1,
                             padding: '6px 8px',
-                            border: '1px solid #d1d5db',
+                            border: '1px solid var(--color-border)',
                             borderRadius: '4px',
-                            fontSize: '13px'
+                            fontSize: '13px',
+                            background: 'var(--color-surface)',
+                            color: 'var(--color-text)'
                           }}
                           autoFocus
                         />
@@ -595,11 +603,11 @@ export default function OptionValidationModal({
                       </span>
                     )}
                   </td>
-                  <td style={{ padding: '12px 8px', textAlign: 'center', color: '#374151' }}>{order.quantity}</td>
-                  <td style={{ padding: '12px 8px', textAlign: 'right', color: '#374151' }}>
+                  <td style={{ padding: '12px 8px', textAlign: 'center', color: 'var(--color-text)' }}>{order.quantity}</td>
+                  <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--color-text)' }}>
                     {order.unitPrice ? `${order.unitPrice.toLocaleString()}원` : '-'}
                   </td>
-                  <td style={{ padding: '12px 8px', textAlign: 'right', color: '#374151', fontWeight: '600' }}>
+                  <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--color-text)', fontWeight: '600' }}>
                     {order.supplyPrice ? `${order.supplyPrice.toLocaleString()}원` : '0원'}
                   </td>
                   <td style={{ padding: '12px 8px', textAlign: 'center' }}>
@@ -609,10 +617,10 @@ export default function OptionValidationModal({
                         style={{
                           padding: '4px 8px',
                           background: 'none',
-                          border: '1px solid #d1d5db',
+                          border: '1px solid var(--color-border)',
                           borderRadius: '4px',
                           cursor: 'pointer',
-                          color: '#6b7280'
+                          color: 'var(--color-text-secondary)'
                         }}
                       >
                         <Edit2 size={14} />
@@ -628,13 +636,13 @@ export default function OptionValidationModal({
         {/* 푸터 */}
         <div style={{
           padding: '20px 24px',
-          borderTop: '1px solid #e5e7eb',
+          borderTop: '1px solid var(--color-border)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: '#f9fafb'
+          background: 'var(--color-surface-hover)'
         }}>
-          <div style={{ fontSize: '13px', color: '#6b7280' }}>
+          <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
             {stats.unmatched > 0 ? (
               <>
                 <AlertCircle size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} color="#dc2626" />
@@ -652,9 +660,9 @@ export default function OptionValidationModal({
               onClick={onClose}
               style={{
                 padding: '10px 20px',
-                background: '#ffffff',
-                color: '#374151',
-                border: '1px solid #d1d5db',
+                background: 'var(--color-surface)',
+                color: 'var(--color-text)',
+                border: '1px solid var(--color-border)',
                 borderRadius: '8px',
                 fontSize: '14px',
                 fontWeight: '500',
@@ -683,6 +691,7 @@ export default function OptionValidationModal({
           </div>
         </div>
       </div>
+
     </div>
   );
 }

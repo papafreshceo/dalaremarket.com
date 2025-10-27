@@ -8,19 +8,23 @@ import DashboardTab from './components/DashboardTab';
 import OrderRegistrationTab from './components/OrderRegistrationTab';
 import MobileRegistrationTab from './components/MobileRegistrationTab';
 import SettlementTab from './components/SettlementTab';
+import OptionMappingTab from './components/OptionMappingTab';
 import UploadModal from './modals/UploadModal';
 import OrderDetailModal from './modals/OrderDetailModal';
 import ValidationErrorModal from './modals/ValidationErrorModal';
 import OptionValidationModal from './modals/OptionValidationModal';
+import MappingResultModal from './modals/MappingResultModal';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import * as XLSX from 'xlsx';
 import { validateRequiredColumns } from './utils/validation';
 import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC } from '@/lib/date';
+import { applyOptionMapping } from './utils/applyOptionMapping';
 
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<Tab>('대시보드');
   const router = useRouter();
+  const [userId, setUserId] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
   const [orders, setOrders] = useState<Order[]>([]);
 
@@ -41,6 +45,9 @@ export default function OrdersPage() {
   const [showOptionValidationModal, setShowOptionValidationModal] = useState<boolean>(false);
   const [uploadedOrders, setUploadedOrders] = useState<any[]>([]);
   const [optionProductsMap, setOptionProductsMap] = useState<Map<string, any>>(new Map());
+  const [showMappingResultModal, setShowMappingResultModal] = useState<boolean>(false);
+  const [mappingResults, setMappingResults] = useState<any[]>([]);
+  const [mappingStats, setMappingStats] = useState({ total: 0, mapped: 0 });
 
   useEffect(() => {
     const checkMobile = () => {
@@ -56,9 +63,12 @@ export default function OrdersPage() {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       console.log('🔍 현재 로그인 사용자:', user);
-      if (user?.email) {
-        setUserEmail(user.email);
-        console.log('✅ 이메일 설정:', user.email);
+      if (user) {
+        setUserId(user.id);
+        if (user.email) {
+          setUserEmail(user.email);
+          console.log('✅ 사용자 설정 - ID:', user.id, 'Email:', user.email);
+        }
       } else {
         console.log('❌ 로그인되지 않음');
       }
@@ -313,8 +323,8 @@ export default function OrdersPage() {
         });
         setOptionProductsMap(productMap);
 
-        // 검증 모달용 주문 데이터 준비
-        const ordersForValidation = jsonData.map((row: any, index: number) => ({
+        // 주문 데이터 준비
+        let ordersForValidation = jsonData.map((row: any, index: number) => ({
           index,
           orderNumber: String(row['주문번호'] || ''),
           orderer: String(row['주문자'] || ''),
@@ -338,10 +348,55 @@ export default function OrdersPage() {
           }
         }));
 
-        // 검증 모달 표시
-        setUploadedOrders(ordersForValidation);
-        setShowUploadModal(false);
-        setShowOptionValidationModal(true);
+        // 1단계: 옵션명 매핑 적용
+        const { orders: mappedOrders, mappingResults: results, totalOrders, mappedOrders: mappedCount } =
+          await applyOptionMapping(ordersForValidation, user.id);
+
+        ordersForValidation = mappedOrders;
+
+        // 매핑 후 변환된 옵션명으로 option_products 다시 조회
+        if (results.length > 0) {
+          const mappedOptionNames = [...new Set(ordersForValidation.map(order => String(order.optionName || '')).filter(Boolean))];
+
+          if (mappedOptionNames.length > 0) {
+            const { data: mappedNameData, error: mappedNameError } = await supabase
+              .from('option_products')
+              .select('option_name, option_code, seller_supply_price')
+              .in('option_name', mappedOptionNames);
+
+            if (mappedNameError) {
+              console.error('❌ 매핑된 옵션명 조회 오류:', mappedNameError);
+            } else if (mappedNameData) {
+              console.log('✅ 매핑된 옵션명으로 조회된 데이터:', mappedNameData);
+              // 기존 optionProducts에 추가
+              optionProducts = [...optionProducts, ...mappedNameData];
+
+              // productMap 다시 생성
+              const updatedProductMap = new Map<string, any>();
+              optionProducts.forEach((product: any) => {
+                if (product.option_name) {
+                  const key = product.option_name.trim().toLowerCase();
+                  updatedProductMap.set(key, product);
+                }
+              });
+              setOptionProductsMap(updatedProductMap);
+            }
+          }
+        }
+
+        // 2단계: 매핑 결과가 있으면 결과 모달 표시
+        if (results.length > 0) {
+          setMappingResults(results);
+          setMappingStats({ total: totalOrders, mapped: mappedCount });
+          setUploadedOrders(ordersForValidation);
+          setShowUploadModal(false);
+          setShowMappingResultModal(true);
+        } else {
+          // 매핑 결과가 없으면 바로 검증 모달로
+          setUploadedOrders(ordersForValidation);
+          setShowUploadModal(false);
+          setShowOptionValidationModal(true);
+        }
 
       } catch (error) {
         console.error('엑셀 파일 읽기 오류:', error);
@@ -513,18 +568,13 @@ export default function OrdersPage() {
   console.log('📊 전체 주문:', orders.length, '/ 필터된 주문:', filteredOrders.length);
 
   return (
-    <div className="platform-orders-page bg-background" style={{ minHeight: '100vh' }}>
-      {/* Toast 컨테이너 - 화면 정중앙 배치 */}
+    <div className="platform-orders-page" style={{ minHeight: '100vh', background: 'var(--color-background)' }}>
+      {/* Toast 컨테이너 */}
       <Toaster
         position="top-center"
         toastOptions={{
           duration: 3000,
           style: {
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 9999,
             minWidth: '300px',
             maxWidth: '500px',
             padding: '16px 24px',
@@ -547,14 +597,14 @@ export default function OrdersPage() {
         }}
       />
       {/* 발주관리 전용 헤더 */}
-      <div className="bg-surface border-border" style={{
+      <div style={{
         position: 'fixed',
         top: 0,
         left: 0,
         width: '100%',
         height: '70px',
-        background: '#f5f5f5',
-        borderBottom: '1px solid #e0e0e0',
+        background: 'var(--color-background-secondary)',
+        borderBottom: '1px solid var(--color-border)',
         zIndex: 1100,
         display: 'flex',
         alignItems: 'center',
@@ -573,16 +623,16 @@ export default function OrdersPage() {
                 justifyContent: 'center',
                 width: '40px',
                 height: '40px',
-                background: 'white',
-                border: '1px solid #e0e0e0',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
                 borderRadius: '8px',
                 cursor: 'pointer',
                 transition: 'background 0.2s'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-surface)'}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1f2937" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="3" y1="12" x2="21" y2="12"></line>
                 <line x1="3" y1="6" x2="21" y2="6"></line>
                 <line x1="3" y1="18" x2="21" y2="18"></line>
@@ -593,30 +643,25 @@ export default function OrdersPage() {
           {/* 나가기 버튼 */}
           <button
             onClick={() => { router.push('/'); }}
-            className="bg-surface border-border text-text hover:bg-surface-hover"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
               padding: '8px 16px',
-              background: 'white',
-              border: '1px solid #e0e0e0',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
               borderRadius: '8px',
               fontSize: '14px',
-              color: '#1f2937',
+              color: 'var(--color-text)',
               fontWeight: '500',
               cursor: 'pointer',
               transition: 'background 0.2s'
             }}
             onMouseEnter={(e) => {
-              if (!document.documentElement.classList.contains('dark')) {
-                e.currentTarget.style.background = '#f9fafb';
-              }
+              e.currentTarget.style.background = 'var(--color-surface-hover)';
             }}
             onMouseLeave={(e) => {
-              if (!document.documentElement.classList.contains('dark')) {
-                e.currentTarget.style.background = 'white';
-              }
+              e.currentTarget.style.background = 'var(--color-surface)';
             }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -628,9 +673,9 @@ export default function OrdersPage() {
           </button>
 
           {/* 로그인 정보 */}
-          <div className="text-text" style={{
+          <div style={{
             fontSize: '14px',
-            color: '#1f2937',
+            color: 'var(--color-text)',
             fontWeight: '500'
           }}>
             {userEmail || '로그인 정보 없음'}
@@ -659,14 +704,14 @@ export default function OrdersPage() {
       )}
 
       {/* Sidebar */}
-      <div className="bg-background-secondary border-border" style={{
+      <div style={{
         position: 'fixed',
         top: '70px',
         left: isMobile ? (sidebarOpen ? 0 : '-250px') : 0,
         width: isMobile ? '250px' : '175px',
         height: 'calc(100vh - 70px)',
-        background: '#f5f5f5',
-        borderRight: '1px solid #e0e0e0',
+        background: 'var(--color-background-secondary)',
+        borderRight: '1px solid var(--color-border)',
         zIndex: 1100,
         transition: 'left 0.3s ease',
         overflowY: 'auto'
@@ -679,7 +724,6 @@ export default function OrdersPage() {
           {/* 대시보드 탭 */}
           <button
             onClick={() => handleTabChange('대시보드')}
-            className={`text-text ${activeTab === '대시보드' ? 'bg-surface-hover' : ''}`}
             style={{
               width: '100%',
               display: 'flex',
@@ -687,20 +731,19 @@ export default function OrdersPage() {
               gap: '12px',
               padding: isMobile ? '10px 8px' : '10px 16px',
               margin: isMobile ? '4px 6px' : '2px 8px',
-              background: activeTab === '대시보드' ? '#e8e8e8' : 'transparent',
+              background: activeTab === '대시보드' ? 'var(--color-surface-hover)' : 'transparent',
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
               fontSize: isMobile ? '12px' : '14px',
-              fontWeight: activeTab === '대시보드' ? '700' : '400',
-              color: '#1f2937',
+              fontWeight: activeTab === '대시보드' ? '600' : '400',
+              color: 'var(--color-text)',
               textAlign: 'left',
               transition: 'background 0.2s'
             }}
             onMouseEnter={(e) => {
               if (activeTab !== '대시보드') {
-                const isDark = document.documentElement.classList.contains('dark');
-                e.currentTarget.style.background = isDark ? '#3e3e42' : '#f3f4f6';
+                e.currentTarget.style.background = 'var(--color-surface-hover)';
               }
             }}
             onMouseLeave={(e) => {
@@ -726,19 +769,19 @@ export default function OrdersPage() {
               gap: '12px',
               padding: isMobile ? '10px 8px' : '10px 16px',
               margin: isMobile ? '4px 6px' : '2px 8px',
-              background: activeTab === '발주서등록' ? '#e8e8e8' : 'transparent',
+              background: activeTab === '발주서등록' ? 'var(--color-surface-hover)' : 'transparent',
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
               fontSize: isMobile ? '12px' : '14px',
-              fontWeight: activeTab === '발주서등록' ? '700' : '400',
-              color: '#1f2937',
+              fontWeight: activeTab === '발주서등록' ? '600' : '400',
+              color: 'var(--color-text)',
               textAlign: 'left',
               transition: 'background 0.2s'
             }}
             onMouseEnter={(e) => {
               if (activeTab !== '발주서등록') {
-                e.currentTarget.style.background = '#f3f4f6';
+                e.currentTarget.style.background = 'var(--color-surface-hover)';
               }
             }}
             onMouseLeave={(e) => {
@@ -767,19 +810,19 @@ export default function OrdersPage() {
               gap: '12px',
               padding: isMobile ? '10px 8px' : '10px 16px',
               margin: isMobile ? '4px 6px' : '2px 8px',
-              background: activeTab === '모바일등록' ? '#e8e8e8' : 'transparent',
+              background: activeTab === '모바일등록' ? 'var(--color-surface-hover)' : 'transparent',
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
               fontSize: isMobile ? '12px' : '14px',
-              fontWeight: activeTab === '모바일등록' ? '700' : '400',
-              color: '#1f2937',
+              fontWeight: activeTab === '모바일등록' ? '600' : '400',
+              color: 'var(--color-text)',
               textAlign: 'left',
               transition: 'background 0.2s'
             }}
             onMouseEnter={(e) => {
               if (activeTab !== '모바일등록') {
-                e.currentTarget.style.background = '#f3f4f6';
+                e.currentTarget.style.background = 'var(--color-surface-hover)';
               }
             }}
             onMouseLeave={(e) => {
@@ -805,19 +848,19 @@ export default function OrdersPage() {
               gap: '12px',
               padding: isMobile ? '10px 8px' : '10px 16px',
               margin: isMobile ? '4px 6px' : '2px 8px',
-              background: activeTab === '정산관리' ? '#e8e8e8' : 'transparent',
+              background: activeTab === '정산관리' ? 'var(--color-surface-hover)' : 'transparent',
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
               fontSize: isMobile ? '12px' : '14px',
-              fontWeight: activeTab === '정산관리' ? '700' : '400',
-              color: '#1f2937',
+              fontWeight: activeTab === '정산관리' ? '600' : '400',
+              color: 'var(--color-text)',
               textAlign: 'left',
               transition: 'background 0.2s'
             }}
             onMouseEnter={(e) => {
               if (activeTab !== '정산관리') {
-                e.currentTarget.style.background = '#f3f4f6';
+                e.currentTarget.style.background = 'var(--color-surface-hover)';
               }
             }}
             onMouseLeave={(e) => {
@@ -834,15 +877,55 @@ export default function OrdersPage() {
             </svg>
             정산관리
           </button>
+
+          {/* 옵션명매핑 탭 */}
+          <button
+            onClick={() => handleTabChange('옵션명매핑')}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: isMobile ? '10px 8px' : '10px 16px',
+              margin: isMobile ? '4px 6px' : '2px 8px',
+              background: activeTab === '옵션명매핑' ? 'var(--color-surface-hover)' : 'transparent',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: isMobile ? '12px' : '14px',
+              fontWeight: activeTab === '옵션명매핑' ? '600' : '400',
+              color: 'var(--color-text)',
+              textAlign: 'left',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              if (activeTab !== '옵션명매핑') {
+                e.currentTarget.style.background = 'var(--color-surface-hover)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== '옵션명매핑') {
+                e.currentTarget.style.background = 'transparent';
+              }
+            }}
+          >
+            <svg width={isMobile ? '16' : '20'} height={isMobile ? '16' : '20'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="9" y1="15" x2="15" y2="15"></line>
+              <line x1="12" y1="12" x2="12" y2="18"></line>
+            </svg>
+            옵션명매핑
+          </button>
         </div>
       </div>
 
       {/* Main content area */}
-      <div className="bg-background" style={{
+      <div style={{
         marginLeft: isMobile ? '0' : '175px',
         padding: isMobile ? '16px' : '24px',
         paddingTop: '90px',
-        background: '#f5f5f5',
+        background: 'var(--color-background)',
         minHeight: '100vh',
         overflowY: 'auto'
       }}>
@@ -885,6 +968,7 @@ export default function OrdersPage() {
               endDate={endDate}
               setEndDate={setEndDate}
               onRefresh={fetchOrders}
+              userId={userId}
               userEmail={userEmail}
             />
           </div>
@@ -904,6 +988,16 @@ export default function OrdersPage() {
             <SettlementTab
               isMobile={isMobile}
               orders={orders}
+            />
+          </div>
+        )}
+        {activeTab === '옵션명매핑' && (
+          <div style={{
+            maxWidth: '1440px',
+            margin: '0 auto'
+          }}>
+            <OptionMappingTab
+              isMobile={isMobile}
             />
           </div>
         )}
@@ -931,6 +1025,34 @@ export default function OrdersPage() {
           show={showValidationModal}
           onClose={() => setShowValidationModal(false)}
           errors={validationErrors}
+        />
+
+        <MappingResultModal
+          show={showMappingResultModal}
+          onClose={() => {
+            setShowMappingResultModal(false);
+            setShowUploadModal(true);
+          }}
+          onContinue={() => {
+            setShowMappingResultModal(false);
+            // 매핑 후에도 매칭 실패한 옵션이 있는지 확인
+            const unmatchedOrders = uploadedOrders.filter(order => {
+              const optionName = order.optionName || '';
+              const key = optionName.trim().toLowerCase();
+              return !optionProductsMap.has(key);
+            });
+
+            if (unmatchedOrders.length > 0) {
+              // 3단계: 매칭 실패한 옵션이 있으면 검증 모달 표시
+              setShowOptionValidationModal(true);
+            } else {
+              // 4단계: 모두 매칭 성공이면 바로 저장
+              handleSaveValidatedOrders(uploadedOrders);
+            }
+          }}
+          results={mappingResults}
+          totalOrders={mappingStats.total}
+          mappedOrders={mappingStats.mapped}
         />
 
         <OptionValidationModal
