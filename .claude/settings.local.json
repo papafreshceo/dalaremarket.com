@@ -87,7 +87,8 @@
       "Bash(del:*)",
       "Bash(if exist \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\test-mapping-data.js\" del /f \"c:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\test-mapping-data.js\")",
       "Bash(if exist test-market-upload-flow.js del /f test-market-upload-flow.js)",
-      "Bash(npx next dev:*)"
+      "Bash(npx next dev:*)",
+      "Bash(if exist .next rmdir /s /q .next)"
     ],
     "deny": [],
     "ask": []

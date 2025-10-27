@@ -17,6 +17,7 @@ interface OrderStatisticsProps {
   stats: OrderStats;
   statusFilter: string | null;
   onStatusClick: (status: string | null) => void;
+  onPreparingButtonClick?: () => void;
 }
 
 // 성능 최적화: StatCard 컴포넌트 메모이제이션
@@ -25,13 +26,17 @@ const StatCard = memo(({
   value,
   color,
   isActive,
-  onClick
+  onClick,
+  onButtonClick,
+  buttonLabel
 }: {
   label: string;
   value: number;
   color: string;
   isActive: boolean;
   onClick: () => void;
+  onButtonClick?: () => void;
+  buttonLabel?: string;
 }) => {
   const colorClasses: Record<string, { border: string; text: string; hover: string }> = {
     gray: { border: 'border-gray-900', text: 'text-gray-900', hover: 'hover:border-gray-400' },
@@ -48,7 +53,7 @@ const StatCard = memo(({
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all ${
+      className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all relative ${
         isActive
           ? `${colors.border} shadow-md`
           : `border-gray-200 ${colors.hover}`
@@ -58,13 +63,26 @@ const StatCard = memo(({
       <div className={`text-2xl font-semibold ${colors.text}`} suppressHydrationWarning>
         {value.toLocaleString()}
       </div>
+
+      {/* 오버레이 버튼 */}
+      {onButtonClick && buttonLabel && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation(); // 카드 클릭 이벤트 방지
+            onButtonClick();
+          }}
+          className="absolute top-2 right-2 px-2 py-1 bg-yellow-500 text-white text-xs font-medium rounded hover:bg-yellow-600 transition-colors shadow-sm"
+        >
+          {buttonLabel}
+        </button>
+      )}
     </div>
   );
 });
 
 StatCard.displayName = 'StatCard';
 
-export default function OrderStatistics({ stats, statusFilter, onStatusClick }: OrderStatisticsProps) {
+export default function OrderStatistics({ stats, statusFilter, onStatusClick, onPreparingButtonClick }: OrderStatisticsProps) {
   return (
     <div className="grid grid-cols-8 gap-4">
       <StatCard
@@ -94,6 +112,8 @@ export default function OrderStatistics({ stats, statusFilter, onStatusClick }: 
         color="yellow"
         isActive={statusFilter === '상품준비중'}
         onClick={() => onStatusClick('상품준비중')}
+        onButtonClick={onPreparingButtonClick}
+        buttonLabel="집계"
       />
       <StatCard
         label="발송완료"

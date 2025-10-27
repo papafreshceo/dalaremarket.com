@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Download, RefreshCw } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import { Modal } from '@/components/ui/Modal';
+import ModelessWindow from '@/components/ModelessWindow';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { formatDateTimeForDisplay } from '@/lib/date';
@@ -13,6 +14,7 @@ import OrderFilters, { type SearchFilters } from './OrderFilters';
 import VendorSellerStats from './VendorSellerStats';
 import OptionStatsTable from './OptionStatsTable';
 import OrderActionButtons from './OrderActionButtons';
+import PreparingSummaryWindow from './PreparingSummaryWindow';
 
 interface Order {
   id: number;
@@ -225,6 +227,9 @@ export default function SearchTab() {
   const [showVendorFileModal, setShowVendorFileModal] = useState(false);
   const [showMarketInvoiceModal, setShowMarketInvoiceModal] = useState(false);
   const [marketInvoiceStats, setMarketInvoiceStats] = useState<Array<{market: string, count: number}>>([]);
+
+  // 상품준비중 집계 모달리스 윈도우 상태
+  const [showPreparingSummary, setShowPreparingSummary] = useState(false);
 
   // 벤더사 선택 모달 상태
   const [showVendorSelectModal, setShowVendorSelectModal] = useState(false);
@@ -3219,6 +3224,7 @@ export default function SearchTab() {
           stats={stats}
           statusFilter={statusFilter}
           onStatusClick={handleStatusCardClick}
+          onPreparingButtonClick={() => setShowPreparingSummary(true)}
         />
       </div>
 
@@ -4524,6 +4530,22 @@ export default function SearchTab() {
           </div>
         </div>
       </Modal>
+
+      {/* 상품준비중 집계 모달리스 윈도우 */}
+      <ModelessWindow
+        title="상품준비중 주문 집계"
+        isOpen={showPreparingSummary}
+        onClose={() => setShowPreparingSummary(false)}
+        defaultWidth={1100}
+        defaultHeight={700}
+        defaultX={150}
+        defaultY={80}
+      >
+        <PreparingSummaryWindow
+          startDate={filters.startDate}
+          endDate={filters.endDate}
+        />
+      </ModelessWindow>
     </div>
   );
 }
