@@ -1112,14 +1112,20 @@ export default function SingleOrderModal({
             flexDirection: 'column',
             gap: '12px'
           }}>
-            <h3 style={{
-              fontSize: '14px',
-              fontWeight: '600',
-              color: 'var(--color-text)',
-              margin: '0 0 8px 0'
-            }}>수령인 정보</h3>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '8px'
+            }}>
+              <h3 style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: 'var(--color-text)',
+                margin: 0
+              }}>수령인 정보</h3>
 
-            {/* 수령인 추가 버튼 - 오른쪽 정렬 */}
+              {/* 수령인 추가 버튼 - 오른쪽 정렬 */}
               <button
                 type="button"
                 onClick={() => {
@@ -1127,7 +1133,6 @@ export default function SingleOrderModal({
                   console.log('수령인 추가');
                 }}
                 style={{
-                  marginLeft: 'auto',
                   padding: '6px 12px',
                   border: '1px solid var(--color-border)',
                   borderRadius: '6px',
@@ -1151,24 +1156,6 @@ export default function SingleOrderModal({
                 수령인 추가
               </button>
             </div>
-
-          </div>
-
-          {/* 3. 수령인 정보 영역 */}
-          <div style={{
-            padding: '16px',
-            background: 'var(--color-background-secondary)',
-            borderRadius: '8px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-            <h3 style={{
-              fontSize: '14px',
-              fontWeight: '600',
-              color: 'var(--color-text)',
-              margin: '0 0 8px 0'
-            }}>수령인 정보</h3>
 
             {/* 주문자와 동일 체크박스 */}
             <div>
