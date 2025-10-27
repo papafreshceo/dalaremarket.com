@@ -224,6 +224,7 @@ export default function SearchTab() {
   // 벤더사전송파일 모달 상태
   const [showVendorFileModal, setShowVendorFileModal] = useState(false);
   const [showMarketInvoiceModal, setShowMarketInvoiceModal] = useState(false);
+  const [marketInvoiceStats, setMarketInvoiceStats] = useState<Array<{market: string, count: number}>>([]);
 
   // 벤더사 선택 모달 상태
   const [showVendorSelectModal, setShowVendorSelectModal] = useState(false);
@@ -233,6 +234,9 @@ export default function SearchTab() {
 
   // 상태 카드 필터
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+
+  // 로딩 상태
+  const [isLoading, setIsLoading] = useState(false);
 
   // 검색 필터 상태
   // 초기 날짜 계산 (7일 범위)
@@ -723,11 +727,13 @@ export default function SearchTab() {
     logPrefix = '',
     options: { page?: number } = {}
   ) => {
-    const { page = 1 } = options;
-    const offset = (page - 1) * itemsPerPage;
+    setIsLoading(true);
+    try {
+      const { page = 1 } = options;
+      const offset = (page - 1) * itemsPerPage;
 
-    // 주문 데이터 조회 함수
-    const fetchOrdersData = async () => {
+      // 주문 데이터 조회 함수
+      const fetchOrdersData = async () => {
       const params = new URLSearchParams();
       params.append('startDate', targetFilters.startDate);
       params.append('endDate', targetFilters.endDate);
@@ -776,22 +782,25 @@ export default function SearchTab() {
       return result.data;
     };
 
-    // 주문 + 통계 병렬 조회
-    const [ordersData, statsData] = await Promise.all([
-      fetchOrdersData(),
-      fetchStatsData(),
-    ]);
+      // 주문 + 통계 병렬 조회
+      const [ordersData, statsData] = await Promise.all([
+        fetchOrdersData(),
+        fetchStatsData(),
+      ]);
 
-    // 주문 데이터 처리
-    setOrders(ordersData);
-    console.log(`✅ ${logPrefix} Orders updated:`, ordersData.length, `(page ${page})`);
+      // 주문 데이터 처리
+      setOrders(ordersData);
+      console.log(`✅ ${logPrefix} Orders updated:`, ordersData.length, `(page ${page})`);
 
-    // 통계 데이터 처리
-    setStats(statsData.stats);
-    setVendorStats(statsData.vendorStats);
-    setSellerStats(statsData.sellerStats);
-    setOptionStats(statsData.optionStats);
-    console.log(`✅ ${logPrefix} Stats updated`);
+      // 통계 데이터 처리
+      setStats(statsData.stats);
+      setVendorStats(statsData.vendorStats);
+      setSellerStats(statsData.sellerStats);
+      setOptionStats(statsData.optionStats);
+      console.log(`✅ ${logPrefix} Stats updated`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // ⚡ React Query를 사용한 데이터 조회 (병렬 처리 + 캐싱)
@@ -1970,8 +1979,8 @@ export default function SearchTab() {
     }
   };
 
-  // 전체 마켓 일괄 다운로드
-  const handleAllMarketInvoiceDownload = async () => {
+  // 마켓 송장 모달을 열 때 전체 데이터 기반으로 마켓별 통계 계산
+  const handleOpenMarketInvoiceModal = async () => {
     try {
       // 서버에서 현재 필터 조건으로 전체 주문 가져오기
       const params = new URLSearchParams();
@@ -1995,32 +2004,51 @@ export default function SearchTab() {
 
       const allOrders = data.data || [];
 
-      // 마켓별로 발송완료 주문이 있는지 확인
-      const activeMarkets = uniqueMarkets.filter((market) => {
-        // CS발송, 전화주문 제외
-        if (market === 'CS발송' || market === '전화주문') {
-          return false;
-        }
+      // 발송완료 주문만 필터링
+      const shippedOrders = allOrders.filter(
+        (o: Order) => o.shipping_status === '발송완료'
+      );
 
-        const marketOrders = allOrders.filter(
-          (o: Order) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === market
-        );
-        return marketOrders.length > 0;
+      // 마켓별 건수 계산
+      const marketCountMap = new Map<string, number>();
+      shippedOrders.forEach((order: Order) => {
+        const marketName = order.market_name || '미지정';
+        // CS발송, 전화주문 제외
+        if (marketName === 'CS발송' || marketName === '전화주문') {
+          return;
+        }
+        marketCountMap.set(marketName, (marketCountMap.get(marketName) || 0) + 1);
       });
 
-      if (activeMarkets.length === 0) {
+      // 통계 배열로 변환 (건수 많은 순으로 정렬)
+      const stats = Array.from(marketCountMap.entries())
+        .map(([market, count]) => ({ market, count }))
+        .sort((a, b) => b.count - a.count);
+
+      setMarketInvoiceStats(stats);
+      setShowMarketInvoiceModal(true);
+    } catch (error) {
+      console.error('마켓 통계 조회 실패:', error);
+      alert('마켓 통계 조회 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 전체 마켓 일괄 다운로드
+  const handleAllMarketInvoiceDownload = async () => {
+    try {
+      if (marketInvoiceStats.length === 0) {
         alert('다운로드할 마켓이 없습니다.');
         return;
       }
 
       // 각 마켓별로 다운로드
-      for (const market of activeMarkets) {
-        await handleMarketInvoiceDownload(market);
+      for (const stat of marketInvoiceStats) {
+        await handleMarketInvoiceDownload(stat.market);
         // 다운로드 사이에 약간의 딜레이 추가 (브라우저가 여러 파일을 처리할 시간 확보)
         await new Promise(resolve => setTimeout(resolve, 300));
       }
 
-      alert(`${activeMarkets.length}개 마켓의 송장파일이 다운로드되었습니다.`);
+      alert(`${marketInvoiceStats.length}개 마켓의 송장파일이 다운로드되었습니다.`);
     } catch (error) {
       console.error('마켓 송장 일괄 다운로드 실패:', error);
       alert('마켓 송장 일괄 다운로드 중 오류가 발생했습니다.');
@@ -3173,34 +3201,51 @@ export default function SearchTab() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
+      {/* 전역 로딩 오버레이 (통계 카드 + 필터 영역) */}
+      {isLoading && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+          <div className="bg-white rounded-lg shadow-2xl p-8 flex flex-col items-center gap-4 pointer-events-auto">
+            <RefreshCw className="w-12 h-12 animate-spin text-blue-600" />
+            <div className="text-xl font-bold text-gray-900">주문 데이터 로딩중...</div>
+            <div className="text-sm text-gray-600">잠시만 기다려주세요</div>
+          </div>
+        </div>
+      )}
+
       {/* 통계 카드 */}
-      <OrderStatistics
-        stats={stats}
-        statusFilter={statusFilter}
-        onStatusClick={handleStatusCardClick}
-      />
+      <div className={isLoading ? 'pointer-events-none opacity-70' : ''}>
+        <OrderStatistics
+          stats={stats}
+          statusFilter={statusFilter}
+          onStatusClick={handleStatusCardClick}
+        />
+      </div>
 
       {/* 벤더사별/셀러별 테이블 */}
-      <VendorSellerStats
-        vendorStats={vendorStats}
-        sellerStats={sellerStats}
-        onVendorExcelDownload={handleVendorExcelDownload}
-        onPaymentCheckToggle={handlePaymentCheckToggle}
-        onRefundComplete={handleRefundComplete}
-      />
+      <div className={isLoading ? 'pointer-events-none opacity-70' : ''}>
+        <VendorSellerStats
+          vendorStats={vendorStats}
+          sellerStats={sellerStats}
+          onVendorExcelDownload={handleVendorExcelDownload}
+          onPaymentCheckToggle={handlePaymentCheckToggle}
+          onRefundComplete={handleRefundComplete}
+        />
+      </div>
 
       {/* 검색 필터 */}
-      <OrderFilters
-        filters={filters}
-        onFiltersChange={setFilters}
-        onSearch={fetchOrders}
-        onQuickDateFilter={setQuickDateFilter}
-        uniqueMarkets={uniqueMarkets}
-        uniqueStatuses={uniqueStatuses}
-        uniqueVendors={uniqueVendors}
-        isQuickDateFilterActive={isQuickDateFilterActive}
-      />
+      <div className={isLoading ? 'pointer-events-none opacity-70' : ''}>
+        <OrderFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+          onSearch={fetchOrders}
+          onQuickDateFilter={setQuickDateFilter}
+          uniqueMarkets={uniqueMarkets}
+          uniqueStatuses={uniqueStatuses}
+          uniqueVendors={uniqueVendors}
+          isQuickDateFilterActive={isQuickDateFilterActive}
+        />
+      </div>
 
       {/* EditableAdminGrid */}
       {columns.length === 0 ? (
@@ -3209,7 +3254,7 @@ export default function SearchTab() {
           <span className="text-gray-500">칼럼 로딩중...</span>
         </div>
       ) : (
-        <div ref={tableContainerRef}>
+        <div ref={tableContainerRef} className={`relative ${isLoading ? 'pointer-events-none opacity-70' : ''}`}>
             <EditableAdminGrid
               columns={columns}
               data={filteredOrders}
@@ -3262,7 +3307,7 @@ export default function SearchTab() {
                   onBulkInvoiceUpload={handleBulkInvoiceUpload}
                   onBulkInvoiceUpdate={handleBulkInvoiceUpdate}
                   onVendorFileModal={() => setShowVendorFileModal(true)}
-                  onMarketInvoiceModal={() => setShowMarketInvoiceModal(true)}
+                  onMarketInvoiceModal={handleOpenMarketInvoiceModal}
                   onRegisterAsRegularCustomer={handleRegisterAsRegularCustomer}
                   onRegisterAsMarketingCustomer={handleRegisterAsMarketingCustomer}
                 />
@@ -4339,7 +4384,10 @@ export default function SearchTab() {
       {/* 마켓 송장파일 다운로드 모달 */}
       <Modal
         isOpen={showMarketInvoiceModal}
-        onClose={() => setShowMarketInvoiceModal(false)}
+        onClose={() => {
+          setShowMarketInvoiceModal(false);
+          setMarketInvoiceStats([]);
+        }}
         title="마켓별 송장파일 다운로드"
         size="md"
       >
@@ -4348,10 +4396,14 @@ export default function SearchTab() {
             각 마켓별로 송장파일을 다운로드하거나 전체 마켓을 일괄 다운로드할 수 있습니다.
           </p>
 
-          <div className="flex justify-end mb-3">
+          <div className="flex justify-between items-center mb-3">
+            <div className="text-sm font-medium text-gray-700">
+              총 {marketInvoiceStats.reduce((sum, stat) => sum + stat.count, 0)}건
+            </div>
             <button
               onClick={handleAllMarketInvoiceDownload}
-              className="px-4 py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 flex items-center gap-2"
+              disabled={marketInvoiceStats.length === 0}
+              className="px-4 py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
             >
               <Download className="w-4 h-4" />
               전체 다운로드
@@ -4359,43 +4411,34 @@ export default function SearchTab() {
           </div>
 
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {uniqueMarkets
-              .filter(market => market !== 'CS발송' && market !== '전화주문') // CS발송, 전화주문 제외
-              .map((market) => {
-                const marketOrders = filteredOrders.filter(
-                  (o) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === market
-                );
-                const orderCount = marketOrders.length;
-                const isActive = orderCount > 0;
-
-                return (
-                  <div
-                    key={market}
-                    className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-gray-50 hover:bg-gray-100'
-                        : 'bg-gray-100 opacity-50 cursor-not-allowed'
-                    }`}
-                  >
-                    <div className="flex-1">
-                      <span className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-500'}`}>
-                        {market}
-                      </span>
-                      <span className="ml-2 text-sm text-gray-500">
-                        ({orderCount}건)
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => handleMarketInvoiceDownload(market)}
-                      disabled={!isActive}
-                      className="px-3 py-1.5 bg-gray-600 text-white rounded text-sm font-medium hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
-                    >
-                      <Download className="w-4 h-4" />
-                      다운로드
-                    </button>
+            {marketInvoiceStats.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                발송완료 상태의 주문이 없습니다.
+              </div>
+            ) : (
+              marketInvoiceStats.map((stat) => (
+                <div
+                  key={stat.market}
+                  className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex-1">
+                    <span className="font-medium text-gray-900">
+                      {stat.market}
+                    </span>
+                    <span className="ml-2 text-sm text-gray-500">
+                      ({stat.count.toLocaleString()}건)
+                    </span>
                   </div>
-                );
-              })}
+                  <button
+                    onClick={() => handleMarketInvoiceDownload(stat.market)}
+                    className="px-3 py-1.5 bg-gray-600 text-white rounded text-sm font-medium hover:bg-gray-700 flex items-center gap-1"
+                  >
+                    <Download className="w-4 h-4" />
+                    다운로드
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </Modal>
