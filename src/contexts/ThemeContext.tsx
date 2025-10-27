@@ -14,51 +14,34 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light')
+  // localStorage에서 초기 테마 읽기 (관리자 화면에서만)
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+      const savedTheme = localStorage.getItem('theme') as Theme
+      return savedTheme || 'light'
+    }
+    return 'light'
+  })
   const [userId, setUserId] = useState<string | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
-    // 사용자 정보 및 테마 불러오기
-    const loadTheme = async () => {
+    // 사용자 ID만 로드
+    const loadUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-
       if (user) {
         setUserId(user.id)
-
-        // DB에서 사용자의 테마 설정 불러오기
-        const { data, error } = await supabase
-          .from('users')
-          .select('theme_preference')
-          .eq('id', user.id)
-          .single()
-
-        if (error) {
-          // DB 에러 시 로컬 스토리지 사용 (theme_preference 컬럼이 없을 경우 대비)
-          console.warn('Failed to load theme from DB, using localStorage:', error)
-          const savedTheme = localStorage.getItem('theme') as Theme
-          const fallbackTheme = savedTheme || 'light'
-          setTheme(fallbackTheme)
-          document.documentElement.classList.toggle('dark', fallbackTheme === 'dark')
-        } else {
-          const userTheme = (data?.theme_preference as Theme) || 'light'
-          setTheme(userTheme)
-          document.documentElement.classList.toggle('dark', userTheme === 'dark')
-        }
-      } else {
-        // 로그인하지 않은 경우 로컬 스토리지 사용
-        const savedTheme = localStorage.getItem('theme') as Theme
-        if (savedTheme) {
-          setTheme(savedTheme)
-          document.documentElement.classList.toggle('dark', savedTheme === 'dark')
-        }
       }
     }
-
-    loadTheme()
+    loadUser()
   }, [])
 
   const toggleTheme = async () => {
+    // 관리자 화면에서만 테마 토글 작동
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/admin')) {
+      return
+    }
+
     const newTheme = theme === 'light' ? 'dark' : 'light'
     setTheme(newTheme)
     document.documentElement.classList.toggle('dark', newTheme === 'dark')

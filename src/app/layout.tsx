@@ -27,16 +27,35 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <head>
         <link
-          rel="stylesheet"
+          rel="preload"
           as="style"
-          crossOrigin="anonymous"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
         />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
+        />
+        {/* FOUC 방지: 관리자 화면에서만 테마 적용 */}
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              try {
+                // 관리자 화면에서만 다크모드 적용
+                if (window.location.pathname.startsWith('/admin')) {
+                  const theme = localStorage.getItem('theme');
+                  if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                  }
+                }
+              } catch (e) {}
+            })();
+          `
+        }} />
       </head>
-      <body className="font-pretendard antialiased">
+      <body className="font-pretendard antialiased" style={{ visibility: 'visible' }}>
         <ThemeProvider>
           <ToastProvider>
             {children}

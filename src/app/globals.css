@@ -1,6 +1,4 @@
 /* app/globals.css */
-/* 폰트 임포트 - 최상단 */
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
 @import "tailwindcss";
 @import "ag-grid-community/styles/ag-grid.css";
 @import "ag-grid-community/styles/ag-theme-alpine.css";

@@ -29,6 +29,8 @@ export default function UserHeader() {
   const [expandedSubmenu, setExpandedSubmenu] = useState<string | null>(null);
   const [headerVisible, setHeaderVisible] = useState<boolean>(true);
   const [lastScrollY, setLastScrollY] = useState<number>(0);
+  const [ordersModalOpen, setOrdersModalOpen] = useState<boolean>(false);
+  const [ordersModalLoaded, setOrdersModalLoaded] = useState<boolean>(false);
   const supabase = createClient();
   const { showToast } = useToast();
 
@@ -104,7 +106,7 @@ export default function UserHeader() {
         { path: '/gallery', text: '이미지다운로드' }
       ]
     },
-    { path: '/platform/orders', text: '발주관리' },
+    { path: '/platform/orders', text: '발주관리', special: true },
     {
       path: '/platform/tools',
       text: '업무도구',
@@ -229,6 +231,26 @@ export default function UserHeader() {
                   onMouseEnter={() => item.hasSubmenu && setShowSubmenu(item.path)}
                   onMouseLeave={() => setShowSubmenu(null)}
                 >
+                  {item.text === '발주관리' ? (
+                    <button
+                      onClick={() => setOrdersModalOpen(true)}
+                      style={{
+                        fontSize: '14px',
+                        color: '#212529',
+                        fontWeight: '500',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 0
+                      }}
+                    >
+                      {item.text}
+                    </button>
+                  ) : (
                   <Link
                     href={item.path}
                     style={{
@@ -271,6 +293,7 @@ export default function UserHeader() {
                       </>
                     )}
                   </Link>
+                  )}
 
                   {/* Submenu dropdown */}
                   {item.hasSubmenu && showSubmenu === item.path && (
@@ -461,6 +484,10 @@ export default function UserHeader() {
                     if (item.hasSubmenu) {
                       e.preventDefault();
                       setExpandedSubmenu(expandedSubmenu === item.path ? null : item.path);
+                    } else if (item.text === '발주관리') {
+                      e.preventDefault();
+                      setOrdersModalOpen(true);
+                      setMobileMenuOpen(false);
                     } else {
                       setMobileMenuOpen(false);
                     }
@@ -494,6 +521,8 @@ export default function UserHeader() {
                         <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </>
+                  ) : item.text === '발주관리' ? (
+                    <span>{item.text}</span>
                   ) : (
                     <Link
                       href={item.path}
@@ -620,6 +649,121 @@ export default function UserHeader() {
         onClose={() => setAuthModalOpen(false)}
         initialMode={authModalMode}
       />
+
+      {/* 발주관리 모달 */}
+      {ordersModalOpen && (
+        <>
+          {/* 배경 오버레이 */}
+          <div
+            onClick={() => {
+              setOrdersModalOpen(false);
+              setOrdersModalLoaded(false);
+            }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 9998
+            }}
+          />
+
+          {/* 모달 컨텐츠 */}
+          <div style={{
+            position: 'fixed',
+            top: '5vh',
+            left: '5vw',
+            right: '5vw',
+            bottom: '5vh',
+            background: 'var(--color-background)',
+            borderRadius: '12px',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+            zIndex: 9999,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            {/* 로딩 화면 */}
+            {!ordersModalLoaded && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'var(--color-background)',
+                zIndex: 10001,
+                gap: '24px'
+              }}>
+                {/* 로딩 스피너 */}
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  border: '4px solid rgba(37, 99, 235, 0.1)',
+                  borderTop: '4px solid #2563eb',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }} />
+
+                <div style={{
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  color: 'var(--color-text)',
+                  textAlign: 'center'
+                }}>
+                  발주관리시스템으로 이동중
+                </div>
+
+                <style>{`
+                  @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                  }
+
+                  /* 다크모드 스크롤바 스타일 */
+                  .orders-modal-iframe::-webkit-scrollbar {
+                    width: 12px;
+                  }
+
+                  .orders-modal-iframe::-webkit-scrollbar-track {
+                    background: var(--color-background);
+                  }
+
+                  .orders-modal-iframe::-webkit-scrollbar-thumb {
+                    background: var(--color-border);
+                    border-radius: 6px;
+                  }
+
+                  .orders-modal-iframe::-webkit-scrollbar-thumb:hover {
+                    background: var(--color-text-secondary);
+                  }
+                `}</style>
+              </div>
+            )}
+
+            {/* iframe으로 orders 페이지 로드 */}
+            <iframe
+              className="orders-modal-iframe"
+              src="/platform/orders"
+              onLoad={() => setOrdersModalLoaded(true)}
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none',
+                borderRadius: '12px',
+                opacity: ordersModalLoaded ? 1 : 0,
+                transition: 'opacity 0.3s'
+              }}
+            />
+          </div>
+        </>
+      )}
     </>
   );
 }

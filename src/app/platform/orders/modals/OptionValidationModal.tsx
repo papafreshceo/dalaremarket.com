@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, AlertCircle, CheckCircle, Edit2, Save } from 'lucide-react';
+import { X, AlertCircle, CheckCircle, Edit2, Save, ExternalLink } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import toast from 'react-hot-toast';
 
@@ -28,6 +28,7 @@ export default function OptionValidationModal({
   const [bulkEditFrom, setBulkEditFrom] = useState('');
   const [bulkEditTo, setBulkEditTo] = useState('');
   const [recommendedOptions, setRecommendedOptions] = useState<string[]>([]); // 추천 옵션명 목록
+  const [showMappingModal, setShowMappingModal] = useState(false);
 
   useEffect(() => {
     if (show && orders.length > 0) {
@@ -345,7 +346,30 @@ export default function OptionValidationModal({
               color: 'var(--color-text-secondary)',
               margin: 0
             }}>
-              매칭에 실패한 옵션명을 수정해주세요. 좌측 메뉴의 <strong>옵션명매핑</strong> 탭에서 미리 설정해두시면 다음부터는 수정작업 없이 바로 등록이 가능합니다.
+              매칭에 실패한 옵션명을 수정해주세요. 좌측 메뉴의{' '}
+              <button
+                onClick={() => setShowMappingModal(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  color: '#2563eb',
+                  fontWeight: '600',
+                  textDecoration: 'none',
+                  borderBottom: '1px solid #2563eb',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+              >
+                옵션명매핑
+                <ExternalLink size={12} />
+              </button>{' '}
+              탭에서 미리 설정해두시면 다음부터는 수정작업 없이 바로 등록이 가능합니다.
             </p>
           </div>
           <button
@@ -692,6 +716,83 @@ export default function OptionValidationModal({
         </div>
       </div>
 
+      {/* 옵션명매핑 플로팅 모달 */}
+      {showMappingModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 3000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'var(--color-surface)',
+            borderRadius: '16px',
+            width: '95%',
+            height: '90vh',
+            maxWidth: '1400px',
+            border: '1px solid var(--color-border)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            {/* 헤더 */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--color-border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'var(--color-surface-hover)'
+            }}>
+              <h2 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                color: 'var(--color-text)',
+                margin: 0
+              }}>
+                옵션명매핑 설정
+              </h2>
+              <button
+                onClick={() => setShowMappingModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  color: 'var(--color-text-secondary)',
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* iframe 컨텐츠 */}
+            <div style={{
+              flex: 1,
+              overflow: 'hidden'
+            }}>
+              <iframe
+                src="/platform/orders?tab=옵션명매핑&modal=true"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none'
+                }}
+                title="옵션명매핑 설정"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

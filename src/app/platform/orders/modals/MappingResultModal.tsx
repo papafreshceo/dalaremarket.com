@@ -117,7 +117,7 @@ export default function MappingResultModal({
           {unmappedCount > 0 && (
             <div>
               <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>변환 실패:</span>
-              <span style={{ fontSize: '18px', fontWeight: '700', color: '#dc2626', marginLeft: '8px' }}>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: '#f87171', marginLeft: '8px' }}>
                 {unmappedCount}건
               </span>
             </div>
@@ -166,7 +166,7 @@ export default function MappingResultModal({
                     <span style={{
                       flex: 1,
                       fontSize: '14px',
-                      color: '#dc2626',
+                      color: '#f87171',
                       fontWeight: '500',
                       textDecoration: 'line-through'
                     }}>
@@ -213,7 +213,7 @@ export default function MappingResultModal({
           <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
             {unmappedCount > 0 ? (
               <>
-                <AlertCircle size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} color="#dc2626" />
+                <AlertCircle size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} color="#f87171" />
                 변환되지 않은 옵션명이 {unmappedCount}건 있습니다
               </>
             ) : (
@@ -252,7 +252,7 @@ export default function MappingResultModal({
                 cursor: 'pointer'
               }}
             >
-              {unmappedCount > 0 ? '계속 진행' : '발주서 등록'}
+              확인
             </button>
           </div>
         </div>

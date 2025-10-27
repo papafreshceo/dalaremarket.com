@@ -1,36 +1,40 @@
-// src/components/ui/ThemeToggle.tsx
+// src/app/platform/orders/components/LocalThemeToggle.tsx
 'use client'
 
-import { useTheme } from '@/contexts/ThemeContext'
 import { useState, useEffect } from 'react'
 
-export function ThemeToggle() {
-  const { theme, toggleTheme } = useTheme()
+interface LocalThemeToggleProps {
+  onThemeChange: (theme: 'light' | 'dark') => void
+  currentTheme: 'light' | 'dark'
+}
+
+export function LocalThemeToggle({ onThemeChange, currentTheme }: LocalThemeToggleProps) {
   const [mounted, setMounted] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    // 관리자 화면인지 확인
-    setIsAdmin(window.location.pathname.startsWith('/admin'))
   }, [])
 
-  // 관리자 화면이 아니면 아무것도 표시하지 않음
-  if (!mounted || !isAdmin) {
+  if (!mounted) {
     return null
+  }
+
+  const toggleTheme = () => {
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light'
+    onThemeChange(newTheme)
   }
 
   return (
     <button
       onClick={toggleTheme}
       style={{
-        background: theme === 'dark' ? '#1e293b' : '#ffffff',
+        background: currentTheme === 'dark' ? '#1e293b' : '#ffffff',
         border: '1px solid',
-        borderColor: theme === 'dark' ? '#334155' : '#bfdbfe',
+        borderColor: currentTheme === 'dark' ? '#334155' : '#bfdbfe',
         borderRadius: '10px',
         padding: '8px 12px',
         cursor: 'pointer',
-        color: theme === 'dark' ? '#f1f5f9' : '#1d4ed8',
+        color: currentTheme === 'dark' ? '#f1f5f9' : '#1d4ed8',
         fontWeight: '600',
         fontSize: '14px',
         display: 'flex',
@@ -39,13 +43,13 @@ export function ThemeToggle() {
         transition: 'all 0.2s'
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = theme === 'dark' ? '#334155' : '#eff6ff'
+        e.currentTarget.style.background = currentTheme === 'dark' ? '#334155' : '#eff6ff'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = theme === 'dark' ? '#1e293b' : '#ffffff'
+        e.currentTarget.style.background = currentTheme === 'dark' ? '#1e293b' : '#ffffff'
       }}
     >
-      {theme === 'dark' ? (
+      {currentTheme === 'dark' ? (
         <>
           <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
             <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />

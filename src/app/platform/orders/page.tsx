@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useRef, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Order, StatusConfig, StatsData, Tab } from './types';
 import DashboardTab from './components/DashboardTab';
@@ -9,19 +9,23 @@ import OrderRegistrationTab from './components/OrderRegistrationTab';
 import MobileRegistrationTab from './components/MobileRegistrationTab';
 import SettlementTab from './components/SettlementTab';
 import OptionMappingTab from './components/OptionMappingTab';
+import SellerInfoTab from './components/SellerInfoTab';
 import UploadModal from './modals/UploadModal';
 import OrderDetailModal from './modals/OrderDetailModal';
 import ValidationErrorModal from './modals/ValidationErrorModal';
 import OptionValidationModal from './modals/OptionValidationModal';
 import MappingResultModal from './modals/MappingResultModal';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { LocalThemeToggle } from './components/LocalThemeToggle';
 import * as XLSX from 'xlsx';
 import { validateRequiredColumns } from './utils/validation';
 import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC } from '@/lib/date';
 import { applyOptionMapping } from './utils/applyOptionMapping';
+import { showStatusToast } from './utils/statusToast';
 
-export default function OrdersPage() {
+function OrdersPageContent() {
+  const searchParams = useSearchParams();
+  const isModalMode = searchParams.get('modal') === 'true';
   const [activeTab, setActiveTab] = useState<Tab>('대시보드');
   const router = useRouter();
   const [userId, setUserId] = useState<string>('');
@@ -37,7 +41,12 @@ export default function OrdersPage() {
   const [dragActive, setDragActive] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
-  const [startDate, setStartDate] = useState<Date | null>(new Date());
+  // 기본값: 7일 전부터 오늘까지
+  const [startDate, setStartDate] = useState<Date | null>(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 7);
+    return date;
+  });
   const [endDate, setEndDate] = useState<Date | null>(new Date());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -48,6 +57,64 @@ export default function OrdersPage() {
   const [showMappingResultModal, setShowMappingResultModal] = useState<boolean>(false);
   const [mappingResults, setMappingResults] = useState<any[]>([]);
   const [mappingStats, setMappingStats] = useState({ total: 0, mapped: 0 });
+
+  // 로컬 다크모드 상태 (발주관리 페이지 전용, 사용자별 DB 저장)
+  const [localTheme, setLocalTheme] = useState<'light' | 'dark'>('light');
+  const [themeLoaded, setThemeLoaded] = useState(false);
+
+  // 사용자별 테마 불러오기
+  useEffect(() => {
+    const loadUserTheme = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('orders_theme')
+          .eq('id', user.id)
+          .single();
+
+        if (!error && data?.orders_theme) {
+          setLocalTheme(data.orders_theme as 'light' | 'dark');
+        }
+      }
+      setThemeLoaded(true);
+    };
+
+    loadUserTheme();
+  }, []);
+
+  // 로컬 다크모드 적용
+  useEffect(() => {
+    if (!themeLoaded) return;
+
+    if (localTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
+    // 컴포넌트 언마운트 시 다크모드 해제 (다른 페이지로 이동 시)
+    return () => {
+      document.documentElement.classList.remove('dark');
+    };
+  }, [localTheme, themeLoaded]);
+
+  const handleThemeChange = async (newTheme: 'light' | 'dark') => {
+    setLocalTheme(newTheme);
+
+    // DB에 저장
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      await supabase
+        .from('users')
+        .update({ orders_theme: newTheme })
+        .eq('id', user.id);
+    }
+  };
 
   useEffect(() => {
     const checkMobile = () => {
@@ -166,17 +233,24 @@ export default function OrdersPage() {
     setOrders(convertedOrders);
   };
 
-  // 클라이언트에서만 localStorage에서 탭 불러오기
+  // URL 쿼리 파라미터에서 탭 읽어오기
   useEffect(() => {
-    const savedTab = localStorage.getItem('ordersActiveTab');
-    if (savedTab) {
-      setActiveTab(savedTab as Tab);
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['대시보드', '발주서등록', '건별등록', '정산관리', '옵션명매핑', '판매자정보'].includes(tabParam)) {
+      setActiveTab(tabParam as Tab);
+      localStorage.setItem('ordersActiveTab', tabParam);
     } else {
-      // 저장된 탭이 없으면 기본값으로 '대시보드' 설정
-      setActiveTab('대시보드');
-      localStorage.setItem('ordersActiveTab', '대시보드');
+      // URL에 탭 파라미터가 없으면 localStorage에서 불러오기
+      const savedTab = localStorage.getItem('ordersActiveTab');
+      if (savedTab) {
+        setActiveTab(savedTab as Tab);
+      } else {
+        // 저장된 탭이 없으면 기본값으로 '대시보드' 설정
+        setActiveTab('대시보드');
+        localStorage.setItem('ordersActiveTab', '대시보드');
+      }
     }
-  }, []);
+  }, [searchParams]);
 
   // 탭 변경 시 localStorage에 저장
   const handleTabChange = (tab: Tab) => {
@@ -193,7 +267,7 @@ export default function OrdersPage() {
     confirmed: { label: '발주서확정', color: '#7c3aed', bg: '#ede9fe' },
     preparing: { label: '상품준비중', color: '#f59e0b', bg: '#fef3c7' },
     shipped: { label: '발송완료', color: '#10b981', bg: '#d1fae5' },
-    cancelRequested: { label: '취소요청', color: '#ef4444', bg: '#fee2e2' },
+    cancelRequested: { label: '취소요청', color: '#f87171', bg: '#fee2e2' },
     cancelled: { label: '취소완료', color: '#6b7280', bg: '#f3f4f6' },
     refunded: { label: '환불완료', color: '#10b981', bg: '#d1fae5' }
   };
@@ -203,7 +277,7 @@ export default function OrdersPage() {
     { status: 'confirmed', count: orders.filter(o => o.status === 'confirmed').length, bgGradient: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)' },
     { status: 'preparing', count: orders.filter(o => o.status === 'preparing').length, bgGradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' },
     { status: 'shipped', count: orders.filter(o => o.status === 'shipped').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' },
-    { status: 'cancelRequested', count: orders.filter(o => o.status === 'cancelRequested').length, bgGradient: 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)' },
+    { status: 'cancelRequested', count: orders.filter(o => o.status === 'cancelRequested').length, bgGradient: 'linear-gradient(135deg, #f87171 0%, #fca5a5 100%)' },
     { status: 'cancelled', count: orders.filter(o => o.status === 'cancelled').length, bgGradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' },
     { status: 'refunded', count: orders.filter(o => o.status === 'refunded').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' }
   ];
@@ -474,10 +548,7 @@ export default function OrdersPage() {
       }
 
       console.log('✅ 주문 저장 성공:', result.data);
-      toast.success(`${result.count}건의 주문이 성공적으로 등록되었습니다.`, {
-        position: 'top-center',
-        duration: 3000
-      });
+      showStatusToast('registered', `${result.count}건의 주문이 성공적으로 등록되었습니다.`, 3000);
 
       // 모달 닫기 및 상태 초기화
       setShowOptionValidationModal(false);
@@ -569,6 +640,32 @@ export default function OrdersPage() {
 
   return (
     <div className="platform-orders-page" style={{ minHeight: '100vh', background: 'var(--color-background)' }}>
+      {/* 다크모드 스크롤바 스타일 */}
+      <style>{`
+        * {
+          scrollbar-width: thin;
+          scrollbar-color: var(--color-border) var(--color-background);
+        }
+
+        *::-webkit-scrollbar {
+          width: 12px;
+          height: 12px;
+        }
+
+        *::-webkit-scrollbar-track {
+          background: var(--color-background);
+        }
+
+        *::-webkit-scrollbar-thumb {
+          background: var(--color-border);
+          border-radius: 6px;
+        }
+
+        *::-webkit-scrollbar-thumb:hover {
+          background: var(--color-text-secondary);
+        }
+      `}</style>
+
       {/* Toast 컨테이너 */}
       <Toaster
         position="top-center"
@@ -597,6 +694,7 @@ export default function OrdersPage() {
         }}
       />
       {/* 발주관리 전용 헤더 */}
+      {!isModalMode && (
       <div style={{
         position: 'fixed',
         top: 0,
@@ -683,11 +781,12 @@ export default function OrdersPage() {
         </div>
 
         {/* 오른쪽: 다크모드 토글 */}
-        <ThemeToggle />
+        <LocalThemeToggle onThemeChange={handleThemeChange} currentTheme={localTheme} />
       </div>
+      )}
 
       {/* Overlay (모바일에서 사이드바 열릴 때) */}
-      {isMobile && sidebarOpen && (
+      {!isModalMode && isMobile && sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
           style={{
@@ -704,6 +803,7 @@ export default function OrdersPage() {
       )}
 
       {/* Sidebar */}
+      {!isModalMode && (
       <div style={{
         position: 'fixed',
         top: '70px',
@@ -800,9 +900,9 @@ export default function OrdersPage() {
             발주서등록
           </button>
 
-          {/* 모바일등록 탭 */}
+          {/* 건별등록 탭 */}
           <button
-            onClick={() => handleTabChange('모바일등록')}
+            onClick={() => handleTabChange('건별등록')}
             style={{
               width: '100%',
               display: 'flex',
@@ -810,23 +910,23 @@ export default function OrdersPage() {
               gap: '12px',
               padding: isMobile ? '10px 8px' : '10px 16px',
               margin: isMobile ? '4px 6px' : '2px 8px',
-              background: activeTab === '모바일등록' ? 'var(--color-surface-hover)' : 'transparent',
+              background: activeTab === '건별등록' ? 'var(--color-surface-hover)' : 'transparent',
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
               fontSize: isMobile ? '12px' : '14px',
-              fontWeight: activeTab === '모바일등록' ? '600' : '400',
+              fontWeight: activeTab === '건별등록' ? '600' : '400',
               color: 'var(--color-text)',
               textAlign: 'left',
               transition: 'background 0.2s'
             }}
             onMouseEnter={(e) => {
-              if (activeTab !== '모바일등록') {
+              if (activeTab !== '건별등록') {
                 e.currentTarget.style.background = 'var(--color-surface-hover)';
               }
             }}
             onMouseLeave={(e) => {
-              if (activeTab !== '모바일등록') {
+              if (activeTab !== '건별등록') {
                 e.currentTarget.style.background = 'transparent';
               }
             }}
@@ -835,7 +935,7 @@ export default function OrdersPage() {
               <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
               <line x1="12" y1="18" x2="12.01" y2="18"></line>
             </svg>
-            모바일등록
+            건별등록
           </button>
 
           {/* 정산관리 탭 */}
@@ -917,14 +1017,53 @@ export default function OrdersPage() {
             </svg>
             옵션명매핑
           </button>
+
+          {/* 판매자정보 탭 */}
+          <button
+            onClick={() => handleTabChange('판매자정보')}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: isMobile ? '10px 8px' : '10px 16px',
+              margin: isMobile ? '4px 6px' : '2px 8px',
+              background: activeTab === '판매자정보' ? 'var(--color-surface-hover)' : 'transparent',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: isMobile ? '12px' : '14px',
+              fontWeight: activeTab === '판매자정보' ? '600' : '400',
+              color: 'var(--color-text)',
+              textAlign: 'left',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              if (activeTab !== '판매자정보') {
+                e.currentTarget.style.background = 'var(--color-surface-hover)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== '판매자정보') {
+                e.currentTarget.style.background = 'transparent';
+              }
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            판매자정보
+          </button>
         </div>
       </div>
+      )}
 
       {/* Main content area */}
       <div style={{
-        marginLeft: isMobile ? '0' : '175px',
+        marginLeft: isModalMode ? '0' : (isMobile ? '0' : '175px'),
         padding: isMobile ? '16px' : '24px',
-        paddingTop: '90px',
+        paddingTop: isModalMode ? '20px' : '90px',
         background: 'var(--color-background)',
         minHeight: '100vh',
         overflowY: 'auto'
@@ -973,7 +1112,7 @@ export default function OrdersPage() {
             />
           </div>
         )}
-        {activeTab === '모바일등록' && (
+        {activeTab === '건별등록' && (
           <MobileRegistrationTab
             isMobile={isMobile}
             onRefresh={fetchOrders}
@@ -1000,6 +1139,9 @@ export default function OrdersPage() {
               isMobile={isMobile}
             />
           </div>
+        )}
+        {activeTab === '판매자정보' && (
+          <SellerInfoTab userId={userId} />
         )}
 
         {/* 모달들 */}
@@ -1064,5 +1206,23 @@ export default function OrdersPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        color: 'var(--color-text)'
+      }}>
+        로딩중...
+      </div>
+    }>
+      <OrdersPageContent />
+    </Suspense>
   );
 }

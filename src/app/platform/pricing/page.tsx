@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface PlanLimits {
   [featureId: string]: string;
@@ -28,6 +28,20 @@ interface Feature {
 
 export default function PricingPage() {
   const [billingMode, setBillingMode] = useState<'monthly' | 'yearly'>('monthly');
+  const [isMounted, setIsMounted] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(0);
+
+  useEffect(() => {
+    setIsMounted(true);
+    setWindowWidth(window.innerWidth);
+
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const formatPrice = (price: number): string => {
     return '₩' + price.toLocaleString('ko-KR');
@@ -357,7 +371,7 @@ export default function PricingPage() {
           gap: '20px',
           marginTop: '36px',
           marginBottom: '70px',
-          gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth >= 900 ? 'repeat(3, 1fr)' : '1fr'
+          gridTemplateColumns: isMounted && windowWidth >= 900 ? 'repeat(3, 1fr)' : '1fr'
         }}>
           {/* 스타터(무료) 플랜 */}
           <div style={{

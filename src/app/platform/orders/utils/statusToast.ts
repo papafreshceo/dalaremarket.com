@@ -87,3 +87,26 @@ export function showErrorToast(message: string, duration: number = 3000) {
     },
   });
 }
+
+/**
+ * 성공 토스트 메시지 표시
+ * @param message - 표시할 성공 메시지
+ * @param duration - 표시 시간 (ms, 기본값: 3000)
+ */
+export function showSuccessToast(message: string, duration: number = 3000) {
+  return toast.success(message, {
+    duration,
+    position: 'top-center',
+    style: {
+      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.85) 0%, rgba(52, 211, 153, 0.85) 100%)',
+      backdropFilter: 'blur(10px)',
+      color: 'white',
+      padding: '14px 28px',
+      borderRadius: '12px',
+      fontSize: '15px',
+      fontWeight: '600',
+      boxShadow: '0 8px 24px rgba(16, 185, 129, 0.25), 0 2px 8px rgba(16, 185, 129, 0.25)',
+      border: 'none',
+    },
+  });
+}

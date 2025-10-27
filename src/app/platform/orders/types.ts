@@ -49,7 +49,7 @@ export interface StatsData {
   bgGradient: string;
 }
 
-export type Tab = '대시보드' | '발주서등록' | '모바일등록' | '정산관리' | '옵션명매핑';
+export type Tab = '대시보드' | '발주서등록' | '건별등록' | '정산관리' | '옵션명매핑' | '판매자정보';
 
 export interface OptionMapping {
   id: number;

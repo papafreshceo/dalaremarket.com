@@ -4,6 +4,7 @@ interface MappingResult {
   original: string;
   mapped: string;
   count: number;
+  isUnmatched?: boolean;
 }
 
 interface ApplyMappingResult {
@@ -11,6 +12,7 @@ interface ApplyMappingResult {
   mappingResults: MappingResult[];
   totalOrders: number;
   mappedOrders: number;
+  unmatchedCount: number;
 }
 
 /**

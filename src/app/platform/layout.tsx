@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import UserHeader from '@/components/layout/UserHeader'
 import MobileBottomNav from '@/components/layout/MobileBottomNav'
 
@@ -9,6 +9,13 @@ export default function PlatformLayout({
 }: {
   children: React.ReactNode
 }) {
+  // iframe 안에서 로드되었는지 확인
+  const [isInIframe, setIsInIframe] = useState(false)
+
+  useEffect(() => {
+    setIsInIframe(window.self !== window.top)
+  }, [])
+
   // 플랫폼 화면 파비콘 설정 (더 빠른 타이밍)
   useEffect(() => {
     const updateFavicon = () => {
@@ -40,9 +47,9 @@ export default function PlatformLayout({
 
   return (
     <>
-      <UserHeader />
+      {!isInIframe && <UserHeader />}
       {children}
-      <MobileBottomNav />
+      {!isInIframe && <MobileBottomNav />}
     </>
   )
 }

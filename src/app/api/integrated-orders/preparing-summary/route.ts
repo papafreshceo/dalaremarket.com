@@ -81,6 +81,7 @@ export async function GET(request: NextRequest) {
 
     // 옵션명 목록 추출
     const optionNames = [...new Set(orders.map(o => o.option_name).filter(Boolean))];
+    console.log('📦 옵션명 목록:', optionNames);
 
     // 옵션상품 및 원물 정보 조회
     const { data: optionProductsData, error: optionError } = await supabase
@@ -92,8 +93,11 @@ export async function GET(request: NextRequest) {
       console.error('옵션상품 조회 오류:', optionError);
     }
 
+    console.log('📦 조회된 옵션상품:', optionProductsData?.length || 0, '개');
+
     // 옵션상품 ID 목록
     const optionProductIds = optionProductsData?.map(op => op.id) || [];
+    console.log('📦 옵션상품 ID 목록:', optionProductIds);
 
     // 옵션명으로 매핑
     const optionNameToId = new Map(
@@ -110,6 +114,9 @@ export async function GET(request: NextRequest) {
       console.error('원물 링크 조회 오류:', materialsLinksError);
     }
 
+    console.log('📦 조회된 원물 링크:', materialsLinksData?.length || 0, '개');
+    console.log('📦 원물 링크 데이터:', materialsLinksData);
+
     // 원물 ID 목록 추출
     const rawMaterialIds = [
       ...new Set(
@@ -118,16 +125,23 @@ export async function GET(request: NextRequest) {
           .filter(Boolean) || []
       )
     ];
+    console.log('📦 원물 ID 목록:', rawMaterialIds);
 
     // 원물 정보 조회
     const { data: rawMaterialsData, error: rawMaterialsError } = await supabase
       .from('raw_materials')
-      .select('id, material_name, standard_unit, unit_quantity')
+      .select('id, material_name, standard_unit, standard_quantity')
       .in('id', rawMaterialIds);
 
     if (rawMaterialsError) {
       console.error('원물 정보 조회 오류:', rawMaterialsError);
     }
+
+    console.log('📦 조회된 원물 정보:', rawMaterialsData?.length || 0, '개');
+    console.log('📦 원물 데이터:', rawMaterialsData?.map(rm => ({
+      name: rm.material_name,
+      standard_quantity: rm.standard_quantity
+    })));
 
     // 원물 ID로 매핑
     const rawMaterialsById = new Map(
@@ -136,7 +150,7 @@ export async function GET(request: NextRequest) {
 
     // 옵션상품ID별 원물 정보 매핑
     const optionToMaterials = new Map<number, Array<{
-      rawMaterial: { id: string; material_name: string; standard_unit: string; unit_quantity: number };
+      rawMaterial: { id: string; material_name: string; standard_unit: string; standard_quantity: number };
       quantity: number;
     }>>();
 
@@ -162,7 +176,7 @@ export async function GET(request: NextRequest) {
       name: string;
       unit: string;
       total_usage: number;
-      unit_quantity: number;
+      standard_quantity: number;
     }>();
 
     orders.forEach((order) => {
@@ -188,9 +202,9 @@ export async function GET(request: NextRequest) {
             name: rawMaterial.material_name,
             unit: rawMaterial.standard_unit || 'kg',
             total_usage: totalUsage,
-            unit_quantity: typeof rawMaterial.unit_quantity === 'string'
-              ? parseFloat(rawMaterial.unit_quantity) || 0
-              : rawMaterial.unit_quantity || 0,
+            standard_quantity: typeof rawMaterial.standard_quantity === 'string'
+              ? parseFloat(rawMaterial.standard_quantity) || 0
+              : rawMaterial.standard_quantity || 0,
           });
         }
       });

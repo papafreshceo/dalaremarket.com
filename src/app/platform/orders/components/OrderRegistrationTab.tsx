@@ -68,6 +68,9 @@ export default function OrderRegistrationTab({
   // 툴팁 상태 관리 (최상단에 배치)
   const [hoveredStatus, setHoveredStatus] = useState<Order['status'] | null>(null);
 
+  // 선택된 날짜 필터 상태
+  const [selectedDateFilter, setSelectedDateFilter] = useState<'today' | 'yesterday' | '7days' | '30days' | '90days' | null>('7days');
+
   // 그리드 리마운트 트리거
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -1744,7 +1747,10 @@ export default function OrderRegistrationTab({
           <div style={{ display: 'inline-block' }}>
             <DatePicker
               value={startDate}
-              onChange={setStartDate}
+              onChange={(date) => {
+                setStartDate(date);
+                setSelectedDateFilter(null); // 수동 선택 시 필터 해제
+              }}
               placeholder="시작일"
               maxDate={endDate || undefined}
             />
@@ -1753,7 +1759,10 @@ export default function OrderRegistrationTab({
           <div style={{ display: 'inline-block' }}>
             <DatePicker
               value={endDate}
-              onChange={setEndDate}
+              onChange={(date) => {
+                setEndDate(date);
+                setSelectedDateFilter(null); // 수동 선택 시 필터 해제
+              }}
               placeholder="종료일"
               minDate={startDate || undefined}
             />
@@ -1765,22 +1774,66 @@ export default function OrderRegistrationTab({
               const today = new Date();
               setStartDate(today);
               setEndDate(today);
+              setSelectedDateFilter('today');
             }}
             style={{
               padding: '4px 12px',
-              border: '1px solid var(--color-border)',
+              border: selectedDateFilter === 'today' ? '2px solid #3b82f6' : '1px solid var(--color-border)',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px',
-              background: 'var(--color-surface)',
-              color: 'var(--color-text)',
+              background: selectedDateFilter === 'today' ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-surface)',
+              color: selectedDateFilter === 'today' ? '#3b82f6' : 'var(--color-text)',
+              fontWeight: selectedDateFilter === 'today' ? '600' : '400',
               cursor: 'pointer',
               transition: 'all 0.2s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-hover)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-surface)'}
+            onMouseEnter={(e) => {
+              if (selectedDateFilter !== 'today') {
+                e.currentTarget.style.background = 'var(--color-surface-hover)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (selectedDateFilter !== 'today') {
+                e.currentTarget.style.background = 'var(--color-surface)';
+              }
+            }}
           >
             오늘
+          </button>
+          <button
+            onClick={() => {
+              const today = new Date();
+              const yesterday = new Date();
+              yesterday.setDate(today.getDate() - 1);
+              setStartDate(yesterday);
+              setEndDate(yesterday);
+              setSelectedDateFilter('yesterday');
+            }}
+            style={{
+              padding: '4px 12px',
+              border: selectedDateFilter === 'yesterday' ? '2px solid #3b82f6' : '1px solid var(--color-border)',
+              borderRadius: '6px',
+              fontSize: '12px',
+              height: '28px',
+              background: selectedDateFilter === 'yesterday' ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-surface)',
+              color: selectedDateFilter === 'yesterday' ? '#3b82f6' : 'var(--color-text)',
+              fontWeight: selectedDateFilter === 'yesterday' ? '600' : '400',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              if (selectedDateFilter !== 'yesterday') {
+                e.currentTarget.style.background = 'var(--color-surface-hover)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (selectedDateFilter !== 'yesterday') {
+                e.currentTarget.style.background = 'var(--color-surface)';
+              }
+            }}
+          >
+            어제
           </button>
           <button
             onClick={() => {
@@ -1789,20 +1842,30 @@ export default function OrderRegistrationTab({
               sevenDaysAgo.setDate(today.getDate() - 7);
               setStartDate(sevenDaysAgo);
               setEndDate(today);
+              setSelectedDateFilter('7days');
             }}
             style={{
               padding: '4px 12px',
-              border: '1px solid var(--color-border)',
+              border: selectedDateFilter === '7days' ? '2px solid #3b82f6' : '1px solid var(--color-border)',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px',
-              background: 'var(--color-surface)',
-              color: 'var(--color-text)',
+              background: selectedDateFilter === '7days' ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-surface)',
+              color: selectedDateFilter === '7days' ? '#3b82f6' : 'var(--color-text)',
+              fontWeight: selectedDateFilter === '7days' ? '600' : '400',
               cursor: 'pointer',
               transition: 'all 0.2s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-hover)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-surface)'}
+            onMouseEnter={(e) => {
+              if (selectedDateFilter !== '7days') {
+                e.currentTarget.style.background = 'var(--color-surface-hover)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (selectedDateFilter !== '7days') {
+                e.currentTarget.style.background = 'var(--color-surface)';
+              }
+            }}
           >
             7일
           </button>
@@ -1813,20 +1876,30 @@ export default function OrderRegistrationTab({
               thirtyDaysAgo.setDate(today.getDate() - 30);
               setStartDate(thirtyDaysAgo);
               setEndDate(today);
+              setSelectedDateFilter('30days');
             }}
             style={{
               padding: '4px 12px',
-              border: '1px solid var(--color-border)',
+              border: selectedDateFilter === '30days' ? '2px solid #3b82f6' : '1px solid var(--color-border)',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px',
-              background: 'var(--color-surface)',
-              color: 'var(--color-text)',
+              background: selectedDateFilter === '30days' ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-surface)',
+              color: selectedDateFilter === '30days' ? '#3b82f6' : 'var(--color-text)',
+              fontWeight: selectedDateFilter === '30days' ? '600' : '400',
               cursor: 'pointer',
               transition: 'all 0.2s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-hover)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-surface)'}
+            onMouseEnter={(e) => {
+              if (selectedDateFilter !== '30days') {
+                e.currentTarget.style.background = 'var(--color-surface-hover)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (selectedDateFilter !== '30days') {
+                e.currentTarget.style.background = 'var(--color-surface)';
+              }
+            }}
           >
             30일
           </button>
@@ -1837,20 +1910,30 @@ export default function OrderRegistrationTab({
               ninetyDaysAgo.setDate(today.getDate() - 90);
               setStartDate(ninetyDaysAgo);
               setEndDate(today);
+              setSelectedDateFilter('90days');
             }}
             style={{
               padding: '4px 12px',
-              border: '1px solid var(--color-border)',
+              border: selectedDateFilter === '90days' ? '2px solid #3b82f6' : '1px solid var(--color-border)',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px',
-              background: 'var(--color-surface)',
-              color: 'var(--color-text)',
+              background: selectedDateFilter === '90days' ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-surface)',
+              color: selectedDateFilter === '90days' ? '#3b82f6' : 'var(--color-text)',
+              fontWeight: selectedDateFilter === '90days' ? '600' : '400',
               cursor: 'pointer',
               transition: 'all 0.2s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-hover)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-surface)'}
+            onMouseEnter={(e) => {
+              if (selectedDateFilter !== '90days') {
+                e.currentTarget.style.background = 'var(--color-surface-hover)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (selectedDateFilter !== '90days') {
+                e.currentTarget.style.background = 'var(--color-surface)';
+              }
+            }}
           >
             90일
           </button>
@@ -2071,19 +2154,19 @@ export default function OrderRegistrationTab({
               fontSize: '0.75rem',
               fontWeight: '500',
               transition: 'all 0.2s',
-              backgroundColor: selectedOrders.length === 0 ? '#d1d5db' : '#000000',
-              color: selectedOrders.length === 0 ? '#6b7280' : '#ffffff',
+              backgroundColor: selectedOrders.length === 0 ? 'var(--color-border)' : '#1f2937',
+              color: selectedOrders.length === 0 ? 'var(--color-text-secondary)' : '#ffffff',
               cursor: selectedOrders.length === 0 ? 'not-allowed' : 'pointer',
               border: 'none'
             }}
             onMouseEnter={(e) => {
               if (selectedOrders.length > 0) {
-                e.currentTarget.style.backgroundColor = '#1f2937';
+                e.currentTarget.style.backgroundColor = '#111827';
               }
             }}
             onMouseLeave={(e) => {
               if (selectedOrders.length > 0) {
-                e.currentTarget.style.backgroundColor = '#000000';
+                e.currentTarget.style.backgroundColor = '#1f2937';
               }
             }}
           >

@@ -16,7 +16,7 @@ interface RawMaterialSummary {
   name: string;
   unit: string;
   total_usage: number;
-  unit_quantity: number;
+  standard_quantity: number;
 }
 
 interface PreparingSummaryWindowProps {
@@ -184,8 +184,8 @@ export default function PreparingSummaryWindow({ startDate, endDate }: Preparing
                       </tr>
                     ) : (
                       rawMaterials.map((item, index) => {
-                        const standardUnitCount = item.unit_quantity > 0
-                          ? (item.total_usage / item.unit_quantity)
+                        const standardUnitCount = item.standard_quantity > 0
+                          ? (item.total_usage / item.standard_quantity)
                           : 0;
 
                         return (
