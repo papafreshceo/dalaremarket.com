@@ -1179,35 +1179,58 @@ export default function SearchTab() {
 
   // 발주확인 핸들러 - 선택된 결제완료 상태 주문을 상품준비중으로 변경
   const handleOrderConfirm = async () => {
-    // 선택된 주문만 필터링
-    if (selectedOrders.length === 0) {
-      alert('발주확인할 주문을 선택해주세요.');
-      return;
+    try {
+      // 서버에서 현재 필터 조건으로 전체 주문 가져오기
+      const params = new URLSearchParams();
+      params.append('startDate', filters.startDate);
+      params.append('endDate', filters.endDate);
+      params.append('dateType', filters.dateType);
+      params.append('limit', '0'); // 전체 데이터
+      if (filters.marketName) params.append('marketName', filters.marketName);
+      if (filters.searchKeyword) params.append('searchKeyword', filters.searchKeyword);
+      if (statusFilter) params.append('shippingStatus', statusFilter);
+      else if (filters.shippingStatus) params.append('shippingStatus', filters.shippingStatus);
+      if (filters.vendorName) params.append('vendorName', filters.vendorName);
+
+      const res = await fetch(`/api/integrated-orders?${params}`);
+      const data = await res.json();
+
+      if (!data.success) {
+        alert('데이터 조회 실패');
+        return;
+      }
+
+      const allOrders = data.data || [];
+
+      // 선택된 주문이 있으면 선택된 주문만, 없으면 전체 주문
+      const confirmOrders = selectedOrders.length > 0
+        ? allOrders.filter((order: Order) => selectedOrders.includes(order.id) && order.shipping_status === '결제완료')
+        : allOrders.filter((order: Order) => order.shipping_status === '결제완료');
+
+      if (confirmOrders.length === 0) {
+        alert(selectedOrders.length > 0
+          ? '선택한 주문 중 결제완료 상태인 주문이 없습니다.'
+          : '결제완료 상태인 주문이 없습니다.');
+        return;
+      }
+
+      // 벤더사가 비어있는 주문 확인
+      const ordersWithoutVendor = confirmOrders.filter((order: Order) => !order.vendor_name);
+
+      if (ordersWithoutVendor.length > 0) {
+        // 벤더사가 없는 주문이 있으면 모달 표시
+        setOrdersNeedingVendor(ordersWithoutVendor);
+        await fetchVendors();
+        setShowVendorSelectModal(true);
+        return;
+      }
+
+      // 벤더사가 모두 있으면 바로 처리
+      await proceedOrderConfirm(confirmOrders);
+    } catch (error) {
+      console.error('발주확인 오류:', error);
+      alert('발주확인 중 오류가 발생했습니다.');
     }
-
-    // selectedOrders가 ID 배열인지 인덱스 배열인지 확인
-    const confirmOrders = filteredOrders
-      .filter(order => selectedOrders.includes(order.id))
-      .filter(order => order && order.shipping_status === '결제완료');
-
-    if (confirmOrders.length === 0) {
-      alert('선택한 주문 중 결제완료 상태인 주문이 없습니다.');
-      return;
-    }
-
-    // 벤더사가 비어있는 주문 확인
-    const ordersWithoutVendor = confirmOrders.filter(order => !order.vendor_name);
-
-    if (ordersWithoutVendor.length > 0) {
-      // 벤더사가 없는 주문이 있으면 모달 표시
-      setOrdersNeedingVendor(ordersWithoutVendor);
-      await fetchVendors();
-      setShowVendorSelectModal(true);
-      return;
-    }
-
-    // 벤더사가 모두 있으면 바로 처리
-    await proceedOrderConfirm(confirmOrders);
   };
 
   // 실제 발주확인 처리
@@ -1263,32 +1286,51 @@ export default function SearchTab() {
 
   // 입금확인 핸들러 - 접수 상태 주문을 결제완료로 변경
   const handlePaymentConfirm = async (orderIds?: number[]) => {
-    // orderIds가 전달되지 않으면 selectedOrders 사용 (접수 통계카드용)
-    const targetOrderIds = Array.isArray(orderIds) ? orderIds : selectedOrders;
-
-    if (!Array.isArray(targetOrderIds) || targetOrderIds.length === 0) {
-      alert('입금확인할 주문을 선택해주세요.');
-      return;
-    }
-
-    // 접수 상태인 주문만 필터링
-    const ordersToConfirm = filteredOrders.filter(order =>
-      targetOrderIds.includes(order.id) && order.shipping_status === '접수'
-    );
-
-    if (ordersToConfirm.length === 0) {
-      alert('입금확인할 수 있는 주문이 없습니다. (접수 상태만 가능)');
-      return;
-    }
-
-    if (!confirm(`${ordersToConfirm.length}건의 주문을 입금확인 하시겠습니까?\n상태가 '결제완료'로 변경됩니다.`)) {
-      return;
-    }
-
     try {
+      // 서버에서 현재 필터 조건으로 전체 주문 가져오기
+      const params = new URLSearchParams();
+      params.append('startDate', filters.startDate);
+      params.append('endDate', filters.endDate);
+      params.append('dateType', filters.dateType);
+      params.append('limit', '0'); // 전체 데이터
+      if (filters.marketName) params.append('marketName', filters.marketName);
+      if (filters.searchKeyword) params.append('searchKeyword', filters.searchKeyword);
+      if (statusFilter) params.append('shippingStatus', statusFilter);
+      else if (filters.shippingStatus) params.append('shippingStatus', filters.shippingStatus);
+      if (filters.vendorName) params.append('vendorName', filters.vendorName);
+
+      const res = await fetch(`/api/integrated-orders?${params}`);
+      const data = await res.json();
+
+      if (!data.success) {
+        alert('데이터 조회 실패');
+        return;
+      }
+
+      const allOrders = data.data || [];
+
+      // orderIds가 전달되지 않으면 selectedOrders 사용
+      const targetOrderIds = Array.isArray(orderIds) ? orderIds : selectedOrders;
+
+      // 접수 상태인 주문만 필터링
+      const ordersToConfirm = targetOrderIds.length > 0
+        ? allOrders.filter((order: Order) => targetOrderIds.includes(order.id) && order.shipping_status === '접수')
+        : allOrders.filter((order: Order) => order.shipping_status === '접수');
+
+      if (ordersToConfirm.length === 0) {
+        alert(targetOrderIds.length > 0
+          ? '선택한 주문 중 입금확인할 수 있는 주문이 없습니다. (접수 상태만 가능)'
+          : '입금확인할 수 있는 주문이 없습니다. (접수 상태만 가능)');
+        return;
+      }
+
+      if (!confirm(`${ordersToConfirm.length}건의 주문을 입금확인 하시겠습니까?\n상태가 '결제완료'로 변경됩니다.`)) {
+        return;
+      }
+
       console.log('💰 입금확인 시작:', ordersToConfirm.length, '건');
 
-      const ordersToSave = ordersToConfirm.map(order => ({
+      const ordersToSave = ordersToConfirm.map((order: Order) => ({
         id: order.id,
         shipping_status: '결제완료',
       }));
@@ -1519,17 +1561,36 @@ export default function SearchTab() {
 
   // 벤더사별 엑셀 다운로드
   const handleVendorExcelDownload = async (vendorName: string) => {
-    // 현재 필터된 주문(화면에 보이는 것) 중에서 상품준비중 상태이면서 해당 벤더사인 주문만 필터링
-    const vendorOrders = filteredOrders.filter(
-      (o) => o.shipping_status === '상품준비중' && (o.vendor_name || '미지정') === vendorName
-    );
-
-    if (vendorOrders.length === 0) {
-      alert('다운로드할 주문이 없습니다.');
-      return;
-    }
-
     try {
+      // 서버에서 현재 필터 조건으로 전체 주문 가져오기 (페이지네이션 없이)
+      const params = new URLSearchParams();
+      params.append('startDate', filters.startDate);
+      params.append('endDate', filters.endDate);
+      params.append('dateType', filters.dateType);
+      params.append('limit', '0'); // limit=0으로 전체 데이터 요청
+      if (filters.marketName) params.append('marketName', filters.marketName);
+      if (filters.searchKeyword) params.append('searchKeyword', filters.searchKeyword);
+      if (statusFilter) params.append('shippingStatus', statusFilter);
+      else if (filters.shippingStatus) params.append('shippingStatus', filters.shippingStatus);
+      if (filters.vendorName) params.append('vendorName', filters.vendorName);
+
+      const res = await fetch(`/api/integrated-orders?${params}`);
+      const data = await res.json();
+
+      if (!data.success) {
+        alert('데이터 조회 실패');
+        return;
+      }
+
+      // 필터된 전체 주문에서 상품준비중 + 해당 벤더사만
+      const vendorOrders = (data.data || []).filter(
+        (o: Order) => o.shipping_status === '상품준비중' && (o.vendor_name || '미지정') === vendorName
+      );
+
+      if (vendorOrders.length === 0) {
+        alert('다운로드할 주문이 없습니다.');
+        return;
+      }
       // 벤더사 템플릿 가져오기
       const response = await fetch(`/api/vendor-templates/${encodeURIComponent(vendorName)}`);
       const result = await response.json();
@@ -1697,19 +1758,42 @@ export default function SearchTab() {
   const handleMarketInvoiceDownload = async (marketName: string) => {
     console.log('📦 [송장다운로드] 시작:', marketName);
 
-    // 현재 필터된 주문 중에서 발송완료 상태이면서 해당 마켓인 주문만 필터링
-    const marketOrders = filteredOrders.filter(
-      (o) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === marketName
-    );
-
-    console.log('📦 [송장다운로드] 주문 수:', marketOrders.length);
-
-    if (marketOrders.length === 0) {
-      alert('다운로드할 주문이 없습니다.');
-      return;
-    }
-
     try {
+      // 서버에서 현재 필터 조건으로 전체 주문 가져오기 (페이지네이션 없이)
+      const params = new URLSearchParams();
+      params.append('startDate', filters.startDate);
+      params.append('endDate', filters.endDate);
+      params.append('dateType', filters.dateType);
+      params.append('limit', '0'); // limit=0으로 전체 데이터 요청
+      if (filters.marketName) params.append('marketName', filters.marketName);
+      if (filters.searchKeyword) params.append('searchKeyword', filters.searchKeyword);
+      if (statusFilter) params.append('shippingStatus', statusFilter);
+      else if (filters.shippingStatus) params.append('shippingStatus', filters.shippingStatus);
+      if (filters.vendorName) params.append('vendorName', filters.vendorName);
+
+      const res = await fetch(`/api/integrated-orders?${params}`);
+      const data = await res.json();
+
+      if (!data.success) {
+        alert('데이터 조회 실패');
+        return;
+      }
+
+      console.log('📦 [송장다운로드] 서버에서 받은 전체 주문 수:', (data.data || []).length);
+      console.log('📦 [송장다운로드] 마켓명:', marketName);
+
+      // 필터된 전체 주문에서 발송완료 + 해당 마켓만
+      const marketOrders = (data.data || []).filter(
+        (o: Order) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === marketName
+      );
+
+      console.log('📦 [송장다운로드] 발송완료 상태의', marketName, '마켓 주문 수:', marketOrders.length);
+
+      if (marketOrders.length === 0) {
+        alert('다운로드할 주문이 없습니다.');
+        return;
+      }
+
       // 마켓 송장 템플릿 가져오기
       const apiUrl = `/api/market-invoice-templates/${encodeURIComponent(marketName)}`;
       console.log('📦 [송장다운로드] API 호출:', apiUrl);
@@ -1888,61 +1972,115 @@ export default function SearchTab() {
 
   // 전체 마켓 일괄 다운로드
   const handleAllMarketInvoiceDownload = async () => {
-    const activeMarkets = uniqueMarkets.filter((market) => {
-      // CS발송, 전화주문 제외
-      if (market === 'CS발송' || market === '전화주문') {
-        return false;
+    try {
+      // 서버에서 현재 필터 조건으로 전체 주문 가져오기
+      const params = new URLSearchParams();
+      params.append('startDate', filters.startDate);
+      params.append('endDate', filters.endDate);
+      params.append('dateType', filters.dateType);
+      params.append('limit', '0'); // 전체 데이터
+      if (filters.marketName) params.append('marketName', filters.marketName);
+      if (filters.searchKeyword) params.append('searchKeyword', filters.searchKeyword);
+      if (statusFilter) params.append('shippingStatus', statusFilter);
+      else if (filters.shippingStatus) params.append('shippingStatus', filters.shippingStatus);
+      if (filters.vendorName) params.append('vendorName', filters.vendorName);
+
+      const res = await fetch(`/api/integrated-orders?${params}`);
+      const data = await res.json();
+
+      if (!data.success) {
+        alert('데이터 조회 실패');
+        return;
       }
 
-      const marketOrders = filteredOrders.filter(
-        (o) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === market
-      );
-      return marketOrders.length > 0;
-    });
+      const allOrders = data.data || [];
 
-    if (activeMarkets.length === 0) {
-      alert('다운로드할 마켓이 없습니다.');
-      return;
+      // 마켓별로 발송완료 주문이 있는지 확인
+      const activeMarkets = uniqueMarkets.filter((market) => {
+        // CS발송, 전화주문 제외
+        if (market === 'CS발송' || market === '전화주문') {
+          return false;
+        }
+
+        const marketOrders = allOrders.filter(
+          (o: Order) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === market
+        );
+        return marketOrders.length > 0;
+      });
+
+      if (activeMarkets.length === 0) {
+        alert('다운로드할 마켓이 없습니다.');
+        return;
+      }
+
+      // 각 마켓별로 다운로드
+      for (const market of activeMarkets) {
+        await handleMarketInvoiceDownload(market);
+        // 다운로드 사이에 약간의 딜레이 추가 (브라우저가 여러 파일을 처리할 시간 확보)
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+
+      alert(`${activeMarkets.length}개 마켓의 송장파일이 다운로드되었습니다.`);
+    } catch (error) {
+      console.error('마켓 송장 일괄 다운로드 실패:', error);
+      alert('마켓 송장 일괄 다운로드 중 오류가 발생했습니다.');
     }
-
-    // 각 마켓별로 다운로드
-    for (const market of activeMarkets) {
-      await handleMarketInvoiceDownload(market);
-      // 다운로드 사이에 약간의 딜레이 추가 (브라우저가 여러 파일을 처리할 시간 확보)
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
-
-    alert(`${activeMarkets.length}개 마켓의 송장파일이 다운로드되었습니다.`);
   };
 
   // 셀러별 엑셀 다운로드
-  const handleSellerExcelDownload = (sellerId: string) => {
-    const sellerOrders = orders.filter((o) => (o.seller_id || '미지정') === sellerId);
+  const handleSellerExcelDownload = async (sellerId: string) => {
+    try {
+      // 서버에서 현재 필터 조건으로 전체 주문 가져오기
+      const params = new URLSearchParams();
+      params.append('startDate', filters.startDate);
+      params.append('endDate', filters.endDate);
+      params.append('dateType', filters.dateType);
+      params.append('limit', '0'); // 전체 데이터
+      if (filters.marketName) params.append('marketName', filters.marketName);
+      if (filters.searchKeyword) params.append('searchKeyword', filters.searchKeyword);
+      if (statusFilter) params.append('shippingStatus', statusFilter);
+      else if (filters.shippingStatus) params.append('shippingStatus', filters.shippingStatus);
+      if (filters.vendorName) params.append('vendorName', filters.vendorName);
 
-    if (sellerOrders.length === 0) {
-      alert('다운로드할 주문이 없습니다.');
-      return;
+      const res = await fetch(`/api/integrated-orders?${params}`);
+      const data = await res.json();
+
+      if (!data.success) {
+        alert('데이터 조회 실패');
+        return;
+      }
+
+      const allOrders = data.data || [];
+      const sellerOrders = allOrders.filter((o: Order) => (o.seller_id || '미지정') === sellerId);
+
+      if (sellerOrders.length === 0) {
+        alert('다운로드할 주문이 없습니다.');
+        return;
+      }
+
+      const exportData = sellerOrders.map((order: Order) => ({
+        주문번호: order.order_number,
+        수취인: order.recipient_name,
+        전화번호: order.recipient_phone || '',
+        주소: order.recipient_address || '',
+        옵션명: order.option_name,
+        수량: order.quantity,
+        발송상태: order.shipping_status,
+        택배사: order.courier_company || '',
+        송장번호: order.tracking_number || '',
+        발송일: order.shipped_date || '',
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, sellerId);
+
+      const fileName = `${sellerId}_발송목록_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error('셀러 엑셀 다운로드 실패:', error);
+      alert('셀러 엑셀 다운로드 중 오류가 발생했습니다.');
     }
-
-    const exportData = sellerOrders.map((order) => ({
-      주문번호: order.order_number,
-      수취인: order.recipient_name,
-      전화번호: order.recipient_phone || '',
-      주소: order.recipient_address || '',
-      옵션명: order.option_name,
-      수량: order.quantity,
-      발송상태: order.shipping_status,
-      택배사: order.courier_company || '',
-      송장번호: order.tracking_number || '',
-      발송일: order.shipped_date || '',
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, sellerId);
-
-    const fileName = `${sellerId}_발송목록_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(wb, fileName);
   };
 
   // 송장일괄등록 핸들러
@@ -2025,15 +2163,37 @@ export default function SearchTab() {
         console.log('📦 엑셀에서 읽은 송장 정보:', invoiceMap.size, '건');
         console.log('📦 엑셀 주문번호 샘플 (처음 5개):', Array.from(invoiceMap.keys()).slice(0, 5));
 
-        // 현재 화면에 보이면서 '상품준비중' 상태인 주문들만 매칭하여 업데이트
+        // 서버에서 현재 필터 조건으로 전체 주문 가져오기
+        const params = new URLSearchParams();
+        params.append('startDate', filters.startDate);
+        params.append('endDate', filters.endDate);
+        params.append('dateType', filters.dateType);
+        params.append('limit', '0'); // 전체 데이터
+        if (filters.marketName) params.append('marketName', filters.marketName);
+        if (filters.searchKeyword) params.append('searchKeyword', filters.searchKeyword);
+        if (statusFilter) params.append('shippingStatus', statusFilter);
+        else if (filters.shippingStatus) params.append('shippingStatus', filters.shippingStatus);
+        if (filters.vendorName) params.append('vendorName', filters.vendorName);
+
+        const res = await fetch(`/api/integrated-orders?${params}`);
+        const allData = await res.json();
+
+        if (!allData.success) {
+          alert('데이터 조회 실패');
+          return;
+        }
+
+        const allOrders = allData.data || [];
+
+        // 전체 주문 중에서 '상품준비중' 상태인 주문들만 매칭하여 업데이트
         const updates: any[] = [];
         const shippedDateTime = getKoreanDateTime(); // 한국 시간으로 발송일 설정
 
-        const targetOrders = filteredOrders.filter(order => order.shipping_status === '상품준비중');
+        const targetOrders = allOrders.filter((order: Order) => order.shipping_status === '상품준비중');
 
-        console.log('📋 현재 화면의 전체 주문 수:', filteredOrders.length, '건');
+        console.log('📋 전체 주문 수:', allOrders.length, '건');
         console.log('📋 상품준비중 주문 수:', targetOrders.length, '건');
-        console.log('📋 화면 주문번호 샘플 (처음 5개):', targetOrders.slice(0, 5).map(o => o.order_number));
+        console.log('📋 주문번호 샘플 (처음 5개):', targetOrders.slice(0, 5).map((o: Order) => o.order_number));
 
         let matchCount = 0;
         let notMatchCount = 0;
@@ -2197,15 +2357,37 @@ export default function SearchTab() {
         console.log('📦 엑셀에서 읽은 송장 정보:', invoiceMap.size, '건');
         console.log('📦 엑셀 주문번호 샘플 (처음 5개):', Array.from(invoiceMap.keys()).slice(0, 5));
 
-        // 현재 화면에 보이면서 '발송완료' 상태인 주문들만 매칭하여 업데이트
+        // 서버에서 현재 필터 조건으로 전체 주문 가져오기
+        const params = new URLSearchParams();
+        params.append('startDate', filters.startDate);
+        params.append('endDate', filters.endDate);
+        params.append('dateType', filters.dateType);
+        params.append('limit', '0'); // 전체 데이터
+        if (filters.marketName) params.append('marketName', filters.marketName);
+        if (filters.searchKeyword) params.append('searchKeyword', filters.searchKeyword);
+        if (statusFilter) params.append('shippingStatus', statusFilter);
+        else if (filters.shippingStatus) params.append('shippingStatus', filters.shippingStatus);
+        if (filters.vendorName) params.append('vendorName', filters.vendorName);
+
+        const res = await fetch(`/api/integrated-orders?${params}`);
+        const allData = await res.json();
+
+        if (!allData.success) {
+          alert('데이터 조회 실패');
+          return;
+        }
+
+        const allOrders = allData.data || [];
+
+        // 전체 주문 중에서 '발송완료' 상태인 주문들만 매칭하여 업데이트
         const updates: any[] = [];
         const shippedDateTime = getKoreanDateTime(); // 한국 시간으로 발송일 설정
 
-        const targetOrders = filteredOrders.filter(order => order.shipping_status === '발송완료');
+        const targetOrders = allOrders.filter((order: Order) => order.shipping_status === '발송완료');
 
-        console.log('📋 현재 화면의 전체 주문 수:', filteredOrders.length, '건');
+        console.log('📋 전체 주문 수:', allOrders.length, '건');
         console.log('📋 발송완료 주문 수:', targetOrders.length, '건');
-        console.log('📋 화면 주문번호 샘플 (처음 5개):', targetOrders.slice(0, 5).map(o => o.order_number));
+        console.log('📋 주문번호 샘플 (처음 5개):', targetOrders.slice(0, 5).map((o: Order) => o.order_number));
 
         let matchCount = 0;
         let notMatchCount = 0;

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { enrichOrderWithOptionInfo } from '@/lib/order-utils';
+import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
 import { requireAuth, requireAdmin, auditLog } from '@/lib/api-security';
 
 /**
@@ -137,8 +137,8 @@ export async function GET(request: NextRequest) {
       seller_name: order.seller_id ? sellersMap.get(order.seller_id) || null : null
     }));
 
-    // 페이지네이션 적용
-    const paginatedData = normalizedData.slice(offset, offset + limit);
+    // 페이지네이션 적용 (limit이 0이면 전체 데이터 반환)
+    const paginatedData = limit === 0 ? normalizedData : normalizedData.slice(offset, offset + limit);
 
     return NextResponse.json({
       success: true,
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
         total: count || 0,
         page,
         limit,
-        totalPages: Math.ceil((count || 0) / limit),
+        totalPages: limit === 0 ? 1 : Math.ceil((count || 0) / limit),
       },
     });
   } catch (error: any) {
@@ -190,7 +190,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 옵션 상품 정보 자동 매핑 (option_products 테이블)
-    const orderDataWithInfo = await enrichOrderWithOptionInfo(body);
+    const enrichedOrders = await enrichOrdersWithOptionInfo([body]);
+    const orderDataWithInfo = enrichedOrders[0];
 
     const { data, error } = await supabase
       .from('integrated_orders')
