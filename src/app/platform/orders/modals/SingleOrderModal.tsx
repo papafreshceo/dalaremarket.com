@@ -401,10 +401,23 @@ export default function SingleOrderModal({
       finalValue = formatPhoneNumber(value);
     }
 
-    setFormData(prev => ({
-      ...prev,
-      [field]: finalValue
-    }));
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        [field]: finalValue
+      };
+
+      // 주문자와 동일이 체크되어 있으면 수령인 정보도 자동 업데이트
+      if (sameAsOrderer) {
+        if (field === 'orderer') {
+          updated.recipient = finalValue as string;
+        } else if (field === 'ordererPhone') {
+          updated.recipientPhone = finalValue as string;
+        }
+      }
+
+      return updated;
+    });
 
     // 에러 메시지 제거
     if (errors[field]) {
@@ -520,7 +533,8 @@ export default function SingleOrderModal({
           maxWidth: '1400px',
           width: '100%',
           maxHeight: '90vh',
-          overflow: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
           position: 'relative'
         }}
         onClick={(e) => e.stopPropagation()}
@@ -584,9 +598,11 @@ export default function SingleOrderModal({
         <div style={{
           padding: '24px',
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
+          gridTemplateColumns: '0.7fr 230px 1.3fr',
           gap: '16px',
-          minHeight: 'calc(90vh - 180px)'
+          alignItems: 'start',
+          overflowY: 'auto',
+          flex: '1 1 auto'
         }}>
           {/* 1. 옵션 상품 선택 영역 */}
           <div style={{
@@ -857,8 +873,150 @@ export default function SingleOrderModal({
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
 
-                {/* 상품추가 버튼 */}
+          {/* 2. 주문자 정보 영역 */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            <div style={{
+              padding: '16px',
+              background: 'var(--color-background-secondary)',
+              borderRadius: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '8px'
+            }}>
+              <h3 style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: 'var(--color-text)',
+                margin: 0
+              }}>주문자 정보</h3>
+
+              <button
+                type="button"
+                onClick={() => {
+                  // TODO: 수령인 추가 기능 구현
+                  console.log('수령인 추가');
+                }}
+                style={{
+                  padding: '4px 10px',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  color: 'var(--color-text)',
+                  background: 'var(--color-surface)',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--color-surface-hover)';
+                  e.currentTarget.style.borderColor = 'var(--color-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'var(--color-surface)';
+                  e.currentTarget.style.borderColor = 'var(--color-border)';
+                }}
+              >
+                수령인 추가
+              </button>
+            </div>
+
+            {/* 주문자 & 연락처 */}
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+              <div style={{ width: '80px' }}>
+                <input
+                  type="text"
+                  value={formData.orderer}
+                  onChange={(e) => handleChange('orderer', e.target.value)}
+                  placeholder="주문자"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: `1px solid ${errors.orderer ? '#ef4444' : 'var(--color-border)'}`,
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    background: 'var(--color-surface)',
+                    color: 'var(--color-text)',
+                    textAlign: 'center'
+                  }}
+                />
+                {errors.orderer && (
+                  <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
+                    {errors.orderer}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ width: '140px' }}>
+                <input
+                  type="text"
+                  value={formData.ordererPhone}
+                  onChange={(e) => handleChange('ordererPhone', e.target.value)}
+                  placeholder="주문자 연락처"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: `1px solid ${errors.ordererPhone ? '#ef4444' : 'var(--color-border)'}`,
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    background: 'var(--color-surface)',
+                    color: 'var(--color-text)',
+                    textAlign: 'center'
+                  }}
+                />
+                {errors.ordererPhone && (
+                  <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
+                    {errors.ordererPhone}
+                  </div>
+                )}
+              </div>
+            </div>
+            </div>
+          </div>
+
+          {/* 3. 수령인 정보 영역 */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            <div style={{
+              padding: '16px',
+              background: 'var(--color-background-secondary)',
+              borderRadius: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '8px'
+            }}>
+              <h3 style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: 'var(--color-text)',
+                margin: 0
+              }}>수령인 정보</h3>
+
+              {/* 상품추가/삭제 버튼 */}
+              <div style={{ display: 'flex', gap: '6px' }}>
                 <button
                   type="button"
                   onClick={handleAddProduct}
@@ -886,7 +1044,6 @@ export default function SingleOrderModal({
                   상품추가
                 </button>
 
-                {/* 삭제 버튼 */}
                 <button
                   type="button"
                   onClick={handleRemoveProduct}
@@ -920,382 +1077,151 @@ export default function SingleOrderModal({
                   삭제
                 </button>
               </div>
-
-              {/* 공급가 표시 */}
-              <div style={{
-                padding: '12px',
-                background: 'var(--color-surface)',
-                borderRadius: '8px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                border: '1px solid var(--color-border)'
-              }}>
-                <div style={{
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  color: 'var(--color-text)'
-                }}>
-                  정산 예정 금액
-                </div>
-                <div style={{
-                  fontSize: '18px',
-                  fontWeight: '700',
-                  color: 'var(--color-primary)'
-                }}>
-                  {supplyPrice.toLocaleString()}원
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 2. 주문자 정보 영역 */}
-          <div style={{
-            padding: '16px',
-            background: 'var(--color-background-secondary)',
-            borderRadius: '8px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-            <h3 style={{
-              fontSize: '14px',
-              fontWeight: '600',
-              color: 'var(--color-text)',
-              margin: '0 0 8px 0'
-            }}>주문자 정보</h3>
-
-            {/* 주문자명 */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '12px',
-                color: 'var(--color-text-secondary)',
-                marginBottom: '6px'
-              }}>
-                주문자명
-              </label>
-              <input
-                type="text"
-                value={formData.orderer}
-                onChange={(e) => handleChange('orderer', e.target.value)}
-                placeholder="주문자명"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: `1px solid ${errors.orderer ? '#ef4444' : 'var(--color-border)'}`,
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  background: 'var(--color-surface)',
-                  color: 'var(--color-text)'
-                }}
-              />
-              {errors.orderer && (
-                <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
-                  {errors.orderer}
-                </div>
-              )}
             </div>
 
-            {/* 주문자 연락처 */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '12px',
-                color: 'var(--color-text-secondary)',
-                marginBottom: '6px'
-              }}>
-                주문자 연락처
-              </label>
-              <input
-                type="text"
-                value={formData.ordererPhone}
-                onChange={(e) => handleChange('ordererPhone', e.target.value)}
-                placeholder="주문자 연락처"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: `1px solid ${errors.ordererPhone ? '#ef4444' : 'var(--color-border)'}`,
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  background: 'var(--color-surface)',
-                  color: 'var(--color-text)'
-                }}
-              />
-              {errors.ordererPhone && (
-                <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
-                  {errors.ordererPhone}
-                </div>
-              )}
-            </div>
-
-            {/* 주문자 배송지 */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '12px',
-                color: 'var(--color-text-secondary)',
-                marginBottom: '6px'
-              }}>
-                배송지
-              </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  value={formData.ordererAddress || ''}
-                  readOnly
-                  placeholder="주소 검색"
-                  style={{
-                    flex: 1,
-                    padding: '8px 12px',
-                    border: `1px solid var(--color-border)`,
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    background: 'var(--color-background-secondary)',
-                    color: 'var(--color-text)',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => handleAddressSearch('orderer')}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleAddressSearch('orderer')}
-                  style={{
-                    padding: '8px 16px',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    background: 'var(--color-surface)',
-                    color: 'var(--color-text)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  검색
-                </button>
-              </div>
-            </div>
-
-            {/* 주문자 배송 메시지 */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '12px',
-                color: 'var(--color-text-secondary)',
-                marginBottom: '6px'
-              }}>
-                배송 메시지
-              </label>
-              <input
-                type="text"
-                value={formData.ordererDeliveryMessage || ''}
-                onChange={(e) => handleChange('ordererDeliveryMessage', e.target.value)}
-                placeholder="배송 메시지 (선택)"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: `1px solid var(--color-border)`,
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  background: 'var(--color-surface)',
-                  color: 'var(--color-text)'
-                }}
-              />
-            </div>
-          </div>
-
-          {/* 3. 수령인 정보 영역 */}
-          <div style={{
-            padding: '16px',
-            background: 'var(--color-background-secondary)',
-            borderRadius: '8px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '8px'
-            }}>
-              <h3 style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: 'var(--color-text)',
-                margin: 0
-              }}>수령인 정보</h3>
-
-              {/* 수령인 추가 버튼 - 오른쪽 정렬 */}
-              <button
-                type="button"
-                onClick={() => {
-                  // TODO: 수령인 추가 기능 구현
-                  console.log('수령인 추가');
-                }}
-                style={{
-                  padding: '6px 12px',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  color: 'var(--color-text)',
-                  background: 'var(--color-surface)',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--color-surface-hover)';
-                  e.currentTarget.style.borderColor = 'var(--color-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'var(--color-surface)';
-                  e.currentTarget.style.borderColor = 'var(--color-border)';
-                }}
-              >
-                수령인 추가
-              </button>
-            </div>
-
-            {/* 주문자와 동일 체크박스 */}
-            <div>
+            {/* 주문자와 동일 & 수령인 & 연락처 & 배송지 */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {/* 주문자와 동일 체크박스 */}
               <label style={{
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                gap: '6px',
-                fontSize: '12px',
-                color: 'var(--color-text-secondary)',
-                cursor: 'pointer',
-                marginBottom: '6px'
+                gap: '2px',
+                cursor: 'pointer'
               }}>
+                <span style={{
+                  fontSize: '10px',
+                  color: 'var(--color-text-secondary)',
+                  lineHeight: '1'
+                }}>주문자와동일</span>
                 <input
                   type="checkbox"
                   checked={sameAsOrderer}
                   onChange={(e) => handleSameAsOrderer(e.target.checked)}
                   style={{
-                    width: '14px',
-                    height: '14px',
-                    cursor: 'pointer'
+                    width: '16px',
+                    height: '16px',
+                    cursor: 'pointer',
+                    margin: 0
                   }}
                 />
-                주문자와 동일
               </label>
-            </div>
 
-            {/* 수령인명 */}
-            <div>
-              <input
-                type="text"
-                value={formData.recipient}
-                onChange={(e) => {
-                  handleChange('recipient', e.target.value);
-                  if (sameAsOrderer) setSameAsOrderer(false);
-                }}
-                placeholder="수령인명"
-                disabled={sameAsOrderer}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: `1px solid ${errors.recipient ? '#ef4444' : 'var(--color-border)'}`,
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  background: sameAsOrderer ? 'var(--color-background-secondary)' : 'var(--color-surface)',
-                  color: 'var(--color-text)',
-                  cursor: sameAsOrderer ? 'not-allowed' : 'text',
-                  opacity: sameAsOrderer ? 0.7 : 1
-                }}
-              />
-              {errors.recipient && (
-                <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
-                  {errors.recipient}
-                </div>
-              )}
-            </div>
-
-            {/* 수령인 연락처 */}
-            <div>
-              <input
-                type="text"
-                value={formData.recipientPhone}
-                onChange={(e) => {
-                  handleChange('recipientPhone', e.target.value);
-                  if (sameAsOrderer) setSameAsOrderer(false);
-                }}
-                placeholder="수령인 연락처"
-                disabled={sameAsOrderer}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: `1px solid ${errors.recipientPhone ? '#ef4444' : 'var(--color-border)'}`,
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  background: sameAsOrderer ? 'var(--color-background-secondary)' : 'var(--color-surface)',
-                  color: 'var(--color-text)',
-                  cursor: sameAsOrderer ? 'not-allowed' : 'text',
-                  opacity: sameAsOrderer ? 0.7 : 1
-                }}
-              />
-              {errors.recipientPhone && (
-                <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
-                  {errors.recipientPhone}
-                </div>
-              )}
-            </div>
-
-            {/* 배송지 */}
-            <div>
-              <div style={{ position: 'relative' }}>
+              <div style={{ width: '80px' }}>
                 <input
                   type="text"
-                  value={formData.address}
-                  onChange={(e) => handleChange('address', e.target.value)}
-                  placeholder="배송지"
+                  value={formData.recipient}
+                  onChange={(e) => {
+                    handleChange('recipient', e.target.value);
+                    if (sameAsOrderer) setSameAsOrderer(false);
+                  }}
+                  placeholder="수령인"
+                  disabled={sameAsOrderer}
                   style={{
                     width: '100%',
-                    padding: '8px 80px 8px 12px',
-                    border: `1px solid ${errors.address ? '#ef4444' : 'var(--color-border)'}`,
+                    padding: '8px 12px',
+                    border: `1px solid ${errors.recipient ? '#ef4444' : 'var(--color-border)'}`,
                     borderRadius: '6px',
                     fontSize: '13px',
-                    background: 'var(--color-surface)',
-                    color: 'var(--color-text)'
+                    background: sameAsOrderer ? 'var(--color-background-secondary)' : 'var(--color-surface)',
+                    color: 'var(--color-text)',
+                    cursor: sameAsOrderer ? 'not-allowed' : 'text',
+                    opacity: sameAsOrderer ? 0.7 : 1,
+                    textAlign: 'center'
                   }}
                 />
-                <button
-                  type="button"
-                  onClick={handleAddressSearch}
-                  style={{
-                    position: 'absolute',
-                    right: '4px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    padding: '4px 12px',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    color: 'var(--color-text)',
-                    background: 'var(--color-surface)',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--color-surface-hover)';
-                    e.currentTarget.style.borderColor = 'var(--color-primary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'var(--color-surface)';
-                    e.currentTarget.style.borderColor = 'var(--color-border)';
-                  }}
-                >
-                  검색
-                </button>
+                {errors.recipient && (
+                  <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
+                    {errors.recipient}
+                  </div>
+                )}
               </div>
-              {errors.address && (
-                <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
-                  {errors.address}
+
+              <div style={{ width: '140px' }}>
+                <input
+                  type="text"
+                  value={formData.recipientPhone}
+                  onChange={(e) => {
+                    handleChange('recipientPhone', e.target.value);
+                    if (sameAsOrderer) setSameAsOrderer(false);
+                  }}
+                  placeholder="수령인 연락처"
+                  disabled={sameAsOrderer}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: `1px solid ${errors.recipientPhone ? '#ef4444' : 'var(--color-border)'}`,
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    background: sameAsOrderer ? 'var(--color-background-secondary)' : 'var(--color-surface)',
+                    color: 'var(--color-text)',
+                    cursor: sameAsOrderer ? 'not-allowed' : 'text',
+                    opacity: sameAsOrderer ? 0.7 : 1,
+                    textAlign: 'center'
+                  }}
+                />
+                {errors.recipientPhone && (
+                  <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
+                    {errors.recipientPhone}
+                  </div>
+                )}
+              </div>
+
+              {/* 배송지 */}
+              <div style={{ flex: 1 }}>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={formData.address}
+                    onChange={(e) => handleChange('address', e.target.value)}
+                    placeholder="배송지"
+                    style={{
+                      width: '100%',
+                      padding: '8px 60px 8px 12px',
+                      border: `1px solid ${errors.address ? '#ef4444' : 'var(--color-border)'}`,
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      background: 'var(--color-surface)',
+                      color: 'var(--color-text)'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddressSearch}
+                    style={{
+                      position: 'absolute',
+                      right: '4px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      padding: '4px 12px',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      color: 'var(--color-text)',
+                      background: 'var(--color-surface)',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--color-surface-hover)';
+                      e.currentTarget.style.borderColor = 'var(--color-primary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'var(--color-surface)';
+                      e.currentTarget.style.borderColor = 'var(--color-border)';
+                    }}
+                  >
+                    검색
+                  </button>
                 </div>
-              )}
+                {errors.address && (
+                  <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
+                    {errors.address}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* 배송메시지 */}
@@ -1304,7 +1230,7 @@ export default function SingleOrderModal({
                 type="text"
                 value={formData.deliveryMessage}
                 onChange={(e) => handleChange('deliveryMessage', e.target.value)}
-                placeholder="배송메시지"
+                placeholder="배송메시지(선택)"
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -1315,6 +1241,7 @@ export default function SingleOrderModal({
                   color: 'var(--color-text)'
                 }}
               />
+            </div>
             </div>
           </div>
         </div>
@@ -1325,10 +1252,39 @@ export default function SingleOrderModal({
           borderTop: '1px solid var(--color-border)',
           display: 'flex',
           gap: '12px',
-          position: 'sticky',
-          bottom: 0,
-          background: 'var(--color-surface)'
+          alignItems: 'center',
+          background: 'var(--color-surface)',
+          borderRadius: '0 0 16px 16px',
+          flexShrink: 0
         }}>
+          {/* 정산 예정 금액 */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '12px 16px',
+            background: 'var(--color-background-secondary)',
+            borderRadius: '8px',
+            border: '1px solid var(--color-border)',
+            minWidth: '200px'
+          }}>
+            <div style={{
+              fontSize: '13px',
+              fontWeight: '500',
+              color: 'var(--color-text)'
+            }}>
+              정산 예정 금액
+            </div>
+            <div style={{
+              fontSize: '18px',
+              fontWeight: '700',
+              color: 'var(--color-primary)',
+              marginLeft: 'auto'
+            }}>
+              {supplyPrice.toLocaleString()}원
+            </div>
+          </div>
+
           <button
             onClick={onClose}
             disabled={isSubmitting}
