@@ -87,10 +87,12 @@ export async function POST(request: NextRequest) {
       .eq('is_deleted', false);
 
     // 중복 카운트 계산 (주문번호만으로 판단)
+    // 타입 불일치 문제 해결: 모두 문자열로 변환
     const existingOrderNumbers = new Set(
       (existingOrders || [])
         .map(order => order.order_number)
         .filter(Boolean) // null/undefined 제외
+        .map(num => String(num).trim()) // 문자열로 변환 및 공백 제거
     );
 
     console.log('🔍 중복 체크 시작');
@@ -99,12 +101,25 @@ export async function POST(request: NextRequest) {
     console.log('  - overwriteDuplicates:', overwriteDuplicates);
     console.log('  - skipDuplicateCheck:', skipDuplicateCheck);
 
+    // 샘플 주문번호 타입 확인
+    if (processedOrders.length > 0 && processedOrders[0].order_number) {
+      console.log('  - 첫 번째 주문번호 타입:', typeof processedOrders[0].order_number);
+      console.log('  - 첫 번째 주문번호 값:', processedOrders[0].order_number);
+    }
+    if (existingOrderNumbers.size > 0) {
+      const firstExisting = Array.from(existingOrderNumbers)[0];
+      console.log('  - 기존 주문번호 샘플 타입:', typeof firstExisting);
+      console.log('  - 기존 주문번호 샘플 값:', firstExisting);
+    }
+
     let duplicateCount = 0;
     let newCount = 0;
     processedOrders.forEach(order => {
-      if (order.order_number && existingOrderNumbers.has(order.order_number)) {
+      // 주문번호를 문자열로 변환하여 비교
+      const orderNumber = order.order_number ? String(order.order_number).trim() : null;
+      if (orderNumber && existingOrderNumbers.has(orderNumber)) {
         duplicateCount++;
-        console.log('  ⚠️ 중복 발견:', order.order_number);
+        console.log('  ⚠️ 중복 발견:', orderNumber);
       } else {
         newCount++;
       }
@@ -149,14 +164,16 @@ export async function POST(request: NextRequest) {
     let ordersToSave = processedOrders;
     if (!overwriteDuplicates) {
       ordersToSave = processedOrders.filter(order => {
-        return !(order.order_number && existingOrderNumbers.has(order.order_number));
+        const orderNumber = order.order_number ? String(order.order_number).trim() : null;
+        return !(orderNumber && existingOrderNumbers.has(orderNumber));
       });
     }
 
     // 주문에 연번 부여
     const ordersWithSequence = ordersToSave.map(order => {
       const marketName = order.market_name;
-      const isNewOrder = !(order.order_number && existingOrderNumbers.has(order.order_number));
+      const orderNumber = order.order_number ? String(order.order_number).trim() : null;
+      const isNewOrder = !(orderNumber && existingOrderNumbers.has(orderNumber));
 
       // 신규 주문에만 새 연번 부여
       if (isNewOrder && marketName && marketCounters[marketName] !== undefined) {
