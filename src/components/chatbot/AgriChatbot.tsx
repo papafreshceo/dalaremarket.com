@@ -78,8 +78,7 @@ export default function AgriChatbot() {
         const { data, error } = await supabase
           .from('chatbot_settings')
           .select('*')
-          .limit(1)
-          .single();
+          .limit(1);
 
         if (error) {
           // 테이블이 없거나 권한 문제 - 조용히 무시
@@ -91,8 +90,8 @@ export default function AgriChatbot() {
           return;
         }
 
-        if (data) {
-          setSettings(data);
+        if (data && data.length > 0) {
+          setSettings(data[0]);
           console.log('✅ 챗봇 설정 로드 완료');
         }
       } catch (error) {
