@@ -191,17 +191,34 @@ export async function POST(request: NextRequest) {
     });
 
     // INSERT 또는 UPSERT 수행
-    // 항상 UPSERT를 사용하여 안전하게 처리
     let data, error;
-    const result = await supabase
-      .from('integrated_orders')
-      .upsert(ordersWithSequence, {
-        onConflict: 'order_number',
-        ignoreDuplicates: !overwriteDuplicates,  // 덮어쓰기 모드가 아니면 중복 무시
-      })
-      .select();
-    data = result.data;
-    error = result.error;
+
+    console.log('💾 저장 시작 - 저장할 주문 수:', ordersWithSequence.length);
+
+    if (overwriteDuplicates) {
+      // 덮어쓰기 모드: UPSERT 사용 (중복 시 덮어쓰기)
+      console.log('  모드: 덮어쓰기 (UPSERT)');
+      const result = await supabase
+        .from('integrated_orders')
+        .upsert(ordersWithSequence, {
+          onConflict: 'order_number',
+          ignoreDuplicates: false,
+        })
+        .select();
+      data = result.data;
+      error = result.error;
+    } else {
+      // 중복 제외 모드: INSERT 사용 (이미 필터링됨)
+      console.log('  모드: 중복 제외 (INSERT)');
+      const result = await supabase
+        .from('integrated_orders')
+        .insert(ordersWithSequence)
+        .select();
+      data = result.data;
+      error = result.error;
+    }
+
+    console.log('💾 저장 완료 - 저장된 주문 수:', data?.length || 0);
 
     if (error) {
       console.error('대량 주문 생성 실패:', error);
