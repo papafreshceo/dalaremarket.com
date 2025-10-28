@@ -1049,28 +1049,66 @@ export default function ExcelTab() {
       // 옵션별 통계 재계산
       calculateOptionStats(ordersWithMapping);
 
-      // 검증 결과 모달 표시
-      let content = `총 ${ordersWithMapping.length}개 주문\n\n`;
-      content += `✓ 매칭 성공: ${matchedCount}개\n`;
-      content += `✗ 매칭 실패: ${unmatchedCount}개\n`;
+      // 검증 결과 모달 표시 - 시각적으로 개선
+      let content = `<div style="font-size: 15px; line-height: 1.8;">`;
 
+      // 전체 통계
+      content += `<div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">`;
+      content += `<div style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">📊 전체 통계</div>`;
+      content += `<div style="font-size: 18px;">총 <strong>${ordersWithMapping.length}</strong>개 주문</div>`;
+      content += `</div>`;
+
+      // 매칭 결과
+      content += `<div style="display: flex; gap: 10px; margin-bottom: 20px;">`;
+
+      // 매칭 성공
+      content += `<div style="flex: 1; padding: 15px; background: ${matchedCount > 0 ? '#d4edda' : '#f8f9fa'}; border: 2px solid ${matchedCount > 0 ? '#28a745' : '#dee2e6'}; border-radius: 8px;">`;
+      content += `<div style="font-size: 14px; color: #666; margin-bottom: 5px;">✓ 매칭 성공</div>`;
+      content += `<div style="font-size: 24px; font-weight: bold; color: ${matchedCount > 0 ? '#28a745' : '#999'};">${matchedCount}개</div>`;
+      content += `</div>`;
+
+      // 매칭 실패
+      content += `<div style="flex: 1; padding: 15px; background: ${unmatchedCount > 0 ? '#f8d7da' : '#f8f9fa'}; border: 2px solid ${unmatchedCount > 0 ? '#dc3545' : '#dee2e6'}; border-radius: 8px;">`;
+      content += `<div style="font-size: 14px; color: #666; margin-bottom: 5px;">✗ 매칭 실패</div>`;
+      content += `<div style="font-size: 24px; font-weight: bold; color: ${unmatchedCount > 0 ? '#dc3545' : '#999'};">${unmatchedCount}개</div>`;
+      content += `</div>`;
+
+      content += `</div>`;
+
+      // 수정된 옵션명 통계
       if (modifiedMatched > 0 || modifiedUnmatched > 0) {
-        content += `\n📝 수정된 옵션명:\n`;
+        content += `<div style="margin-bottom: 20px; padding: 15px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px;">`;
+        content += `<div style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">📝 수정된 옵션명</div>`;
+        content += `<div style="display: flex; gap: 15px; margin-top: 10px;">`;
+
         if (modifiedMatched > 0) {
-          content += `  ✓ 매칭 성공: ${modifiedMatched}개\n`;
+          content += `<div style="flex: 1;">`;
+          content += `<div style="font-size: 13px; color: #666;">✓ 매칭 성공</div>`;
+          content += `<div style="font-size: 20px; font-weight: bold; color: #28a745;">${modifiedMatched}개</div>`;
+          content += `</div>`;
         }
+
         if (modifiedUnmatched > 0) {
-          content += `  ✗ 여전히 매칭 실패: ${modifiedUnmatched}개\n`;
+          content += `<div style="flex: 1;">`;
+          content += `<div style="font-size: 13px; color: #666;">✗ 여전히 매칭 실패</div>`;
+          content += `<div style="font-size: 20px; font-weight: bold; color: #dc3545;">${modifiedUnmatched}개</div>`;
+          content += `</div>`;
         }
+
+        content += `</div></div>`;
       }
 
-      content += `\n`;
+      // 안내 메시지
+      content += `<div style="margin-top: 20px; padding: 15px; background: ${unmatchedCount > 0 ? '#fff3cd' : '#d4edda'}; border-radius: 8px;">`;
       if (unmatchedCount > 0) {
-        content += `매칭 실패한 옵션명은 출고 정보가 자동으로 입력되지 않았습니다.\n`;
-        content += `"옵션명 일괄수정" 버튼을 사용하여 수정하세요.`;
+        content += `<div style="color: #856404; font-weight: 500;">⚠️ 매칭 실패한 옵션명은 출고 정보가 자동으로 입력되지 않았습니다.</div>`;
+        content += `<div style="color: #856404; margin-top: 5px;">"옵션명 일괄수정" 버튼을 사용하여 수정하세요.</div>`;
       } else {
-        content += `✅ 모든 주문의 출고 정보가 자동으로 입력되었습니다!`;
+        content += `<div style="color: #155724; font-weight: 500;">✅ 모든 주문의 출고 정보가 자동으로 입력되었습니다!</div>`;
       }
+      content += `</div>`;
+
+      content += `</div>`;
 
       setResultMessage({
         title: '옵션명 검증 완료',
@@ -1862,7 +1900,10 @@ export default function ExcelTab() {
         <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">{resultMessage.title}</h3>
-            <p className="text-gray-700 whitespace-pre-line mb-6">{resultMessage.content}</p>
+            <div
+              className="text-gray-700 mb-6"
+              dangerouslySetInnerHTML={{ __html: resultMessage.content }}
+            />
             <button
               onClick={() => setShowResultModal(false)}
               className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"

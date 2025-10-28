@@ -80,37 +80,38 @@ export async function POST(request: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .eq('is_deleted', false);
 
-    // 중복 체크를 위해 기존 주문 조회 (주문번호 기준)
-    const { data: existingOrders } = await supabase
-      .from('integrated_orders')
-      .select('order_number')
-      .eq('is_deleted', false);
-
-    // 중복 카운트 계산 (주문번호만으로 판단)
-    // 타입 불일치 문제 해결: 모두 문자열로 변환
-    const existingOrderNumbers = new Set(
-      (existingOrders || [])
-        .map(order => order.order_number)
-        .filter(Boolean) // null/undefined 제외
-        .map(num => String(num).trim()) // 문자열로 변환 및 공백 제거
-    );
+    // 중복 체크를 위해 업로드하려는 주문번호 목록만 DB에서 조회 (성능 최적화)
+    // 전체 DB를 조회하지 않고, 업로드할 주문번호만 IN 절로 검색
+    const uploadOrderNumbers = processedOrders
+      .map(o => o.order_number)
+      .filter(Boolean)
+      .map(num => String(num).trim());
 
     console.log('🔍 중복 체크 시작');
-    console.log('  - 기존 주문번호 개수:', existingOrderNumbers.size);
-    console.log('  - 저장할 주문 개수:', processedOrders.length);
+    console.log('  - 업로드할 주문 개수:', processedOrders.length);
+    console.log('  - 업로드할 주문번호 개수:', uploadOrderNumbers.length);
     console.log('  - overwriteDuplicates:', overwriteDuplicates);
     console.log('  - skipDuplicateCheck:', skipDuplicateCheck);
 
-    // 샘플 주문번호 타입 확인
-    if (processedOrders.length > 0 && processedOrders[0].order_number) {
-      console.log('  - 첫 번째 주문번호 타입:', typeof processedOrders[0].order_number);
-      console.log('  - 첫 번째 주문번호 값:', processedOrders[0].order_number);
+    // 업로드하려는 주문번호 중에서 이미 DB에 있는 것만 조회 (IN 절 사용)
+    const { data: existingOrders, error: fetchError } = await supabase
+      .from('integrated_orders')
+      .select('order_number')
+      .in('order_number', uploadOrderNumbers)
+      .eq('is_deleted', false);
+
+    if (fetchError) {
+      console.error('기존 주문 조회 실패:', fetchError);
     }
-    if (existingOrderNumbers.size > 0) {
-      const firstExisting = Array.from(existingOrderNumbers)[0];
-      console.log('  - 기존 주문번호 샘플 타입:', typeof firstExisting);
-      console.log('  - 기존 주문번호 샘플 값:', firstExisting);
-    }
+
+    // 중복 체크를 위한 Set 생성
+    const existingOrderNumbers = new Set(
+      (existingOrders || [])
+        .map(order => String(order.order_number).trim())
+        .filter(Boolean)
+    );
+
+    console.log('  - DB에서 발견된 기존 주문:', existingOrderNumbers.size);
 
     let duplicateCount = 0;
     let newCount = 0;
