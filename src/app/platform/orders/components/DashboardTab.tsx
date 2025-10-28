@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Order, StatusConfig } from '../types';
+import DatePicker from '@/components/ui/DatePicker';
 
 interface DashboardTabProps {
   isMobile: boolean;
@@ -10,11 +11,33 @@ interface DashboardTabProps {
 }
 
 export default function DashboardTab({ isMobile, orders, statusConfig }: DashboardTabProps) {
+  const [hoveredBadge, setHoveredBadge] = useState<{ type: string; amount: number; position: { x: number; y: number } } | null>(null);
+
   // 현재 날짜 정보
   const now = useMemo(() => new Date(), []);
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-  const currentDay = now.getDate();
+  const todayYear = now.getFullYear();
+  const todayMonth = now.getMonth() + 1;
+  const todayDay = now.getDate();
+  const [currentYear, setCurrentYear] = useState(todayYear);
+  const [currentMonth, setCurrentMonth] = useState(todayMonth);
+
+  // 날짜 필터 상태 (기본값: 최근 7일)
+  const [startDate, setStartDate] = useState(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 6);
+    const year = start.getFullYear();
+    const month = String(start.getMonth() + 1).padStart(2, '0');
+    const day = String(start.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
 
   // 이번 달 첫날과 마지막 날
   const firstDayOfMonth = useMemo(() => new Date(currentYear, currentMonth - 1, 1), [currentYear, currentMonth]);
@@ -22,21 +45,144 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
   const daysInMonth = lastDayOfMonth.getDate();
   const firstDayOfWeek = firstDayOfMonth.getDay();
 
-  // 날짜별 주문 집계
+  // 전월 마지막 날짜
+  const prevMonthLastDay = useMemo(() => new Date(currentYear, currentMonth - 1, 0).getDate(), [currentYear, currentMonth]);
+  const prevMonth = useMemo(() => currentMonth === 1 ? 12 : currentMonth - 1, [currentMonth]);
+
+  // 다음달 첫 날짜 이후 필요한 칸 수
+  const totalCells = firstDayOfWeek + daysInMonth;
+  const remainingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  const nextMonth = useMemo(() => currentMonth === 12 ? 1 : currentMonth + 1, [currentMonth]);
+
+  // 대한민국 공휴일 (2025년 기준)
+  const holidays = useMemo(() => {
+    const holidayMap: Record<string, string> = {
+      '1-1': '신정',
+      '1-28': '설날연휴',
+      '1-29': '설날',
+      '1-30': '설날연휴',
+      '3-1': '삼일절',
+      '3-3': '삼일절대체',
+      '5-5': '어린이날',
+      '5-6': '대체공휴일',
+      '6-6': '현충일',
+      '8-15': '광복절',
+      '10-3': '개천절',
+      '10-4': '추석연휴',
+      '10-5': '추석연휴',
+      '10-6': '추석',
+      '10-7': '추석연휴',
+      '10-8': '대체공휴일',
+      '10-9': '한글날',
+      '12-25': '크리스마스'
+    };
+    return holidayMap;
+  }, []);
+
+  // 특정 날짜가 공휴일인지 확인
+  const getHoliday = (month: number, day: number) => {
+    return holidays[`${month}-${day}`];
+  };
+
+  // 이전 달로 이동
+  const handlePrevMonth = () => {
+    if (currentMonth === 1) {
+      setCurrentYear(currentYear - 1);
+      setCurrentMonth(12);
+    } else {
+      setCurrentMonth(currentMonth - 1);
+    }
+  };
+
+  // 다음 달로 이동
+  const handleNextMonth = () => {
+    if (currentMonth === 12) {
+      setCurrentYear(currentYear + 1);
+      setCurrentMonth(1);
+    } else {
+      setCurrentMonth(currentMonth + 1);
+    }
+  };
+
+  // 날짜 필터 함수
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const setDateRange = (days: number) => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - days + 1);
+    setStartDate(formatDate(start));
+    setEndDate(formatDate(end));
+  };
+
+  const handleToday = () => {
+    const today = new Date();
+    setStartDate(formatDate(today));
+    setEndDate(formatDate(today));
+  };
+
+  const handleYesterday = () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    setStartDate(formatDate(yesterday));
+    setEndDate(formatDate(yesterday));
+  };
+
+  const handleThisYear = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const yearStart = `${year}-01-01`;
+    setStartDate(yearStart);
+    setEndDate(formatDate(today));
+  };
+
+  // 날짜별 주문 집계 (발주서확정일 기준으로 확정건수 + 발송완료건수 + 취소요청건수)
   const ordersByDate = useMemo(() => {
-    const dateMap: Record<number, { count: number; amount: number }> = {};
+    const dateMap: Record<number, {
+      confirmedCount: number;
+      shippedCount: number;
+      cancelRequestedCount: number;
+      confirmedAmount: number;
+      shippedAmount: number;
+      cancelRequestedAmount: number;
+    }> = {};
 
     orders.forEach(order => {
-      const orderDate = order.registeredAt ? new Date(order.registeredAt) : null;
-      if (!orderDate) return;
+      // 발주서확정일 기준으로 집계
+      if (order.confirmedAt) {
+        const confirmedDate = new Date(order.confirmedAt);
+        if (confirmedDate.getFullYear() === currentYear && confirmedDate.getMonth() === currentMonth - 1) {
+          const day = confirmedDate.getDate();
+          if (!dateMap[day]) {
+            dateMap[day] = {
+              confirmedCount: 0,
+              shippedCount: 0,
+              cancelRequestedCount: 0,
+              confirmedAmount: 0,
+              shippedAmount: 0,
+              cancelRequestedAmount: 0
+            };
+          }
+          dateMap[day].confirmedCount++;
+          dateMap[day].confirmedAmount += (order as any).settlement_amount || 0;
 
-      if (orderDate.getFullYear() === currentYear && orderDate.getMonth() === currentMonth - 1) {
-        const day = orderDate.getDate();
-        if (!dateMap[day]) {
-          dateMap[day] = { count: 0, amount: 0 };
+          // 같은 발주서확정일에, 해당 주문이 발송완료되었다면 shippedCount 증가
+          if (order.shippedDate) {
+            dateMap[day].shippedCount++;
+            dateMap[day].shippedAmount += (order as any).settlement_amount || 0;
+          }
+
+          // 같은 발주서확정일에, 해당 주문이 취소요청되었다면 cancelRequestedCount 증가
+          if (order.status === 'cancelRequested') {
+            dateMap[day].cancelRequestedCount++;
+            dateMap[day].cancelRequestedAmount += (order as any).settlement_amount || 0;
+          }
         }
-        dateMap[day].count++;
-        dateMap[day].amount += order.amount || 0;
       }
     });
 
@@ -213,22 +359,26 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               fontWeight: '600',
               margin: 0
             }}>
-              월간 발주 일정
+              발주캘린더
             </h3>
             <div style={{
               display: 'flex',
               gap: '8px',
               alignItems: 'center'
             }}>
-              <button className="bg-white border-gray-200" style={{
-                padding: '6px',
-                border: '1px solid',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
+              <button
+                onClick={handlePrevMonth}
+                className="bg-white border-gray-200"
+                style={{
+                  padding: '6px',
+                  border: '1px solid',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
                 <svg width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none" opacity="0.6">
                   <path d="M15 18l-6-6 6-6"/>
                 </svg>
@@ -241,15 +391,19 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               }}>
                 {currentYear}년 {currentMonth}월
               </span>
-              <button className="bg-white border-gray-200" style={{
-                padding: '6px',
-                border: '1px solid',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
+              <button
+                onClick={handleNextMonth}
+                className="bg-white border-gray-200"
+                style={{
+                  padding: '6px',
+                  border: '1px solid',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
                 <svg width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none" opacity="0.6">
                   <path d="M9 18l6-6-6-6"/>
                 </svg>
@@ -282,19 +436,42 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             gridTemplateColumns: 'repeat(7, 1fr)',
             gap: '4px'
           }}>
-            {/* 이전 달 빈 칸 */}
-            {Array.from({ length: firstDayOfWeek }, (_, i) => (
-              <div key={`empty-${i}`} style={{ padding: '8px 4px' }} />
-            ))}
+            {/* 이전 달 날짜 */}
+            {Array.from({ length: firstDayOfWeek }, (_, i) => {
+              const prevDay = prevMonthLastDay - firstDayOfWeek + i + 1;
+              return (
+                <div key={`prev-${i}`} style={{
+                  padding: '12px 4px',
+                  minHeight: '80px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'center'
+                }}>
+                  <span style={{
+                    fontSize: '11px',
+                    color: '#999',
+                    fontWeight: '400'
+                  }}>
+                    {prevMonth}/{prevDay}
+                  </span>
+                </div>
+              );
+            })}
 
             {/* 현재 달 날짜 */}
             {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
-              const isToday = day === currentDay;
+              const isToday = currentYear === todayYear && currentMonth === todayMonth && day === todayDay;
               const dayData = ordersByDate[day];
               const hasOrder = !!dayData;
-              const orderCount = dayData?.count || 0;
-              const orderAmount = dayData?.amount || 0;
+              const confirmedCount = dayData?.confirmedCount || 0;
+              const shippedCount = dayData?.shippedCount || 0;
+              const cancelRequestedCount = dayData?.cancelRequestedCount || 0;
+              const confirmedAmount = dayData?.confirmedAmount || 0;
+              const shippedAmount = dayData?.shippedAmount || 0;
+              const cancelRequestedAmount = dayData?.cancelRequestedAmount || 0;
               const dayOfWeek = (firstDayOfWeek + day - 1) % 7;
+              const holiday = getHoliday(currentMonth, day);
+              const isHoliday = !!holiday;
 
               return (
                 <div key={day} className={hasOrder && !isToday ? 'bg-white' : ''} style={{
@@ -303,8 +480,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   border: isToday ? '2px solid' : hasOrder ? '1px solid' : 'none',
                   borderColor: isToday ? '#2563eb' : hasOrder ? '#dee2e6' : undefined,
                   borderRadius: '8px',
-                  padding: '8px 4px',
-                  minHeight: '60px',
+                  padding: '12px 4px',
+                  minHeight: '80px',
                   cursor: hasOrder ? 'pointer' : 'default',
                   transition: 'all 0.2s',
                   display: 'flex',
@@ -324,30 +501,127 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     e.currentTarget.style.transform = 'scale(1)';
                   }
                 }}>
-                  <span className={dayOfWeek === 0 ? 'text-danger' : dayOfWeek === 6 || isToday ? 'text-primary' : ''} style={{
-                    fontSize: '13px',
-                    fontWeight: isToday ? '600' : '500'
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '2px'
                   }}>
-                    {day}
-                  </span>
+                    <span className={dayOfWeek === 0 || isHoliday ? 'text-danger' : dayOfWeek === 6 || isToday ? 'text-primary' : ''} style={{
+                      fontSize: '13px',
+                      fontWeight: isToday ? '600' : '500'
+                    }}>
+                      {day}
+                    </span>
+                    {isHoliday && (
+                      <span style={{
+                        fontSize: '9px',
+                        color: '#ef4444',
+                        fontWeight: '500',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {holiday}
+                      </span>
+                    )}
+                  </div>
                   {hasOrder && (
-                    <>
-                      <div className="bg-primary" style={{
-                        color: '#ffffff',
-                        borderRadius: '10px',
-                        padding: '2px 6px',
-                        fontSize: '12px',
-                        fontWeight: '500'
-                      }}>
-                        {orderCount}건
-                      </div>
-                      <div className="text-success" style={{
-                        fontSize: '12px',
-                        fontWeight: '500'
-                      }}>
-                        ₩{(orderAmount / 1000).toFixed(0)}K
-                      </div>
-                    </>
+                    <div style={{
+                      display: 'flex',
+                      gap: '3px',
+                      flexWrap: 'wrap',
+                      justifyContent: 'center'
+                    }}>
+                      {confirmedCount > 0 && (
+                        <div
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setHoveredBadge({
+                              type: '확정',
+                              amount: confirmedAmount,
+                              position: { x: rect.left + rect.width / 2, y: rect.top }
+                            });
+                          }}
+                          onMouseLeave={() => setHoveredBadge(null)}
+                          style={{
+                            border: '1px solid #7c3aed',
+                            color: '#7c3aed',
+                            background: 'transparent',
+                            borderRadius: '3px',
+                            width: '20px',
+                            height: '20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            position: 'relative'
+                          }}
+                        >
+                          {confirmedCount}
+                        </div>
+                      )}
+                      {shippedCount > 0 && (
+                        <div
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setHoveredBadge({
+                              type: '발송',
+                              amount: shippedAmount,
+                              position: { x: rect.left + rect.width / 2, y: rect.top }
+                            });
+                          }}
+                          onMouseLeave={() => setHoveredBadge(null)}
+                          style={{
+                            border: '1px solid #10b981',
+                            color: '#10b981',
+                            background: 'transparent',
+                            borderRadius: '3px',
+                            width: '20px',
+                            height: '20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            position: 'relative'
+                          }}
+                        >
+                          {shippedCount}
+                        </div>
+                      )}
+                      {cancelRequestedCount > 0 && (
+                        <div
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setHoveredBadge({
+                              type: '취소',
+                              amount: cancelRequestedAmount,
+                              position: { x: rect.left + rect.width / 2, y: rect.top }
+                            });
+                          }}
+                          onMouseLeave={() => setHoveredBadge(null)}
+                          style={{
+                            border: '1px solid #f87171',
+                            color: '#f87171',
+                            background: 'transparent',
+                            borderRadius: '3px',
+                            width: '20px',
+                            height: '20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            position: 'relative'
+                          }}
+                        >
+                          {cancelRequestedCount}
+                        </div>
+                      )}
+                    </div>
                   )}
                   {isToday && (
                     <div className="bg-primary" style={{
@@ -366,6 +640,28 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 </div>
               );
             })}
+
+            {/* 다음 달 날짜 */}
+            {Array.from({ length: remainingCells }, (_, i) => {
+              const nextDay = i + 1;
+              return (
+                <div key={`next-${i}`} style={{
+                  padding: '12px 4px',
+                  minHeight: '80px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'center'
+                }}>
+                  <span style={{
+                    fontSize: '11px',
+                    color: '#999',
+                    fontWeight: '400'
+                  }}>
+                    {nextMonth}/{nextDay}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           {/* 캘린더 범례 */}
@@ -375,39 +671,246 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             marginTop: '16px',
             paddingTop: '12px',
             borderTop: '1px solid rgba(222, 226, 230, 0.5)',
-            fontSize: '11px'
+            fontSize: '11px',
+            justifyContent: 'flex-start'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
-                width: '12px',
-                height: '12px',
-                background: 'rgba(37, 99, 235, 0.1)',
-                border: '2px solid',
-                borderColor: '#2563eb',
-                borderRadius: '3px'
-              }} />
-              <span>오늘</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div className="bg-white border-gray-200" style={{
-                width: '12px',
-                height: '12px',
-                border: '1px solid',
-                borderRadius: '3px'
-              }} />
-              <span>발주일</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div className="bg-primary" style={{
-                color: '#ffffff',
-                borderRadius: '10px',
-                padding: '1px 6px',
+                border: '1px solid #7c3aed',
+                color: '#7c3aed',
+                background: 'transparent',
+                borderRadius: '2px',
+                width: '16px',
+                height: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 fontSize: '9px',
-                fontWeight: '500'
+                fontWeight: '700'
               }}>
-                N건
+                N
               </div>
-              <span>발주 건수</span>
+              <span style={{ color: '#7c3aed', fontWeight: '500' }}>발주확정</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                border: '1px solid #10b981',
+                color: '#10b981',
+                background: 'transparent',
+                borderRadius: '2px',
+                width: '16px',
+                height: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '9px',
+                fontWeight: '700'
+              }}>
+                N
+              </div>
+              <span style={{ color: '#10b981', fontWeight: '500' }}>발송완료</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                border: '1px solid #f87171',
+                color: '#f87171',
+                background: 'transparent',
+                borderRadius: '2px',
+                width: '16px',
+                height: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '9px',
+                fontWeight: '700'
+              }}>
+                N
+              </div>
+              <span style={{ color: '#f87171', fontWeight: '500' }}>취소요청</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 날짜 필터 */}
+        <div className="card" style={{
+          borderRadius: '12px',
+          padding: '20px',
+          marginBottom: '24px'
+        }}>
+          <div style={{
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: '16px',
+            alignItems: 'center'
+          }}>
+            {/* 날짜 입력 */}
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'center'
+            }}>
+              <DatePicker
+                value={startDate}
+                onChange={(date) => setStartDate(date)}
+                placeholder="시작일"
+                maxDate={endDate || undefined}
+              />
+              <span style={{ color: '#6b7280' }}>~</span>
+              <DatePicker
+                value={endDate}
+                onChange={(date) => setEndDate(date)}
+                placeholder="종료일"
+                minDate={startDate || undefined}
+              />
+            </div>
+
+            {/* 빠른 선택 버튼 */}
+            <div style={{
+              display: 'flex',
+              gap: '6px',
+              flexWrap: 'wrap',
+              alignItems: 'center'
+            }}>
+              <button
+                onClick={handleToday}
+                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontWeight: '400',
+                  border: '1px solid',
+                  color: 'var(--color-text)',
+                  boxSizing: 'border-box',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: '20px'
+                }}
+              >
+                오늘
+              </button>
+              <button
+                onClick={handleYesterday}
+                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontWeight: '400',
+                  border: '1px solid',
+                  color: 'var(--color-text)',
+                  boxSizing: 'border-box',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: '20px'
+                }}
+              >
+                어제
+              </button>
+              <button
+                onClick={() => setDateRange(7)}
+                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontWeight: '400',
+                  border: '1px solid',
+                  color: 'var(--color-text)',
+                  boxSizing: 'border-box',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: '20px'
+                }}
+              >
+                7일
+              </button>
+              <button
+                onClick={() => setDateRange(30)}
+                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontWeight: '400',
+                  border: '1px solid',
+                  color: 'var(--color-text)',
+                  boxSizing: 'border-box',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: '20px'
+                }}
+              >
+                30일
+              </button>
+              <button
+                onClick={() => setDateRange(90)}
+                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontWeight: '400',
+                  border: '1px solid',
+                  color: 'var(--color-text)',
+                  boxSizing: 'border-box',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: '20px'
+                }}
+              >
+                90일
+              </button>
+              <button
+                onClick={() => setDateRange(365)}
+                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontWeight: '400',
+                  border: '1px solid',
+                  color: 'var(--color-text)',
+                  boxSizing: 'border-box',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: '20px'
+                }}
+              >
+                1년
+              </button>
+              <button
+                onClick={handleThisYear}
+                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontWeight: '400',
+                  border: '1px solid',
+                  color: 'var(--color-text)',
+                  boxSizing: 'border-box',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: '20px'
+                }}
+              >
+                올해
+              </button>
             </div>
           </div>
         </div>
@@ -749,6 +1252,43 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           </div>
         </div>
       </div>
+
+      {/* 커스텀 툴팁 */}
+      {hoveredBadge && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${hoveredBadge.position.x}px`,
+            top: `${hoveredBadge.position.y - 40}px`,
+            transform: 'translateX(-50%)',
+            background: 'rgba(0, 0, 0, 0.9)',
+            color: 'white',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: '600',
+            zIndex: 10000,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+          }}
+        >
+          {hoveredBadge.type}: {hoveredBadge.amount.toLocaleString()}원
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '-4px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 0,
+              height: 0,
+              borderLeft: '4px solid transparent',
+              borderRight: '4px solid transparent',
+              borderTop: '4px solid rgba(0, 0, 0, 0.9)'
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

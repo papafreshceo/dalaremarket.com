@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC } from '@/lib/date';
 import { X } from 'lucide-react';
 import { showErrorToast } from '../utils/statusToast';
@@ -110,37 +110,68 @@ export default function SingleOrderModal({
     }
   ]);
 
-  // 배지 색상 생성 함수 (다크모드 지원)
+  // 모달 초기화 함수
+  const resetModal = () => {
+    setFormData({
+      orderNumber: '',
+      orderer: '',
+      ordererPhone: '',
+      recipient: '',
+      recipientPhone: '',
+      address: '',
+      deliveryMessage: '',
+      quantity: 1,
+      specialRequest: ''
+    });
+    setRecipients([
+      {
+        id: 1,
+        recipient: '',
+        recipientPhone: '',
+        address: '',
+        deliveryMessage: '',
+        sameAsOrderer: true,
+        selectedBadgeId: null,
+        badges: []
+      }
+    ]);
+    setSelectedOption(null);
+    setErrors({});
+    setSameAsOrderer(false);
+    setBaseAddress('');
+  };
+
+  // 배지 색상 생성 함수 (배경색만 랜덤, 글자색은 검정)
   const generateBadgeColor = () => {
     const colors = [
       {
         bg: 'rgba(14, 165, 233, 0.15)',
-        text: 'rgb(14, 165, 233)',
+        text: '#000000',
         border: 'rgba(14, 165, 233, 0.3)'
       }, // blue
       {
         bg: 'rgba(34, 197, 94, 0.15)',
-        text: 'rgb(34, 197, 94)',
+        text: '#000000',
         border: 'rgba(34, 197, 94, 0.3)'
       }, // green
       {
         bg: 'rgba(234, 179, 8, 0.15)',
-        text: 'rgb(234, 179, 8)',
+        text: '#000000',
         border: 'rgba(234, 179, 8, 0.3)'
       }, // yellow
       {
         bg: 'rgba(236, 72, 153, 0.15)',
-        text: 'rgb(236, 72, 153)',
+        text: '#000000',
         border: 'rgba(236, 72, 153, 0.3)'
       }, // pink
       {
         bg: 'rgba(168, 85, 247, 0.15)',
-        text: 'rgb(168, 85, 247)',
+        text: '#000000',
         border: 'rgba(168, 85, 247, 0.3)'
       }, // purple
       {
         bg: 'rgba(249, 115, 22, 0.15)',
-        text: 'rgb(249, 115, 22)',
+        text: '#000000',
         border: 'rgba(249, 115, 22, 0.3)'
       }, // orange
     ];
@@ -161,10 +192,16 @@ export default function SingleOrderModal({
     const selectedRecipient = recipients.find(r => r.id === selectedRecipientId);
     if (!selectedRecipient) return;
 
+    console.log('선택된 배지 ID:', selectedRecipient.selectedBadgeId);
+    console.log('옵션명:', option.option_name);
+    console.log('현재 배지들:', selectedRecipient.badges.map(b => b.optionName));
+
     // 선택된 배지가 없고, 중복 체크 필요한 경우
     if (selectedRecipient.selectedBadgeId === null) {
       const isDuplicate = selectedRecipient.badges.some(badge => badge.optionName === option.option_name);
+      console.log('중복 체크 결과:', isDuplicate);
       if (isDuplicate) {
+        console.log('토스트 호출!');
         showErrorToast('이미 추가된 상품입니다');
         return;
       }
@@ -267,16 +304,14 @@ export default function SingleOrderModal({
     );
   };
 
-  // Daum 주소 검색 스크립트 로드
+  // Daum Postcode API 스크립트 로드
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
+    if (typeof window !== 'undefined' && !document.querySelector('script[src*="postcode.map.daum.net"]')) {
+      const script = document.createElement('script');
+      script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
   }, []);
 
   // 품목 목록 로드
@@ -421,30 +456,14 @@ export default function SingleOrderModal({
     }
   };
 
-  // 주소 검색
+  // 주소 검색 (Daum Postcode API)
   const handleAddressSearch = () => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !(window as any).daum) return;
 
-    // @ts-ignore - Daum Postcode API
-    new window.daum.Postcode({
+    new (window as any).daum.Postcode({
       oncomplete: function(data: any) {
-        // 기본 주소
-        let fullAddress = data.address;
-        let extraAddress = '';
-
-        // 건물명이 있을 경우 추가
-        if (data.addressType === 'R') {
-          if (data.bname !== '') {
-            extraAddress += data.bname;
-          }
-          if (data.buildingName !== '') {
-            extraAddress += (extraAddress !== '' ? ', ' + data.buildingName : data.buildingName);
-          }
-          fullAddress += (extraAddress !== '' ? ' (' + extraAddress + ')' : '');
-        }
-
-        // 기본 주소 저장하고 상세주소 입력 모달 띄우기
-        setBaseAddress(fullAddress);
+        const addr = data.roadAddress || data.jibunAddress;
+        setBaseAddress(addr);
         setShowDetailAddressModal(true);
       }
     }).open();
@@ -580,22 +599,65 @@ export default function SingleOrderModal({
   };
 
   const validateForm = () => {
-    const newErrors: Record<string, string> = {};
+    console.log('🔍 검증 시작');
+    console.log('주문자:', formData.orderer);
+    console.log('주문자 연락처:', formData.ordererPhone);
+    console.log('수령인 목록:', recipients);
 
-    if (!formData.orderer.trim()) newErrors.orderer = '주문자명을 입력하세요';
-    if (!formData.ordererPhone.trim()) newErrors.ordererPhone = '주문자 연락처를 입력하세요';
-    if (!formData.recipient.trim()) newErrors.recipient = '수령인을 입력하세요';
-    if (!formData.recipientPhone.trim()) newErrors.recipientPhone = '수령인 연락처를 입력하세요';
-    if (!formData.address.trim()) newErrors.address = '배송지를 입력하세요';
-    if (!formData.quantity || formData.quantity < 1) newErrors.quantity = '수량은 1개 이상이어야 합니다';
+    // 주문자 정보 검증
+    if (!formData.orderer || !formData.orderer.trim()) {
+      console.log('❌ 주문자명 없음');
+      toast.error('주문자명을 입력하세요');
+      return false;
+    }
+    if (!formData.ordererPhone || !formData.ordererPhone.trim()) {
+      console.log('❌ 주문자 연락처 없음');
+      toast.error('주문자 연락처를 입력하세요');
+      return false;
+    }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    // 전체 옵션 상품 개수 확인
+    const totalBadges = recipients.reduce((sum, recipient) => sum + recipient.badges.length, 0);
+    console.log('총 옵션 상품 개수:', totalBadges);
+    if (totalBadges === 0) {
+      console.log('❌ 옵션 상품 없음');
+      toast.error('옵션 상품을 선택해주세요');
+      return false;
+    }
+
+    // 수령인별 검증
+    for (let i = 0; i < recipients.length; i++) {
+      const recipient = recipients[i];
+      console.log(`수령인 ${i + 1} 검증:`, recipient);
+
+      if (!recipient.recipient || !recipient.recipient.trim()) {
+        console.log(`❌ 수령인 ${i + 1} 이름 없음`);
+        toast.error(`수령인 정보를 입력하세요`);
+        return false;
+      }
+      if (!recipient.recipientPhone || !recipient.recipientPhone.trim()) {
+        console.log(`❌ 수령인 ${i + 1} 연락처 없음`);
+        toast.error(`수령인 연락처를 입력하세요`);
+        return false;
+      }
+      if (!recipient.address || !recipient.address.trim()) {
+        console.log(`❌ 수령인 ${i + 1} 배송지 없음`);
+        toast.error(`배송지를 입력하세요`);
+        return false;
+      }
+      if (recipient.badges.length === 0) {
+        console.log(`❌ 수령인 ${i + 1} 상품 없음`);
+        toast.error(`수령인에게 상품을 추가하세요`);
+        return false;
+      }
+    }
+
+    console.log('✅ 검증 성공');
+    return true;
   };
 
   const handleSubmit = async () => {
     if (!validateForm()) {
-      toast.error('필수 항목을 모두 입력해주세요');
       return;
     }
 
@@ -607,50 +669,59 @@ export default function SingleOrderModal({
 
       if (!user) {
         toast.error('로그인이 필요합니다');
+        setIsSubmitting(false);
         return;
       }
 
-      if (!selectedOption) {
-        toast.error('옵션을 선택해주세요');
+      const ordersToInsert = [];
+
+      // 각 수령인의 각 배지마다 별도의 주문 생성
+      for (const recipient of recipients) {
+        for (const badge of recipient.badges) {
+          // 주문번호 생성 (각 주문마다 고유)
+          const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+          const orderData = {
+            seller_id: user.id,
+            order_number: orderNumber,
+            buyer_name: formData.orderer,
+            buyer_phone: formData.ordererPhone,
+            recipient_name: recipient.recipient,
+            recipient_phone: recipient.recipientPhone,
+            recipient_address: recipient.address,
+            delivery_message: recipient.deliveryMessage || '',
+            option_name: badge.optionName,
+            quantity: String(badge.quantity),
+            shipping_status: '접수',
+            market_name: '플랫폼',
+            created_by: user.id,
+            created_at: getCurrentTimeUTC(),
+            is_deleted: false
+          };
+
+          ordersToInsert.push(orderData);
+        }
+      }
+
+      // API를 통해 주문 일괄 저장 (옵션 상품 정보 자동 매핑)
+      const response = await fetch('/api/platform-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: ordersToInsert }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        console.error('주문 등록 실패:', result.error);
+        toast.error(`주문 등록에 실패했습니다: ${result.error}`);
+        setIsSubmitting(false);
         return;
       }
 
-      // 주문번호 자동 생성
-      const finalOrderNumber = `ORD-${Date.now()}`;
-
-      const orderData = {
-        seller_id: user.id,
-        order_number: finalOrderNumber,
-        orderer: formData.orderer,
-        orderer_phone: formData.ordererPhone,
-        recipient: formData.recipient,
-        recipient_phone: formData.recipientPhone,
-        address: formData.address,
-        delivery_message: formData.deliveryMessage,
-        option_name: selectedOption.option_name,
-        option_code: selectedOption.option_code || '',
-        quantity: formData.quantity,
-        unit_price: unitPrice,
-        supply_price: supplyPrice,
-        special_request: formData.specialRequest,
-        shipping_status: 'registered',
-        created_at: getCurrentTimeUTC(),
-        updated_at: getCurrentTimeUTC()
-      };
-
-      const { error } = await supabase
-        .from('integrated_orders')
-        .insert([orderData]);
-
-      if (error) {
-        console.error('주문 등록 오류:', error);
-        toast.error('주문 등록에 실패했습니다');
-        return;
-      }
-
-      toast.success('주문이 등록되었습니다');
+      toast.success(`${result.count}건의 주문이 등록되었습니다`);
       onRefresh?.();
-      onClose();
+      resetModal(); // 모달 초기화
     } catch (error) {
       console.error('주문 등록 실패:', error);
       toast.error('주문 등록에 실패했습니다');
@@ -675,6 +746,8 @@ export default function SingleOrderModal({
         padding: '20px'
       }}
       onClick={(e) => {
+        // 주문등록 중에는 클릭 무시
+        if (isSubmitting) return;
         // 배경 클릭 시 배지 선택 해제
         setRecipients(prev =>
           prev.map(r => ({ ...r, selectedBadgeId: null }))
@@ -684,15 +757,19 @@ export default function SingleOrderModal({
       <div
         style={{
           background: 'var(--color-surface)',
-          borderRadius: '16px',
           maxWidth: '1600px',
           width: '100%',
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          position: 'relative'
+          position: 'relative',
+          border: 'none',
+          outline: 'none',
+          boxShadow: 'none'
         }}
         onClick={(e) => {
+          // 주문등록 중에는 클릭 무시
+          if (isSubmitting) return;
           e.stopPropagation();
           // 모달 내부 클릭 시 배지 선택 해제
           setRecipients(prev =>
@@ -700,6 +777,88 @@ export default function SingleOrderModal({
           );
         }}
       >
+        {/* 모달 내부 토스트 컨테이너 */}
+        <Toaster
+          position="top-center"
+          containerStyle={{
+            top: 80,
+            zIndex: 10002
+          }}
+          toastOptions={{
+            duration: 3000,
+            style: {
+              minWidth: '300px',
+              maxWidth: '500px',
+              padding: '16px 24px',
+              fontSize: '15px',
+              fontWeight: '500',
+              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+            },
+            success: {
+              iconTheme: {
+                primary: '#10b981',
+                secondary: '#fff',
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: '#ef4444',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
+
+        {/* 주문등록 중 로딩 오버레이 */}
+        {isSubmitting && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10001,
+            cursor: 'not-allowed'
+          }}>
+            <div style={{
+              background: 'white',
+              padding: '24px 32px',
+              borderRadius: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)'
+            }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                border: '4px solid #f3f4f6',
+                borderTop: '4px solid #2563eb',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }} />
+              <style>{`
+                @keyframes spin {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+              `}</style>
+              <p style={{
+                margin: 0,
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#1f2937'
+              }}>
+                주문 등록 중...
+              </p>
+            </div>
+          </div>
+        )}
         {/* 헤더 */}
         <div style={{
           padding: '16px 24px',
@@ -918,7 +1077,9 @@ export default function SingleOrderModal({
               borderRadius: '8px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '6px'
+              gap: '6px',
+              border: '1px solid var(--color-primary)',
+              transition: 'all 0.2s'
             }}>
             <div style={{
               marginBottom: '4px',
@@ -1236,28 +1397,21 @@ export default function SingleOrderModal({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedRecipientId(recipient.id);
+                      const currentRecipientId = recipient.id;
+                      setSelectedRecipientId(currentRecipientId);
                       setRecipients(prev =>
                         prev.map(r => ({ ...r, selectedBadgeId: null }))
                       );
-                      if (typeof window === 'undefined') return;
-                      // @ts-ignore
-                      new window.daum.Postcode({
+
+                      // Daum 주소검색 API 호출
+                      if (typeof window === 'undefined' || !(window as any).daum) return;
+
+                      new (window as any).daum.Postcode({
                         oncomplete: function(data: any) {
-                          let fullAddress = data.address;
-                          let extraAddress = '';
-                          if (data.addressType === 'R') {
-                            if (data.bname !== '') {
-                              extraAddress += data.bname;
-                            }
-                            if (data.buildingName !== '') {
-                              extraAddress += (extraAddress !== '' ? ', ' + data.buildingName : data.buildingName);
-                            }
-                            fullAddress += (extraAddress !== '' ? ' (' + extraAddress + ')' : '');
-                          }
+                          const addr = data.roadAddress || data.jibunAddress;
                           setRecipients(prev => prev.map(r =>
-                            r.id === recipient.id
-                              ? { ...r, address: fullAddress }
+                            r.id === currentRecipientId
+                              ? { ...r, address: addr }
                               : r
                           ));
                         }
@@ -1294,240 +1448,200 @@ export default function SingleOrderModal({
               </div>
             </div>
 
-            {/* 옵션상품 배지 및 상품추가/삭제 버튼 */}
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', alignItems: 'center' }}>
-              {/* 옵션명과 수량 배지 목록 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flex: 1, marginLeft: '62px' }}>
-                {recipient.badges.map((badge) => (
-                  <div
-                    key={badge.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // 해당 수령인 선택
-                      setSelectedRecipientId(recipient.id);
-                      // 모든 수령인의 배지 선택을 해제하고, 클릭한 배지만 선택
-                      setRecipients(prev =>
-                        prev.map(r =>
-                          r.id === recipient.id
-                            ? { ...r, selectedBadgeId: badge.id }
-                            : { ...r, selectedBadgeId: null }
-                        )
-                      );
-                    }}
-                    style={{
-                      position: 'relative',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      borderRadius: '6px',
-                      background: badge.color.bg,
-                      border: recipient.selectedBadgeId === badge.id ? `2px solid ${badge.color.border}` : 'none',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      opacity: recipient.selectedBadgeId === badge.id ? 1 : 0.6,
-                      boxShadow: recipient.selectedBadgeId === badge.id ? '0 2px 8px rgba(0,0,0,0.15)' : 'none'
-                    }}
-                  >
-                    {/* 옵션명 표시 */}
-                    <div style={{
-                      padding: '4px 8px',
-                      fontSize: '12px',
-                      color: badge.color.text,
-                      fontWeight: '500',
-                      whiteSpace: 'nowrap',
-                      background: 'transparent',
-                      minWidth: '50px'
-                    }}>
-                      {badge.optionName || '옵션 선택'}
-                    </div>
+            {/* 옵션상품 배지 */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginLeft: '62px' }}>
+              {recipient.badges.map((badge) => (
+                <div
+                  key={badge.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // 해당 수령인 선택
+                    setSelectedRecipientId(recipient.id);
+                    // 모든 수령인의 배지 선택을 해제하고, 클릭한 배지만 선택
+                    setRecipients(prev =>
+                      prev.map(r =>
+                        r.id === recipient.id
+                          ? { ...r, selectedBadgeId: badge.id }
+                          : { ...r, selectedBadgeId: null }
+                      )
+                    );
+                  }}
+                  style={{
+                    position: 'relative',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    borderRadius: '6px',
+                    background: badge.color.bg,
+                    border: recipient.selectedBadgeId === badge.id ? `2px solid ${badge.color.border}` : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    opacity: recipient.selectedBadgeId === badge.id ? 1 : 0.6,
+                    boxShadow: recipient.selectedBadgeId === badge.id ? '0 2px 8px rgba(0,0,0,0.15)' : 'none'
+                  }}
+                >
+                  {/* 옵션명 표시 */}
+                  <div style={{
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    color: badge.color.text,
+                    fontWeight: '500',
+                    whiteSpace: 'nowrap',
+                    background: 'transparent',
+                    minWidth: '50px'
+                  }}>
+                    {badge.optionName || '옵션 선택'}
+                  </div>
 
-                    {/* 수량 입력란 */}
-                    <div style={{ position: 'relative', display: 'flex', background: 'transparent' }} onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="text"
-                        value={badge.quantity}
-                        onChange={(e) => {
-                          const value = parseInt(e.target.value.replace(/[^\d]/g, '')) || 1;
-                          handleBadgeQuantityChange(recipient.id, badge.id, value);
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setRecipients(prev =>
-                            prev.map(r =>
-                              r.id === recipient.id
-                                ? { ...r, selectedBadgeId: badge.id }
-                                : r
-                            )
-                          );
-                        }}
-                        style={{
-                          width: '40px',
-                          padding: '4px 22px 4px 0',
-                          border: 'none',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          background: 'transparent',
-                          color: badge.color.text,
-                          textAlign: 'center',
-                          outline: 'none'
-                        }}
-                      />
-                      {/* 스핀 버튼 */}
-                      <div style={{
-                        position: 'absolute',
-                        right: '6px',
-                        top: '0',
-                        bottom: '0',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        width: '14px',
-                        background: 'transparent'
-                      }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleBadgeQuantityChange(recipient.id, badge.id, badge.quantity + 1);
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: '0',
-                            border: 'none',
-                            fontSize: '7px',
-                            lineHeight: '7px',
-                            color: badge.color.text,
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.opacity = '0.7';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.opacity = '1';
-                          }}
-                        >
-                          ▲
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleBadgeQuantityChange(recipient.id, badge.id, Math.max(1, badge.quantity - 1));
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: '0',
-                            border: 'none',
-                            fontSize: '7px',
-                            lineHeight: '7px',
-                            color: badge.color.text,
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.opacity = '0.7';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.opacity = '1';
-                          }}
-                        >
-                          ▼
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* x 삭제 버튼 */}
-                    <button
-                      type="button"
+                  {/* 수량 입력란 */}
+                  <div style={{ position: 'relative', display: 'flex', background: 'transparent' }} onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="text"
+                      value={badge.quantity}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value.replace(/[^\d]/g, '')) || 1;
+                        handleBadgeQuantityChange(recipient.id, badge.id, value);
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         setRecipients(prev =>
                           prev.map(r =>
                             r.id === recipient.id
-                              ? { ...r, badges: r.badges.filter(b => b.id !== badge.id) }
+                              ? { ...r, selectedBadgeId: badge.id }
                               : r
                           )
                         );
                       }}
                       style={{
-                        position: 'absolute',
-                        top: '-6px',
-                        right: '-10px',
-                        width: '18px',
-                        height: '18px',
-                        padding: '0',
+                        width: '40px',
+                        padding: '4px 22px 4px 0',
                         border: 'none',
-                        borderRadius: '50%',
-                        background: badge.color.text,
-                        color: '#ffffff',
                         fontSize: '12px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s',
-                        opacity: 0.8,
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                        fontWeight: '600',
+                        background: 'transparent',
+                        color: badge.color.text,
+                        textAlign: 'center',
+                        outline: 'none'
                       }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.opacity = '1';
-                        e.currentTarget.style.transform = 'scale(1.1)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.opacity = '0.8';
-                        e.currentTarget.style.transform = 'scale(1)';
-                      }}
-                    >
-                      ×
-                    </button>
+                    />
+                    {/* 스핀 버튼 */}
+                    <div style={{
+                      position: 'absolute',
+                      right: '6px',
+                      top: '0',
+                      bottom: '0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      width: '14px',
+                      background: 'transparent'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleBadgeQuantityChange(recipient.id, badge.id, badge.quantity + 1);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '0',
+                          border: 'none',
+                          fontSize: '7px',
+                          lineHeight: '7px',
+                          color: badge.color.text,
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = '0.7';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = '1';
+                        }}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleBadgeQuantityChange(recipient.id, badge.id, Math.max(1, badge.quantity - 1));
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '0',
+                          border: 'none',
+                          fontSize: '7px',
+                          lineHeight: '7px',
+                          color: badge.color.text,
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = '0.7';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = '1';
+                        }}
+                      >
+                        ▼
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
 
-              {/* 상품추가 버튼 */}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedRecipientId(recipient.id);
-                    setRecipients(prev =>
-                      prev.map(r => ({ ...r, selectedBadgeId: null }))
-                    );
-                    handleAddProduct(recipient.id);
-                  }}
-                  style={{
-                    padding: '6px 12px',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    color: 'var(--color-text)',
-                    background: 'var(--color-surface)',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--color-surface-hover)';
-                    e.currentTarget.style.borderColor = 'var(--color-primary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'var(--color-surface)';
-                    e.currentTarget.style.borderColor = 'var(--color-border)';
-                  }}
-                >
-                  상품추가
-                </button>
-              </div>
+                  {/* x 삭제 버튼 */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRecipients(prev =>
+                        prev.map(r =>
+                          r.id === recipient.id
+                            ? { ...r, badges: r.badges.filter(b => b.id !== badge.id) }
+                            : r
+                        )
+                      );
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: '-6px',
+                      right: '-10px',
+                      width: '18px',
+                      height: '18px',
+                      padding: '0',
+                      border: 'none',
+                      borderRadius: '50%',
+                      background: badge.color.text,
+                      color: '#ffffff',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s',
+                      opacity: 0.8,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '1';
+                      e.currentTarget.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '0.8';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
             </div>
 
             </div>

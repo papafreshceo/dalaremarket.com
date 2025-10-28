@@ -62,6 +62,9 @@ function OrdersPageContent() {
   const [localTheme, setLocalTheme] = useState<'light' | 'dark'>('light');
   const [themeLoaded, setThemeLoaded] = useState(false);
 
+  // 새로고침 상태
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   // 사용자별 테마 불러오기
   useEffect(() => {
     const loadUserTheme = async () => {
@@ -125,6 +128,37 @@ function OrdersPageContent() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // F5 키 가로채기 - 페이지 새로고침 대신 컴포넌트만 새로고침
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // F5 키 또는 Ctrl+R 감지 (e.code도 체크)
+      if (e.key === 'F5' || e.code === 'F5' || (e.ctrlKey && e.key === 'r')) {
+        e.preventDefault(); // 기본 새로고침 동작 막기
+        e.stopPropagation(); // 이벤트 전파 중지
+        console.log('🔄 F5 감지 - 컴포넌트 새로고침 중...');
+
+        setIsRefreshing(true);
+
+        try {
+          // 현재 컴포넌트만 새로고침 (데이터 다시 로드)
+          await fetchOrders();
+
+          // 1초 후 새로고침 상태 해제
+          setTimeout(() => {
+            setIsRefreshing(false);
+          }, 1000);
+        } catch (error) {
+          console.error('새로고침 오류:', error);
+          setIsRefreshing(false);
+        }
+      }
+    };
+
+    // capture 단계에서 이벤트 캡처
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, []); // fetchOrders는 함수 선언이므로 의존성 불필요
 
   useEffect(() => {
     const supabase = createClient();
@@ -349,53 +383,22 @@ function OrdersPageContent() {
         // UTC 시간 생성
         const utcTime = getCurrentTimeUTC();
 
-        // 모든 옵션명과 옵션코드 수집 (중복 제거)
+        // 옵션명 검증용으로만 option_products 조회 (저장 시에는 서버에서 자동 처리)
         const uniqueOptionNames = [...new Set(jsonData.map((row: any) => String(row['옵션명'] || '')).filter(Boolean))];
-        const uniqueOptionCodes = [...new Set(jsonData.map((row: any) => String(row['옵션코드'] || '')).filter(Boolean))];
 
-        console.log('📋 수집된 옵션명:', uniqueOptionNames);
-        console.log('📋 수집된 옵션코드:', uniqueOptionCodes);
-
-        // option_products에서 공급단가 조회
         let optionProducts: any[] = [];
-
-        // 옵션명으로 조회
         if (uniqueOptionNames.length > 0) {
           const { data: nameData, error: nameError } = await supabase
             .from('option_products')
             .select('option_name, option_code, seller_supply_price')
             .in('option_name', uniqueOptionNames);
 
-          if (nameError) {
-            console.error('❌ 옵션명 조회 오류:', nameError);
-          } else {
-            console.log('✅ 옵션명으로 조회된 데이터:', nameData);
-            if (nameData) {
-              optionProducts = [...optionProducts, ...nameData];
-            }
+          if (!nameError && nameData) {
+            optionProducts = nameData;
           }
         }
 
-        // 옵션코드로 조회
-        if (uniqueOptionCodes.length > 0) {
-          const { data: codeData, error: codeError } = await supabase
-            .from('option_products')
-            .select('option_name, option_code, seller_supply_price')
-            .in('option_code', uniqueOptionCodes);
-
-          if (codeError) {
-            console.error('❌ 옵션코드 조회 오류:', codeError);
-          } else {
-            console.log('✅ 옵션코드로 조회된 데이터:', codeData);
-            if (codeData) {
-              optionProducts = [...optionProducts, ...codeData];
-            }
-          }
-        }
-
-        console.log('💰 최종 조회된 옵션상품:', optionProducts);
-
-        // 옵션상품 Map 저장 (옵션명 소문자 키로 저장)
+        // 검증용 Map 생성 (옵션명 검증 모달에서 사용)
         const productMap = new Map<string, any>();
         optionProducts.forEach((product: any) => {
           if (product.option_name) {
@@ -436,7 +439,7 @@ function OrdersPageContent() {
 
         ordersForValidation = mappedOrders;
 
-        // 매핑 후 변환된 옵션명으로 option_products 다시 조회
+        // 매핑 후 변환된 옵션명도 검증용으로 조회
         if (results.length > 0) {
           const mappedOptionNames = [...new Set(ordersForValidation.map(order => String(order.optionName || '')).filter(Boolean))];
 
@@ -446,10 +449,7 @@ function OrdersPageContent() {
               .select('option_name, option_code, seller_supply_price')
               .in('option_name', mappedOptionNames);
 
-            if (mappedNameError) {
-              console.error('❌ 매핑된 옵션명 조회 오류:', mappedNameError);
-            } else if (mappedNameData) {
-              console.log('✅ 매핑된 옵션명으로 조회된 데이터:', mappedNameData);
+            if (!mappedNameError && mappedNameData) {
               // 기존 optionProducts에 추가
               optionProducts = [...optionProducts, ...mappedNameData];
 
@@ -504,27 +504,23 @@ function OrdersPageContent() {
         return;
       }
 
-      // 검증된 주문 데이터를 DB 형식으로 변환
+      // 최소한의 정보만 전송 - 서버에서 enrichOrdersWithOptionInfo()가 자동 처리
       const ordersToInsert = validatedOrders.map((order) => {
         const quantity = parseInt(order.quantity) || 1;
-        const unitPrice = order.unitPrice || 0;
-        const supplyPrice = order.supplyPrice || (unitPrice * quantity);
 
         return {
           market_name: order._metadata.market_name,
-          seller_order_number: order.orderNumber, // 셀러의 주문번호
+          seller_order_number: order.orderNumber,
           buyer_name: order.orderer,
           buyer_phone: order.ordererPhone,
           recipient_name: order.recipient,
           recipient_phone: order.recipientPhone,
           recipient_address: order.address,
           delivery_message: order.deliveryMessage,
-          option_name: order.optionName,
+          option_name: order.optionName,         // 서버에서 이걸로 자동 매핑
           option_code: order.optionCode,
           quantity: String(quantity),
           special_request: order.specialRequest,
-          seller_supply_price: unitPrice,
-          settlement_amount: supplyPrice,
           sheet_date: order._metadata.sheet_date,
           payment_date: order._metadata.payment_date,
           shipping_status: order._metadata.shipping_status,
@@ -677,6 +673,9 @@ function OrdersPageContent() {
       {/* Toast 컨테이너 */}
       <Toaster
         position="top-center"
+        containerStyle={{
+          zIndex: 99999
+        }}
         toastOptions={{
           duration: 3000,
           style: {
@@ -805,8 +804,32 @@ function OrdersPageContent() {
           </div>
         </div>
 
-        {/* 오른쪽: 다크모드 토글 */}
-        <LocalThemeToggle onThemeChange={handleThemeChange} currentTheme={localTheme} />
+        {/* 오른쪽: 새로고침 인디케이터 + 다크모드 토글 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {/* 새로고침 인디케이터 */}
+          {isRefreshing && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 12px',
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: '500',
+              color: '#10b981'
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{
+                animation: 'spin 1s linear infinite'
+              }}>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+              </svg>
+              새로고침 완료
+            </div>
+          )}
+          <LocalThemeToggle onThemeChange={handleThemeChange} currentTheme={localTheme} />
+        </div>
       </div>
 
       {/* Overlay (모바일에서 사이드바 열릴 때) */}

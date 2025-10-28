@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>주소 검색</title>
+    <script language="javascript">
+    function getParams(){
+        var params = {};
+        var queryString = location.search.substring(1);
+        var pairs = queryString.split('&');
+        for(var i=0; i<pairs.length; i++){
+            var pair = pairs[i].split('=');
+            params[pair[0]] = decodeURIComponent(pair[1] || '');
+        }
+        return params;
+    }
+
+    function init(){
+        var params = getParams();
+        var inputYn = params.inputYn;
+
+        // 결과를 받아온 경우
+        if(inputYn == "Y"){
+            var roadFullAddr = params.roadFullAddr || '';
+            var roadAddrPart1 = params.roadAddrPart1 || '';
+            var addrDetail = params.addrDetail || '';
+            var roadAddrPart2 = params.roadAddrPart2 || '';
+            var engAddr = params.engAddr || '';
+            var jibunAddr = params.jibunAddr || '';
+            var zipNo = params.zipNo || '';
+            var admCd = params.admCd || '';
+            var rnMgtSn = params.rnMgtSn || '';
+            var bdMgtSn = params.bdMgtSn || '';
+
+            if(window.opener && typeof window.opener.jusoCallBack === 'function'){
+                window.opener.jusoCallBack(roadFullAddr, roadAddrPart1, addrDetail, roadAddrPart2, engAddr, jibunAddr, zipNo, admCd, rnMgtSn, bdMgtSn);
+            }
+            window.close();
+        }
+        // 처음 열린 경우 - 주소 검색 페이지로 이동
+        else{
+            var url = location.origin + location.pathname;
+            var confmKey = "U01TX0FVVEgyMDI1MTAyODE5MDE0NTExNjM3Mzk=";
+            var resultType = "4";
+
+            document.form.confmKey.value = confmKey;
+            document.form.returnUrl.value = url;
+            document.form.resultType.value = resultType;
+            document.form.action = "https://business.juso.go.kr/addrlink/addrLinkUrl.do";
+            document.form.submit();
+        }
+    }
+    </script>
+</head>
+<body onload="init();">
+    <form id="form" name="form" method="post">
+        <input type="hidden" id="confmKey" name="confmKey" value=""/>
+        <input type="hidden" id="returnUrl" name="returnUrl" value=""/>
+        <input type="hidden" id="resultType" name="resultType" value=""/>
+    </form>
+</body>
+</html>

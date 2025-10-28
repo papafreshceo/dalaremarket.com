@@ -31,6 +31,7 @@ export default function UserHeader() {
   const [lastScrollY, setLastScrollY] = useState<number>(0);
   const [ordersModalOpen, setOrdersModalOpen] = useState<boolean>(false);
   const [ordersModalLoaded, setOrdersModalLoaded] = useState<boolean>(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const supabase = createClient();
   const { showToast } = useToast();
 
@@ -42,6 +43,25 @@ export default function UserHeader() {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    // 다크모드 감지
+    const checkDarkMode = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setIsDarkMode(isDark);
+    };
+
+    checkDarkMode();
+
+    // MutationObserver로 class 변경 감지
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -690,13 +710,15 @@ export default function UserHeader() {
             left: '5vw',
             right: '5vw',
             bottom: '5vh',
-            background: 'var(--color-background)',
+            background: 'transparent',
             borderRadius: '12px',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
             zIndex: 9999,
             overflow: 'hidden',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            border: 'none',
+            outline: 'none',
+            boxShadow: 'none'
           }}>
             {/* 로딩 화면 */}
             {!ordersModalLoaded && (
@@ -769,7 +791,6 @@ export default function UserHeader() {
                 width: '100%',
                 height: '100%',
                 border: 'none',
-                borderRadius: '12px',
                 opacity: ordersModalLoaded ? 1 : 0,
                 transition: 'opacity 0.3s'
               }}

@@ -564,47 +564,15 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
 
     setIsSaving(true);
     try {
-      const supabase = createClient();
       const utcTime = getCurrentTimeUTC();
       const dateOnly = utcTime.split('T')[0];
 
-      // 발주서 업로드 방식과 동일: 클라이언트에서 공급단가 조회
-      const uniqueOptionNames = [...new Set(uploadedOrders.map(order => order.optionName).filter(Boolean))];
-
-      // option_products에서 공급단가 조회
-      const { data: optionProducts } = await supabase
-        .from('option_products')
-        .select('option_name, seller_supply_price')
-        .in('option_name', uniqueOptionNames);
-
-      console.log('🔍 조회된 옵션상품:', optionProducts);
-      console.log('🔍 업로드된 주문 옵션명:', uniqueOptionNames);
-
-      // 옵션명별 공급단가 맵 생성
-      const priceMap = new Map<string, number>();
-      if (optionProducts) {
-        optionProducts.forEach(product => {
-          if (product.option_name && product.seller_supply_price) {
-            const key = product.option_name.trim().toLowerCase();
-            console.log(`🗺️ Map에 추가: "${key}" => ${product.seller_supply_price}`);
-            priceMap.set(key, product.seller_supply_price);
-          }
-        });
-      }
-
-      console.log('🗺️ 최종 priceMap:', Array.from(priceMap.entries()));
-
-      // 발주서 업로드와 동일한 형식으로 데이터 변환
+      // 최소한의 정보만 전송 - 서버에서 enrichOrdersWithOptionInfo()가 자동 처리
       const ordersToInsert = uploadedOrders.map(order => {
         const quantity = parseInt(String(order.quantity)) || 1;
-        const lookupKey = order.optionName.trim().toLowerCase();
-        const unitPrice = priceMap.get(lookupKey) || 0;
-        const settlementAmount = unitPrice * quantity;
-
-        console.log(`💰 옵션명 "${order.optionName}" (키: "${lookupKey}") => 단가: ${unitPrice}`);
 
         return {
-          market_name: order.marketName,
+          seller_market_name: order.marketName,
           seller_order_number: order.orderNumber,
           buyer_name: order.orderer,
           buyer_phone: order.ordererPhone,
@@ -612,12 +580,8 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
           recipient_phone: order.recipientPhone,
           recipient_address: order.address,
           delivery_message: order.deliveryMessage,
-          option_name: order.optionName,
-          option_code: null,
+          option_name: order.optionName,        // 서버에서 이걸로 자동 매핑
           quantity: String(quantity),
-          special_request: null,
-          seller_supply_price: unitPrice,           // 클라이언트에서 조회한 공급단가
-          settlement_amount: settlementAmount,      // 클라이언트에서 계산한 정산금액
           sheet_date: dateOnly,
           payment_date: dateOnly,
           shipping_status: '발주서등록',
@@ -628,8 +592,8 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
         };
       });
 
-      console.log('전송할 데이터:', ordersToInsert);
-      console.log('주문 개수:', ordersToInsert.length);
+      console.log('📤 전송할 데이터:', ordersToInsert);
+      console.log('📊 주문 개수:', ordersToInsert.length);
 
       const response = await fetch('/api/platform-orders', {
         method: 'POST',
@@ -976,37 +940,15 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
           setIsSaving(true);
 
           try {
-            const supabase = createClient();
             const utcTime = getCurrentTimeUTC();
             const dateOnly = utcTime.split('T')[0];
 
-            // 옵션 상품에서 공급단가 조회
-            const uniqueOptionNames = [...new Set(validatedOrders.map(order => order.optionName).filter(Boolean))];
-            const { data: optionProductsData } = await supabase
-              .from('option_products')
-              .select('option_name, seller_supply_price')
-              .in('option_name', uniqueOptionNames);
-
-            // 옵션명별 공급단가 맵 생성
-            const priceMap = new Map<string, number>();
-            if (optionProductsData) {
-              optionProductsData.forEach(product => {
-                if (product.option_name && product.seller_supply_price) {
-                  const key = product.option_name.trim().toLowerCase();
-                  priceMap.set(key, product.seller_supply_price);
-                }
-              });
-            }
-
-            // 발주서 데이터 변환
+            // 최소한의 정보만 전송 - 서버에서 enrichOrdersWithOptionInfo()가 자동 처리
             const ordersToInsert = validatedOrders.map(order => {
               const quantity = parseInt(String(order.quantity)) || 1;
-              const lookupKey = order.optionName.trim().toLowerCase();
-              const unitPrice = priceMap.get(lookupKey) || 0;
-              const settlementAmount = unitPrice * quantity;
 
               return {
-                market_name: order.marketName,
+                seller_market_name: order.marketName,
                 seller_order_number: order.orderNumber,
                 buyer_name: order.orderer,
                 buyer_phone: order.ordererPhone,
@@ -1014,12 +956,8 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
                 recipient_phone: order.recipientPhone,
                 recipient_address: order.address,
                 delivery_message: order.deliveryMessage,
-                option_name: order.optionName,
-                option_code: null,
+                option_name: order.optionName,        // 서버에서 이걸로 자동 매핑
                 quantity: String(quantity),
-                special_request: null,
-                seller_supply_price: unitPrice,
-                settlement_amount: settlementAmount,
                 sheet_date: dateOnly,
                 payment_date: dateOnly,
                 shipping_status: '발주서등록',

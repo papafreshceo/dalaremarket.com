@@ -49,6 +49,8 @@ export async function POST(request: NextRequest) {
       // 2단계: 옵션 상품 정보 자동 매핑 (공급단가, 발송정보 등)
       const ordersWithInfo = await enrichOrdersWithOptionInfo(orders);
 
+      console.log('[platform-orders] DB에 저장할 데이터 (첫 번째 주문):', JSON.stringify(ordersWithInfo[0], null, 2));
+
       // DB에 일괄 저장
       const { data, error } = await supabase
         .from('integrated_orders')
