@@ -95,6 +95,19 @@ export default function UserHeader() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // 모달 닫기 메시지 수신
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'closeModal') {
+        setOrdersModalOpen(false);
+        setOrdersModalLoaded(false);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   const navItems: NavItem[] = [
     {
       path: '/platform/products',
@@ -750,7 +763,7 @@ export default function UserHeader() {
             {/* iframe으로 orders 페이지 로드 */}
             <iframe
               className="orders-modal-iframe"
-              src="/platform/orders"
+              src="/platform/orders?modal=true"
               onLoad={() => setOrdersModalLoaded(true)}
               style={{
                 width: '100%',

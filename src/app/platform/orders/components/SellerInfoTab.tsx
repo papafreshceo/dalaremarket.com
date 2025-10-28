@@ -288,36 +288,36 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
         </button>
       </div>
 
-      {/* 섹션들을 2열로 배치하는 그리드 컨테이너 */}
+      {/* 섹션들을 4열로 배치하는 그리드 컨테이너 */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '24px'
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '16px'
       }}>
         {/* 기본 정보 섹션 */}
         <div style={{
           background: 'var(--color-surface)',
           borderRadius: '12px',
-          padding: '24px',
+          padding: '16px',
           border: '1px solid var(--color-border)'
         }}>
         <h3 style={{
-          fontSize: '18px',
+          fontSize: '16px',
           fontWeight: '600',
           color: 'var(--color-text)',
-          marginBottom: '20px'
+          marginBottom: '16px'
         }}>
           기본
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               이름
             </label>
@@ -327,11 +327,11 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               onChange={(e) => handleChange('name', e.target.value)}
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: 'var(--color-surface)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: 'var(--color-text)',
                 cursor: 'text'
               }}
@@ -341,10 +341,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               이메일
             </label>
@@ -354,11 +354,11 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               onChange={(e) => handleChange('email', e.target.value)}
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: 'var(--color-surface)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: 'var(--color-text)',
                 cursor: 'text'
               }}
@@ -368,10 +368,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               전화번호
             </label>
@@ -382,11 +382,11 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               maxLength={13}
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: 'var(--color-surface)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: 'var(--color-text)',
                 cursor: 'text'
               }}
@@ -399,26 +399,26 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
         <div style={{
           background: 'var(--color-surface)',
           borderRadius: '12px',
-          padding: '24px',
+          padding: '16px',
           border: '1px solid var(--color-border)'
         }}>
         <h3 style={{
-          fontSize: '18px',
+          fontSize: '16px',
           fontWeight: '600',
           color: 'var(--color-text)',
-          marginBottom: '20px'
+          marginBottom: '16px'
         }}>
           사업자
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               사업자명
             </label>
@@ -426,14 +426,14 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               type="text"
               value={sellerInfo.business_name || ''}
               onChange={(e) => handleChange('business_name', e.target.value)}
-              placeholder="사업자명을 입력하세요"
+              placeholder="사업자명"
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: 'var(--color-text)',
                 cursor: 'text'
               }}
@@ -443,10 +443,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               주소
             </label>
@@ -454,14 +454,14 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               type="text"
               value={sellerInfo.business_address || ''}
               onChange={(e) => handleChange('business_address', e.target.value)}
-              placeholder="주소를 입력하세요"
+              placeholder="주소"
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: 'var(--color-text)',
                 cursor: 'text'
               }}
@@ -471,10 +471,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               사업자등록번호
             </label>
@@ -486,12 +486,12 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
                 placeholder="000-00-00000"
                 style={{
                   width: '100%',
-                  padding: '12px 16px',
-                  paddingRight: '70px',
+                  padding: '8px 12px',
+                  paddingRight: '60px',
                   background: 'var(--color-background)',
                   border: '1px solid var(--color-border)',
-                  borderRadius: '8px',
-                  fontSize: '14px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
                   color: 'var(--color-text)',
                   cursor: 'text'
                 }}
@@ -502,15 +502,15 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
                 type="button"
                 style={{
                   position: 'absolute',
-                  right: '8px',
+                  right: '6px',
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  padding: '6px 12px',
+                  padding: '4px 8px',
                   background: verifying ? '#9ca3af' : '#3b82f6',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '13px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
                   fontWeight: '500',
                   cursor: verifying ? 'not-allowed' : 'pointer',
                   transition: 'all 0.2s'
@@ -532,22 +532,22 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
-              marginBottom: '8px'
+              gap: '8px',
+              marginBottom: '6px'
             }}>
               <label style={{
-                fontSize: '14px',
+                fontSize: '13px',
                 fontWeight: '500',
                 color: 'var(--color-text)'
               }}>
-                이메일 (계산서발행용)
+                이메일 (계산서)
               </label>
 
               {/* 기본 이메일과 동일 체크박스 */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '3px'
               }}>
                 <input
                   type="checkbox"
@@ -560,15 +560,15 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
                     }
                   }}
                   style={{
-                    width: '16px',
-                    height: '16px',
+                    width: '14px',
+                    height: '14px',
                     cursor: 'pointer'
                   }}
                 />
                 <label
                   htmlFor="sameAsEmail"
                   style={{
-                    fontSize: '13px',
+                    fontSize: '11px',
                     color: 'var(--color-text-secondary)',
                     cursor: 'pointer'
                   }}
@@ -586,11 +586,11 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               placeholder="example@company.com"
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: isSameAsEmail ? 'var(--color-background-secondary)' : 'var(--color-background)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: isSameAsEmail ? 'var(--color-text-secondary)' : 'var(--color-text)',
                 cursor: isSameAsEmail ? 'not-allowed' : 'text'
               }}
@@ -600,10 +600,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               대표자명
             </label>
@@ -611,14 +611,14 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               type="text"
               value={sellerInfo.representative_name || ''}
               onChange={(e) => handleChange('representative_name', e.target.value)}
-              placeholder="대표자명을 입력하세요"
+              placeholder="대표자명"
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: 'var(--color-text)',
                 cursor: 'text'
               }}
@@ -628,10 +628,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               대표자 연락처
             </label>
@@ -643,11 +643,11 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               maxLength={13}
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: 'var(--color-text)',
                 cursor: 'text'
               }}
@@ -660,26 +660,26 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
         <div style={{
           background: 'var(--color-surface)',
           borderRadius: '12px',
-          padding: '24px',
+          padding: '16px',
           border: '1px solid var(--color-border)'
         }}>
         <h3 style={{
-          fontSize: '18px',
+          fontSize: '16px',
           fontWeight: '600',
           color: 'var(--color-text)',
-          marginBottom: '20px'
+          marginBottom: '16px'
         }}>
           담당자
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               이름
             </label>
@@ -687,14 +687,14 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               type="text"
               value={sellerInfo.manager_name || ''}
               onChange={(e) => handleChange('manager_name', e.target.value)}
-              placeholder="담당자 이름을 입력하세요"
+              placeholder="담당자 이름"
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: 'var(--color-text)',
                 cursor: 'text'
               }}
@@ -704,10 +704,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               연락처
             </label>
@@ -719,11 +719,11 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               maxLength={13}
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: 'var(--color-text)',
                 cursor: 'text'
               }}
@@ -736,26 +736,26 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
         <div style={{
           background: 'var(--color-surface)',
           borderRadius: '12px',
-          padding: '24px',
+          padding: '16px',
           border: '1px solid var(--color-border)'
         }}>
         <h3 style={{
-          fontSize: '18px',
+          fontSize: '16px',
           fontWeight: '600',
           color: 'var(--color-text)',
-          marginBottom: '20px'
+          marginBottom: '16px'
         }}>
           정산 계좌
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               은행명
             </label>
@@ -766,11 +766,11 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               placeholder="예: 국민은행"
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: 'var(--color-text)',
                 cursor: 'text'
               }}
@@ -780,10 +780,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               계좌번호
             </label>
@@ -794,11 +794,11 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               placeholder="'-' 없이 입력"
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: 'var(--color-text)',
                 cursor: 'text'
               }}
@@ -808,10 +808,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               예금주
             </label>
@@ -819,14 +819,14 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               type="text"
               value={sellerInfo.account_holder || ''}
               onChange={(e) => handleChange('account_holder', e.target.value)}
-              placeholder="예금주명을 입력하세요"
+              placeholder="예금주명"
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: 'var(--color-text)',
                 cursor: 'text'
               }}
@@ -835,21 +835,22 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
         </div>
         </div>
 
-        {/* 스토어 정보 섹션 */}
+        {/* 스토어 정보 섹션 - 2칸 차지 */}
         <div style={{
           background: 'var(--color-surface)',
           borderRadius: '12px',
-          padding: '24px',
-          border: '1px solid var(--color-border)'
+          padding: '16px',
+          border: '1px solid var(--color-border)',
+          gridColumn: 'span 2'
         }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          marginBottom: '20px'
+          marginBottom: '16px'
         }}>
           <h3 style={{
-            fontSize: '18px',
+            fontSize: '16px',
             fontWeight: '600',
             color: 'var(--color-text)',
             margin: 0
@@ -857,24 +858,24 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
             송장출력
           </h3>
           <span style={{
-            fontSize: '12px',
+            fontSize: '11px',
             color: 'var(--color-text-secondary)'
           }}>
             택배 송장에 출력할 정보를 설정해주세요
           </span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
             {/* 업체명 라벨과 체크박스를 한 줄로 */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
-              marginBottom: '8px'
+              gap: '8px',
+              marginBottom: '6px'
             }}>
               <label style={{
-                fontSize: '14px',
+                fontSize: '13px',
                 fontWeight: '500',
                 color: 'var(--color-text)'
               }}>
@@ -885,7 +886,7 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '3px'
               }}>
                 <input
                   type="checkbox"
@@ -898,15 +899,15 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
                     }
                   }}
                   style={{
-                    width: '16px',
-                    height: '16px',
+                    width: '14px',
+                    height: '14px',
                     cursor: 'pointer'
                   }}
                 />
                 <label
                   htmlFor="sameAsBusinessName"
                   style={{
-                    fontSize: '13px',
+                    fontSize: '11px',
                     color: 'var(--color-text-secondary)',
                     cursor: 'pointer'
                   }}
@@ -921,14 +922,14 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               value={sellerInfo.store_name || ''}
               onChange={(e) => handleChange('store_name', e.target.value)}
               disabled={isSameAsBusinessName}
-              placeholder="업체명을 입력하세요"
+              placeholder="업체명"
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: isSameAsBusinessName ? 'var(--color-background-secondary)' : 'var(--color-surface)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: isSameAsBusinessName ? 'var(--color-text-secondary)' : 'var(--color-text)',
                 cursor: isSameAsBusinessName ? 'not-allowed' : 'text'
               }}
@@ -938,10 +939,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               전화번호
             </label>
@@ -953,11 +954,11 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               maxLength={13}
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 background: 'var(--color-surface)',
                 border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '14px',
+                borderRadius: '6px',
+                fontSize: '13px',
                 color: 'var(--color-text)',
                 cursor: 'text'
               }}

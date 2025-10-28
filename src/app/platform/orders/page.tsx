@@ -236,6 +236,14 @@ function OrdersPageContent() {
   // URL 쿼리 파라미터에서 탭 읽어오기
   useEffect(() => {
     const tabParam = searchParams.get('tab');
+
+    // 모달 모드인 경우 항상 대시보드로 시작
+    if (isModalMode) {
+      setActiveTab('대시보드');
+      localStorage.setItem('ordersActiveTab', '대시보드');
+      return;
+    }
+
     if (tabParam && ['대시보드', '발주서등록', '건별등록', '정산관리', '옵션명매핑', '판매자정보'].includes(tabParam)) {
       setActiveTab(tabParam as Tab);
       localStorage.setItem('ordersActiveTab', tabParam);
@@ -250,7 +258,7 @@ function OrdersPageContent() {
         localStorage.setItem('ordersActiveTab', '대시보드');
       }
     }
-  }, [searchParams]);
+  }, [searchParams, isModalMode]);
 
   // 탭 변경 시 localStorage에 저장
   const handleTabChange = (tab: Tab) => {
@@ -694,7 +702,6 @@ function OrdersPageContent() {
         }}
       />
       {/* 발주관리 전용 헤더 */}
-      {!isModalMode && (
       <div style={{
         position: 'fixed',
         top: 0,
@@ -738,9 +745,15 @@ function OrdersPageContent() {
             </button>
           )}
 
-          {/* 나가기 버튼 */}
+          {/* 나가기/닫기 버튼 */}
           <button
-            onClick={() => { router.push('/'); }}
+            onClick={() => {
+              if (isModalMode) {
+                window.parent.postMessage({ type: 'closeModal' }, '*');
+              } else {
+                router.push('/');
+              }
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -762,12 +775,24 @@ function OrdersPageContent() {
               e.currentTarget.style.background = 'var(--color-surface)';
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
-            나가기
+            {isModalMode ? (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                닫기
+              </>
+            ) : (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                나가기
+              </>
+            )}
           </button>
 
           {/* 로그인 정보 */}
@@ -783,10 +808,9 @@ function OrdersPageContent() {
         {/* 오른쪽: 다크모드 토글 */}
         <LocalThemeToggle onThemeChange={handleThemeChange} currentTheme={localTheme} />
       </div>
-      )}
 
       {/* Overlay (모바일에서 사이드바 열릴 때) */}
-      {!isModalMode && isMobile && sidebarOpen && (
+      {isMobile && sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
           style={{
@@ -803,7 +827,6 @@ function OrdersPageContent() {
       )}
 
       {/* Sidebar */}
-      {!isModalMode && (
       <div style={{
         position: 'fixed',
         top: '70px',
@@ -1057,13 +1080,12 @@ function OrdersPageContent() {
           </button>
         </div>
       </div>
-      )}
 
       {/* Main content area */}
       <div style={{
-        marginLeft: isModalMode ? '0' : (isMobile ? '0' : '175px'),
+        marginLeft: isMobile ? '0' : '175px',
         padding: isMobile ? '16px' : '24px',
-        paddingTop: isModalMode ? '20px' : '90px',
+        paddingTop: '90px',
         background: 'var(--color-background)',
         minHeight: '100vh',
         overflowY: 'auto'
