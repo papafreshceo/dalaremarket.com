@@ -35,6 +35,10 @@ export async function enrichOrdersWithOptionInfo<T extends { option_name: string
   // 중복 제거: 동일 옵션명은 한번만 조회
   const uniqueOptionNames = [...new Set(ordersData.map(order => order.option_name).filter(Boolean))];
 
+  if (uniqueOptionNames.length === 0) {
+    return ordersData as Array<T & OptionProductInfo & { settlement_amount?: number }>;
+  }
+
   // option_products 테이블에서 옵션 정보 일괄 조회
   const { data: optionProducts, error } = await supabase
     .from('option_products')
@@ -66,10 +70,11 @@ export async function enrichOrdersWithOptionInfo<T extends { option_name: string
   // 각 주문에 옵션 정보 매핑 및 정산금액 계산
   return ordersData.map(order => {
     const optionInfo = optionInfoMap.get(order.option_name) || {};
+    const orderAny = order as any;
 
     // 이미 클라이언트에서 값이 있으면 덮어쓰지 않음
-    const hasExistingPrice = 'seller_supply_price' in order && order.seller_supply_price !== undefined && order.seller_supply_price !== null;
-    const hasExistingSettlement = 'settlement_amount' in order && order.settlement_amount !== undefined && order.settlement_amount !== null;
+    const hasExistingPrice = 'seller_supply_price' in orderAny && orderAny.seller_supply_price !== undefined && orderAny.seller_supply_price !== null;
+    const hasExistingSettlement = 'settlement_amount' in orderAny && orderAny.settlement_amount !== undefined && orderAny.settlement_amount !== null;
 
     // 정산금액 = 공급단가 × 수량 (기존 값이 없을 때만 계산)
     let settlement_amount: number | undefined;
