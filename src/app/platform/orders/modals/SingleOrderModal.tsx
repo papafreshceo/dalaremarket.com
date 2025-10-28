@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import toast from 'react-hot-toast';
 import { getCurrentTimeUTC } from '@/lib/date';
 import { X } from 'lucide-react';
+import { showErrorToast } from '../utils/statusToast';
 
 interface SingleOrderModalProps {
   isOpen: boolean;
@@ -77,6 +78,38 @@ export default function SingleOrderModal({
   const [showDetailAddressModal, setShowDetailAddressModal] = useState(false);
   const [baseAddress, setBaseAddress] = useState('');
 
+  // 상품 배지 목록 관리
+  interface ProductBadge {
+    id: number;
+    optionName: string;
+    quantity: number;
+    color: { bg: string; text: string; border: string };
+  }
+
+  // 수령인 목록 관리
+  interface Recipient {
+    id: number;
+    recipient: string;
+    recipientPhone: string;
+    address: string;
+    deliveryMessage: string;
+    sameAsOrderer: boolean;
+    selectedBadgeId: number | null;
+    badges: ProductBadge[]; // 각 수령인별 배지 목록
+  }
+  const [recipients, setRecipients] = useState<Recipient[]>([
+    {
+      id: 1,
+      recipient: '',
+      recipientPhone: '',
+      address: '',
+      deliveryMessage: '',
+      sameAsOrderer: true,
+      selectedBadgeId: null,
+      badges: []
+    }
+  ]);
+
   // 배지 색상 생성 함수 (다크모드 지원)
   const generateBadgeColor = () => {
     const colors = [
@@ -114,75 +147,122 @@ export default function SingleOrderModal({
     return colors[Math.floor(Math.random() * colors.length)];
   };
 
-  // 상품 배지 목록 관리
-  interface ProductBadge {
-    id: number;
-    optionName: string;
-    quantity: number;
-    color: { bg: string; text: string; border: string };
-  }
-
-  const [productBadges, setProductBadges] = useState<ProductBadge[]>([]);
-  const [selectedBadgeId, setSelectedBadgeId] = useState<number | null>(null);
+  const [supplyPrice, setSupplyPrice] = useState(0);
+  const [selectedRecipientId, setSelectedRecipientId] = useState<number>(1); // 선택된 수령인 ID (첫 번째 수령인)
 
   // 옵션 선택 시 배지 추가 또는 수정
   const handleOptionSelect = (option: OptionProduct) => {
     setSelectedOption(option);
 
-    // 선택된 배지가 있고 배지 목록에 존재하면 해당 배지의 옵션명 변경
-    const selectedBadgeExists = productBadges.some(badge => badge.id === selectedBadgeId);
+    // 선택된 수령인이 없으면 배지 추가하지 않음
+    if (selectedRecipientId === null) return;
 
-    if (selectedBadgeId !== null && selectedBadgeExists) {
-      setProductBadges(prev =>
-        prev.map(badge =>
-          badge.id === selectedBadgeId
-            ? { ...badge, optionName: option.option_name }
-            : badge
-        )
-      );
-    } else {
-      // 선택된 배지가 없거나 배지가 없으면 새 배지 추가
-      const newBadge: ProductBadge = {
-        id: Date.now(),
-        optionName: option.option_name,
-        quantity: 1,
-        color: generateBadgeColor()
-      };
-      setProductBadges(prev => [...prev, newBadge]);
-      // 새로 추가된 배지를 선택 상태로 설정
-      setSelectedBadgeId(newBadge.id);
+    // 선택된 수령인 찾기
+    const selectedRecipient = recipients.find(r => r.id === selectedRecipientId);
+    if (!selectedRecipient) return;
+
+    // 선택된 배지가 없고, 중복 체크 필요한 경우
+    if (selectedRecipient.selectedBadgeId === null) {
+      const isDuplicate = selectedRecipient.badges.some(badge => badge.optionName === option.option_name);
+      if (isDuplicate) {
+        showErrorToast('이미 추가된 상품입니다');
+        return;
+      }
     }
+
+    // 선택된 수령인에게만 배지 추가/수정
+    setRecipients(prev =>
+      prev.map(recipient => {
+        if (recipient.id !== selectedRecipientId) return recipient;
+
+        // 선택된 수령인에 선택된 배지가 있는지 확인
+        if (recipient.selectedBadgeId !== null) {
+          // 선택된 배지가 있으면 해당 배지의 옵션명 변경
+          return {
+            ...recipient,
+            badges: recipient.badges.map(badge =>
+              badge.id === recipient.selectedBadgeId
+                ? { ...badge, optionName: option.option_name }
+                : badge
+            )
+          };
+        } else {
+          // 선택된 배지가 없으면 새 배지 추가 (선택 상태로 만들지 않음)
+          const newBadge: ProductBadge = {
+            id: Date.now(),
+            optionName: option.option_name,
+            quantity: 1,
+            color: generateBadgeColor()
+          };
+          return {
+            ...recipient,
+            badges: [...recipient.badges, newBadge]
+          };
+        }
+      })
+    );
   };
 
-  // 상품 추가 핸들러
-  const handleAddProduct = () => {
+  // 상품 추가 핸들러 (특정 수령인에게 추가)
+  const handleAddProduct = (recipientId: number) => {
     if (!selectedOption) {
       toast.error('옵션을 먼저 선택해주세요');
       return;
     }
+
+    // 중복 체크: 해당 수령인에게 이미 동일한 옵션이 있는지 확인
+    const targetRecipient = recipients.find(r => r.id === recipientId);
+    if (targetRecipient) {
+      const isDuplicate = targetRecipient.badges.some(badge => badge.optionName === selectedOption.option_name);
+      if (isDuplicate) {
+        showErrorToast('이미 추가된 상품입니다');
+        return;
+      }
+    }
+
     const newBadge: ProductBadge = {
       id: Date.now(),
       optionName: selectedOption.option_name,
       quantity: 1,
       color: generateBadgeColor()
     };
-    setProductBadges(prev => [...prev, newBadge]);
-    // 새로 추가된 배지를 선택 상태로 설정
-    setSelectedBadgeId(newBadge.id);
+
+    // 해당 수령인에게 배지 추가 (선택 상태로 만들지 않음)
+    setRecipients(prev =>
+      prev.map(recipient =>
+        recipient.id === recipientId
+          ? {
+              ...recipient,
+              badges: [...recipient.badges, newBadge]
+            }
+          : recipient
+      )
+    );
   };
 
-  // 상품 삭제 핸들러 (마지막 배지부터 삭제)
-  const handleRemoveProduct = () => {
-    if (productBadges.length > 0) {
-      setProductBadges(prev => prev.slice(0, -1));
-    }
+  // 상품 삭제 핸들러 (특정 수령인의 마지막 배지 삭제)
+  const handleRemoveProduct = (recipientId: number) => {
+    setRecipients(prev =>
+      prev.map(recipient =>
+        recipient.id === recipientId && recipient.badges.length > 0
+          ? { ...recipient, badges: recipient.badges.slice(0, -1) }
+          : recipient
+      )
+    );
   };
 
   // 배지 수량 변경 핸들러
-  const handleBadgeQuantityChange = (id: number, newQuantity: number) => {
-    setProductBadges(prev =>
-      prev.map(badge =>
-        badge.id === id ? { ...badge, quantity: Math.max(1, newQuantity) } : badge
+  const handleBadgeQuantityChange = (recipientId: number, badgeId: number, newQuantity: number) => {
+    setRecipients(prev =>
+      prev.map(recipient =>
+        recipient.id === recipientId
+          ? {
+              ...recipient,
+              badges: recipient.badges.map(badge =>
+                badge.id === badgeId ? { ...badge, quantity: Math.max(1, newQuantity) } : badge
+              )
+            }
+          : recipient
       )
     );
   };
@@ -312,10 +392,20 @@ export default function SingleOrderModal({
       setSelectedOption(null);
       setSameAsOrderer(false);
       // 모달 작업 내용 초기화
-      setProductBadges([]);
-      setSelectedBadgeId(null);
       setSelectedProductMaster(null);
       setProductMasters([]);
+      setSelectedRecipientId(1); // 첫 번째 수령인 선택
+      // 수령인 초기화
+      setRecipients([{
+        id: 1,
+        recipient: '',
+        recipientPhone: '',
+        address: '',
+        deliveryMessage: '',
+        sameAsOrderer: true,
+        selectedBadgeId: null,
+        badges: []
+      }]);
     }
   }, [isOpen]);
 
@@ -368,15 +458,64 @@ export default function SingleOrderModal({
     setBaseAddress('');
   };
 
-  if (!isOpen) return null;
+  // 옵션별 통계 state
+  interface OptionSummary {
+    optionName: string;
+    unitPrice: number;
+    totalQuantity: number;
+    totalPrice: number;
+  }
+  const [optionSummaries, setOptionSummaries] = useState<OptionSummary[]>([]);
 
-  // 공급가 계산 (모든 배지의 옵션과 수량 기반)
-  const supplyPrice = productBadges.reduce((total, badge) => {
-    // 배지의 옵션명으로 옵션상품 찾기
-    const option = optionProducts.find(opt => opt.option_name === badge.optionName);
-    const price = option?.seller_supply_price || 0;
-    return total + (price * badge.quantity);
-  }, 0);
+  // 공급가 계산 (배지 변경 시마다 DB에서 가격 조회)
+  useEffect(() => {
+    const calculateSupplyPrice = async () => {
+      // 모든 수령인의 배지를 합산
+      const allBadges = recipients.flatMap(r => r.badges);
+
+      if (allBadges.length === 0) {
+        setSupplyPrice(0);
+        setOptionSummaries([]);
+        return;
+      }
+
+      const supabase = createClient();
+      let total = 0;
+      const summaryMap = new Map<string, OptionSummary>();
+
+      for (const badge of allBadges) {
+        const { data } = await supabase
+          .from('option_products')
+          .select('seller_supply_price')
+          .eq('option_name', badge.optionName)
+          .single();
+
+        const price = data?.seller_supply_price || 0;
+        total += price * badge.quantity;
+
+        // 옵션별 통계 집계
+        if (summaryMap.has(badge.optionName)) {
+          const existing = summaryMap.get(badge.optionName)!;
+          existing.totalQuantity += badge.quantity;
+          existing.totalPrice += price * badge.quantity;
+        } else {
+          summaryMap.set(badge.optionName, {
+            optionName: badge.optionName,
+            unitPrice: price,
+            totalQuantity: badge.quantity,
+            totalPrice: price * badge.quantity
+          });
+        }
+      }
+
+      setSupplyPrice(total);
+      setOptionSummaries(Array.from(summaryMap.values()));
+    };
+
+    calculateSupplyPrice();
+  }, [recipients]);
+
+  if (!isOpen) return null;
 
   // 휴대폰 번호 포맷팅 함수
   const formatPhoneNumber = (value: string) => {
@@ -418,6 +557,17 @@ export default function SingleOrderModal({
 
       return updated;
     });
+
+    // 주문자 정보가 변경되면 sameAsOrderer가 체크된 모든 수령인도 업데이트
+    if (field === 'orderer') {
+      setRecipients(prev => prev.map(r =>
+        r.sameAsOrderer ? { ...r, recipient: finalValue as string } : r
+      ));
+    } else if (field === 'ordererPhone') {
+      setRecipients(prev => prev.map(r =>
+        r.sameAsOrderer ? { ...r, recipientPhone: finalValue as string } : r
+      ));
+    }
 
     // 에러 메시지 제거
     if (errors[field]) {
@@ -524,24 +674,35 @@ export default function SingleOrderModal({
         zIndex: 10000,
         padding: '20px'
       }}
-      onClick={onClose}
+      onClick={(e) => {
+        // 배경 클릭 시 배지 선택 해제
+        setRecipients(prev =>
+          prev.map(r => ({ ...r, selectedBadgeId: null }))
+        );
+      }}
     >
       <div
         style={{
           background: 'var(--color-surface)',
           borderRadius: '16px',
-          maxWidth: '1400px',
+          maxWidth: '1600px',
           width: '100%',
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
           position: 'relative'
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          // 모달 내부 클릭 시 배지 선택 해제
+          setRecipients(prev =>
+            prev.map(r => ({ ...r, selectedBadgeId: null }))
+          );
+        }}
       >
         {/* 헤더 */}
         <div style={{
-          padding: '24px',
+          padding: '16px 24px',
           borderBottom: '1px solid var(--color-border)',
           display: 'flex',
           justifyContent: 'space-between',
@@ -551,25 +712,14 @@ export default function SingleOrderModal({
           background: 'var(--color-surface)',
           zIndex: 1
         }}>
-          <div>
-            <h2 style={{
-              fontSize: '20px',
-              fontWeight: '600',
-              color: 'var(--color-text)',
-              marginBottom: '4px'
-            }}>
-              주문 등록
-            </h2>
-            {selectedProductMaster && (
-              <div style={{
-                fontSize: '14px',
-                color: 'var(--color-text-secondary)'
-              }}>
-                {selectedProductMaster.category_3 && `${selectedProductMaster.category_3} / `}
-                {selectedProductMaster.category_4}
-              </div>
-            )}
-          </div>
+          <h2 style={{
+            fontSize: '18px',
+            fontWeight: '600',
+            color: 'var(--color-text)',
+            margin: 0
+          }}>
+            주문 등록
+          </h2>
           <button
             onClick={onClose}
             style={{
@@ -691,7 +841,10 @@ export default function SingleOrderModal({
                           {options.map(option => (
                             <button
                               key={option.id}
-                              onClick={() => handleOptionSelect(option)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOptionSelect(option);
+                              }}
                               style={{
                                 padding: '6px 12px',
                                 border: selectedOption?.id === option.id
@@ -743,138 +896,6 @@ export default function SingleOrderModal({
                 품목을 선택하면 옵션이 표시됩니다
               </div>
             )}
-
-            {/* 옵션명과 수량 배지 목록 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'auto' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                {productBadges.map((badge) => (
-                  <div
-                    key={badge.id}
-                    onClick={() => setSelectedBadgeId(badge.id)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      borderRadius: '6px',
-                      background: badge.color.bg,
-                      border: selectedBadgeId === badge.id ? `2px solid ${badge.color.border}` : `1px solid ${badge.color.border}`,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      opacity: selectedBadgeId === badge.id ? 1 : 0.6,
-                      boxShadow: selectedBadgeId === badge.id ? '0 2px 8px rgba(0,0,0,0.15)' : 'none'
-                    }}
-                  >
-                    {/* 옵션명 표시 */}
-                    <div style={{
-                      padding: '4px 8px',
-                      fontSize: '12px',
-                      color: badge.color.text,
-                      fontWeight: '500',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      maxWidth: '120px',
-                      background: 'transparent',
-                      minWidth: '50px'
-                    }}>
-                      {badge.optionName || '옵션 선택'}
-                    </div>
-
-                    {/* 수량 입력란 */}
-                    <div style={{ position: 'relative', display: 'flex', background: 'transparent' }}>
-                      <input
-                        type="text"
-                        value={badge.quantity}
-                        onChange={(e) => {
-                          const value = parseInt(e.target.value.replace(/[^\d]/g, '')) || 1;
-                          handleBadgeQuantityChange(badge.id, value);
-                        }}
-                        style={{
-                          width: '35px',
-                          padding: '4px 16px 4px 6px',
-                          border: 'none',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          background: 'transparent',
-                          color: badge.color.text,
-                          textAlign: 'center',
-                          outline: 'none'
-                        }}
-                      />
-                      {/* 스핀 버튼 */}
-                      <div style={{
-                        position: 'absolute',
-                        right: '0',
-                        top: '0',
-                        bottom: '0',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        width: '14px',
-                        background: 'transparent'
-                      }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleBadgeQuantityChange(badge.id, badge.quantity + 1);
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: '0',
-                            border: 'none',
-                            fontSize: '7px',
-                            lineHeight: '7px',
-                            color: badge.color.text,
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.opacity = '0.7';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.opacity = '1';
-                          }}
-                        >
-                          ▲
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleBadgeQuantityChange(badge.id, Math.max(1, badge.quantity - 1));
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: '0',
-                            border: 'none',
-                            fontSize: '7px',
-                            lineHeight: '7px',
-                            color: badge.color.text,
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.opacity = '0.7';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.opacity = '1';
-                          }}
-                        >
-                          ▼
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* 2. 주문자 정보 영역 */}
@@ -883,61 +904,39 @@ export default function SingleOrderModal({
             flexDirection: 'column',
             gap: '12px'
           }}>
-            <div style={{
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                // 주문자 영역 클릭 시 배지 선택 해제
+                setRecipients(prev =>
+                  prev.map(r => ({ ...r, selectedBadgeId: null }))
+                );
+              }}
+              style={{
               padding: '16px',
               background: 'var(--color-background-secondary)',
               borderRadius: '8px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px'
+              gap: '6px'
             }}>
             <div style={{
+              marginBottom: '4px',
+              height: '32px',
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '8px'
+              alignItems: 'center'
             }}>
               <h3 style={{
                 fontSize: '14px',
                 fontWeight: '600',
                 color: 'var(--color-text)',
                 margin: 0
-              }}>주문자 정보</h3>
-
-              <button
-                type="button"
-                onClick={() => {
-                  // TODO: 수령인 추가 기능 구현
-                  console.log('수령인 추가');
-                }}
-                style={{
-                  padding: '4px 10px',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  fontWeight: '500',
-                  color: 'var(--color-text)',
-                  background: 'var(--color-surface)',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--color-surface-hover)';
-                  e.currentTarget.style.borderColor = 'var(--color-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'var(--color-surface)';
-                  e.currentTarget.style.borderColor = 'var(--color-border)';
-                }}
-              >
-                수령인 추가
-              </button>
+              }}>주문자</h3>
             </div>
 
             {/* 주문자 & 연락처 */}
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-              <div style={{ width: '80px' }}>
+              <div style={{ width: '80px' }} onClick={(e) => e.stopPropagation()}>
                 <input
                   type="text"
                   value={formData.orderer}
@@ -961,7 +960,7 @@ export default function SingleOrderModal({
                 )}
               </div>
 
-              <div style={{ width: '140px' }}>
+              <div style={{ width: '140px' }} onClick={(e) => e.stopPropagation()}>
                 <input
                   type="text"
                   value={formData.ordererPhone}
@@ -994,101 +993,134 @@ export default function SingleOrderModal({
             flexDirection: 'column',
             gap: '12px'
           }}>
-            <div style={{
-              padding: '16px',
-              background: 'var(--color-background-secondary)',
-              borderRadius: '8px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '8px'
-            }}>
-              <h3 style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: 'var(--color-text)',
-                margin: 0
-              }}>수령인 정보</h3>
+            {recipients.map((recipient, index) => (
+              <div
+                key={recipient.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedRecipientId(recipient.id);
+                  // 수령인 영역 클릭 시 배지 선택 해제
+                  setRecipients(prev =>
+                    prev.map(r => ({ ...r, selectedBadgeId: null }))
+                  );
+                }}
+                style={{
+                  padding: '16px',
+                  background: 'var(--color-background-secondary)',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  border: selectedRecipientId === recipient.id ? '2px solid var(--color-primary)' : '2px solid transparent',
+                  boxShadow: selectedRecipientId === recipient.id ? '0 0 0 1px var(--color-primary)' : 'none',
+                  transition: 'all 0.2s'
+                }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '4px',
+                gap: '12px',
+                height: '32px'
+              }}>
+                <h3 style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: 'var(--color-text)',
+                  margin: 0
+                }}>수령인({index + 1}) {recipients.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedRecipientId(recipient.id);
+                      setRecipients(prev =>
+                        prev.map(r => ({ ...r, selectedBadgeId: null }))
+                      );
+                      // 삭제 처리
+                      setTimeout(() => {
+                        const remainingRecipients = recipients.filter(r => r.id !== recipient.id);
+                        setRecipients(remainingRecipients);
+                        // 삭제된 수령인이 선택되어 있었다면 첫 번째 남은 수령인 선택
+                        if (selectedRecipientId === recipient.id && remainingRecipients.length > 0) {
+                          setSelectedRecipientId(remainingRecipients[0].id);
+                        }
+                      }, 0);
+                    }}
+                    style={{
+                      marginLeft: '8px',
+                      padding: '2px 6px',
+                      border: '1px solid #ef4444',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      color: '#ef4444',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#ef4444';
+                      e.currentTarget.style.color = '#ffffff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = '#ef4444';
+                    }}
+                  >
+                    x
+                  </button>
+                )}</h3>
 
-              {/* 상품추가/삭제 버튼 */}
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  type="button"
-                  onClick={handleAddProduct}
+                {/* 배송메시지 */}
+                <input
+                  type="text"
+                  value={recipient.deliveryMessage}
+                  onChange={(e) => {
+                    setRecipients(prev => prev.map(r =>
+                      r.id === recipient.id
+                        ? { ...r, deliveryMessage: e.target.value }
+                        : r
+                    ));
+                  }}
+                  onFocus={() => {
+                    setSelectedRecipientId(recipient.id);
+                    setRecipients(prev =>
+                      prev.map(r => ({ ...r, selectedBadgeId: null }))
+                    );
+                  }}
+                  placeholder="배송메시지(선택)"
                   style={{
-                    padding: '6px 12px',
+                    width: '250px',
+                    padding: '4px 10px',
                     border: '1px solid var(--color-border)',
                     borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    color: 'var(--color-text)',
+                    fontSize: '12px',
                     background: 'var(--color-surface)',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s'
+                    color: 'var(--color-text)'
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--color-surface-hover)';
-                    e.currentTarget.style.borderColor = 'var(--color-primary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'var(--color-surface)';
-                    e.currentTarget.style.borderColor = 'var(--color-border)';
-                  }}
-                >
-                  상품추가
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleRemoveProduct}
-                  disabled={productBadges.length === 0}
-                  style={{
-                    padding: '6px 12px',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    color: productBadges.length === 0 ? 'var(--color-text-secondary)' : 'var(--color-text)',
-                    background: 'var(--color-surface)',
-                    cursor: productBadges.length === 0 ? 'not-allowed' : 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s',
-                    opacity: productBadges.length === 0 ? 0.5 : 1
-                  }}
-                  onMouseEnter={(e) => {
-                    if (productBadges.length > 0) {
-                      e.currentTarget.style.background = 'var(--color-surface-hover)';
-                      e.currentTarget.style.borderColor = '#ef4444';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (productBadges.length > 0) {
-                      e.currentTarget.style.background = 'var(--color-surface)';
-                      e.currentTarget.style.borderColor = 'var(--color-border)';
-                    }
-                  }}
-                >
-                  삭제
-                </button>
+                />
               </div>
-            </div>
 
             {/* 주문자와 동일 & 수령인 & 연락처 & 배송지 */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               {/* 주문자와 동일 체크박스 */}
-              <label style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '2px',
-                cursor: 'pointer'
-              }}>
+              <label
+                onClick={() => {
+                  setSelectedRecipientId(recipient.id);
+                  setRecipients(prev =>
+                    prev.map(r => ({ ...r, selectedBadgeId: null }))
+                  );
+                }}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '2px',
+                  cursor: 'pointer'
+                }}
+              >
                 <span style={{
                   fontSize: '10px',
                   color: 'var(--color-text-secondary)',
@@ -1096,8 +1128,20 @@ export default function SingleOrderModal({
                 }}>주문자와동일</span>
                 <input
                   type="checkbox"
-                  checked={sameAsOrderer}
-                  onChange={(e) => handleSameAsOrderer(e.target.checked)}
+                  checked={recipient.sameAsOrderer}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setRecipients(prev => prev.map(r =>
+                      r.id === recipient.id
+                        ? {
+                            ...r,
+                            sameAsOrderer: checked,
+                            recipient: checked ? formData.orderer : r.recipient,
+                            recipientPhone: checked ? formData.ordererPhone : r.recipientPhone
+                          }
+                        : r
+                    ));
+                  }}
                   style={{
                     width: '16px',
                     height: '16px',
@@ -1110,61 +1154,58 @@ export default function SingleOrderModal({
               <div style={{ width: '80px' }}>
                 <input
                   type="text"
-                  value={formData.recipient}
+                  value={recipient.recipient}
                   onChange={(e) => {
-                    handleChange('recipient', e.target.value);
-                    if (sameAsOrderer) setSameAsOrderer(false);
+                    setRecipients(prev => prev.map(r =>
+                      r.id === recipient.id
+                        ? { ...r, recipient: e.target.value, sameAsOrderer: false }
+                        : r
+                    ));
                   }}
                   placeholder="수령인"
-                  disabled={sameAsOrderer}
+                  disabled={recipient.sameAsOrderer}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
-                    border: `1px solid ${errors.recipient ? '#ef4444' : 'var(--color-border)'}`,
+                    border: `1px solid var(--color-border)`,
                     borderRadius: '6px',
                     fontSize: '13px',
-                    background: sameAsOrderer ? 'var(--color-background-secondary)' : 'var(--color-surface)',
+                    background: recipient.sameAsOrderer ? 'var(--color-background-secondary)' : 'var(--color-surface)',
                     color: 'var(--color-text)',
-                    cursor: sameAsOrderer ? 'not-allowed' : 'text',
-                    opacity: sameAsOrderer ? 0.7 : 1,
+                    cursor: recipient.sameAsOrderer ? 'not-allowed' : 'text',
+                    opacity: recipient.sameAsOrderer ? 0.7 : 1,
                     textAlign: 'center'
                   }}
                 />
-                {errors.recipient && (
-                  <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
-                    {errors.recipient}
-                  </div>
-                )}
               </div>
 
               <div style={{ width: '140px' }}>
                 <input
                   type="text"
-                  value={formData.recipientPhone}
+                  value={recipient.recipientPhone}
                   onChange={(e) => {
-                    handleChange('recipientPhone', e.target.value);
-                    if (sameAsOrderer) setSameAsOrderer(false);
+                    const formatted = formatPhoneNumber(e.target.value);
+                    setRecipients(prev => prev.map(r =>
+                      r.id === recipient.id
+                        ? { ...r, recipientPhone: formatted, sameAsOrderer: false }
+                        : r
+                    ));
                   }}
                   placeholder="수령인 연락처"
-                  disabled={sameAsOrderer}
+                  disabled={recipient.sameAsOrderer}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
-                    border: `1px solid ${errors.recipientPhone ? '#ef4444' : 'var(--color-border)'}`,
+                    border: `1px solid var(--color-border)`,
                     borderRadius: '6px',
                     fontSize: '13px',
-                    background: sameAsOrderer ? 'var(--color-background-secondary)' : 'var(--color-surface)',
+                    background: recipient.sameAsOrderer ? 'var(--color-background-secondary)' : 'var(--color-surface)',
                     color: 'var(--color-text)',
-                    cursor: sameAsOrderer ? 'not-allowed' : 'text',
-                    opacity: sameAsOrderer ? 0.7 : 1,
+                    cursor: recipient.sameAsOrderer ? 'not-allowed' : 'text',
+                    opacity: recipient.sameAsOrderer ? 0.7 : 1,
                     textAlign: 'center'
                   }}
                 />
-                {errors.recipientPhone && (
-                  <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
-                    {errors.recipientPhone}
-                  </div>
-                )}
               </div>
 
               {/* 배송지 */}
@@ -1172,13 +1213,19 @@ export default function SingleOrderModal({
                 <div style={{ position: 'relative' }}>
                   <input
                     type="text"
-                    value={formData.address}
-                    onChange={(e) => handleChange('address', e.target.value)}
+                    value={recipient.address}
+                    onChange={(e) => {
+                      setRecipients(prev => prev.map(r =>
+                        r.id === recipient.id
+                          ? { ...r, address: e.target.value }
+                          : r
+                      ));
+                    }}
                     placeholder="배송지"
                     style={{
                       width: '100%',
                       padding: '8px 60px 8px 12px',
-                      border: `1px solid ${errors.address ? '#ef4444' : 'var(--color-border)'}`,
+                      border: `1px solid var(--color-border)`,
                       borderRadius: '6px',
                       fontSize: '13px',
                       background: 'var(--color-surface)',
@@ -1187,7 +1234,35 @@ export default function SingleOrderModal({
                   />
                   <button
                     type="button"
-                    onClick={handleAddressSearch}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedRecipientId(recipient.id);
+                      setRecipients(prev =>
+                        prev.map(r => ({ ...r, selectedBadgeId: null }))
+                      );
+                      if (typeof window === 'undefined') return;
+                      // @ts-ignore
+                      new window.daum.Postcode({
+                        oncomplete: function(data: any) {
+                          let fullAddress = data.address;
+                          let extraAddress = '';
+                          if (data.addressType === 'R') {
+                            if (data.bname !== '') {
+                              extraAddress += data.bname;
+                            }
+                            if (data.buildingName !== '') {
+                              extraAddress += (extraAddress !== '' ? ', ' + data.buildingName : data.buildingName);
+                            }
+                            fullAddress += (extraAddress !== '' ? ' (' + extraAddress + ')' : '');
+                          }
+                          setRecipients(prev => prev.map(r =>
+                            r.id === recipient.id
+                              ? { ...r, address: fullAddress }
+                              : r
+                          ));
+                        }
+                      }).open();
+                    }}
                     style={{
                       position: 'absolute',
                       right: '4px',
@@ -1216,33 +1291,296 @@ export default function SingleOrderModal({
                     검색
                   </button>
                 </div>
-                {errors.address && (
-                  <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
-                    {errors.address}
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* 배송메시지 */}
-            <div>
-              <input
-                type="text"
-                value={formData.deliveryMessage}
-                onChange={(e) => handleChange('deliveryMessage', e.target.value)}
-                placeholder="배송메시지(선택)"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  background: 'var(--color-surface)',
-                  color: 'var(--color-text)'
-                }}
-              />
+            {/* 옵션상품 배지 및 상품추가/삭제 버튼 */}
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', alignItems: 'center' }}>
+              {/* 옵션명과 수량 배지 목록 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flex: 1, marginLeft: '62px' }}>
+                {recipient.badges.map((badge) => (
+                  <div
+                    key={badge.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // 해당 수령인 선택
+                      setSelectedRecipientId(recipient.id);
+                      // 모든 수령인의 배지 선택을 해제하고, 클릭한 배지만 선택
+                      setRecipients(prev =>
+                        prev.map(r =>
+                          r.id === recipient.id
+                            ? { ...r, selectedBadgeId: badge.id }
+                            : { ...r, selectedBadgeId: null }
+                        )
+                      );
+                    }}
+                    style={{
+                      position: 'relative',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      borderRadius: '6px',
+                      background: badge.color.bg,
+                      border: recipient.selectedBadgeId === badge.id ? `2px solid ${badge.color.border}` : 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      opacity: recipient.selectedBadgeId === badge.id ? 1 : 0.6,
+                      boxShadow: recipient.selectedBadgeId === badge.id ? '0 2px 8px rgba(0,0,0,0.15)' : 'none'
+                    }}
+                  >
+                    {/* 옵션명 표시 */}
+                    <div style={{
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      color: badge.color.text,
+                      fontWeight: '500',
+                      whiteSpace: 'nowrap',
+                      background: 'transparent',
+                      minWidth: '50px'
+                    }}>
+                      {badge.optionName || '옵션 선택'}
+                    </div>
+
+                    {/* 수량 입력란 */}
+                    <div style={{ position: 'relative', display: 'flex', background: 'transparent' }} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={badge.quantity}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value.replace(/[^\d]/g, '')) || 1;
+                          handleBadgeQuantityChange(recipient.id, badge.id, value);
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRecipients(prev =>
+                            prev.map(r =>
+                              r.id === recipient.id
+                                ? { ...r, selectedBadgeId: badge.id }
+                                : r
+                            )
+                          );
+                        }}
+                        style={{
+                          width: '40px',
+                          padding: '4px 22px 4px 0',
+                          border: 'none',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          background: 'transparent',
+                          color: badge.color.text,
+                          textAlign: 'center',
+                          outline: 'none'
+                        }}
+                      />
+                      {/* 스핀 버튼 */}
+                      <div style={{
+                        position: 'absolute',
+                        right: '6px',
+                        top: '0',
+                        bottom: '0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        width: '14px',
+                        background: 'transparent'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBadgeQuantityChange(recipient.id, badge.id, badge.quantity + 1);
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '0',
+                            border: 'none',
+                            fontSize: '7px',
+                            lineHeight: '7px',
+                            color: badge.color.text,
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.opacity = '0.7';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.opacity = '1';
+                          }}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBadgeQuantityChange(recipient.id, badge.id, Math.max(1, badge.quantity - 1));
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '0',
+                            border: 'none',
+                            fontSize: '7px',
+                            lineHeight: '7px',
+                            color: badge.color.text,
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.opacity = '0.7';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.opacity = '1';
+                          }}
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* x 삭제 버튼 */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRecipients(prev =>
+                          prev.map(r =>
+                            r.id === recipient.id
+                              ? { ...r, badges: r.badges.filter(b => b.id !== badge.id) }
+                              : r
+                          )
+                        );
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '-6px',
+                        right: '-10px',
+                        width: '18px',
+                        height: '18px',
+                        padding: '0',
+                        border: 'none',
+                        borderRadius: '50%',
+                        background: badge.color.text,
+                        color: '#ffffff',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s',
+                        opacity: 0.8,
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.opacity = '1';
+                        e.currentTarget.style.transform = 'scale(1.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.opacity = '0.8';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* 상품추가 버튼 */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedRecipientId(recipient.id);
+                    setRecipients(prev =>
+                      prev.map(r => ({ ...r, selectedBadgeId: null }))
+                    );
+                    handleAddProduct(recipient.id);
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: 'var(--color-text)',
+                    background: 'var(--color-surface)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--color-surface-hover)';
+                    e.currentTarget.style.borderColor = 'var(--color-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'var(--color-surface)';
+                    e.currentTarget.style.borderColor = 'var(--color-border)';
+                  }}
+                >
+                  상품추가
+                </button>
+              </div>
             </div>
+
             </div>
+            ))}
+
+            {/* 수령인 추가 버튼 */}
+            <button
+              type="button"
+              onClick={() => {
+                const newId = Math.max(...recipients.map(r => r.id)) + 1;
+                setRecipients(prev => [...prev, {
+                  id: newId,
+                  recipient: '',
+                  recipientPhone: '',
+                  address: '',
+                  deliveryMessage: '',
+                  sameAsOrderer: false,
+                  selectedBadgeId: null,
+                  badges: []
+                }]);
+                setSelectedRecipientId(newId); // 새로 추가된 수령인 자동 선택
+              }}
+              style={{
+                width: '36px',
+                height: '36px',
+                padding: '0',
+                border: 'none',
+                borderRadius: '50%',
+                fontSize: '22px',
+                fontWeight: '400',
+                color: '#ffffff',
+                background: 'var(--color-primary)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s',
+                boxShadow: '0 2px 8px rgba(14, 165, 233, 0.3)',
+                alignSelf: 'center',
+                lineHeight: '0',
+                fontFamily: 'Arial, sans-serif'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.1)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(14, 165, 233, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(14, 165, 233, 0.3)';
+              }}
+            >
+              +
+            </button>
           </div>
         </div>
 
@@ -1253,74 +1591,110 @@ export default function SingleOrderModal({
           display: 'flex',
           gap: '12px',
           alignItems: 'center',
+          justifyContent: 'space-between',
           background: 'var(--color-surface)',
           borderRadius: '0 0 16px 16px',
           flexShrink: 0
         }}>
-          {/* 정산 예정 금액 */}
+          <div style={{ flex: 1 }} />
+
+          {/* 우측 버튼 그룹 */}
           <div style={{
             display: 'flex',
-            alignItems: 'center',
             gap: '12px',
-            padding: '12px 16px',
-            background: 'var(--color-background-secondary)',
-            borderRadius: '8px',
-            border: '1px solid var(--color-border)',
-            minWidth: '200px'
+            alignItems: 'center'
           }}>
+            {/* 옵션별 통계 */}
             <div style={{
-              fontSize: '13px',
-              fontWeight: '500',
-              color: 'var(--color-text)'
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              alignItems: 'flex-end'
             }}>
-              정산 예정 금액
+              {optionSummaries.map((summary, index) => (
+                <div key={index} style={{
+                  fontSize: '12px',
+                  color: 'var(--color-text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <span style={{ fontWeight: '500' }}>{summary.optionName}</span>
+                  <span>({summary.unitPrice.toLocaleString()}원)</span>
+                  <span>×</span>
+                  <span>{summary.totalQuantity}개</span>
+                  <span>=</span>
+                  <span style={{ fontWeight: '600', color: 'var(--color-text)' }}>
+                    {summary.totalPrice.toLocaleString()}원
+                  </span>
+                </div>
+              ))}
             </div>
+            {/* 정산 예정 금액 */}
             <div style={{
-              fontSize: '18px',
-              fontWeight: '700',
-              color: 'var(--color-primary)',
-              marginLeft: 'auto'
-            }}>
-              {supplyPrice.toLocaleString()}원
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            disabled={isSubmitting}
-            style={{
-              flex: 1,
-              padding: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 16px',
+              background: 'var(--color-background-secondary)',
+              borderRadius: '8px',
               border: '1px solid var(--color-border)',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: 'var(--color-text)',
-              background: 'var(--color-surface)',
-              cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              opacity: isSubmitting ? 0.5 : 1
-            }}
-          >
-            취소
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            style={{
-              flex: 1,
-              padding: '12px',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#ffffff',
-              background: 'var(--color-primary)',
-              cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              opacity: isSubmitting ? 0.7 : 1
-            }}
-          >
-            {isSubmitting ? '등록 중...' : '주문 등록'}
-          </button>
+              minWidth: '200px'
+            }}>
+              <div style={{
+                fontSize: '13px',
+                fontWeight: '500',
+                color: 'var(--color-text)'
+              }}>
+                정산 예정 금액
+              </div>
+              <div style={{
+                fontSize: '18px',
+                fontWeight: '700',
+                color: 'var(--color-primary)',
+                marginLeft: 'auto'
+              }}>
+                {supplyPrice.toLocaleString()}원
+              </div>
+            </div>
+
+            <button
+              onClick={onClose}
+              disabled={isSubmitting}
+              style={{
+                width: '150px',
+                padding: '12px',
+                border: '1px solid var(--color-border)',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: 'var(--color-text)',
+                background: 'var(--color-surface)',
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.5 : 1
+              }}
+            >
+              취소
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              style={{
+                width: '150px',
+                padding: '12px',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#ffffff',
+                background: 'var(--color-primary)',
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.7 : 1
+              }}
+            >
+              {isSubmitting ? '등록 중...' : '주문 등록'}
+            </button>
+          </div>
         </div>
       </div>
 
