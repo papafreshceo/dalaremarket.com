@@ -93,18 +93,29 @@ export async function POST(request: NextRequest) {
         .filter(Boolean) // null/undefined 제외
     );
 
+    console.log('🔍 중복 체크 시작');
+    console.log('  - 기존 주문번호 개수:', existingOrderNumbers.size);
+    console.log('  - 저장할 주문 개수:', processedOrders.length);
+    console.log('  - overwriteDuplicates:', overwriteDuplicates);
+    console.log('  - skipDuplicateCheck:', skipDuplicateCheck);
+
     let duplicateCount = 0;
     let newCount = 0;
     processedOrders.forEach(order => {
       if (order.order_number && existingOrderNumbers.has(order.order_number)) {
         duplicateCount++;
+        console.log('  ⚠️ 중복 발견:', order.order_number);
       } else {
         newCount++;
       }
     });
 
+    console.log('  - 중복 개수:', duplicateCount);
+    console.log('  - 신규 개수:', newCount);
+
     // 중복이 있고 덮어쓰기가 아니며 중복 체크를 건너뛰지 않는 경우 → 확인 모달 표시
     if (duplicateCount > 0 && !overwriteDuplicates && !skipDuplicateCheck) {
+      console.log('✅ 중복 모달 표시 조건 충족');
       // 마켓별 회차 정보 생성
       const marketBatchDetails = Object.entries(marketBatchInfo)
         .map(([marketName, info]) => `${marketName}: ${info.currentBatch}회차`)
@@ -163,27 +174,17 @@ export async function POST(request: NextRequest) {
     });
 
     // INSERT 또는 UPSERT 수행
+    // 항상 UPSERT를 사용하여 안전하게 처리
     let data, error;
-    if (overwriteDuplicates) {
-      // 덮어쓰기 모드: UPSERT (주문번호 기준)
-      const result = await supabase
-        .from('integrated_orders')
-        .upsert(ordersWithSequence, {
-          onConflict: 'order_number',
-          ignoreDuplicates: false,  // 중복 시 덮어쓰기
-        })
-        .select();
-      data = result.data;
-      error = result.error;
-    } else {
-      // 중복 제외 모드: INSERT만 (신규만)
-      const result = await supabase
-        .from('integrated_orders')
-        .insert(ordersWithSequence)
-        .select();
-      data = result.data;
-      error = result.error;
-    }
+    const result = await supabase
+      .from('integrated_orders')
+      .upsert(ordersWithSequence, {
+        onConflict: 'order_number',
+        ignoreDuplicates: !overwriteDuplicates,  // 덮어쓰기 모드가 아니면 중복 무시
+      })
+      .select();
+    data = result.data;
+    error = result.error;
 
     if (error) {
       console.error('대량 주문 생성 실패:', error);
