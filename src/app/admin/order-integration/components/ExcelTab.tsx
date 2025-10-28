@@ -1184,25 +1184,15 @@ export default function ExcelTab() {
         };
       });
 
-      // UNIQUE 제약조건 기준으로 중복 제거 (마지막 항목 유지)
-      // market_name + order_number + buyer_name + recipient_name + option_name + quantity
-      const uniqueOrders = Array.from(
-        new Map(
-          ordersToSave.map(order => {
-            const key = `${order.market_name || ''}-${order.order_number || ''}-${order.buyer_name || ''}-${order.recipient_name || ''}-${order.option_name || ''}-${order.quantity || ''}`;
-            return [key, order];
-          })
-        ).values()
-      );
-
-      console.log('총 저장할 주문 수:', uniqueOrders.length);
-      console.log('첫 번째 주문 데이터:', uniqueOrders[0]);
-      console.log('첫 번째 주문의 모든 키:', Object.keys(uniqueOrders[0]));
+      // 중복 제거를 서버에서 처리하도록 모든 주문 전송
+      console.log('총 저장할 주문 수:', ordersToSave.length);
+      console.log('첫 번째 주문 데이터:', ordersToSave[0]);
+      console.log('첫 번째 주문의 모든 키:', Object.keys(ordersToSave[0]));
 
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orders: uniqueOrders, overwriteDuplicates, skipDuplicateCheck }),
+        body: JSON.stringify({ orders: ordersToSave, overwriteDuplicates, skipDuplicateCheck }),
       });
 
       const result = await response.json();
