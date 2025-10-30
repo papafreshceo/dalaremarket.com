@@ -2758,11 +2758,11 @@ export default function SearchTab() {
         const seconds = String(now.getSeconds()).padStart(2, '0');
         const csOrderNumber = `CS${year}${month}${day}${hours}${minutes}${seconds}001`;
 
-        // 옵션명으로 매핑 정보 가져오기
+        // 옵션명 (서버에서 자동 매핑됨)
         const optionName = csFormData.resendOption || selectedOrder.option_name;
-        const mappingData = await fetchMappingByOptionName(optionName);
 
         // 새 주문 데이터 생성 (한국 시간 기준)
+        // ✅ 옵션명만 전달하면 서버(/api/integrated-orders POST)에서 자동으로 공급단가, 발송정보 등을 매핑함
         const koreanDate = getKoreanDate();
         const newOrderData = {
           sheet_date: koreanDate,
@@ -2772,7 +2772,7 @@ export default function SearchTab() {
           recipient_phone: csFormData.phone || selectedOrder.recipient_phone,
           recipient_address: csFormData.address || selectedOrder.recipient_address,
           delivery_message: csFormData.resendNote || '',
-          option_name: optionName,
+          option_name: optionName, // ✅ 이 옵션명 기준으로 서버에서 자동 매핑됨
           quantity: csFormData.resendQty || selectedOrder.quantity,
           shipping_status: '접수',
           memo: `원주문: ${selectedOrder.order_number} / CS유형: ${csFormData.category}`,
@@ -2784,15 +2784,6 @@ export default function SearchTab() {
           // 발송요청일과 CS유형(해결방법) 추가
           shipping_request_date: csFormData.requestDate || null,
           cs_type: csFormData.solution || null,
-          // 옵션명 기준 자동 매핑 (없으면 원주문 정보 복사)
-          seller_supply_price: mappingData?.seller_supply_price || selectedOrder.seller_supply_price,
-          shipping_source: mappingData?.shipping_source || selectedOrder.shipping_source,
-          invoice_issuer: mappingData?.invoice_issuer || selectedOrder.invoice_issuer,
-          vendor_name: mappingData?.vendor_name || selectedOrder.vendor_name,
-          shipping_location_name: mappingData?.shipping_location_name || selectedOrder.shipping_location_name,
-          shipping_location_address: mappingData?.shipping_location_address || selectedOrder.shipping_location_address,
-          shipping_location_contact: mappingData?.shipping_location_contact || selectedOrder.shipping_location_contact,
-          shipping_cost: mappingData?.shipping_cost || selectedOrder.shipping_cost,
         };
 
         console.log('📤 재발송 주문 생성 요청 데이터:', newOrderData);
@@ -3205,6 +3196,50 @@ export default function SearchTab() {
     }
   };
 
+  // 완전 삭제 핸들러 (접수 상태만)
+  const handleHardDelete = async () => {
+    if (selectedOrders.length === 0) {
+      alert('삭제할 주문을 선택해주세요.');
+      return;
+    }
+
+    // 선택된 주문들이 모두 접수 상태인지 확인
+    const selectedOrderData = filteredOrders.filter(order => selectedOrders.includes(order.id));
+    const nonRegisteredOrders = selectedOrderData.filter(order => order.shipping_status !== '접수');
+
+    if (nonRegisteredOrders.length > 0) {
+      alert('접수 상태가 아닌 주문은 완전 삭제할 수 없습니다.');
+      return;
+    }
+
+    const confirmed = confirm(
+      `선택한 ${selectedOrders.length}건의 주문을 DB에서 완전히 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다!`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch('/api/integrated-orders/hard-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedOrders }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`${result.count}건의 주문이 완전히 삭제되었습니다.`);
+        setSelectedOrders([]);
+        fetchOrders(); // 새로고침
+      } else {
+        alert('완전 삭제 실패: ' + result.error);
+      }
+    } catch (error) {
+      console.error('완전 삭제 오류:', error);
+      alert('완전 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
   return (
     <div className="space-y-4 relative">
       {/* 전역 로딩 오버레이 (통계 카드 + 필터 영역) */}
@@ -3316,6 +3351,7 @@ export default function SearchTab() {
                   onMarketInvoiceModal={handleOpenMarketInvoiceModal}
                   onRegisterAsRegularCustomer={handleRegisterAsRegularCustomer}
                   onRegisterAsMarketingCustomer={handleRegisterAsMarketingCustomer}
+                  onHardDelete={handleHardDelete}
                 />
               }
             />

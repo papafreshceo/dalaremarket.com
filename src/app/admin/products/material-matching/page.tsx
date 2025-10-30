@@ -478,7 +478,7 @@ export default function MaterialMatchingPage() {
       // products_master에서 품목으로 조회
       const { data: productMaster, error: fetchError } = await supabase
         .from('products_master')
-        .select('category_1, category_2, category_3, category_4, category_5')
+        .select('category_1, category_2, category_3, category_4')
         .eq('category_4', targetCategory4)
         .eq('is_active', true)
         .limit(1)
@@ -496,8 +496,7 @@ export default function MaterialMatchingPage() {
           category_1: productMaster.category_1,
           category_2: productMaster.category_2,
           category_3: productMaster.category_3,
-          category_4: productMaster.category_4,
-          category_5: productMaster.category_5
+          category_4: productMaster.category_4
         })
         .eq('id', selectedProduct.id)
 
@@ -569,7 +568,7 @@ export default function MaterialMatchingPage() {
         if (product?.category_4) {
           const { data: productMaster } = await supabase
             .from('products_master')
-            .select('category_1, category_2, category_3, category_4, category_5')
+            .select('category_1, category_2, category_3, category_4')
             .eq('category_4', product.category_4)
             .eq('is_active', true)
             .limit(1)
@@ -582,8 +581,7 @@ export default function MaterialMatchingPage() {
                 category_1: productMaster.category_1,
                 category_2: productMaster.category_2,
                 category_3: productMaster.category_3,
-                category_4: productMaster.category_4,
-                category_5: productMaster.category_5
+                category_4: productMaster.category_4
               })
               .eq('id', productId)
           }

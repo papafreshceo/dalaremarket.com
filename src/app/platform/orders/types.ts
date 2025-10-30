@@ -35,6 +35,7 @@ export interface Order {
   unitPrice?: number; // 공급단가
   supplyPrice?: number; // 공급가 (정산예정금액)
   marketName?: string; // 마켓명
+  sellerMarketName?: string; // 셀러 마켓명
 }
 
 export interface StatusConfig {

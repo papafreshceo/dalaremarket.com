@@ -49,8 +49,18 @@ export default function PreparingSummaryWindow({ startDate, endDate }: Preparing
       const result = await res.json();
 
       if (result.success) {
-        setData(result.data?.orders || []);
-        setRawMaterials(result.data?.rawMaterials || []);
+        // 옵션명 기준 가나다순 정렬
+        const sortedOrders = (result.data?.orders || []).sort((a, b) =>
+          a.option_name.localeCompare(b.option_name, 'ko-KR')
+        );
+
+        // 원물명 기준 가나다순 정렬
+        const sortedRawMaterials = (result.data?.rawMaterials || []).sort((a, b) =>
+          a.name.localeCompare(b.name, 'ko-KR')
+        );
+
+        setData(sortedOrders);
+        setRawMaterials(sortedRawMaterials);
       } else {
         alert('데이터 조회 실패: ' + result.error);
       }

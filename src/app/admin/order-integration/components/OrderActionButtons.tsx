@@ -26,6 +26,7 @@ interface OrderActionButtonsProps {
   onMarketInvoiceModal: () => void;
   onRegisterAsRegularCustomer: () => void;
   onRegisterAsMarketingCustomer: () => void;
+  onHardDelete: () => void; // ✅ 완전 삭제 추가
 }
 
 export default function OrderActionButtons({
@@ -52,6 +53,7 @@ export default function OrderActionButtons({
   onMarketInvoiceModal,
   onRegisterAsRegularCustomer,
   onRegisterAsMarketingCustomer,
+  onHardDelete, // ✅ 완전 삭제 추가
 }: OrderActionButtonsProps) {
 
   const handleCSClick = () => {
@@ -263,6 +265,18 @@ export default function OrderActionButtons({
             </div>
           )}
         </>
+      )}
+
+      {/* 완전삭제 버튼 (우측 끝) */}
+      {statusFilter === '접수' && (
+        <div className="flex items-center gap-1 ml-auto">
+          <button
+            onClick={onHardDelete}
+            className="px-2 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700"
+          >
+            완전삭제
+          </button>
+        </div>
       )}
     </div>
   );

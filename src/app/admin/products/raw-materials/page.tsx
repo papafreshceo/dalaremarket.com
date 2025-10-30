@@ -1539,8 +1539,11 @@ export default function RawMaterialsManagementPage() {
                     })
 
                     // 날짜 필드 변환 (Excel 숫자를 날짜 문자열로)
-                    const dateFields = ['last_trade_date', 'season_start_date', 'season_peak_date', 'season_end_date', 'created_at', 'updated_at']
-                    dateFields.forEach(field => {
+                    const fullDateFields = ['last_trade_date', 'created_at', 'updated_at']
+                    const seasonDateFields = ['season_start_date', 'season_peak_date', 'season_end_date']
+
+                    // 완전한 날짜 필드 (YYYY-MM-DD)
+                    fullDateFields.forEach(field => {
                       if (normalizedRow[field]) {
                         if (typeof normalizedRow[field] === 'number') {
                           // Excel 날짜 숫자를 JavaScript Date로 변환
@@ -1550,6 +1553,41 @@ export default function RawMaterialsManagementPage() {
                           normalizedRow[field] = normalizedRow[field].toISOString().split('T')[0]
                         } else if (typeof normalizedRow[field] === 'string' && normalizedRow[field].trim() === '') {
                           normalizedRow[field] = null
+                        }
+                      }
+                    })
+
+                    // 시즌 날짜 필드 (MM-DD만 저장, 년도 제거)
+                    seasonDateFields.forEach(field => {
+                      if (normalizedRow[field]) {
+                        if (typeof normalizedRow[field] === 'number') {
+                          // Excel 날짜 숫자를 JavaScript Date로 변환
+                          const date = new Date((normalizedRow[field] - 25569) * 86400 * 1000)
+                          const month = String(date.getMonth() + 1).padStart(2, '0')
+                          const day = String(date.getDate()).padStart(2, '0')
+                          normalizedRow[field] = `${month}-${day}`
+                        } else if (normalizedRow[field] instanceof Date) {
+                          const date = normalizedRow[field]
+                          const month = String(date.getMonth() + 1).padStart(2, '0')
+                          const day = String(date.getDate()).padStart(2, '0')
+                          normalizedRow[field] = `${month}-${day}`
+                        } else if (typeof normalizedRow[field] === 'string') {
+                          if (normalizedRow[field].trim() === '') {
+                            normalizedRow[field] = null
+                          } else {
+                            // 문자열이 YYYY-MM-DD 형식이면 MM-DD만 추출
+                            const dateMatch = normalizedRow[field].match(/(\d{4}-)?\d{2}-\d{2}/)
+                            if (dateMatch) {
+                              const fullDate = normalizedRow[field]
+                              if (fullDate.length === 10) {
+                                // YYYY-MM-DD 형식에서 MM-DD만 추출
+                                normalizedRow[field] = fullDate.substring(5)
+                              } else if (fullDate.length === 5) {
+                                // 이미 MM-DD 형식
+                                normalizedRow[field] = fullDate
+                              }
+                            }
+                          }
                         }
                       }
                     })
@@ -3000,13 +3038,19 @@ export default function RawMaterialsManagementPage() {
 
                   // 2. id가 없는 데이터 신규 추가
                   if (dataWithoutId.length > 0) {
+                    console.log('📦 삽입할 데이터 샘플:', JSON.stringify(dataWithoutId[0], null, 2))
                     const { error: insertError } = await supabase
                       .from('raw_materials')
                       .insert(dataWithoutId)
 
                     if (insertError) {
                       console.error('신규 데이터 추가 실패:', insertError)
-                      showToast('업로드 중 오류가 발생했습니다.', 'error')
+                      console.error('에러 상세 정보:', JSON.stringify(insertError, null, 2))
+                      console.error('에러 메시지:', insertError?.message)
+                      console.error('에러 코드:', insertError?.code)
+                      console.error('에러 상세:', insertError?.details)
+                      console.error('에러 힌트:', insertError?.hint)
+                      showToast(`업로드 중 오류가 발생했습니다.\n${insertError?.message || '알 수 없는 오류'}`, 'error')
                       return
                     }
                     console.log('✅ 신규 데이터 추가 완료:', dataWithoutId.length)
@@ -3158,15 +3202,22 @@ export default function RawMaterialsManagementPage() {
 
                   // 2. id가 없는 데이터 신규 추가
                   if (dataWithoutId.length > 0) {
+                    console.log('📦 삽입할 데이터 샘플:', JSON.stringify(dataWithoutId[0], null, 2))
                     const { error: insertError } = await supabase
                       .from('raw_materials')
                       .insert(dataWithoutId)
 
                     if (insertError) {
                       console.error('신규 데이터 추가 실패:', insertError)
-                      showToast('업로드 중 오류가 발생했습니다.', 'error')
+                      console.error('에러 상세 정보:', JSON.stringify(insertError, null, 2))
+                      console.error('에러 메시지:', insertError?.message)
+                      console.error('에러 코드:', insertError?.code)
+                      console.error('에러 상세:', insertError?.details)
+                      console.error('에러 힌트:', insertError?.hint)
+                      showToast(`업로드 중 오류가 발생했습니다.\n${insertError?.message || '알 수 없는 오류'}`, 'error')
                       return
                     }
+                    console.log('✅ 신규 데이터 추가 완료:', dataWithoutId.length)
                   }
 
                   showToast('병합 완료!', 'success')

@@ -51,8 +51,10 @@ export async function inheritProductMasterToRawMaterials(productMasterId: string
 
 /**
  * 원물(raw_materials)의 모든 속성을 해당 원물과 매칭된 모든 옵션상품에 상속
- * 상속 필드: category_1~4, supply_status, shipping_deadline, season_start_date, season_end_date,
+ * 상속 필드: category_1~4, product_master_id,
  *           seller_supply, is_best, is_recommended, has_image, has_detail_page
+ * 주의: option_products는 시즌 관련 컬럼이 없음 (필요시 품목마스터에서 조회)
+ * 주의: raw_materials는 shipping_deadline 컬럼이 없음 (품목마스터에서만 관리)
  */
 export async function inheritRawMaterialToOptionProducts(rawMaterialId: string) {
   const supabase = createClient()
@@ -70,27 +72,31 @@ export async function inheritRawMaterialToOptionProducts(rawMaterialId: string) 
   }
 
   // 2. raw_material_partner를 통해 연결된 옵션상품 업데이트
+  // 주의: option_products는 시즌 관련 컬럼이 없음 (필요시 품목마스터에서 조회)
+  // 주의: raw_materials는 shipping_deadline 컬럼이 없음 (품목마스터에서만 관리)
+  const updateData: any = {
+    category_1: rawMaterial.category_1,
+    category_2: rawMaterial.category_2,
+    category_3: rawMaterial.category_3,
+    category_4: rawMaterial.category_4,
+    product_master_id: rawMaterial.product_master_id,
+    seller_supply: rawMaterial.seller_supply,
+    is_best: rawMaterial.is_best,
+    is_recommended: rawMaterial.is_recommended,
+    has_image: rawMaterial.has_image,
+    has_detail_page: rawMaterial.has_detail_page
+  }
+
+  console.log('Updating option products with data:', updateData)
+
   const { error: updateError, count } = await supabase
     .from('option_products')
-    .update({
-      category_1: rawMaterial.category_1,
-      category_2: rawMaterial.category_2,
-      category_3: rawMaterial.category_3,
-      category_4: rawMaterial.category_4,
-      product_master_id: rawMaterial.product_master_id,
-      shipping_deadline: rawMaterial.shipping_deadline,
-      season_start_date: rawMaterial.season_start_date,
-      season_end_date: rawMaterial.season_end_date,
-      seller_supply: rawMaterial.seller_supply,
-      is_best: rawMaterial.is_best,
-      is_recommended: rawMaterial.is_recommended,
-      has_image: rawMaterial.has_image,
-      has_detail_page: rawMaterial.has_detail_page
-    })
+    .update(updateData)
     .eq('raw_material_partner', rawMaterialId)
 
   if (updateError) {
     console.error('Failed to update option products:', updateError)
+    console.error('Error details:', JSON.stringify(updateError, null, 2))
     return { success: false, error: updateError }
   }
 
@@ -127,6 +133,7 @@ export async function inheritProductMasterToAllDescendants(productMasterId: stri
   }
 
   // 3. 품목 마스터 → 옵션상품 직접 상속 (category_4 기준)
+  // 주의: option_products는 시즌 관련 컬럼이 없음 (필요시 품목마스터에서 조회)
   const { error: optionUpdateError, count: optionCount } = await supabase
     .from('option_products')
     .update({
@@ -135,8 +142,6 @@ export async function inheritProductMasterToAllDescendants(productMasterId: stri
       category_3: productMaster.category_3,
       category_4: productMaster.category_4,
       shipping_deadline: productMaster.shipping_deadline,
-      season_start_date: productMaster.season_start_date,
-      season_end_date: productMaster.season_end_date,
       seller_supply: productMaster.seller_supply,
       is_best: productMaster.is_best,
       is_recommended: productMaster.is_recommended,

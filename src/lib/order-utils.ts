@@ -39,12 +39,23 @@ export async function enrichOrdersWithOptionInfo<T extends { option_name: string
     return ordersData as Array<T & OptionProductInfo & { settlement_amount?: number }>;
   }
 
-  // option_products 테이블에서 옵션 정보 일괄 조회 (영문 칼럼명 사용)
+  // option_products 테이블에서 옵션 정보 일괄 조회 (shipping_vendor와 JOIN)
   console.log('[enrichOrdersWithOptionInfo] 조회할 옵션명:', uniqueOptionNames);
 
   const { data: optionProducts, error } = await supabase
     .from('option_products')
-    .select('option_name, option_code, seller_supply_price, shipping_entity, invoice_entity, vendor_name, shipping_location_name, shipping_location_address, shipping_location_contact, shipping_cost')
+    .select(`
+      option_name,
+      option_code,
+      seller_supply_price,
+      shipping_entity,
+      invoice_entity,
+      shipping_location_name,
+      shipping_location_address,
+      shipping_location_contact,
+      shipping_cost,
+      shipping_vendor:partners!shipping_vendor_id(name)
+    `)
     .in('option_name', uniqueOptionNames);
 
   if (error) {
@@ -62,7 +73,7 @@ export async function enrichOrdersWithOptionInfo<T extends { option_name: string
           seller_supply_price: product.seller_supply_price,
           shipping_source: product.shipping_entity,      // shipping_entity → shipping_source
           invoice_issuer: product.invoice_entity,        // invoice_entity → invoice_issuer
-          vendor_name: product.vendor_name,
+          vendor_name: product.shipping_vendor?.name || null,  // JOIN으로 가져온 벤더명
           shipping_location_name: product.shipping_location_name,
           shipping_location_address: product.shipping_location_address,
           shipping_location_contact: product.shipping_location_contact,

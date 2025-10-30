@@ -26,14 +26,19 @@ import { showStatusToast } from './utils/statusToast';
 function OrdersPageContent() {
   const searchParams = useSearchParams();
   const isModalMode = searchParams.get('modal') === 'true';
-  const [activeTab, setActiveTab] = useState<Tab>('대시보드');
+  const statusParam = searchParams.get('status') as Order['status'] | null;
+
+  const [activeTab, setActiveTab] = useState<Tab>(statusParam ? '발주서등록' : '대시보드');
   const router = useRouter();
   const [userId, setUserId] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
   const [orders, setOrders] = useState<Order[]>([]);
 
-  const [filterStatus, setFilterStatus] = useState<'all' | Order['status']>('registered');
+  const [filterStatus, setFilterStatus] = useState<'all' | Order['status']>(statusParam || 'registered');
   const [searchTerm, setSearchTerm] = useState<string>('');
+
+  // postMessage 처리 여부 추적
+  const messageHandledRef = useRef<boolean>(false);
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
   const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
   const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
@@ -136,7 +141,6 @@ function OrdersPageContent() {
       if (e.key === 'F5' || e.code === 'F5' || (e.ctrlKey && e.key === 'r')) {
         e.preventDefault(); // 기본 새로고침 동작 막기
         e.stopPropagation(); // 이벤트 전파 중지
-        console.log('🔄 F5 감지 - 컴포넌트 새로고침 중...');
 
         setIsRefreshing(true);
 
@@ -163,15 +167,11 @@ function OrdersPageContent() {
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
-      console.log('🔍 현재 로그인 사용자:', user);
       if (user) {
         setUserId(user.id);
         if (user.email) {
           setUserEmail(user.email);
-          console.log('✅ 사용자 설정 - ID:', user.id, 'Email:', user.email);
         }
-      } else {
-        console.log('❌ 로그인되지 않음');
       }
     });
 
@@ -179,19 +179,30 @@ function OrdersPageContent() {
     fetchOrders();
   }, []);
 
+  // postMessage로 상태 변경 수신 (최초 1회만)
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // 이미 처리했으면 무시
+      if (messageHandledRef.current) {
+        return;
+      }
+
+      if (event.data.type === 'setStatus' && event.data.status) {
+        setActiveTab('발주서등록');
+        setFilterStatus(event.data.status);
+        messageHandledRef.current = true;
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []); // 빈 배열로 마운트 시 1회만 등록
+
   const fetchOrders = async () => {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    console.log('🔍 fetchOrders 호출됨');
-    console.log('👤 현재 사용자:', user);
-
-    if (!user) {
-      console.log('❌ 사용자가 로그인되지 않음');
-      return;
-    }
-
-    console.log('📋 사용자 ID로 주문 조회 중:', user.id);
+    if (!user) return;
 
     // 현재 로그인한 셀러의 주문만 조회
     const { data, error } = await supabase
@@ -201,12 +212,9 @@ function OrdersPageContent() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('❌ 주문 조회 오류:', error);
+      console.error('주문 조회 오류:', error);
       return;
     }
-
-    console.log('✅ 조회된 주문 개수:', data?.length || 0);
-    console.log('📦 조회된 데이터:', data);
 
     // shipping_status를 Order status로 매핑
     const mapShippingStatus = (shippingStatus: string | null): Order['status'] => {
@@ -260,10 +268,10 @@ function OrdersPageContent() {
       supplyPrice: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined,
       refundAmount: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined, // 환불액 (정산금액과 동일)
       refundedAt: order.refund_processed_at, // 환불일
-      marketName: order.market_name || '미지정' // 마켓명
+      marketName: order.market_name || '미지정', // 마켓명
+      sellerMarketName: order.seller_market_name || '미지정' // 셀러 마켓명
     }));
 
-    console.log('🔄 변환된 주문 데이터:', convertedOrders);
     setOrders(convertedOrders);
   };
 
@@ -356,8 +364,6 @@ function OrdersPageContent() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-
-        console.log('업로드된 데이터:', jsonData);
 
         // 필수 칼럼 검증
         const errors = validateRequiredColumns(jsonData);
@@ -531,8 +537,6 @@ function OrdersPageContent() {
         };
       });
 
-      console.log('💾 DB에 저장할 주문 데이터:', ordersToInsert);
-
       // API를 통해 주문 일괄 저장 (옵션 상품 정보 자동 매핑)
       const response = await fetch('/api/platform-orders', {
         method: 'POST',
@@ -551,7 +555,6 @@ function OrdersPageContent() {
         return;
       }
 
-      console.log('✅ 주문 저장 성공:', result.data);
       showStatusToast('registered', `${result.count}건의 주문이 성공적으로 등록되었습니다.`, 3000);
 
       // 모달 닫기 및 상태 초기화
@@ -639,9 +642,6 @@ function OrdersPageContent() {
     return matchesStatus && matchesDate && matchesSearch;
   });
 
-  console.log('🔍 필터 상태:', { filterStatus, startDate, endDate, searchTerm });
-  console.log('📊 전체 주문:', orders.length, '/ 필터된 주문:', filteredOrders.length);
-
   return (
     <div className="platform-orders-page" style={{ minHeight: '100vh', background: 'var(--color-background)' }}>
       {/* 다크모드 스크롤바 스타일 */}
@@ -713,10 +713,11 @@ function OrdersPageContent() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: isMobile ? '0 16px' : '0 24px'
+        padding: isMobile ? '0 16px' : '0 24px',
+        gap: '16px'
       }}>
         {/* 왼쪽: 햄버거 메뉴(모바일) + 나가기 버튼 & 로그인 정보 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '0 0 auto' }}>
           {/* 햄버거 메뉴 버튼 (모바일만) */}
           {isMobile && (
             <button
@@ -795,17 +796,19 @@ function OrdersPageContent() {
           </button>
 
           {/* 로그인 정보 */}
-          <div style={{
-            fontSize: '14px',
-            color: 'var(--color-text)',
-            fontWeight: '500'
-          }}>
-            {userEmail || '로그인 정보 없음'}
-          </div>
+          {!isMobile && (
+            <div style={{
+              fontSize: '14px',
+              color: 'var(--color-text)',
+              fontWeight: '500'
+            }}>
+              {userEmail || '로그인 정보 없음'}
+            </div>
+          )}
         </div>
 
         {/* 오른쪽: 새로고침 인디케이터 + 다크모드 토글 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '0 0 auto' }}>
           {/* 새로고침 인디케이터 */}
           {isRefreshing && (
             <div style={{
@@ -1110,8 +1113,7 @@ function OrdersPageContent() {
         padding: isMobile ? '16px' : '24px',
         paddingTop: '90px',
         background: 'var(--color-background)',
-        minHeight: '100vh',
-        overflowY: 'auto'
+        minHeight: '100vh'
       }}>
         {/* Tab Content */}
         {activeTab === '대시보드' && (

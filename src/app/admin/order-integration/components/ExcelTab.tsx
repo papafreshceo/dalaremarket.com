@@ -6,6 +6,7 @@ import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import * as XLSX from 'xlsx';
 import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC } from '@/lib/date';
+import PasswordModal from './PasswordModal';
 
 interface UploadedOrder {
   id?: number;
@@ -143,6 +144,13 @@ export default function ExcelTab() {
     orderCount: number;
     markets: string[];
   }[]>([]);
+
+  // 비밀번호 모달 상태
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPasswordFile, setCurrentPasswordFile] = useState<File | null>(null);
+  const [filePasswords, setFilePasswords] = useState<Map<string, string>>(new Map());
+  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null);
+  const [processedPreviews, setProcessedPreviews] = useState<FilePreview[]>([]);
 
   // 초기 데이터 병렬 로드 (성능 최적화)
   useEffect(() => {
@@ -728,66 +736,95 @@ export default function ExcelTab() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
 
-        // xlsx 라이브러리의 console.error를 임시로 무시
-        const originalError = console.error;
-        console.error = (...args: any[]) => {
-          // "Bad uncompressed size" 에러만 무시
-          if (args[0]?.toString().includes('Bad uncompressed size')) {
-            return;
+        try {
+          // xlsx 라이브러리의 console.error를 임시로 무시
+          const originalError = console.error;
+          console.error = (...args: any[]) => {
+            // "Bad uncompressed size" 에러만 무시
+            if (args[0]?.toString().includes('Bad uncompressed size')) {
+              return;
+            }
+            originalError(...args);
+          };
+
+          const data = await file.arrayBuffer();
+          const workbook = XLSX.read(data, { type: 'array', cellDates: true, WTF: true });
+
+          // console.error 복원
+          console.error = originalError;
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+
+          // 헤더 행 감지를 위해 먼저 읽기
+          const allData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
+
+          // 첫 번째 데이터 행으로 템플릿 감지
+          const firstDataRow = allData[0] || [];
+          const headerObj: any = {};
+          firstDataRow.forEach((header: any, index: number) => {
+            headerObj[header] = index;
+          });
+
+          let template = detectMarketTemplate(file.name, headerObj);
+          let marketName = template?.market_name;
+
+          // 템플릿을 찾지 못한 경우 파일명으로 마켓명 추측 후 다시 검색
+          if (!template) {
+            marketName = detectMarketFromFileNameFallback(file.name);
+            // 추측한 마켓명으로 템플릿 다시 검색
+            template = marketTemplates.get(marketName.toLowerCase()) || null;
           }
-          originalError(...args);
-        };
 
-        const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true, WTF: true });
+          // 주문 건수 계산 (실제 데이터 행 개수 - 헤더와 동일한 방식으로)
+          const headerRowIndex = (template?.header_row || 1) - 1;
+          const dataRows = XLSX.utils.sheet_to_json(firstSheet, {
+            range: headerRowIndex,
+            defval: null
+          });
+          const orderCount = dataRows.length;
 
-        // console.error 복원
-        console.error = originalError;
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          // 파일이 오늘 수정되었는지 확인
+          const today = new Date();
+          const fileDate = new Date(file.lastModified);
+          const isToday =
+            fileDate.getFullYear() === today.getFullYear() &&
+            fileDate.getMonth() === today.getMonth() &&
+            fileDate.getDate() === today.getDate();
 
-        // 헤더 행 감지를 위해 먼저 읽기
-        const allData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
+          filePreviews.push({
+            file,
+            marketName: marketName || '알 수 없음',
+            detectedTemplate: template,
+            orderCount,
+            isToday,
+          });
+        } catch (error: any) {
+          // 암호화된 파일 감지
+          console.log('파일 읽기 에러:', error.message, error);
 
-        // 첫 번째 데이터 행으로 템플릿 감지
-        const firstDataRow = allData[0] || [];
-        const headerObj: any = {};
-        firstDataRow.forEach((header: any, index: number) => {
-          headerObj[header] = index;
-        });
-
-        let template = detectMarketTemplate(file.name, headerObj);
-        let marketName = template?.market_name;
-
-        // 템플릿을 찾지 못한 경우 파일명으로 마켓명 추측 후 다시 검색
-        if (!template) {
-          marketName = detectMarketFromFileNameFallback(file.name);
-          // 추측한 마켓명으로 템플릿 다시 검색
-          template = marketTemplates.get(marketName.toLowerCase()) || null;
+          // CFB (Compound File Binary) 형식의 암호화된 파일 감지
+          if (
+            error.message && (
+              error.message.includes('password') ||
+              error.message.includes('encrypted') ||
+              error.message.includes('Unsupported') ||
+              error.message.includes('CFB') ||
+              error.message.toLowerCase().includes('encryption')
+            )
+          ) {
+            console.log('암호화된 파일 감지:', file.name);
+            // 이미 처리된 파일들을 저장
+            setProcessedPreviews(filePreviews);
+            // 원본 FileList 저장
+            setPendingFiles(files);
+            // 암호화된 파일 설정
+            setCurrentPasswordFile(file);
+            setShowPasswordModal(true);
+            setLoading(false);
+            return; // 비밀번호 입력 대기
+          } else {
+            throw error; // 다른 에러는 상위로 전달
+          }
         }
-
-        // 주문 건수 계산 (실제 데이터 행 개수 - 헤더와 동일한 방식으로)
-        const headerRowIndex = (template?.header_row || 1) - 1;
-        const dataRows = XLSX.utils.sheet_to_json(firstSheet, {
-          range: headerRowIndex,
-          defval: null
-        });
-        const orderCount = dataRows.length;
-
-        // 파일이 오늘 수정되었는지 확인
-        const today = new Date();
-        const fileDate = new Date(file.lastModified);
-        const isToday =
-          fileDate.getFullYear() === today.getFullYear() &&
-          fileDate.getMonth() === today.getMonth() &&
-          fileDate.getDate() === today.getDate();
-
-        filePreviews.push({
-          file,
-          marketName: marketName || '알 수 없음',
-          detectedTemplate: template,
-          orderCount,
-          isToday,
-        });
       }
 
       // display_order에 따라 정렬
@@ -808,6 +845,89 @@ export default function ExcelTab() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  // 비밀번호 제출 핸들러
+  const handlePasswordSubmit = async (password: string) => {
+    if (!currentPasswordFile) return;
+
+    setLoading(true);
+
+    try {
+      // FormData 생성
+      const formData = new FormData();
+      formData.append('file', currentPasswordFile);
+      formData.append('password', password);
+
+      // 서버에 복호화 요청
+      const response = await fetch('/api/decrypt-excel', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '파일 복호화에 실패했습니다.');
+      }
+
+      // 복호화된 파일 받기
+      const decryptedBuffer = await response.arrayBuffer();
+
+      // 복호화된 파일을 새 File 객체로 생성
+      const decryptedFile = new File([decryptedBuffer], currentPasswordFile.name, {
+        type: currentPasswordFile.type,
+        lastModified: currentPasswordFile.lastModified,
+      });
+
+      // 비밀번호와 복호화된 파일 저장
+      const newPasswords = new Map(filePasswords);
+      newPasswords.set(currentPasswordFile.name, password);
+      setFilePasswords(newPasswords);
+
+      // 모달 닫기
+      setShowPasswordModal(false);
+      const passwordFileName = currentPasswordFile.name;
+      setCurrentPasswordFile(null);
+
+      // 모든 파일을 다시 조합 (이미 처리된 파일 + 복호화된 파일 + 나머지 파일)
+      const fileList = new DataTransfer();
+
+      if (pendingFiles) {
+        // 모든 원본 파일을 순회하며 추가
+        for (let i = 0; i < pendingFiles.length; i++) {
+          const file = pendingFiles[i];
+          if (file.name === passwordFileName) {
+            // 암호화된 파일 대신 복호화된 파일 추가
+            fileList.items.add(decryptedFile);
+          } else {
+            // 일반 파일은 그대로 추가
+            fileList.items.add(file);
+          }
+        }
+      } else {
+        // pendingFiles가 없으면 복호화된 파일만 추가
+        fileList.items.add(decryptedFile);
+      }
+
+      // 상태 초기화
+      setPendingFiles(null);
+      setProcessedPreviews([]);
+
+      // 모든 파일 다시 처리 (합성 이벤트 생성)
+      const syntheticEvent = {
+        target: { files: fileList.files }
+      } as React.ChangeEvent<HTMLInputElement>;
+
+      await handleFileSelect(syntheticEvent);
+    } catch (error: any) {
+      console.error('복호화 오류:', error);
+      toast.error(error.message || '비밀번호가 올바르지 않습니다.', {
+        duration: 3000,
+        position: 'top-center',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -2117,6 +2237,19 @@ export default function ExcelTab() {
           </div>
         </div>
       )}
+
+      {/* 비밀번호 입력 모달 */}
+      <PasswordModal
+        show={showPasswordModal}
+        fileName={currentPasswordFile?.name || ''}
+        onSubmit={handlePasswordSubmit}
+        onCancel={() => {
+          setShowPasswordModal(false);
+          setCurrentPasswordFile(null);
+          setPendingFiles(null);
+          setProcessedPreviews([]);
+        }}
+      />
     </div>
   );
 }

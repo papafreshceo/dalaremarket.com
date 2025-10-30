@@ -683,7 +683,7 @@ export default function SingleOrderModal({
 
           const orderData = {
             seller_id: user.id,
-            order_number: orderNumber,
+            order_no: orderNumber, // ✅ order_number → order_no 변경
             buyer_name: formData.orderer,
             buyer_phone: formData.ordererPhone,
             recipient_name: recipient.recipient,

@@ -32,8 +32,12 @@ export default function UserHeader() {
   const [ordersModalOpen, setOrdersModalOpen] = useState<boolean>(false);
   const [ordersModalLoaded, setOrdersModalLoaded] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const supabase = createClient();
   const { showToast } = useToast();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [dateFilter, setDateFilter] = useState<'today' | '7days' | '30days' | '90days' | 'all'>('7days');
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -44,6 +48,58 @@ export default function UserHeader() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // 주문 데이터 가져오기
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!user) return;
+
+      // 날짜 필터에 따른 시작 날짜 계산
+      let query = supabase
+        .from('integrated_orders')
+        .select('id, shipping_status, created_at')
+        .eq('seller_id', user.id);
+
+      if (dateFilter !== 'all') {
+        const now = new Date();
+        let startDate = new Date();
+
+        switch (dateFilter) {
+          case 'today':
+            startDate.setHours(0, 0, 0, 0);
+            break;
+          case '7days':
+            startDate.setDate(now.getDate() - 6);
+            startDate.setHours(0, 0, 0, 0);
+            break;
+          case '30days':
+            startDate.setDate(now.getDate() - 29);
+            startDate.setHours(0, 0, 0, 0);
+            break;
+          case '90days':
+            startDate.setDate(now.getDate() - 89);
+            startDate.setHours(0, 0, 0, 0);
+            break;
+        }
+
+        query = query.gte('created_at', startDate.toISOString());
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        setOrders([]);
+      } else {
+        setOrders(data || []);
+      }
+    };
+
+    fetchOrders();
+
+    // 30초마다 새로고침
+    const interval = setInterval(fetchOrders, 30000);
+    return () => clearInterval(interval);
+  }, [user, dateFilter]);
 
   useEffect(() => {
     // 다크모드 감지
@@ -121,6 +177,7 @@ export default function UserHeader() {
       if (event.data.type === 'closeModal') {
         setOrdersModalOpen(false);
         setOrdersModalLoaded(false);
+        setSelectedStatus(null); // Reset selected status when modal closes
       }
     };
 
@@ -180,6 +237,58 @@ export default function UserHeader() {
     await supabase.auth.signOut();
     showToast('로그아웃되었습니다.', 'success');
   };
+
+  // 날짜 필터 레이블
+  const dateFilterLabels: Record<typeof dateFilter, string> = {
+    today: '오늘',
+    '7days': '최근 7일',
+    '30days': '최근 30일',
+    '90days': '최근 90일',
+    all: '전체'
+  };
+
+  // 상태별 설정
+  const statusConfig: Record<string, { label: string; color: string }> = {
+    registered: { label: '등록', color: '#2563eb' },
+    confirmed: { label: '확정', color: '#7c3aed' },
+    preparing: { label: '준비중', color: '#f59e0b' },
+    shipped: { label: '발송', color: '#10b981' },
+    cancelRequested: { label: '취소요청', color: '#f87171' },
+    cancelled: { label: '취소', color: '#6b7280' },
+    refunded: { label: '환불', color: '#10b981' }
+  };
+
+  // shipping_status를 매핑하는 함수
+  const mapShippingStatus = (shippingStatus: string | null): string => {
+    if (!shippingStatus) return 'registered';
+
+    const statusMap: Record<string, string> = {
+      '발주서등록': 'registered',
+      '발주서확정': 'confirmed',
+      '결제완료': 'confirmed',
+      '상품준비중': 'preparing',
+      '배송중': 'shipped',
+      '배송완료': 'shipped',
+      '발송완료': 'shipped',
+      '취소요청': 'cancelRequested',
+      '취소완료': 'cancelled',
+      '환불완료': 'refunded',
+      'refunded': 'refunded'
+    };
+
+    return statusMap[shippingStatus] || 'registered';
+  };
+
+  // 상태별 통계
+  const statsData = [
+    { status: 'registered', count: orders.filter(o => mapShippingStatus(o.shipping_status) === 'registered').length },
+    { status: 'confirmed', count: orders.filter(o => mapShippingStatus(o.shipping_status) === 'confirmed').length },
+    { status: 'preparing', count: orders.filter(o => mapShippingStatus(o.shipping_status) === 'preparing').length },
+    { status: 'shipped', count: orders.filter(o => mapShippingStatus(o.shipping_status) === 'shipped').length },
+    { status: 'cancelRequested', count: orders.filter(o => mapShippingStatus(o.shipping_status) === 'cancelRequested').length },
+    { status: 'cancelled', count: orders.filter(o => mapShippingStatus(o.shipping_status) === 'cancelled').length },
+    { status: 'refunded', count: orders.filter(o => mapShippingStatus(o.shipping_status) === 'refunded').length }
+  ];
 
   return (
     <>
@@ -416,9 +525,218 @@ export default function UserHeader() {
             )}
           </div>
 
-          {/* 우측 버튼들 (데스크톱) */}
+          {/* 우측: 발주관리시스템 버튼 + 상태 통계 배지 + 로그인 정보/버튼들 (데스크톱) */}
           {!isMobile && (
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flex: '0 0 auto' }}>
+              {/* 발주관리시스템 버튼 + 상태 통계 배지 (로그인 시) */}
+              {user && (
+                <>
+                  {/* 발주관리시스템 버튼 */}
+                  <button
+                    onClick={() => setOrdersModalOpen(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 14px',
+                      background: 'white',
+                      border: '1px solid #2563eb',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#2563eb',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#2563eb';
+                      e.currentTarget.style.color = 'white';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'white';
+                      e.currentTarget.style.color = '#2563eb';
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                      <polyline points="16 17 21 12 16 7"></polyline>
+                      <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    발주관리시스템
+                  </button>
+
+                  {/* 날짜 필터 드롭다운 */}
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      onClick={() => setShowDateDropdown(!showDateDropdown)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        background: 'white',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        color: '#6b7280',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#9ca3af';
+                        e.currentTarget.style.background = '#f9fafb';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#d1d5db';
+                        e.currentTarget.style.background = 'white';
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                      </svg>
+                      {dateFilterLabels[dateFilter]}
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{
+                        transform: showDateDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s'
+                      }}>
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    </button>
+
+                    {/* 드롭다운 메뉴 */}
+                    {showDateDropdown && (
+                      <>
+                        {/* 오버레이 */}
+                        <div
+                          onClick={() => setShowDateDropdown(false)}
+                          style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            zIndex: 999
+                          }}
+                        />
+                        {/* 드롭다운 */}
+                        <div style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 8px)',
+                          right: 0,
+                          background: 'white',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+                          zIndex: 1000,
+                          minWidth: '140px',
+                          overflow: 'hidden'
+                        }}>
+                          {(['today', '7days', '30days', '90days', 'all'] as const).map((filter) => (
+                            <button
+                              key={filter}
+                              onClick={() => {
+                                setDateFilter(filter);
+                                setShowDateDropdown(false);
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '10px 16px',
+                                textAlign: 'left',
+                                background: dateFilter === filter ? '#f0f9ff' : 'white',
+                                border: 'none',
+                                fontSize: '13px',
+                                fontWeight: dateFilter === filter ? '600' : '400',
+                                color: dateFilter === filter ? '#2563eb' : '#374151',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
+                              }}
+                              onMouseEnter={(e) => {
+                                if (dateFilter !== filter) {
+                                  e.currentTarget.style.background = '#f9fafb';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (dateFilter !== filter) {
+                                  e.currentTarget.style.background = 'white';
+                                }
+                              }}
+                            >
+                              {dateFilterLabels[filter]}
+                              {dateFilter === filter && (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* 상태 통계 배지들 (0인 항목은 숨김) */}
+                  {statsData.map((stat) => {
+                    const config = statusConfig[stat.status];
+                    if (!config || stat.count === 0) return null;
+                    return (
+                      <div
+                        key={stat.status}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          background: 'white',
+                          border: `1px solid ${config.color}30`,
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          whiteSpace: 'nowrap',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onClick={() => {
+                          setSelectedStatus(stat.status);
+                          // 모달이 이미 열려있으면 닫았다가 다시 열기
+                          if (ordersModalOpen) {
+                            setOrdersModalOpen(false);
+                            setOrdersModalLoaded(false);
+                            setTimeout(() => {
+                              setOrdersModalOpen(true);
+                            }, 50);
+                          } else {
+                            setOrdersModalLoaded(false);
+                            setOrdersModalOpen(true);
+                          }
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = `${config.color}10`;
+                          e.currentTarget.style.borderColor = config.color;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'white';
+                          e.currentTarget.style.borderColor = `${config.color}30`;
+                        }}
+                      >
+                        <span style={{ color: config.color, fontSize: '8px' }}>●</span>
+                        <span style={{ color: '#6b7280' }}>{config.label}</span>
+                        <span style={{ color: config.color, fontWeight: '600' }}>{stat.count}</span>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             {user ? (
               <>
                 <span style={{ fontSize: '14px', color: '#495057' }}>
@@ -691,6 +1009,7 @@ export default function UserHeader() {
             onClick={() => {
               setOrdersModalOpen(false);
               setOrdersModalLoaded(false);
+              setSelectedStatus(null); // Reset selected status when modal closes
             }}
             style={{
               position: 'fixed',
@@ -784,8 +1103,29 @@ export default function UserHeader() {
 
             {/* iframe으로 orders 페이지 로드 */}
             <iframe
+              key={selectedStatus || 'default'} // Force iframe reload when selectedStatus changes
               className="orders-modal-iframe"
-              src="/platform/orders?modal=true"
+              ref={(iframe) => {
+                if (iframe && selectedStatus) {
+                  // iframe이 로드되면 메시지 전송
+                  const sendMessage = () => {
+                    if (iframe.contentWindow) {
+                      iframe.contentWindow.postMessage(
+                        { type: 'setStatus', status: selectedStatus },
+                        window.location.origin
+                      );
+                    }
+                  };
+
+                  // 이미 로드되어 있으면 바로 전송, 아니면 onload 이벤트 대기
+                  if (iframe.contentDocument?.readyState === 'complete') {
+                    setTimeout(sendMessage, 100);
+                  } else {
+                    iframe.addEventListener('load', () => setTimeout(sendMessage, 100), { once: true });
+                  }
+                }
+              }}
+              src={selectedStatus ? `/platform/orders?modal=true&status=${selectedStatus}` : "/platform/orders?modal=true"}
               onLoad={() => setOrdersModalLoaded(true)}
               style={{
                 width: '100%',

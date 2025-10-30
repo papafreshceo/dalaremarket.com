@@ -176,13 +176,14 @@ export default function RegisterOptionProductPage() {
     setSelectedCategory(null)
     setSelectedMaterials([...selectedMaterials, material])
 
+    // 첫 번째 원물 선택 시 시즌 정보를 옵션 행에 반영
     if (selectedMaterials.length === 0) {
-      setOptionData((prev: any) => ({
-        ...prev,
+      setOptionRows((prev) => prev.map(row => ({
+        ...row,
         season_start_date: material.season_start_date || '',
         season_end_date: material.season_end_date || '',
         season: material.season || ''
-      }))
+      })))
     }
 
     showToast('원물이 추가되었습니다.', 'success')
@@ -653,7 +654,7 @@ export default function RegisterOptionProductPage() {
                     />
                   </th>
                   {/* 기본 정보 */}
-                  <th className="border px-2 py-2 font-semibold min-w-[100px]">옵션코드</th>
+                  <th className="border px-2 py-2 font-semibold min-w-[200px]">옵션코드</th>
                   <th className="border px-2 py-2 font-semibold min-w-[120px]">옵션명*</th>
                   <th className="border px-2 py-2 font-semibold min-w-[80px]">규격1</th>
                   <th className="border px-2 py-2 font-semibold min-w-[80px]">규격2</th>
