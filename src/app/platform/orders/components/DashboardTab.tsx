@@ -2003,7 +2003,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                 {/* 헤더 컨테이너 */}
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '8px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#6366f1', margin: 0 }}>품목별 통계</h3>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#6366f1', margin: 0 }}>품목</h3>
                   {selectedProducts.map((p, idx) => {
                     const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
                     return (
@@ -2231,7 +2231,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                 {/* 헤더 컨테이너 */}
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '8px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#8b5cf6', margin: 0 }}>옵션별 통계</h3>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#8b5cf6', margin: 0 }}>옵션</h3>
                   {selectedOptions.map((o, idx) => {
                     const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
                     return (
