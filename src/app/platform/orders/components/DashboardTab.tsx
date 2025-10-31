@@ -2054,7 +2054,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 {productStats.dates.length > 0 && productStats.lines.length > 0 ? (
                   <>
                     {/* 메인 그래프 */}
-                    <svg viewBox="0 0 1200 402" style={{ width: '100%', height: '350px', display: 'block' }}>
+                    <svg viewBox="0 0 1200 412" style={{ width: '100%', height: '350px', display: 'block' }}>
                       {(() => {
                         const maxAmount = Math.max(
                           ...productStats.lines.flatMap(line => line.data.map(d => d.amount)),
@@ -2168,7 +2168,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                 <text
                                   key={idx}
                                   x={x}
-                                  y="392"
+                                  y="402"
                                   fontSize="10"
                                   fill="#6b7280"
                                   textAnchor="middle"
@@ -2289,7 +2289,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 {optionStats.dates.length > 0 && optionStats.lines.length > 0 ? (
                   <>
                     {/* 메인 그래프 */}
-                    <svg viewBox="0 0 1200 402" style={{ width: '100%', height: '350px', display: 'block' }}>
+                    <svg viewBox="0 0 1200 412" style={{ width: '100%', height: '350px', display: 'block' }}>
                       {(() => {
                         const maxAmount = Math.max(
                           ...optionStats.lines.flatMap(line => line.data.map(d => d.amount)),
@@ -2403,7 +2403,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                 <text
                                   key={idx}
                                   x={x}
-                                  y="392"
+                                  y="402"
                                   fontSize="10"
                                   fill="#6b7280"
                                   textAnchor="middle"
