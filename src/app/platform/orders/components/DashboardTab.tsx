@@ -675,8 +675,17 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       data: Array<{ date: string; amount: number }>;
     }> = [];
 
+    // 전체 마켓 목록 생성 (색상 일관성 유지용)
+    const allMarketsSet = new Set<string>();
+    filteredOrders.forEach(order => {
+      const marketName = order.sellerMarketName || '미지정';
+      allMarketsSet.add(marketName);
+    });
+    const allMarketsList = Array.from(allMarketsSet).sort();
+
     selectedItems.forEach((item, itemIdx) => {
-      selectedMarkets.forEach((market, marketIdx) => {
+      selectedMarkets.forEach((market) => {
+        const marketIdx = allMarketsList.indexOf(market);
         lines.push({
           label: `${item} - ${market}`,
           item,
@@ -696,6 +705,26 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       lines
     };
   }, [filteredOrders, selectedProducts, selectedOptions, selectedMarkets, startDate, endDate, activeTab, optionNameToCategory4]);
+
+  // 모든 마켓 목록 추출 (범례 표시용)
+  const allMarkets = useMemo(() => {
+    const markets = new Set<string>();
+    filteredOrders.forEach(order => {
+      const marketName = order.sellerMarketName || '미지정';
+      markets.add(marketName);
+    });
+    return Array.from(markets).sort();
+  }, [filteredOrders]);
+
+  // 마켓 색상 매핑
+  const marketColors = ['#6366f1', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+  const marketColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    allMarkets.forEach((market, idx) => {
+      map.set(market, marketColors[idx % marketColors.length]);
+    });
+    return map;
+  }, [allMarkets]);
 
   // 발주 캘린더 JSX
   const calendarJSX = (
@@ -2036,9 +2065,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       {/* 마켓별 색상 (클릭 가능) */}
                       <div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                          {Array.from(new Set(productOptionStats.lines.map(l => l.market))).map((market) => {
-                            const line = productOptionStats.lines.find(l => l.market === market);
+                          {allMarkets.map((market) => {
                             const isSelected = selectedMarkets.includes(market);
+                            const color = marketColorMap.get(market);
                             return (
                               <div
                                 key={market}
@@ -2058,7 +2087,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                   transition: 'opacity 0.2s'
                                 }}
                               >
-                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: line?.color }} />
+                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color }} />
                                 <span style={{ fontSize: '11px' }}>{market}</span>
                               </div>
                             );
@@ -2257,9 +2286,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       {/* 마켓별 색상 (클릭 가능) */}
                       <div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                          {Array.from(new Set(productOptionStats.lines.map(l => l.market))).map((market) => {
-                            const line = productOptionStats.lines.find(l => l.market === market);
+                          {allMarkets.map((market) => {
                             const isSelected = selectedMarkets.includes(market);
+                            const color = marketColorMap.get(market);
                             return (
                               <div
                                 key={market}
@@ -2288,7 +2317,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                   (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
                                 }}
                               >
-                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: line?.color }} />
+                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color }} />
                                 <span style={{ fontSize: '11px' }}>{market}</span>
                               </div>
                             );
