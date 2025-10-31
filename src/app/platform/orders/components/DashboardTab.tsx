@@ -531,11 +531,22 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       allDates.push(formatYmdKst(d));
     }
 
-    // 30일 초과 시 30개로 샘플링
+    // 30일 초과 시 30개로 샘플링 (시작일과 종료일 반드시 포함)
     let displayDates = allDates;
     if (allDates.length > 30) {
-      const step = allDates.length / 30;
-      displayDates = Array.from({ length: 30 }, (_, i) => allDates[Math.floor(i * step)]);
+      const sampledDates = [allDates[0]]; // 시작일 추가
+
+      // 중간 날짜들 균등 샘플링 (28개)
+      const middleCount = 28;
+      for (let i = 1; i <= middleCount; i++) {
+        const index = Math.floor((i * (allDates.length - 1)) / (middleCount + 1));
+        if (index > 0 && index < allDates.length - 1 && !sampledDates.includes(allDates[index])) {
+          sampledDates.push(allDates[index]);
+        }
+      }
+
+      sampledDates.push(allDates[allDates.length - 1]); // 종료일 추가
+      displayDates = sampledDates;
     }
 
     const sortedDates = displayDates;
@@ -652,11 +663,22 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       allDates.push(formatYmdKst(d));
     }
 
-    // 30일 초과 시 30개로 샘플링
+    // 30일 초과 시 30개로 샘플링 (시작일과 종료일 반드시 포함)
     let displayDates = allDates;
     if (allDates.length > 30) {
-      const step = allDates.length / 30;
-      displayDates = Array.from({ length: 30 }, (_, i) => allDates[Math.floor(i * step)]);
+      const sampledDates = [allDates[0]]; // 시작일 추가
+
+      // 중간 날짜들 균등 샘플링 (28개)
+      const middleCount = 28;
+      for (let i = 1; i <= middleCount; i++) {
+        const index = Math.floor((i * (allDates.length - 1)) / (middleCount + 1));
+        if (index > 0 && index < allDates.length - 1 && !sampledDates.includes(allDates[index])) {
+          sampledDates.push(allDates[index]);
+        }
+      }
+
+      sampledDates.push(allDates[allDates.length - 1]); // 종료일 추가
+      displayDates = sampledDates;
     }
 
     const sortedDates = displayDates;
