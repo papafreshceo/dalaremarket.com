@@ -2053,10 +2053,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 {/* 그래프 */}
                 {productStats.dates.length > 0 && productStats.lines.length > 0 ? (
                   <>
-                    {/* 그래프 컨테이너 */}
-                    <div style={{ background: '#ffffff', padding: '0 16px', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
                     {/* 메인 그래프 */}
-                    <svg viewBox="0 0 1200 400" style={{ width: '100%', height: '350px', display: 'block', verticalAlign: 'bottom' }}>
+                    <svg viewBox="0 0 1200 400" style={{ width: '100%', height: '350px', display: 'block' }}>
                       {(() => {
                         const maxAmount = Math.max(
                           ...productStats.lines.flatMap(line => line.data.map(d => d.amount)),
@@ -2183,7 +2181,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         );
                       })()}
                     </svg>
-                    </div>
 
                     {/* 범례 컨테이너 */}
                     <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px' }}>
@@ -2291,10 +2288,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 {/* 그래프 */}
                 {optionStats.dates.length > 0 && optionStats.lines.length > 0 ? (
                   <>
-                    {/* 그래프 컨테이너 */}
-                    <div style={{ background: '#ffffff', padding: '0 16px', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
                     {/* 메인 그래프 */}
-                    <svg viewBox="0 0 1200 400" style={{ width: '100%', height: '350px', display: 'block', verticalAlign: 'bottom' }}>
+                    <svg viewBox="0 0 1200 400" style={{ width: '100%', height: '350px', display: 'block' }}>
                       {(() => {
                         const maxAmount = Math.max(
                           ...optionStats.lines.flatMap(line => line.data.map(d => d.amount)),
@@ -2421,7 +2416,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         );
                       })()}
                     </svg>
-                    </div>
 
                     {/* 범례 컨테이너 */}
                     <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px' }}>
