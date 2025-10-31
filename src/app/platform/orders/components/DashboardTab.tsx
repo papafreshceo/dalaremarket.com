@@ -1955,7 +1955,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                     fill="#6b7280"
                                     textAnchor="end"
                                   >
-                                    ₩{(value / 10000).toFixed(0)}만
+                                    {value.toLocaleString()}
                                   </text>
                                 </g>
                               );
@@ -2176,7 +2176,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                     fill="#6b7280"
                                     textAnchor="end"
                                   >
-                                    ₩{(value / 10000).toFixed(0)}만
+                                    {value.toLocaleString()}
                                   </text>
                                 </g>
                               );
