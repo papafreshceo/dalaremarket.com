@@ -73,11 +73,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
   const [hoveredBadge, setHoveredBadge] = useState<{ type: string; amount: number; position: { x: number; y: number } } | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<Order['status'] | null>(null);
 
-  // 품목/옵션별 통계 탭 상태
-  const [activeTab, setActiveTab] = useState<'product' | 'option'>('product');
+  // 품목/옵션별 통계 상태
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
-  const [selectedMarkets, setSelectedMarkets] = useState<string[]>([]);
+  const [selectedProductMarkets, setSelectedProductMarkets] = useState<string[]>([]);
+  const [selectedOptionMarkets, setSelectedOptionMarkets] = useState<string[]>([]);
 
   // 그래프 툴팁 상태
   const [tooltip, setTooltip] = useState<{x: number, y: number, item: string, market: string, date: string, amount: number} | null>(null);
@@ -625,18 +625,20 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
   // selectedMarkets 초기화 (마켓 목록 변경 시)
   useEffect(() => {
     const allMarkets = Array.from(new Set(filteredOrders.map(o => o.sellerMarketName || '미지정')));
-    if (selectedMarkets.length === 0) {
-      setSelectedMarkets(allMarkets);
+    if (selectedProductMarkets.length === 0) {
+      setSelectedProductMarkets(allMarkets);
+    }
+    if (selectedOptionMarkets.length === 0) {
+      setSelectedOptionMarkets(allMarkets);
     }
   }, [filteredOrders]);
 
-  // 품목/옵션별 통계 그래프 데이터
-  const productOptionStats = useMemo(() => {
-    // activeTab에 따라 선택된 품목 또는 옵션상품 목록
-    const selectedItems = activeTab === 'product' ? selectedProducts : (activeTab === 'option' ? selectedOptions : []);
-    const itemType = activeTab === 'product' ? 'product' : 'option';
+  // 품목별 통계 그래프 데이터
+  const productStats = useMemo(() => {
+    const selectedItems = selectedProducts;
+    const itemType = 'product';
 
-    if (selectedItems.length === 0 || selectedMarkets.length === 0) {
+    if (selectedItems.length === 0 || selectedProductMarkets.length === 0) {
       return { dates: [], lines: [] };
     }
 
@@ -650,16 +652,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       const marketName = order.sellerMarketName || '미지정';
 
       // 선택된 마켓만 처리
-      if (!selectedMarkets.includes(marketName)) return;
+      if (!selectedProductMarkets.includes(marketName)) return;
 
-      let itemName = '';
-      if (itemType === 'product') {
-        // optionName으로 category4 조회
-        const optionName = order.optionName || '';
-        itemName = optionNameToCategory4.get(optionName) || '미지정';
-      } else {
-        itemName = order.optionName || '미지정';
-      }
+      // optionName으로 category4 조회
+      const optionName = order.optionName || '';
+      const itemName = optionNameToCategory4.get(optionName) || '미지정';
 
       // 선택된 품목/옵션만 처리
       if (!selectedItems.includes(itemName)) return;
@@ -729,7 +726,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     const allMarketsList = Array.from(allMarketsSet).sort();
 
     selectedItems.forEach((item, itemIdx) => {
-      selectedMarkets.forEach((market) => {
+      selectedProductMarkets.forEach((market) => {
         const marketIdx = allMarketsList.indexOf(market);
         lines.push({
           label: `${item} - ${market}`,
@@ -749,7 +746,120 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       dates: sortedDates,
       lines
     };
-  }, [filteredOrders, selectedProducts, selectedOptions, selectedMarkets, startDate, endDate, activeTab, optionNameToCategory4]);
+  }, [filteredOrders, selectedProducts, selectedProductMarkets, startDate, endDate, optionNameToCategory4]);
+
+  // 옵션별 통계 그래프 데이터
+  const optionStats = useMemo(() => {
+    const selectedItems = selectedOptions;
+
+    if (selectedItems.length === 0 || selectedOptionMarkets.length === 0) {
+      return { dates: [], lines: [] };
+    }
+
+    // 날짜별 데이터 맵 생성
+    const dateItemMarketMap = new Map<string, Map<string, Map<string, number>>>();
+
+    filteredOrders.forEach(order => {
+      const b = getBaseDate(order);
+      if (!b) return;
+      const dateKey = ymdKst(b);
+      const marketName = order.sellerMarketName || '미지정';
+
+      // 선택된 마켓만 처리
+      if (!selectedOptionMarkets.includes(marketName)) return;
+
+      // optionName 사용
+      const itemName = order.optionName || '미지정';
+
+      // 선택된 옵션만 처리
+      if (!selectedItems.includes(itemName)) return;
+
+      if (!dateItemMarketMap.has(dateKey)) {
+        dateItemMarketMap.set(dateKey, new Map());
+      }
+      const itemMap = dateItemMarketMap.get(dateKey)!;
+
+      if (!itemMap.has(itemName)) {
+        itemMap.set(itemName, new Map());
+      }
+      const marketMap = itemMap.get(itemName)!;
+
+      marketMap.set(marketName, (marketMap.get(marketName) || 0) + (order.supplyPrice || 0));
+    });
+
+    // startDate부터 endDate까지 모든 날짜 생성
+    const allDates: string[] = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      allDates.push(formatYmdKst(d));
+    }
+
+    // 30일 초과 시 30개로 샘플링 (시작일과 종료일 반드시 포함)
+    let displayDates = allDates;
+    if (allDates.length > 30) {
+      const sampledDates = [allDates[0]]; // 시작일 추가
+
+      // 중간 날짜들 균등 샘플링 (28개)
+      const middleCount = 28;
+      for (let i = 1; i <= middleCount; i++) {
+        const index = Math.floor((i * (allDates.length - 1)) / (middleCount + 1));
+        if (index > 0 && index < allDates.length - 1 && !sampledDates.includes(allDates[index])) {
+          sampledDates.push(allDates[index]);
+        }
+      }
+
+      sampledDates.push(allDates[allDates.length - 1]); // 종료일 추가
+      displayDates = sampledDates;
+    }
+
+    const sortedDates = displayDates;
+
+    // 선 스타일 정의
+    const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
+    const marketColors = ['#6366f1', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+    // 옵션 × 마켓 조합으로 선 생성
+    const lines: Array<{
+      label: string;
+      item: string;
+      market: string;
+      color: string;
+      dashStyle: string;
+      data: Array<{ date: string; amount: number }>;
+    }> = [];
+
+    // 전체 마켓 목록 생성 (색상 일관성 유지용)
+    const allMarketsSet = new Set<string>();
+    filteredOrders.forEach(order => {
+      const marketName = order.sellerMarketName || '미지정';
+      allMarketsSet.add(marketName);
+    });
+    const allMarketsList = Array.from(allMarketsSet).sort();
+
+    selectedItems.forEach((item, itemIdx) => {
+      selectedOptionMarkets.forEach((market) => {
+        const marketIdx = allMarketsList.indexOf(market);
+        lines.push({
+          label: `${item} - ${market}`,
+          item,
+          market,
+          color: marketColors[marketIdx % marketColors.length],
+          dashStyle: dashStyles[itemIdx % dashStyles.length],
+          data: sortedDates.map(date => ({
+            date,
+            amount: dateItemMarketMap.get(date)?.get(item)?.get(market) || 0
+          }))
+        });
+      });
+    });
+
+    return {
+      dates: sortedDates,
+      lines
+    };
+  }, [filteredOrders, selectedOptions, selectedOptionMarkets, startDate, endDate]);
 
   // 모든 마켓 목록 추출 (범례 표시용)
   const allMarkets = useMemo(() => {
