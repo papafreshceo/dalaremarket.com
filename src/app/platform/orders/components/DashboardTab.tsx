@@ -1884,7 +1884,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             transform: 'translateX(-50%)',
             background: 'rgba(0, 0, 0, 0.9)',
             color: 'white',
-            padding: '6px 12px',c
+            padding: '6px 12px',
             borderRadius: '6px',
             fontSize: '12px',
             fontWeight: '600',
