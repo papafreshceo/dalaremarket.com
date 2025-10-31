@@ -2134,13 +2134,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                         key={idx}
                                         cx={x}
                                         cy={y}
-                                        r="3"
+                                        r="8"
                                         fill={line.color}
                                         style={{ cursor: 'pointer' }}
                                         onMouseEnter={(e) => {
                                           setTooltip({
                                             x: e.clientX,
-                                            y: e.clientY,
+                                            y: e.clientY - 40,
                                             item: line.item,
                                             market: line.market,
                                             date: productStats.dates[idx],
