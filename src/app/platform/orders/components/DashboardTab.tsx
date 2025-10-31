@@ -12,7 +12,7 @@ interface DashboardTabProps {
 
 export default function DashboardTab({ isMobile, orders, statusConfig }: DashboardTabProps) {
   // 부드러운 곡선 경로 생성 함수 (Cardinal spline)
-  const createSmoothPath = (points: { x: number; y: number }[], tension = 0.3) => {
+  const createSmoothPath = (points: { x: number; y: number }[], tension = 0.1) => {
     if (points.length < 2) return '';
 
     let path = `M ${points[0].x},${points[0].y}`;
