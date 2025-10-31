@@ -2000,9 +2000,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               {/* 품목별 통계 */}
               <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                 {/* 헤더 컨테이너 */}
-                <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px' }}>
+                <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#6366f1' }}>품목별 통계</h3>
 
                   {/* 선택 정보 표시 */}
@@ -2235,9 +2235,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
               {/* 옵션별 통계 */}
               <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                 {/* 헤더 컨테이너 */}
-                <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px' }}>
+                <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#8b5cf6' }}>옵션별 통계</h3>
 
                   {/* 선택 정보 표시 */}
