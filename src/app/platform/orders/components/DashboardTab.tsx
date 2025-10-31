@@ -1628,14 +1628,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       const isInTop10 = idx < 10;
                       const color = isInTop10 ? colors[idx % colors.length] : '#9ca3af';
                       const isSelected = selectedProducts.includes(item.name);
-                      const isDisabled = selectedOptions.length > 0; // 옵션이 선택되면 품목은 비활성화
 
                       return (
                         <div
                           key={idx}
                           onClick={() => {
-                            if (isDisabled) return; // 비활성화된 경우 클릭 무시
-
                             if (isSelected) {
                               // 이미 선택된 경우 제거
                               setSelectedProducts(selectedProducts.filter(p => p !== item.name));
@@ -1651,11 +1648,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                             alignItems: 'center',
                             marginBottom: '4px',
                             gap: '8px',
-                            cursor: isDisabled ? 'not-allowed' : 'pointer',
+                            cursor: 'pointer',
                             padding: '2px 8px',
                             marginLeft: '-8px',
                             borderRadius: '6px',
-                            opacity: isDisabled ? 0.4 : 1,
                             transition: 'all 0.2s ease'
                           }}
                           onMouseEnter={e => {
@@ -1734,14 +1730,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 {optionTop10.length > 0 ? (
                   optionTop10.map((item, idx) => {
                     const isSelected = selectedOptions.includes(item.name);
-                    const isDisabled = selectedProducts.length > 0; // 품목이 선택되면 옵션은 비활성화
 
                     return (
                       <div
                         key={idx}
                         onClick={() => {
-                          if (isDisabled) return; // 비활성화된 경우 클릭 무시
-
                           if (isSelected) {
                             // 이미 선택된 경우 제거
                             setSelectedOptions(selectedOptions.filter(o => o !== item.name));
@@ -1756,8 +1749,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                           marginBottom: '3px',
                           padding: '3px 8px',
                           borderRadius: '6px',
-                          cursor: isDisabled ? 'not-allowed' : 'pointer',
-                          opacity: isDisabled ? 0.4 : 1,
+                          cursor: 'pointer',
                           transition: 'all 0.2s ease'
                         }}
                       >
