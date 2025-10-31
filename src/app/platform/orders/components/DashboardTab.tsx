@@ -1967,77 +1967,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           {/* 마켓별 통계 */}
           <div className="card" style={{ borderRadius: '12px', padding: '20px', width: '100%', background: 'none', boxShadow: 'none' }}>
             {/* 탭 헤더 */}
-            <div style={{ marginBottom: '16px' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '24px',
-                  borderBottom: '2px solid #e5e7eb',
-                  position: 'relative'
-                }}
-              >
-                <button
-                  onClick={() => setActiveTab('product')}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: '12px 4px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: activeTab === 'product' ? '#6366f1' : '#6b7280',
-                    cursor: 'pointer',
-                    position: 'relative',
-                    transition: 'color 0.2s'
-                  }}
-                >
-                  품목별 통계
-                  {activeTab === 'product' && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: '-2px',
-                        left: 0,
-                        right: 0,
-                        height: '2px',
-                        background: '#6366f1'
-                      }}
-                    />
-                  )}
-                </button>
-                <button
-                  onClick={() => setActiveTab('option')}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: '12px 4px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: activeTab === 'option' ? '#6366f1' : '#6b7280',
-                    cursor: 'pointer',
-                    position: 'relative',
-                    transition: 'color 0.2s'
-                  }}
-                >
-                  옵션별 통계
-                  {activeTab === 'option' && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: '-2px',
-                        left: 0,
-                        right: 0,
-                        height: '2px',
-                        background: '#6366f1'
-                      }}
-                    />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* 품목별 통계 탭 */}
-            {activeTab === 'product' && (
+            {/* 품목별 / 옵션별 통계 좌우 배치 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+              {/* 품목별 통계 */}
+              <div style={{ minWidth: 0 }}>
               <div>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: '#6366f1' }}>품목별 통계</h3>
+
                 {/* 선택 정보 표시 */}
                 {selectedProducts.length > 0 && (
                   <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -2087,13 +2023,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 )}
 
                 {/* 그래프 */}
-                {productOptionStats.dates.length > 0 && productOptionStats.lines.length > 0 ? (
+                {productStats.dates.length > 0 && productStats.lines.length > 0 ? (
                   <div style={{ position: 'relative' }}>
                     {/* 메인 그래프 */}
                     <svg viewBox="0 0 1200 250" style={{ width: '100%', height: '250px' }}>
                       {(() => {
                         const maxAmount = Math.max(
-                          ...productOptionStats.lines.flatMap(line => line.data.map(d => d.amount)),
+                          ...productStats.lines.flatMap(line => line.data.map(d => d.amount)),
                           10000
                         );
 
@@ -2101,7 +2037,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         const maxY = Math.ceil(maxAmount * 1.1 / 10000) * 10000;
                         const yStep = maxY / 5;
 
-                        const dateCount = productOptionStats.dates.length;
+                        const dateCount = productStats.dates.length;
                         const divisor = dateCount > 1 ? dateCount - 1 : 1;
 
                         // 그래프 영역 설정
@@ -2148,8 +2084,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                               );
                             })}
 
-                            {/* 품목/옵션 × 마켓 조합별 선 */}
-                            {productOptionStats.lines.map((line, lineIdx) => {
+                            {/* 품목 × 마켓 조합별 선 */}
+                            {productStats.lines.map((line, lineIdx) => {
                               const points = line.data.map((d, idx) => {
                                 const x = chartLeft + (idx / divisor) * chartWidth;
                                 const y = chartBottom - (d.amount / maxY) * chartHeight;
@@ -2184,7 +2120,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                             y: e.clientY,
                                             item: line.item,
                                             market: line.market,
-                                            date: productOptionStats.dates[idx],
+                                            date: productStats.dates[idx],
                                             amount: d.amount
                                           });
                                         }}
@@ -2197,8 +2133,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                             })}
 
                             {/* X축 날짜 라벨 */}
-                            {productOptionStats.dates.map((date, idx) => {
-                              const divisor = productOptionStats.dates.length > 1 ? productOptionStats.dates.length - 1 : 1;
+                            {productStats.dates.map((date, idx) => {
+                              const divisor = productStats.dates.length > 1 ? productStats.dates.length - 1 : 1;
                               const x = chartLeft + (idx / divisor) * chartWidth;
                               return (
                                 <text
@@ -2224,16 +2160,16 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       <div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                           {allMarkets.map((market) => {
-                            const isSelected = selectedMarkets.includes(market);
+                            const isSelected = selectedProductMarkets.includes(market);
                             const color = marketColorMap.get(market);
                             return (
                               <div
                                 key={market}
                                 onClick={() => {
                                   if (isSelected) {
-                                    setSelectedMarkets(selectedMarkets.filter(m => m !== market));
+                                    setSelectedProductMarkets(selectedProductMarkets.filter(m => m !== market));
                                   } else {
-                                    setSelectedMarkets([...selectedMarkets, market]);
+                                    setSelectedProductMarkets([...selectedProductMarkets, market]);
                                   }
                                 }}
                                 style={{
@@ -2261,11 +2197,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   </div>
                 )}
               </div>
-            )}
+              </div>
 
-            {/* 옵션별 통계 탭 */}
-            {activeTab === 'option' && (
+              {/* 옵션별 통계 */}
+              <div style={{ minWidth: 0 }}>
               <div>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: '#8b5cf6' }}>옵션별 통계</h3>
+
                 {/* 선택 정보 표시 */}
                 {selectedOptions.length > 0 && (
                   <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -2498,7 +2436,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   </div>
                 )}
               </div>
-            )}
+              </div>
+            </div>
           </div>
 
           {/* 두 번째 행: 최근 7일 + 월별 발주 추이 */}
