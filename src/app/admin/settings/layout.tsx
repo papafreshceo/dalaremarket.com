@@ -196,6 +196,27 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
                 <div className="text-[10px] font-semibold text-green-600">정상</div>
               </div>
             </div>
+            {process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA && (
+              <>
+                <div>
+                  <div className="text-[9px] text-gray-500">커밋</div>
+                  <div className="text-[10px] font-mono font-semibold text-gray-900">
+                    {process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA.substring(0, 7)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[9px] text-gray-500">배포일시</div>
+                  <div className="text-[10px] font-semibold text-gray-900">
+                    {new Date(process.env.NEXT_PUBLIC_BUILD_TIME || Date.now()).toLocaleString('ko-KR', {
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
