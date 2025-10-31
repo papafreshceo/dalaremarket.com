@@ -2130,25 +2130,35 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                     const x = chartLeft + (idx / divisor) * chartWidth;
                                     const y = chartBottom - (d.amount / maxY) * chartHeight;
                                     return (
-                                      <circle
-                                        key={idx}
-                                        cx={x}
-                                        cy={y}
-                                        r="8"
-                                        fill={line.color}
-                                        style={{ cursor: 'pointer' }}
-                                        onMouseEnter={(e) => {
-                                          setTooltip({
-                                            x: e.clientX,
-                                            y: e.clientY - 40,
-                                            item: line.item,
-                                            market: line.market,
-                                            date: productStats.dates[idx],
-                                            amount: d.amount
-                                          });
-                                        }}
-                                        onMouseLeave={() => setTooltip(null)}
-                                      />
+                                      <g key={idx}>
+                                        {/* 투명한 큰 원 - 마우스 영역 */}
+                                        <circle
+                                          cx={x}
+                                          cy={y}
+                                          r="12"
+                                          fill="transparent"
+                                          style={{ cursor: 'pointer' }}
+                                          onMouseEnter={(e) => {
+                                            setTooltip({
+                                              x: e.clientX,
+                                              y: e.clientY - 40,
+                                              item: line.item,
+                                              market: line.market,
+                                              date: productStats.dates[idx],
+                                              amount: d.amount
+                                            });
+                                          }}
+                                          onMouseLeave={() => setTooltip(null)}
+                                        />
+                                        {/* 실제 보이는 작은 점 */}
+                                        <circle
+                                          cx={x}
+                                          cy={y}
+                                          r="3"
+                                          fill={line.color}
+                                          style={{ pointerEvents: 'none' }}
+                                        />
+                                      </g>
                                     );
                                   })}
                                 </g>
