@@ -2004,6 +2004,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                         return (
                           <>
+                            {/* clipPath 정의: 0 값 아래로 선이 내려가지 않도록 제한 */}
+                            <defs>
+                              <clipPath id="chart-clip-product">
+                                <rect x={chartLeft} y={chartTop} width={chartWidth} height={chartHeight} />
+                              </clipPath>
+                            </defs>
+
                             {/* 가로 격자선 및 Y축 레이블 */}
                             {[0, 1, 2, 3, 4, 5].map(i => {
                               const y = chartBottom - (i / 5) * chartHeight;
@@ -2042,7 +2049,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                               const smoothPath = createSmoothPath(points, 0.3);
 
                               return (
-                                <g key={lineIdx}>
+                                <g key={lineIdx} clipPath="url(#chart-clip-product)">
                                   <path
                                     d={smoothPath}
                                     fill="none"
@@ -2225,6 +2232,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                         return (
                           <>
+                            {/* clipPath 정의: 0 값 아래로 선이 내려가지 않도록 제한 */}
+                            <defs>
+                              <clipPath id="chart-clip-option">
+                                <rect x={chartLeft} y={chartTop} width={chartWidth} height={chartHeight} />
+                              </clipPath>
+                            </defs>
+
                             {/* 가로 격자선 및 Y축 레이블 */}
                             {[0, 1, 2, 3, 4, 5].map(i => {
                               const y = chartBottom - (i / 5) * chartHeight;
@@ -2263,7 +2277,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                               const smoothPath = createSmoothPath(points, 0.3);
 
                               return (
-                                <g key={lineIdx}>
+                                <g key={lineIdx} clipPath="url(#chart-clip-option)">
                                   <path
                                     d={smoothPath}
                                     fill="none"
