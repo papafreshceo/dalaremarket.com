@@ -2054,7 +2054,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 {productStats.dates.length > 0 && productStats.lines.length > 0 ? (
                   <>
                     {/* 그래프 컨테이너 */}
-                    <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                    <div style={{ background: '#ffffff', padding: '0 16px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
                     {/* 메인 그래프 */}
                     <svg viewBox="0 0 1200 400" style={{ width: '100%', height: '400px' }}>
                       {(() => {
@@ -2292,7 +2292,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 {optionStats.dates.length > 0 && optionStats.lines.length > 0 ? (
                   <>
                     {/* 그래프 컨테이너 */}
-                    <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                    <div style={{ background: '#ffffff', padding: '0 16px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
                     {/* 메인 그래프 */}
                     <svg viewBox="0 0 1200 400" style={{ width: '100%', height: '400px' }}>
                       {(() => {
