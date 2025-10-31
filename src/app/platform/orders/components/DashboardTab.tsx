@@ -56,6 +56,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [selectedMarkets, setSelectedMarkets] = useState<string[]>([]);
 
+  // 그래프 툴팁 상태
+  const [tooltip, setTooltip] = useState<{x: number, y: number, item: string, market: string, date: string, amount: number} | null>(null);
+
   // 현재 날짜 정보 (UI 표시에만 사용)
   const now = useMemo(() => new Date(), []);
   const todayYear = now.getFullYear();
@@ -1987,6 +1990,18 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                         cy={y}
                                         r="3"
                                         fill={line.color}
+                                        style={{ cursor: 'pointer' }}
+                                        onMouseEnter={(e) => {
+                                          setTooltip({
+                                            x: e.clientX,
+                                            y: e.clientY,
+                                            item: line.item,
+                                            market: line.market,
+                                            date: productOptionStats.dates[idx],
+                                            amount: d.amount
+                                          });
+                                        }}
+                                        onMouseLeave={() => setTooltip(null)}
                                       />
                                     );
                                   })}
@@ -2018,37 +2033,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                     {/* 범례 */}
                     <div style={{ display: 'flex', gap: '32px', marginTop: '16px', flexWrap: 'wrap' }}>
-                      {/* 우측: 품목별 선 스타일 */}
+                      {/* 마켓별 색상 (클릭 가능) */}
                       <div>
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '8px' }}>
-                          품목
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          {Array.from(new Set(productOptionStats.lines.map(l => l.item))).map((item, idx) => {
-                            const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
-                            return (
-                              <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <svg width="24" height="12">
-                                  <line
-                                    x1="0"
-                                    y1="6"
-                                    x2="24"
-                                    y2="6"
-                                    stroke="#6b7280"
-                                    strokeWidth="2"
-                                    strokeDasharray={dashStyles[idx % dashStyles.length]}
-                                  />
-                                </svg>
-                                <span style={{ fontSize: '11px' }}>{item}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* 하단: 마켓별 색상 (클릭 가능) */}
-                      <div>
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '8px' }}>마켓</div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                           {Array.from(new Set(productOptionStats.lines.map(l => l.market))).map((market) => {
                             const line = productOptionStats.lines.find(l => l.market === market);
@@ -2225,6 +2211,18 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                         cy={y}
                                         r="3"
                                         fill={line.color}
+                                        style={{ cursor: 'pointer' }}
+                                        onMouseEnter={(e) => {
+                                          setTooltip({
+                                            x: e.clientX,
+                                            y: e.clientY,
+                                            item: line.item,
+                                            market: line.market,
+                                            date: productOptionStats.dates[idx],
+                                            amount: d.amount
+                                          });
+                                        }}
+                                        onMouseLeave={() => setTooltip(null)}
                                       />
                                     );
                                   })}
@@ -2256,37 +2254,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                     {/* 범례 */}
                     <div style={{ display: 'flex', gap: '32px', marginTop: '16px', flexWrap: 'wrap' }}>
-                      {/* 우측: 옵션별 선 스타일 */}
+                      {/* 마켓별 색상 (클릭 가능) */}
                       <div>
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '8px' }}>
-                          옵션상품
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          {Array.from(new Set(productOptionStats.lines.map(l => l.item))).map((item, idx) => {
-                            const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
-                            return (
-                              <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <svg width="24" height="12">
-                                  <line
-                                    x1="0"
-                                    y1="6"
-                                    x2="24"
-                                    y2="6"
-                                    stroke="#6b7280"
-                                    strokeWidth="2"
-                                    strokeDasharray={dashStyles[idx % dashStyles.length]}
-                                  />
-                                </svg>
-                                <span style={{ fontSize: '11px' }}>{item}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* 하단: 마켓별 색상 (클릭 가능) */}
-                      <div>
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '8px' }}>마켓</div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                           {Array.from(new Set(productOptionStats.lines.map(l => l.market))).map((market) => {
                             const line = productOptionStats.lines.find(l => l.market === market);
@@ -2515,6 +2484,33 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               borderTop: '4px solid rgba(0, 0, 0, 0.9)'
             }}
           />
+        </div>
+      )}
+
+      {/* 그래프 점 툴팁 */}
+      {tooltip && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${tooltip.x}px`,
+            top: `${tooltip.y - 60}px`,
+            transform: 'translateX(-50%)',
+            background: 'rgba(255, 255, 255, 0.98)',
+            border: '1px solid #e5e7eb',
+            padding: '8px 10px',
+            borderRadius: '6px',
+            fontSize: '10px',
+            zIndex: 10000,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
+            lineHeight: '1.4'
+          }}
+        >
+          <div style={{ color: '#111827', fontWeight: '600', marginBottom: '2px' }}>{tooltip.item}</div>
+          <div style={{ color: '#6b7280', marginBottom: '2px' }}>{tooltip.market}</div>
+          <div style={{ color: '#6b7280', marginBottom: '2px' }}>{tooltip.date}</div>
+          <div style={{ color: '#111827', fontWeight: '600' }}>{tooltip.amount.toLocaleString()}원</div>
         </div>
       )}
     </div>
