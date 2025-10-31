@@ -2000,60 +2000,61 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               {/* 품목별 통계 */}
               <div style={{ minWidth: 0 }}>
-              <div>
-                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: '#6366f1' }}>품목별 통계</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* 헤더 컨테이너 */}
+                <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#6366f1' }}>품목별 통계</h3>
 
-                {/* 선택 정보 표시 */}
-                {selectedProducts.length > 0 && (
-                  <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    {selectedProducts.length > 0 && (
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>선택된 품목:</span>
-                        {selectedProducts.map((p, idx) => {
-                          const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
-                          return (
-                            <div
-                              key={p}
+                  {/* 선택 정보 표시 */}
+                  {selectedProducts.length > 0 && (
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>선택된 품목:</span>
+                      {selectedProducts.map((p, idx) => {
+                        const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
+                        return (
+                          <div
+                            key={p}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: '#ffffff',
+                              padding: '3px 6px',
+                              borderRadius: '8px',
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
+                            }}
+                          >
+                            <svg width="20" height="10">
+                              <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
+                                strokeDasharray={dashStyles[idx % dashStyles.length]} />
+                            </svg>
+                            <span style={{ fontSize: '10px', color: '#374151' }}>{p}</span>
+                            <button
+                              onClick={() => setSelectedProducts(selectedProducts.filter(item => item !== p))}
                               style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                background: '#f3f4f6',
-                                padding: '3px 6px',
-                                borderRadius: '8px',
-                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
+                                fontSize: '10px',
+                                color: '#9ca3af',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                marginLeft: '2px'
                               }}
                             >
-                              <svg width="20" height="10">
-                                <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
-                                  strokeDasharray={dashStyles[idx % dashStyles.length]} />
-                              </svg>
-                              <span style={{ fontSize: '10px', color: '#374151' }}>{p}</span>
-                              <button
-                                onClick={() => setSelectedProducts(selectedProducts.filter(item => item !== p))}
-                                style={{
-                                  fontSize: '10px',
-                                  color: '#9ca3af',
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  padding: 0,
-                                  marginLeft: '2px'
-                                }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
                 {/* 그래프 */}
                 {productStats.dates.length > 0 && productStats.lines.length > 0 ? (
-                  <div style={{ position: 'relative' }}>
+                  <>
+                    {/* 그래프 컨테이너 */}
+                    <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
                     {/* 메인 그래프 */}
                     <svg viewBox="0 0 1200 400" style={{ width: '100%', height: '400px' }}>
                       {(() => {
@@ -2182,43 +2183,50 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         );
                       })()}
                     </svg>
+                    </div>
 
-                    {/* 범례 */}
-                    <div style={{ display: 'flex', gap: '32px', marginTop: '16px', flexWrap: 'wrap' }}>
-                      {/* 마켓별 색상 (클릭 가능) */}
-                      <div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                          {allMarkets.map((market) => {
-                            const isSelected = selectedProductMarkets.includes(market);
-                            const color = marketColorMap.get(market);
-                            return (
-                              <div
-                                key={market}
-                                onClick={() => {
-                                  if (isSelected) {
-                                    setSelectedProductMarkets(selectedProductMarkets.filter(m => m !== market));
-                                  } else {
-                                    setSelectedProductMarkets([...selectedProductMarkets, market]);
-                                  }
-                                }}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  cursor: 'pointer',
-                                  opacity: isSelected ? 1 : 0.4,
-                                  transition: 'opacity 0.2s'
-                                }}
-                              >
-                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color }} />
-                                <span style={{ fontSize: '11px' }}>{market}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
+                    {/* 범례 컨테이너 */}
+                    <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                        {allMarkets.map((market) => {
+                          const isSelected = selectedProductMarkets.includes(market);
+                          const color = marketColorMap.get(market);
+                          return (
+                            <div
+                              key={market}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedProductMarkets(selectedProductMarkets.filter(m => m !== market));
+                                } else {
+                                  setSelectedProductMarkets([...selectedProductMarkets, market]);
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                cursor: 'pointer',
+                                opacity: isSelected ? 1 : 0.4,
+                                padding: '4px 8px',
+                                marginLeft: '-8px',
+                                borderRadius: '4px',
+                                transition: 'all 0.2s ease'
+                              }}
+                              onMouseEnter={e => {
+                                (e.currentTarget as HTMLDivElement).style.backgroundColor = '#e5e7eb';
+                              }}
+                              onMouseLeave={e => {
+                                (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                              }}
+                            >
+                              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color }} />
+                              <span style={{ fontSize: '11px' }}>{market}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                  </div>
+                  </>
                 ) : (
                   <div style={{ textAlign: 'center', color: '#6b7280', padding: '40px 20px' }}>
                     <div style={{ fontSize: '14px', marginBottom: '8px' }}>좌측에서 품목을 선택하세요</div>
@@ -2230,60 +2238,61 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
               {/* 옵션별 통계 */}
               <div style={{ minWidth: 0 }}>
-              <div>
-                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: '#8b5cf6' }}>옵션별 통계</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* 헤더 컨테이너 */}
+                <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#8b5cf6' }}>옵션별 통계</h3>
 
-                {/* 선택 정보 표시 */}
-                {selectedOptions.length > 0 && (
-                  <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    {selectedOptions.length > 0 && (
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>선택된 옵션:</span>
-                        {selectedOptions.map((o, idx) => {
-                          const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
-                          return (
-                            <div
-                              key={o}
+                  {/* 선택 정보 표시 */}
+                  {selectedOptions.length > 0 && (
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>선택된 옵션:</span>
+                      {selectedOptions.map((o, idx) => {
+                        const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
+                        return (
+                          <div
+                            key={o}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: '#ffffff',
+                              padding: '3px 6px',
+                              borderRadius: '8px',
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
+                            }}
+                          >
+                            <svg width="20" height="10">
+                              <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
+                                strokeDasharray={dashStyles[idx % dashStyles.length]} />
+                            </svg>
+                            <span style={{ fontSize: '10px', color: '#374151' }}>{o}</span>
+                            <button
+                              onClick={() => setSelectedOptions(selectedOptions.filter(item => item !== o))}
                               style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                background: '#f3f4f6',
-                                padding: '3px 6px',
-                                borderRadius: '8px',
-                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
+                                fontSize: '10px',
+                                color: '#9ca3af',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                marginLeft: '2px'
                               }}
                             >
-                              <svg width="20" height="10">
-                                <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
-                                  strokeDasharray={dashStyles[idx % dashStyles.length]} />
-                              </svg>
-                              <span style={{ fontSize: '10px', color: '#374151' }}>{o}</span>
-                              <button
-                                onClick={() => setSelectedOptions(selectedOptions.filter(item => item !== o))}
-                                style={{
-                                  fontSize: '10px',
-                                  color: '#9ca3af',
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  padding: 0,
-                                  marginLeft: '2px'
-                                }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
                 {/* 그래프 */}
                 {optionStats.dates.length > 0 && optionStats.lines.length > 0 ? (
-                  <div style={{ position: 'relative' }}>
+                  <>
+                    {/* 그래프 컨테이너 */}
+                    <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
                     {/* 메인 그래프 */}
                     <svg viewBox="0 0 1200 400" style={{ width: '100%', height: '400px' }}>
                       {(() => {
@@ -2412,52 +2421,50 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         );
                       })()}
                     </svg>
+                    </div>
 
-                    {/* 범례 */}
-                    <div style={{ display: 'flex', gap: '32px', marginTop: '16px', flexWrap: 'wrap' }}>
-                      {/* 마켓별 색상 (클릭 가능) */}
-                      <div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                          {allMarkets.map((market) => {
-                            const isSelected = selectedOptionMarkets.includes(market);
-                            const color = marketColorMap.get(market);
-                            return (
-                              <div
-                                key={market}
-                                onClick={() => {
-                                  if (isSelected) {
-                                    setSelectedOptionMarkets(selectedOptionMarkets.filter(m => m !== market));
-                                  } else {
-                                    setSelectedOptionMarkets([...selectedOptionMarkets, market]);
-                                  }
-                                }}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  cursor: 'pointer',
-                                  opacity: isSelected ? 1 : 0.4,
-                                  padding: '4px 8px',
-                                  marginLeft: '-8px',
-                                  borderRadius: '4px',
-                                  transition: 'all 0.2s ease'
-                                }}
-                                onMouseEnter={e => {
-                                  (e.currentTarget as HTMLDivElement).style.backgroundColor = '#f3f4f6';
-                                }}
-                                onMouseLeave={e => {
-                                  (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
-                                }}
-                              >
-                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color }} />
-                                <span style={{ fontSize: '11px' }}>{market}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
+                    {/* 범례 컨테이너 */}
+                    <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                        {allMarkets.map((market) => {
+                          const isSelected = selectedOptionMarkets.includes(market);
+                          const color = marketColorMap.get(market);
+                          return (
+                            <div
+                              key={market}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedOptionMarkets(selectedOptionMarkets.filter(m => m !== market));
+                                } else {
+                                  setSelectedOptionMarkets([...selectedOptionMarkets, market]);
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                cursor: 'pointer',
+                                opacity: isSelected ? 1 : 0.4,
+                                padding: '4px 8px',
+                                marginLeft: '-8px',
+                                borderRadius: '4px',
+                                transition: 'all 0.2s ease'
+                              }}
+                              onMouseEnter={e => {
+                                (e.currentTarget as HTMLDivElement).style.backgroundColor = '#e5e7eb';
+                              }}
+                              onMouseLeave={e => {
+                                (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                              }}
+                            >
+                              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color }} />
+                              <span style={{ fontSize: '11px' }}>{market}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                  </div>
+                  </>
                 ) : (
                   <div style={{ textAlign: 'center', color: '#6b7280', padding: '40px 20px' }}>
                     <div style={{ fontSize: '14px', marginBottom: '8px' }}>좌측에서 옵션상품을 선택하세요</div>
