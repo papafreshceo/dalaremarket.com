@@ -2043,9 +2043,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                               <div
                                 key={market}
                                 onClick={() => {
-                                  if (isSelected && selectedMarkets.length > 1) {
+                                  if (isSelected) {
                                     setSelectedMarkets(selectedMarkets.filter(m => m !== market));
-                                  } else if (!isSelected) {
+                                  } else {
                                     setSelectedMarkets([...selectedMarkets, market]);
                                   }
                                 }}
@@ -2264,9 +2264,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                               <div
                                 key={market}
                                 onClick={() => {
-                                  if (isSelected && selectedMarkets.length > 1) {
+                                  if (isSelected) {
                                     setSelectedMarkets(selectedMarkets.filter(m => m !== market));
-                                  } else if (!isSelected) {
+                                  } else {
                                     setSelectedMarkets([...selectedMarkets, market]);
                                   }
                                 }}
