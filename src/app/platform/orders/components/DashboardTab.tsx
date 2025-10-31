@@ -2122,7 +2122,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                 return { x, y };
                               });
 
-                              const smoothPath = createSmoothPath(points, 0.3);
+                              const smoothPath = createSmoothPath(points);
 
                               return (
                                 <g key={lineIdx} clipPath="url(#chart-clip-product)">
@@ -2360,7 +2360,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                 return { x, y };
                               });
 
-                              const smoothPath = createSmoothPath(points, 0.3);
+                              const smoothPath = createSmoothPath(points);
 
                               return (
                                 <g key={lineIdx} clipPath="url(#chart-clip-option)">
