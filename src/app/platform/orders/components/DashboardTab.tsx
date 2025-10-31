@@ -51,7 +51,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
   const [selectedStatus, setSelectedStatus] = useState<Order['status'] | null>(null);
 
   // 품목/옵션별 통계 탭 상태
-  const [activeTab, setActiveTab] = useState<'market' | 'product'>('market');
+  const [activeTab, setActiveTab] = useState<'market' | 'product' | 'option'>('market');
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [selectedMarkets, setSelectedMarkets] = useState<string[]>([]);
@@ -595,9 +595,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
   // 품목/옵션별 통계 그래프 데이터
   const productOptionStats = useMemo(() => {
-    // 선택된 품목 또는 옵션상품 목록
-    const selectedItems = selectedProducts.length > 0 ? selectedProducts : selectedOptions;
-    const itemType = selectedProducts.length > 0 ? 'product' : 'option';
+    // activeTab에 따라 선택된 품목 또는 옵션상품 목록
+    const selectedItems = activeTab === 'product' ? selectedProducts : (activeTab === 'option' ? selectedOptions : []);
+    const itemType = activeTab === 'product' ? 'product' : 'option';
 
     if (selectedItems.length === 0 || selectedMarkets.length === 0) {
       return { dates: [], lines: [] };
@@ -690,7 +690,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       dates: sortedDates,
       lines
     };
-  }, [filteredOrders, selectedProducts, selectedOptions, selectedMarkets, startDate, endDate]);
+  }, [filteredOrders, selectedProducts, selectedOptions, selectedMarkets, startDate, endDate, activeTab]);
 
   // 발주 캘린더 JSX
   const calendarJSX = (
@@ -1841,8 +1841,36 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     transition: 'color 0.2s'
                   }}
                 >
-                  품목/옵션별 통계
+                  품목별 통계
                   {activeTab === 'product' && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: '-2px',
+                        left: 0,
+                        right: 0,
+                        height: '2px',
+                        background: '#6366f1'
+                      }}
+                    />
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab('option')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '12px 4px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: activeTab === 'option' ? '#6366f1' : '#6b7280',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    transition: 'color 0.2s'
+                  }}
+                >
+                  옵션별 통계
+                  {activeTab === 'option' && (
                     <div
                       style={{
                         position: 'absolute',
@@ -2067,11 +2095,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               </>
             )}
 
-            {/* 품목/옵션별 통계 탭 */}
+            {/* 품목별 통계 탭 */}
             {activeTab === 'product' && (
               <div>
                 {/* 선택 정보 표시 */}
-                {(selectedProducts.length > 0 || selectedOptions.length > 0) && (
+                {selectedProducts.length > 0 && (
                   <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                     {selectedProducts.length > 0 && (
                       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -2098,48 +2126,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                               <span style={{ fontSize: '10px', color: '#374151' }}>{p}</span>
                               <button
                                 onClick={() => setSelectedProducts(selectedProducts.filter(item => item !== p))}
-                                style={{
-                                  fontSize: '10px',
-                                  color: '#9ca3af',
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  padding: 0,
-                                  marginLeft: '2px'
-                                }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {selectedOptions.length > 0 && (
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>선택된 옵션:</span>
-                        {selectedOptions.map((o, idx) => {
-                          const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
-                          return (
-                            <div
-                              key={o}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                background: '#f3f4f6',
-                                padding: '3px 6px',
-                                borderRadius: '8px',
-                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
-                              }}
-                            >
-                              <svg width="20" height="10">
-                                <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
-                                  strokeDasharray={dashStyles[idx % dashStyles.length]} />
-                              </svg>
-                              <span style={{ fontSize: '10px', color: '#374151' }}>{o}</span>
-                              <button
-                                onClick={() => setSelectedOptions(selectedOptions.filter(item => item !== o))}
                                 style={{
                                   fontSize: '10px',
                                   color: '#9ca3af',
@@ -2275,10 +2261,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                     {/* 범례 */}
                     <div style={{ display: 'flex', gap: '32px', marginTop: '16px', flexWrap: 'wrap' }}>
-                      {/* 우측: 품목/옵션별 선 스타일 */}
+                      {/* 우측: 품목별 선 스타일 */}
                       <div>
                         <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '8px' }}>
-                          {selectedProducts.length > 0 ? '품목' : '옵션상품'}
+                          품목
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           {Array.from(new Set(productOptionStats.lines.map(l => l.item))).map((item, idx) => {
@@ -2340,7 +2326,254 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   </div>
                 ) : (
                   <div style={{ textAlign: 'center', color: '#6b7280', padding: '40px 20px' }}>
-                    <div style={{ fontSize: '14px', marginBottom: '8px' }}>좌측에서 품목 또는 옵션상품을 선택하세요</div>
+                    <div style={{ fontSize: '14px', marginBottom: '8px' }}>좌측에서 품목을 선택하세요</div>
+                    <div style={{ fontSize: '12px', color: '#9ca3af' }}>최대 5개까지 선택 가능</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 옵션별 통계 탭 */}
+            {activeTab === 'option' && (
+              <div>
+                {/* 선택 정보 표시 */}
+                {selectedOptions.length > 0 && (
+                  <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {selectedOptions.length > 0 && (
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>선택된 옵션:</span>
+                        {selectedOptions.map((o, idx) => {
+                          const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
+                          return (
+                            <div
+                              key={o}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: '#f3f4f6',
+                                padding: '3px 6px',
+                                borderRadius: '8px',
+                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
+                              }}
+                            >
+                              <svg width="20" height="10">
+                                <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
+                                  strokeDasharray={dashStyles[idx % dashStyles.length]} />
+                              </svg>
+                              <span style={{ fontSize: '10px', color: '#374151' }}>{o}</span>
+                              <button
+                                onClick={() => setSelectedOptions(selectedOptions.filter(item => item !== o))}
+                                style={{
+                                  fontSize: '10px',
+                                  color: '#9ca3af',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                  marginLeft: '2px'
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 그래프 */}
+                {productOptionStats.dates.length > 0 && productOptionStats.lines.length > 0 ? (
+                  <div style={{ position: 'relative' }}>
+                    {/* 메인 그래프 */}
+                    <svg viewBox="0 0 1200 500" style={{ width: '100%', height: '500px' }}>
+                      {(() => {
+                        const maxAmount = Math.max(
+                          ...productOptionStats.lines.flatMap(line => line.data.map(d => d.amount)),
+                          10000
+                        );
+
+                        // 최대값의 110%를 10,000원 단위로 올림
+                        const maxY = Math.ceil(maxAmount * 1.1 / 10000) * 10000;
+                        const yStep = maxY / 5;
+
+                        const dateCount = productOptionStats.dates.length;
+                        const divisor = dateCount > 1 ? dateCount - 1 : 1;
+
+                        // 그래프 영역 설정
+                        const chartLeft = 100;
+                        const chartRight = 1150;
+                        const chartTop = 30;
+                        const chartBottom = 430;
+                        const chartWidth = chartRight - chartLeft;
+                        const chartHeight = chartBottom - chartTop;
+
+                        return (
+                          <>
+                            {/* 가로 격자선 및 Y축 레이블 */}
+                            {[0, 1, 2, 3, 4, 5].map(i => {
+                              const y = chartBottom - (i / 5) * chartHeight;
+                              const value = i * yStep;
+                              return (
+                                <g key={`grid-${i}`}>
+                                  <line
+                                    x1={chartLeft}
+                                    y1={y}
+                                    x2={chartRight}
+                                    y2={y}
+                                    stroke="#e5e7eb"
+                                    strokeWidth="1"
+                                  />
+                                  <text
+                                    x={chartLeft - 10}
+                                    y={y + 4}
+                                    fontSize="11"
+                                    fill="#6b7280"
+                                    textAnchor="end"
+                                  >
+                                    ₩{(value / 10000).toFixed(0)}만
+                                  </text>
+                                </g>
+                              );
+                            })}
+
+                            {/* 옵션 × 마켓 조합별 선 */}
+                            {productOptionStats.lines.map((line, lineIdx) => {
+                              const points = line.data
+                                .map((d, idx) => {
+                                  const x = chartLeft + (idx / divisor) * chartWidth;
+                                  const y = chartBottom - (d.amount / maxY) * chartHeight;
+                                  return `${x},${y}`;
+                                })
+                                .join(' ');
+
+                              return (
+                                <g key={lineIdx}>
+                                  <polyline
+                                    points={points}
+                                    fill="none"
+                                    stroke={line.color}
+                                    strokeWidth="2"
+                                    strokeDasharray={line.dashStyle}
+                                  />
+                                  {line.data.map((d, idx) => {
+                                    const x = chartLeft + (idx / divisor) * chartWidth;
+                                    const y = chartBottom - (d.amount / maxY) * chartHeight;
+                                    return (
+                                      <circle
+                                        key={idx}
+                                        cx={x}
+                                        cy={y}
+                                        r="3"
+                                        fill={line.color}
+                                      />
+                                    );
+                                  })}
+                                </g>
+                              );
+                            })}
+
+                            {/* X축 날짜 라벨 */}
+                            {productOptionStats.dates.map((date, idx) => {
+                              const divisor = productOptionStats.dates.length > 1 ? productOptionStats.dates.length - 1 : 1;
+                              const x = chartLeft + (idx / divisor) * chartWidth;
+                              return (
+                                <text
+                                  key={idx}
+                                  x={x}
+                                  y="460"
+                                  fontSize="10"
+                                  fill="#6b7280"
+                                  textAnchor="middle"
+                                >
+                                  {date.slice(5)}
+                                </text>
+                              );
+                            })}
+                          </>
+                        );
+                      })()}
+                    </svg>
+
+                    {/* 범례 */}
+                    <div style={{ display: 'flex', gap: '32px', marginTop: '16px', flexWrap: 'wrap' }}>
+                      {/* 우측: 옵션별 선 스타일 */}
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '8px' }}>
+                          옵션상품
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {Array.from(new Set(productOptionStats.lines.map(l => l.item))).map((item, idx) => {
+                            const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
+                            return (
+                              <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <svg width="24" height="12">
+                                  <line
+                                    x1="0"
+                                    y1="6"
+                                    x2="24"
+                                    y2="6"
+                                    stroke="#6b7280"
+                                    strokeWidth="2"
+                                    strokeDasharray={dashStyles[idx % dashStyles.length]}
+                                  />
+                                </svg>
+                                <span style={{ fontSize: '11px' }}>{item}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* 하단: 마켓별 색상 (클릭 가능) */}
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '8px' }}>마켓</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                          {Array.from(new Set(productOptionStats.lines.map(l => l.market))).map((market) => {
+                            const line = productOptionStats.lines.find(l => l.market === market);
+                            const isSelected = selectedMarkets.includes(market);
+                            return (
+                              <div
+                                key={market}
+                                onClick={() => {
+                                  if (isSelected && selectedMarkets.length > 1) {
+                                    setSelectedMarkets(selectedMarkets.filter(m => m !== market));
+                                  } else if (!isSelected) {
+                                    setSelectedMarkets([...selectedMarkets, market]);
+                                  }
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  cursor: 'pointer',
+                                  opacity: isSelected ? 1 : 0.4,
+                                  padding: '4px 8px',
+                                  marginLeft: '-8px',
+                                  borderRadius: '4px',
+                                  transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={e => {
+                                  (e.currentTarget as HTMLDivElement).style.backgroundColor = '#f3f4f6';
+                                }}
+                                onMouseLeave={e => {
+                                  (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: line?.color }} />
+                                <span style={{ fontSize: '11px' }}>{market}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', color: '#6b7280', padding: '40px 20px' }}>
+                    <div style={{ fontSize: '14px', marginBottom: '8px' }}>좌측에서 옵션상품을 선택하세요</div>
                     <div style={{ fontSize: '12px', color: '#9ca3af' }}>최대 5개까지 선택 가능</div>
                   </div>
                 )}
