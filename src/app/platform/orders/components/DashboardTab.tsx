@@ -2002,52 +2002,45 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                 {/* 헤더 컨테이너 */}
-                <div>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#6366f1' }}>품목별 통계</h3>
-
-                  {/* 선택 정보 표시 */}
-                  {selectedProducts.length > 0 && (
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>선택된 품목:</span>
-                      {selectedProducts.map((p, idx) => {
-                        const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
-                        return (
-                          <div
-                            key={p}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              background: '#ffffff',
-                              padding: '3px 6px',
-                              borderRadius: '8px',
-                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
-                            }}
-                          >
-                            <svg width="20" height="10">
-                              <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
-                                strokeDasharray={dashStyles[idx % dashStyles.length]} />
-                            </svg>
-                            <span style={{ fontSize: '10px', color: '#374151' }}>{p}</span>
-                            <button
-                              onClick={() => setSelectedProducts(selectedProducts.filter(item => item !== p))}
-                              style={{
-                                fontSize: '10px',
-                                color: '#9ca3af',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: 0,
-                                marginLeft: '2px'
-                              }}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '8px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#6366f1', margin: 0 }}>품목별 통계</h3>
+                  {selectedProducts.map((p, idx) => {
+                    const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
+                    return (
+                      <div
+                        key={p}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: '#ffffff',
+                          padding: '3px 6px',
+                          borderRadius: '8px',
+                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
+                        }}
+                      >
+                        <svg width="20" height="10">
+                          <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
+                            strokeDasharray={dashStyles[idx % dashStyles.length]} />
+                        </svg>
+                        <span style={{ fontSize: '10px', color: '#374151' }}>{p}</span>
+                        <button
+                          onClick={() => setSelectedProducts(selectedProducts.filter(item => item !== p))}
+                          style={{
+                            fontSize: '10px',
+                            color: '#9ca3af',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: 0,
+                            marginLeft: '2px'
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* 그래프 */}
@@ -2237,52 +2230,45 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                 {/* 헤더 컨테이너 */}
-                <div>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#8b5cf6' }}>옵션별 통계</h3>
-
-                  {/* 선택 정보 표시 */}
-                  {selectedOptions.length > 0 && (
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>선택된 옵션:</span>
-                      {selectedOptions.map((o, idx) => {
-                        const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
-                        return (
-                          <div
-                            key={o}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              background: '#ffffff',
-                              padding: '3px 6px',
-                              borderRadius: '8px',
-                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
-                            }}
-                          >
-                            <svg width="20" height="10">
-                              <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
-                                strokeDasharray={dashStyles[idx % dashStyles.length]} />
-                            </svg>
-                            <span style={{ fontSize: '10px', color: '#374151' }}>{o}</span>
-                            <button
-                              onClick={() => setSelectedOptions(selectedOptions.filter(item => item !== o))}
-                              style={{
-                                fontSize: '10px',
-                                color: '#9ca3af',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: 0,
-                                marginLeft: '2px'
-                              }}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '8px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#8b5cf6', margin: 0 }}>옵션별 통계</h3>
+                  {selectedOptions.map((o, idx) => {
+                    const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
+                    return (
+                      <div
+                        key={o}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: '#ffffff',
+                          padding: '3px 6px',
+                          borderRadius: '8px',
+                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
+                        }}
+                      >
+                        <svg width="20" height="10">
+                          <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
+                            strokeDasharray={dashStyles[idx % dashStyles.length]} />
+                        </svg>
+                        <span style={{ fontSize: '10px', color: '#374151' }}>{o}</span>
+                        <button
+                          onClick={() => setSelectedOptions(selectedOptions.filter(item => item !== o))}
+                          style={{
+                            fontSize: '10px',
+                            color: '#9ca3af',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: 0,
+                            marginLeft: '2px'
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* 그래프 */}
