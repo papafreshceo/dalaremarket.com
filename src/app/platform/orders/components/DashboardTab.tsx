@@ -617,7 +617,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
       let itemName = '';
       if (itemType === 'product') {
-        itemName = order.category4 || '미지정';
+        // optionName으로 category4 조회
+        const optionName = order.optionName || '';
+        itemName = optionNameToCategory4.get(optionName) || '미지정';
       } else {
         itemName = order.optionName || '미지정';
       }
@@ -690,7 +692,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       dates: sortedDates,
       lines
     };
-  }, [filteredOrders, selectedProducts, selectedOptions, selectedMarkets, startDate, endDate, activeTab]);
+  }, [filteredOrders, selectedProducts, selectedOptions, selectedMarkets, startDate, endDate, activeTab, optionNameToCategory4]);
 
   // 발주 캘린더 JSX
   const calendarJSX = (
