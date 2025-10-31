@@ -2056,7 +2056,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     {/* 그래프 컨테이너 */}
                     <div style={{ background: '#ffffff', padding: '0 16px', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
                     {/* 메인 그래프 */}
-                    <svg viewBox="0 0 1200 410" style={{ width: '100%', height: '350px', display: 'block' }}>
+                    <svg viewBox="0 0 1200 405" style={{ width: '100%', height: '350px', display: 'block' }}>
                       {(() => {
                         const maxAmount = Math.max(
                           ...productStats.lines.flatMap(line => line.data.map(d => d.amount)),
@@ -2294,7 +2294,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     {/* 그래프 컨테이너 */}
                     <div style={{ background: '#ffffff', padding: '0 16px', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
                     {/* 메인 그래프 */}
-                    <svg viewBox="0 0 1200 410" style={{ width: '100%', height: '350px', display: 'block' }}>
+                    <svg viewBox="0 0 1200 405" style={{ width: '100%', height: '350px', display: 'block' }}>
                       {(() => {
                         const maxAmount = Math.max(
                           ...optionStats.lines.flatMap(line => line.data.map(d => d.amount)),
