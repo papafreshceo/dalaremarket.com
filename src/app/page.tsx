@@ -6,9 +6,19 @@ import MobileBottomNav from '@/components/layout/MobileBottomNav'
 import Link from 'next/link'
 import Image from 'next/image'
 
+interface CloudinaryImage {
+  id: string
+  secure_url: string
+  title?: string
+  width?: number
+  height?: number
+}
+
 interface PromotionalImage {
   id: number
-  image_url: string
+  image_id: string | null
+  image?: CloudinaryImage
+  section: string
   display_order: number
   title?: string
   link_url?: string
@@ -18,7 +28,11 @@ interface PromotionalImage {
 export default function PlatformHome() {
   const [activeTab, setActiveTab] = useState<{ main?: number }>({})
   const [isMobile, setIsMobile] = useState(false)
-  const [promoImages, setPromoImages] = useState<PromotionalImage[]>([])
+  const [heroImage, setHeroImage] = useState<PromotionalImage | null>(null)
+  const [tab1Images, setTab1Images] = useState<PromotionalImage[]>([])
+  const [tab2Images, setTab2Images] = useState<PromotionalImage[]>([])
+  const [tab3Images, setTab3Images] = useState<PromotionalImage[]>([])
+  const [tab4Images, setTab4Images] = useState<PromotionalImage[]>([])
 
   // 플랫폼 화면 파비콘 설정
   useEffect(() => {
@@ -52,16 +66,34 @@ export default function PlatformHome() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // 홍보 이미지 가져오기
+  // 홍보 이미지 가져오기 (섹션별로 분류)
   useEffect(() => {
     fetch('/api/admin/promotional-images')
       .then(res => res.json())
       .then(data => {
         if (data.success && data.data) {
-          const activeImages = data.data
-            .filter((img: PromotionalImage) => img.is_active)
+          const activeImages = data.data.filter((img: PromotionalImage) => img.is_active)
+
+          // 섹션별로 필터링 및 정렬
+          const hero = activeImages.find((img: PromotionalImage) => img.section === 'hero')
+          const tab1 = activeImages
+            .filter((img: PromotionalImage) => img.section === 'tab1')
             .sort((a: PromotionalImage, b: PromotionalImage) => a.display_order - b.display_order)
-          setPromoImages(activeImages)
+          const tab2 = activeImages
+            .filter((img: PromotionalImage) => img.section === 'tab2')
+            .sort((a: PromotionalImage, b: PromotionalImage) => a.display_order - b.display_order)
+          const tab3 = activeImages
+            .filter((img: PromotionalImage) => img.section === 'tab3')
+            .sort((a: PromotionalImage, b: PromotionalImage) => a.display_order - b.display_order)
+          const tab4 = activeImages
+            .filter((img: PromotionalImage) => img.section === 'tab4')
+            .sort((a: PromotionalImage, b: PromotionalImage) => a.display_order - b.display_order)
+
+          setHeroImage(hero || null)
+          setTab1Images(tab1)
+          setTab2Images(tab2)
+          setTab3Images(tab3)
+          setTab4Images(tab4)
         }
       })
       .catch(error => {
@@ -179,36 +211,55 @@ export default function PlatformHome() {
               </Link>
             </div>
 
-            {/* 두 번째 칼럼 - 이미지 */}
+            {/* 두 번째 칼럼 - 히어로 이미지 */}
             <div style={{
               order: isMobile ? 1 : 2,
               paddingRight: '40px',
               position: 'relative'
             }}>
-              <div style={{
-                height: isMobile ? '250px' : '400px',
-                background: 'rgba(255, 255, 255, 0.1)',
-                borderRadius: '20px',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                overflow: 'hidden',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <div style={{
-                  width: '100%',
-                  height: '100%',
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%)',
+              <div
+                onClick={() => {
+                  if (heroImage?.link_url) {
+                    window.open(heroImage.link_url, '_blank')
+                  }
+                }}
+                style={{
+                  height: isMobile ? '250px' : '400px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  borderRadius: '20px',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  overflow: 'hidden',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '18px',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: '500'
-                }}>
-                  이미지 영역
-                </div>
+                  cursor: heroImage?.link_url ? 'pointer' : 'default',
+                  position: 'relative'
+                }}
+              >
+                {heroImage?.image?.secure_url ? (
+                  <Image
+                    src={heroImage.image.secure_url}
+                    alt={heroImage.title || '히어로 이미지'}
+                    fill
+                    style={{ objectFit: 'cover' }}
+                    sizes="(max-width: 768px) 100vw, 60vw"
+                  />
+                ) : (
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '18px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    fontWeight: '500'
+                  }}>
+                    이미지 영역
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -279,13 +330,13 @@ export default function PlatformHome() {
                 gap: '16px',
                 padding: '0 40px'
               }}>
-                {promoImages.length > 0 ? (
-                  promoImages.map((img) => (
+                {tab1Images.length > 0 ? (
+                  tab1Images.map((slot) => (
                     <div
-                      key={img.id}
+                      key={slot.display_order}
                       onClick={() => {
-                        if (img.link_url) {
-                          window.open(img.link_url, '_blank')
+                        if (slot.link_url) {
+                          window.open(slot.link_url, '_blank')
                         }
                       }}
                       style={{
@@ -293,15 +344,15 @@ export default function PlatformHome() {
                         borderRadius: '16px',
                         overflow: 'hidden',
                         boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                        cursor: img.link_url ? 'pointer' : 'default',
+                        cursor: slot.link_url ? 'pointer' : 'default',
                         position: 'relative',
                         background: '#f3f4f6'
                       }}
                     >
-                      {img.image_url ? (
+                      {slot.image?.secure_url ? (
                         <Image
-                          src={img.image_url}
-                          alt={img.title || `홍보 이미지 ${img.display_order}`}
+                          src={slot.image.secure_url}
+                          alt={slot.title || `홍보 이미지 ${slot.display_order}`}
                           fill
                           style={{ objectFit: 'cover' }}
                           sizes="(max-width: 768px) 100vw, 50vw"
@@ -316,7 +367,7 @@ export default function PlatformHome() {
                           color: '#9ca3af',
                           fontSize: '14px'
                         }}>
-                          {img.title || `홍보 이미지 ${img.display_order}`}
+                          {slot.title || `프로모션 슬롯 ${slot.display_order}`}
                         </div>
                       )}
                     </div>
@@ -336,7 +387,7 @@ export default function PlatformHome() {
                       color: '#6c757d',
                       fontSize: '14px'
                     }}>
-                      상품 홍보 이미지 {i}
+                      프로모션 슬롯 {i}
                     </div>
                   ))
                 )}
@@ -351,24 +402,68 @@ export default function PlatformHome() {
                 gap: '16px',
                 padding: '0 40px'
               }}>
-                {[1, 2, 3, 4].map(i => (
-                  <div key={i} style={{
-                    aspectRatio: '16/9',
-                    background: i % 2 === 0
-                      ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)'
-                      : 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(52, 211, 153, 0.1) 100%)',
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#475569',
-                    fontSize: '14px'
-                  }}>
-                    발주 기능 {i}
-                  </div>
-                ))}
+                {tab2Images.length > 0 ? (
+                  tab2Images.map((slot) => (
+                    <div
+                      key={slot.display_order}
+                      onClick={() => {
+                        if (slot.link_url) {
+                          window.open(slot.link_url, '_blank')
+                        }
+                      }}
+                      style={{
+                        aspectRatio: '16/9',
+                        borderRadius: '16px',
+                        overflow: 'hidden',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                        cursor: slot.link_url ? 'pointer' : 'default',
+                        position: 'relative',
+                        background: '#f3f4f6'
+                      }}
+                    >
+                      {slot.image?.secure_url ? (
+                        <Image
+                          src={slot.image.secure_url}
+                          alt={slot.title || `발주 기능 ${slot.display_order}`}
+                          fill
+                          style={{ objectFit: 'cover' }}
+                          sizes="(max-width: 768px) 100vw, 50vw"
+                        />
+                      ) : (
+                        <div style={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#9ca3af',
+                          fontSize: '14px'
+                        }}>
+                          발주 기능 {slot.display_order}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  [1, 2, 3, 4].map(i => (
+                    <div key={i} style={{
+                      aspectRatio: '16/9',
+                      background: i % 2 === 0
+                        ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)'
+                        : 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(52, 211, 153, 0.1) 100%)',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#475569',
+                      fontSize: '14px'
+                    }}>
+                      발주 기능 {i}
+                    </div>
+                  ))
+                )}
               </div>
 
               {/* 탭 3: 셀러 업무도구 - 세로형 카드 */}
@@ -379,31 +474,84 @@ export default function PlatformHome() {
                 gap: '16px',
                 padding: '0 40px'
               }}>
-                {['재고관리', '매출분석', '세금계산서', '고객관리'].map((tool, i) => (
-                  <div key={i} style={{
-                    aspectRatio: '3/4',
-                    background: `linear-gradient(135deg, hsl(${i * 90}, 70%, 50%) 0%, hsl(${i * 90 + 30}, 70%, 60%) 100%)`,
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#ffffff',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    transition: 'transform 0.3s',
-                    cursor: 'pointer'
-                  }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-8px)'
+                {tab3Images.length > 0 ? (
+                  tab3Images.map((slot) => (
+                    <div
+                      key={slot.display_order}
+                      onClick={() => {
+                        if (slot.link_url) {
+                          window.open(slot.link_url, '_blank')
+                        }
+                      }}
+                      style={{
+                        aspectRatio: '3/4',
+                        borderRadius: '16px',
+                        overflow: 'hidden',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                        cursor: slot.link_url ? 'pointer' : 'default',
+                        position: 'relative',
+                        background: '#f3f4f6',
+                        transition: 'transform 0.3s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-8px)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                      }}
+                    >
+                      {slot.image?.secure_url ? (
+                        <Image
+                          src={slot.image.secure_url}
+                          alt={slot.title || `업무도구 ${slot.display_order}`}
+                          fill
+                          style={{ objectFit: 'cover' }}
+                          sizes="(max-width: 768px) 50vw, 25vw"
+                        />
+                      ) : (
+                        <div style={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#ffffff',
+                          fontSize: '16px',
+                          fontWeight: '600',
+                          background: `linear-gradient(135deg, hsl(${slot.display_order * 90}, 70%, 50%) 0%, hsl(${slot.display_order * 90 + 30}, 70%, 60%) 100%)`
+                        }}>
+                          {slot.title}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  ['재고관리', '매출분석', '세금계산서', '고객관리'].map((tool, i) => (
+                    <div key={i} style={{
+                      aspectRatio: '3/4',
+                      background: `linear-gradient(135deg, hsl(${i * 90}, 70%, 50%) 0%, hsl(${i * 90 + 30}, 70%, 60%) 100%)`,
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      transition: 'transform 0.3s',
+                      cursor: 'pointer'
                     }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)'
-                    }}>
-                    {tool}
-                  </div>
-                ))}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-8px)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                      }}>
+                      {tool}
+                    </div>
+                  ))
+                )}
               </div>
 
               {/* 탭 4: 다양한 서비스 - 혼합 레이아웃 */}
@@ -414,63 +562,126 @@ export default function PlatformHome() {
                 gap: '16px',
                 padding: '0 40px'
               }}>
-                <div style={{
-                  gridRow: 'span 2',
-                  aspectRatio: '3/4',
-                  background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#1e40af'
-                }}>
-                  프리미엄 서비스
-                </div>
-                <div style={{
-                  aspectRatio: '4/3',
-                  background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#475569',
-                  fontSize: '14px'
-                }}>
-                  서비스 1
-                </div>
-                <div style={{
-                  aspectRatio: '4/3',
-                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#475569',
-                  fontSize: '14px'
-                }}>
-                  서비스 2
-                </div>
-                <div style={{
-                  gridColumn: 'span 2',
-                  aspectRatio: '8/3',
-                  background: 'linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%)',
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#475569',
-                  fontSize: '14px'
-                }}>
-                  서비스 3
-                </div>
+                {tab4Images.length > 0 ? (
+                  tab4Images.map((slot, index) => {
+                    const gridStyle = index === 0
+                      ? { gridRow: 'span 2', aspectRatio: '3/4' }
+                      : index === 3
+                      ? { gridColumn: 'span 2', aspectRatio: '8/3' }
+                      : { aspectRatio: '4/3' }
+
+                    const defaultBgs = [
+                      'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                      'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+                      'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                      'linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%)'
+                    ]
+
+                    return (
+                      <div
+                        key={slot.display_order}
+                        onClick={() => {
+                          if (slot.link_url) {
+                            window.open(slot.link_url, '_blank')
+                          }
+                        }}
+                        style={{
+                          ...gridStyle,
+                          borderRadius: '16px',
+                          overflow: 'hidden',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                          cursor: slot.link_url ? 'pointer' : 'default',
+                          position: 'relative',
+                          background: '#f3f4f6'
+                        }}
+                      >
+                        {slot.image?.secure_url ? (
+                          <Image
+                            src={slot.image.secure_url}
+                            alt={slot.title || `서비스 ${slot.display_order}`}
+                            fill
+                            style={{ objectFit: 'cover' }}
+                            sizes="(max-width: 768px) 50vw, 33vw"
+                          />
+                        ) : (
+                          <div style={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: index === 0 ? '#1e40af' : '#475569',
+                            fontSize: index === 0 ? '16px' : '14px',
+                            fontWeight: index === 0 ? '600' : 'normal',
+                            background: defaultBgs[index]
+                          }}>
+                            {slot.title}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                ) : (
+                  <>
+                    <div style={{
+                      gridRow: 'span 2',
+                      aspectRatio: '3/4',
+                      background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#1e40af'
+                    }}>
+                      프리미엄 서비스
+                    </div>
+                    <div style={{
+                      aspectRatio: '4/3',
+                      background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#475569',
+                      fontSize: '14px'
+                    }}>
+                      서비스 1
+                    </div>
+                    <div style={{
+                      aspectRatio: '4/3',
+                      background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#475569',
+                      fontSize: '14px'
+                    }}>
+                      서비스 2
+                    </div>
+                    <div style={{
+                      gridColumn: 'span 2',
+                      aspectRatio: '8/3',
+                      background: 'linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%)',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#475569',
+                      fontSize: '14px'
+                    }}>
+                      서비스 3
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

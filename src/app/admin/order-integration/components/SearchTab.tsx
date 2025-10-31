@@ -832,6 +832,20 @@ export default function SearchTab() {
     fetchOrders();
   }, []);
 
+  // 날짜 필터 변경 감지 (초기 로드 제외)
+  const isFirstDateFilterRender = useRef(true);
+  useEffect(() => {
+    // 초기 렌더링은 제외
+    if (isFirstDateFilterRender.current) {
+      isFirstDateFilterRender.current = false;
+      return;
+    }
+
+    // 날짜 필터가 변경되면 자동 조회
+    fetchOrders(filters, 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.startDate, filters.endDate, filters.dateType]);
+
   // 빠른 날짜 필터 (한국 시간 기준)
   const setQuickDateFilter = async (days: number) => {
     const now = new Date();

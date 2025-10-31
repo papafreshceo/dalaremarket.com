@@ -68,6 +68,16 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           href: '/admin/settings/banners'
         },
         {
+          title: '팝업 관리',
+          description: '팝업 공지사항 관리',
+          href: '/admin/settings/popups'
+        },
+        {
+          title: '프로모션 이미지',
+          description: '메인 페이지 프로모션 이미지',
+          href: '/admin/settings/promotional-images'
+        },
+        {
           title: '카테고리 노출',
           description: '플랫폼 카테고리 노출 순서',
           href: '/admin/settings/category-display'

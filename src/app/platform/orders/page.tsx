@@ -70,6 +70,9 @@ function OrdersPageContent() {
   // 새로고침 상태
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // 샘플 모드 상태
+  const [isSampleMode, setIsSampleMode] = useState(false);
+
   // 사용자별 테마 불러오기
   useEffect(() => {
     const loadUserTheme = async () => {
@@ -199,22 +202,25 @@ function OrdersPageContent() {
   }, []); // 빈 배열로 마운트 시 1회만 등록
 
   const fetchOrders = async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    try {
+      // API를 통해 주문 조회 (샘플 모드 자동 처리)
+      const response = await fetch('/api/platform-orders');
+      const result = await response.json();
 
-    if (!user) return;
+      if (!result.success) {
+        console.error('주문 조회 오류:', result.error);
+        return;
+      }
 
-    // 현재 로그인한 셀러의 주문만 조회
-    const { data, error } = await supabase
-      .from('integrated_orders')
-      .select('*')
-      .eq('seller_id', user.id)
-      .order('created_at', { ascending: false });
+      const data = result.data || [];
 
-    if (error) {
-      console.error('주문 조회 오류:', error);
-      return;
-    }
+      // 샘플 데이터인 경우 콘솔에 표시
+      if (result.isSample) {
+        console.log('📊 샘플 데이터 표시 중 (' + data.length + '건)');
+        setIsSampleMode(true);
+      } else {
+        setIsSampleMode(false);
+      }
 
     // shipping_status를 Order status로 매핑
     const mapShippingStatus = (shippingStatus: string | null): Order['status'] => {
@@ -273,6 +279,9 @@ function OrdersPageContent() {
     }));
 
     setOrders(convertedOrders);
+    } catch (error) {
+      console.error('주문 조회 중 오류:', error);
+    }
   };
 
   // URL 쿼리 파라미터에서 탭 읽어오기
@@ -322,14 +331,58 @@ function OrdersPageContent() {
     refunded: { label: '환불완료', color: '#10b981', bg: '#d1fae5' }
   };
 
+  const filteredOrders = orders.filter(order => {
+    // 상태 필터
+    const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
+
+    // 날짜 필터 (한국 시간 기준)
+    let matchesDate = true;
+    if (startDate || endDate) {
+      // UTC 시간을 한국 시간(UTC+9)으로 변환
+      const orderDate = new Date(order.date);
+      const koreaOrderDate = new Date(orderDate.getTime() + (9 * 60 * 60 * 1000));
+
+      // 한국 시간 기준 날짜만 추출 (시간 제거)
+      const orderDateOnly = new Date(
+        koreaOrderDate.getUTCFullYear(),
+        koreaOrderDate.getUTCMonth(),
+        koreaOrderDate.getUTCDate()
+      );
+
+      if (startDate) {
+        const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+        if (orderDateOnly < startDateOnly) {
+          matchesDate = false;
+        }
+      }
+
+      if (endDate) {
+        const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+        if (orderDateOnly > endDateOnly) {
+          matchesDate = false;
+        }
+      }
+    }
+
+    // 검색 필터
+    const matchesSearch = !searchTerm ||
+      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.optionName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.marketName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.recipientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.recipientPhone?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    return matchesStatus && matchesDate && matchesSearch;
+  });
+
   const statsData: StatsData[] = [
-    { status: 'registered', count: orders.filter(o => o.status === 'registered').length, bgGradient: 'linear-gradient(135deg, #2563eb 0%, #60a5fa 100%)' },
-    { status: 'confirmed', count: orders.filter(o => o.status === 'confirmed').length, bgGradient: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)' },
-    { status: 'preparing', count: orders.filter(o => o.status === 'preparing').length, bgGradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' },
-    { status: 'shipped', count: orders.filter(o => o.status === 'shipped').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' },
-    { status: 'cancelRequested', count: orders.filter(o => o.status === 'cancelRequested').length, bgGradient: 'linear-gradient(135deg, #f87171 0%, #fca5a5 100%)' },
-    { status: 'cancelled', count: orders.filter(o => o.status === 'cancelled').length, bgGradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' },
-    { status: 'refunded', count: orders.filter(o => o.status === 'refunded').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' }
+    { status: 'registered', count: filteredOrders.filter(o => o.status === 'registered').length, bgGradient: 'linear-gradient(135deg, #2563eb 0%, #60a5fa 100%)' },
+    { status: 'confirmed', count: filteredOrders.filter(o => o.status === 'confirmed').length, bgGradient: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)' },
+    { status: 'preparing', count: filteredOrders.filter(o => o.status === 'preparing').length, bgGradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' },
+    { status: 'shipped', count: filteredOrders.filter(o => o.status === 'shipped').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' },
+    { status: 'cancelRequested', count: filteredOrders.filter(o => o.status === 'cancelRequested').length, bgGradient: 'linear-gradient(135deg, #f87171 0%, #fca5a5 100%)' },
+    { status: 'cancelled', count: filteredOrders.filter(o => o.status === 'cancelled').length, bgGradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' },
+    { status: 'refunded', count: filteredOrders.filter(o => o.status === 'refunded').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' }
   ];
 
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
@@ -590,57 +643,30 @@ function OrdersPageContent() {
     }
   };
 
-  const filteredOrders = orders.filter(order => {
-    // 상태 필터
-    const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
-
-    // 날짜 필터 (한국 시간 기준)
-    let matchesDate = true;
-    if (startDate || endDate) {
-      // UTC 시간을 한국 시간(UTC+9)으로 변환
-      const orderDate = new Date(order.date);
-      const koreaOrderDate = new Date(orderDate.getTime() + (9 * 60 * 60 * 1000));
-
-      // 한국 시간 기준 날짜만 추출 (시간 제거)
-      const orderDateOnly = new Date(
-        koreaOrderDate.getUTCFullYear(),
-        koreaOrderDate.getUTCMonth(),
-        koreaOrderDate.getUTCDate()
-      );
-
-      if (startDate) {
-        const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-        if (orderDateOnly < startDateOnly) {
-          matchesDate = false;
-        }
-      }
-      if (endDate) {
-        const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-        if (orderDateOnly > endDateOnly) {
-          matchesDate = false;
-        }
-      }
+  // 샘플 데이터 삭제 핸들러
+  const handleDeleteSampleData = async () => {
+    if (!confirm('샘플 데이터를 삭제하시겠습니까?\n이후 실제 주문 데이터만 표시됩니다.')) {
+      return;
     }
 
-    // 검색어 필터 (모든 컬럼 대상)
-    let matchesSearch = true;
-    if (searchTerm && searchTerm.trim()) {
-      // 미완성 자음/모음 제거 (완성된 글자만 남김)
-      const cleanedSearchTerm = searchTerm.replace(/[ㄱ-ㅎㅏ-ㅣ]/g, '');
+    try {
+      const response = await fetch('/api/platform-orders/sample', {
+        method: 'DELETE',
+      });
 
-      // 완성된 글자가 없으면 필터링 하지 않음
-      if (!cleanedSearchTerm.trim()) {
-        return true;
+      const result = await response.json();
+
+      if (result.success) {
+        alert('샘플 데이터가 삭제되었습니다.');
+        await fetchOrders(); // 주문 목록 새로고침
+      } else {
+        alert('샘플 데이터 삭제에 실패했습니다: ' + result.error);
       }
-
-      const searchLower = cleanedSearchTerm.toLowerCase();
-      matchesSearch = Object.values(order).some(value =>
-        String(value || '').toLowerCase().includes(searchLower)
-      );
+    } catch (error) {
+      console.error('샘플 데이터 삭제 오류:', error);
+      alert('샘플 데이터 삭제 중 오류가 발생했습니다.');
     }
-
-    return matchesStatus && matchesDate && matchesSearch;
-  });
+  };
 
   return (
     <div className="platform-orders-page" style={{ minHeight: '100vh', background: 'var(--color-background)' }}>
@@ -870,6 +896,55 @@ function OrdersPageContent() {
           paddingLeft: isMobile ? '6px' : '12px',
           paddingRight: isMobile ? '6px' : '12px'
         }}>
+          {/* 샘플 모드 배지 및 삭제 버튼 */}
+          {isSampleMode && (
+            <div style={{
+              margin: '0 8px 16px 8px',
+              padding: '12px',
+              background: '#fffbeb',
+              border: '1px solid #fbbf24',
+              borderRadius: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: '#92400e'
+              }}>
+                <span style={{ fontSize: '16px' }}>📊</span>
+                <span>샘플 데이터를 보고 계십니다</span>
+              </div>
+              <div style={{
+                fontSize: '11px',
+                color: '#78350f',
+                lineHeight: '1.5'
+              }}>
+                실제 주문서를 업로드하면 자동으로 실제 데이터로 전환됩니다.
+              </div>
+              <button
+                onClick={handleDeleteSampleData}
+                style={{
+                  padding: '6px 12px',
+                  background: '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  alignSelf: 'flex-start'
+                }}
+              >
+                샘플 데이터 삭제
+              </button>
+            </div>
+          )}
+
           {/* 대시보드 탭 */}
           <button
             onClick={() => handleTabChange('대시보드')}

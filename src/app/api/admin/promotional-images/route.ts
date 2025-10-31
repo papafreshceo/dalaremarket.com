@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * GET /api/admin/promotional-images
- * 홍보 이미지 목록 조회
+ * 홍보 이미지 목록 조회 (Cloudinary 이미지 포함)
  */
 export async function GET() {
   try {
@@ -11,7 +11,16 @@ export async function GET() {
 
     const { data, error } = await supabase
       .from('promotional_images')
-      .select('*')
+      .select(`
+        *,
+        image:cloudinary_images(
+          id,
+          secure_url,
+          title,
+          width,
+          height
+        )
+      `)
       .order('display_order', { ascending: true });
 
     if (error) {
@@ -44,9 +53,15 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const body = await request.json();
 
+    // section 필드 추가 (기본값: tab1)
+    const insertData = {
+      ...body,
+      section: body.section || 'tab1',
+    };
+
     const { data, error } = await supabase
       .from('promotional_images')
-      .insert(body)
+      .insert(insertData)
       .select()
       .single();
 
