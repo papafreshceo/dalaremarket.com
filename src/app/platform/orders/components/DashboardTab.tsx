@@ -1655,20 +1655,14 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                             padding: '2px 8px',
                             marginLeft: '-8px',
                             borderRadius: '6px',
-                            backgroundColor: isSelected ? '#dbeafe' : 'transparent',
-                            border: isSelected ? '2px solid #3b82f6' : '2px solid transparent',
                             opacity: isDisabled ? 0.4 : 1,
                             transition: 'all 0.2s ease'
                           }}
                           onMouseEnter={e => {
-                            if (!isSelected) {
-                              (e.currentTarget as HTMLDivElement).style.backgroundColor = '#f9fafb';
-                            }
+                            (e.currentTarget as HTMLDivElement).style.backgroundColor = '#f9fafb';
                           }}
                           onMouseLeave={e => {
-                            if (!isSelected) {
-                              (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
-                            }
+                            (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
                           }}
                         >
                           <div
@@ -1762,8 +1756,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                           marginBottom: '3px',
                           padding: '3px 8px',
                           borderRadius: '6px',
-                          backgroundColor: isSelected ? '#d1fae5' : 'transparent',
-                          border: isSelected ? '2px solid #10b981' : '2px solid transparent',
                           cursor: isDisabled ? 'not-allowed' : 'pointer',
                           opacity: isDisabled ? 0.4 : 1,
                           transition: 'all 0.2s ease'
@@ -2080,25 +2072,89 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               <div>
                 {/* 선택 정보 표시 */}
                 {(selectedProducts.length > 0 || selectedOptions.length > 0) && (
-                  <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                     {selectedProducts.length > 0 && (
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
                         <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>선택된 품목:</span>
-                        {selectedProducts.map(p => (
-                          <span key={p} style={{ fontSize: '11px', padding: '2px 8px', background: '#dbeafe', color: '#1e40af', borderRadius: '12px' }}>
-                            {p}
-                          </span>
-                        ))}
+                        {selectedProducts.map((p, idx) => {
+                          const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
+                          return (
+                            <div
+                              key={p}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: '#f3f4f6',
+                                padding: '3px 6px',
+                                borderRadius: '8px',
+                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
+                              }}
+                            >
+                              <svg width="20" height="10">
+                                <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
+                                  strokeDasharray={dashStyles[idx % dashStyles.length]} />
+                              </svg>
+                              <span style={{ fontSize: '10px', color: '#374151' }}>{p}</span>
+                              <button
+                                onClick={() => setSelectedProducts(selectedProducts.filter(item => item !== p))}
+                                style={{
+                                  fontSize: '10px',
+                                  color: '#9ca3af',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                  marginLeft: '2px'
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                     {selectedOptions.length > 0 && (
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
                         <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>선택된 옵션:</span>
-                        {selectedOptions.map(o => (
-                          <span key={o} style={{ fontSize: '11px', padding: '2px 8px', background: '#d1fae5', color: '#065f46', borderRadius: '12px' }}>
-                            {o}
-                          </span>
-                        ))}
+                        {selectedOptions.map((o, idx) => {
+                          const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
+                          return (
+                            <div
+                              key={o}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: '#f3f4f6',
+                                padding: '3px 6px',
+                                borderRadius: '8px',
+                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
+                              }}
+                            >
+                              <svg width="20" height="10">
+                                <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
+                                  strokeDasharray={dashStyles[idx % dashStyles.length]} />
+                              </svg>
+                              <span style={{ fontSize: '10px', color: '#374151' }}>{o}</span>
+                              <button
+                                onClick={() => setSelectedOptions(selectedOptions.filter(item => item !== o))}
+                                style={{
+                                  fontSize: '10px',
+                                  color: '#9ca3af',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                  marginLeft: '2px'
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
