@@ -2092,15 +2092,17 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                     stroke="#e5e7eb"
                                     strokeWidth="1"
                                   />
-                                  <text
-                                    x={chartLeft - 10}
-                                    y={y + 4}
-                                    fontSize="11"
-                                    fill="#6b7280"
-                                    textAnchor="end"
-                                  >
-                                    {value.toLocaleString()}
-                                  </text>
+                                  {i !== 0 && (
+                                    <text
+                                      x={chartLeft - 10}
+                                      y={y + 4}
+                                      fontSize="11"
+                                      fill="#6b7280"
+                                      textAnchor="end"
+                                    >
+                                      {value.toLocaleString()}
+                                    </text>
+                                  )}
                                 </g>
                               );
                             })}
@@ -2320,15 +2322,17 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                     stroke="#e5e7eb"
                                     strokeWidth="1"
                                   />
-                                  <text
-                                    x={chartLeft - 10}
-                                    y={y + 4}
-                                    fontSize="11"
-                                    fill="#6b7280"
-                                    textAnchor="end"
-                                  >
-                                    {value.toLocaleString()}
-                                  </text>
+                                  {i !== 0 && (
+                                    <text
+                                      x={chartLeft - 10}
+                                      y={y + 4}
+                                      fontSize="11"
+                                      fill="#6b7280"
+                                      textAnchor="end"
+                                    >
+                                      {value.toLocaleString()}
+                                    </text>
+                                  )}
                                 </g>
                               );
                             })}
