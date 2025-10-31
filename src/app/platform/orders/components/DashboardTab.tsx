@@ -50,6 +50,12 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
   const [hoveredBadge, setHoveredBadge] = useState<{ type: string; amount: number; position: { x: number; y: number } } | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<Order['status'] | null>(null);
 
+  // 품목/옵션별 통계 탭 상태
+  const [activeTab, setActiveTab] = useState<'market' | 'product'>('market');
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+  const [selectedMarkets, setSelectedMarkets] = useState<string[]>([]);
+
   // 현재 날짜 정보 (UI 표시에만 사용)
   const now = useMemo(() => new Date(), []);
   const todayYear = now.getFullYear();
@@ -513,7 +519,23 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       marketMap.set(marketName, (marketMap.get(marketName) || 0) + (order.supplyPrice || 0));
     });
 
-    const sortedDates = Array.from(dateMarketMap.keys()).sort();
+    // startDate부터 endDate까지 모든 날짜 생성
+    const allDates: string[] = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      allDates.push(formatYmdKst(d));
+    }
+
+    // 30일 초과 시 30개로 샘플링
+    let displayDates = allDates;
+    if (allDates.length > 30) {
+      const step = allDates.length / 30;
+      displayDates = Array.from({ length: 30 }, (_, i) => allDates[Math.floor(i * step)]);
+    }
+
+    const sortedDates = displayDates;
 
     const allMarkets = new Set<string>();
     filteredOrders.forEach(order => {
@@ -561,7 +583,114 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       marketLines: finalMarketLines,
       totalMarkets: marketLines.length
     };
+  }, [filteredOrders, startDate, endDate]);
+
+  // selectedMarkets 초기화 (마켓 목록 변경 시)
+  useEffect(() => {
+    const allMarkets = Array.from(new Set(filteredOrders.map(o => o.sellerMarketName || '미지정')));
+    if (selectedMarkets.length === 0) {
+      setSelectedMarkets(allMarkets);
+    }
   }, [filteredOrders]);
+
+  // 품목/옵션별 통계 그래프 데이터
+  const productOptionStats = useMemo(() => {
+    // 선택된 품목 또는 옵션상품 목록
+    const selectedItems = selectedProducts.length > 0 ? selectedProducts : selectedOptions;
+    const itemType = selectedProducts.length > 0 ? 'product' : 'option';
+
+    if (selectedItems.length === 0 || selectedMarkets.length === 0) {
+      return { dates: [], lines: [] };
+    }
+
+    // 날짜별 데이터 맵 생성
+    const dateItemMarketMap = new Map<string, Map<string, Map<string, number>>>();
+
+    filteredOrders.forEach(order => {
+      const b = getBaseDate(order);
+      if (!b) return;
+      const dateKey = ymdKst(b);
+      const marketName = order.sellerMarketName || '미지정';
+
+      // 선택된 마켓만 처리
+      if (!selectedMarkets.includes(marketName)) return;
+
+      let itemName = '';
+      if (itemType === 'product') {
+        itemName = order.category4 || '미지정';
+      } else {
+        itemName = order.optionName || '미지정';
+      }
+
+      // 선택된 품목/옵션만 처리
+      if (!selectedItems.includes(itemName)) return;
+
+      if (!dateItemMarketMap.has(dateKey)) {
+        dateItemMarketMap.set(dateKey, new Map());
+      }
+      const itemMap = dateItemMarketMap.get(dateKey)!;
+
+      if (!itemMap.has(itemName)) {
+        itemMap.set(itemName, new Map());
+      }
+      const marketMap = itemMap.get(itemName)!;
+
+      marketMap.set(marketName, (marketMap.get(marketName) || 0) + (order.supplyPrice || 0));
+    });
+
+    // startDate부터 endDate까지 모든 날짜 생성
+    const allDates: string[] = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      allDates.push(formatYmdKst(d));
+    }
+
+    // 30일 초과 시 30개로 샘플링
+    let displayDates = allDates;
+    if (allDates.length > 30) {
+      const step = allDates.length / 30;
+      displayDates = Array.from({ length: 30 }, (_, i) => allDates[Math.floor(i * step)]);
+    }
+
+    const sortedDates = displayDates;
+
+    // 선 스타일 정의
+    const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
+    const marketColors = ['#6366f1', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+    // 품목/옵션 × 마켓 조합으로 선 생성
+    const lines: Array<{
+      label: string;
+      item: string;
+      market: string;
+      color: string;
+      dashStyle: string;
+      data: Array<{ date: string; amount: number }>;
+    }> = [];
+
+    selectedItems.forEach((item, itemIdx) => {
+      selectedMarkets.forEach((market, marketIdx) => {
+        lines.push({
+          label: `${item} - ${market}`,
+          item,
+          market,
+          color: marketColors[marketIdx % marketColors.length],
+          dashStyle: dashStyles[itemIdx % dashStyles.length],
+          data: sortedDates.map(date => ({
+            date,
+            amount: dateItemMarketMap.get(date)?.get(item)?.get(market) || 0
+          }))
+        });
+      });
+    });
+
+    return {
+      dates: sortedDates,
+      lines
+    };
+  }, [filteredOrders, selectedProducts, selectedOptions, selectedMarkets, startDate, endDate]);
 
   return (
     <div>
@@ -1214,85 +1343,88 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           </div>
 
           {/* 통계 카드들 */}
-          {statsData.map(stat => {
-            const config = statusConfig[stat.status];
-            const isSelected = selectedStatus === stat.status;
+          {statsData
+            .filter(stat => !['registered', 'preparing', 'cancelRequested'].includes(stat.status))
+            .map(stat => {
+              const config = statusConfig[stat.status];
+              const isSelected = selectedStatus === stat.status;
 
-            return (
-              <div
-                key={stat.status}
-                className="card"
-                onClick={() => setSelectedStatus(isSelected ? null : stat.status)}
-                style={{
-                  borderRadius: '6px',
-                  padding: '6px 8px',
-                  cursor: 'pointer',
-                  border: isSelected ? `2px solid ${config.color}` : '1px solid transparent',
-                  boxShadow: isSelected ? `0 0 0 2px ${config.color}20` : undefined,
-                  transform: isSelected ? 'scale(1.01)' : undefined,
-                  transition: 'all 0.2s ease'
-                }}
-              >
+              return (
                 <div
+                  key={stat.status}
+                  className="card"
+                  onClick={() => setSelectedStatus(isSelected ? null : stat.status)}
                   style={{
-                    fontSize: '11px',
-                    marginBottom: '3px',
-                    color: config.color,
-                    fontWeight: '500'
+                    borderRadius: '6px',
+                    padding: '6px 8px',
+                    cursor: 'pointer',
+                    border: isSelected ? `2px solid ${config.color}` : '1px solid transparent',
+                    boxShadow: isSelected ? `0 0 0 2px ${config.color}20` : undefined,
+                    transform: isSelected ? 'scale(1.01)' : undefined,
+                    transition: 'all 0.2s ease'
                   }}
                 >
-                  {config.label}
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'baseline',
-                    justifyContent: 'space-between',
-                    gap: '4px'
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: '22px',
-                      fontWeight: '700',
-                      color: config.color
-                    }}
-                  >
-                    {stat.count}
-                  </div>
                   <div
                     style={{
                       fontSize: '11px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '1px',
-                      color: '#6b7280',
-                      whiteSpace: 'nowrap'
+                      marginBottom: '3px',
+                      color: config.color,
+                      fontWeight: '500'
                     }}
                   >
-                    <span>₩</span>
-                    <span>{stat.amount.toLocaleString()}</span>
+                    {config.label}
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      justifyContent: 'space-between',
+                      gap: '4px'
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '22px',
+                        fontWeight: '700',
+                        color: config.color
+                      }}
+                    >
+                      {stat.count}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '11px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1px',
+                        color: '#6b7280',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <span>₩</span>
+                      <span>{stat.amount.toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
 
         {/* 두 번째/세 번째 열 */}
         <div
           style={{
-            flex: 1,
+            width: '974px',
+            flexShrink: 0,
             display: 'flex',
             flexDirection: 'column',
             gap: '24px'
           }}
         >
-          {/* 첫 번째 행: 발주 TOP 10 + 옵션상품 발주 TOP 10 (6:4) */}
+          {/* 첫 번째 행: 발주 TOP 10 + 옵션상품 발주 TOP 10 */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '6fr 4fr',
+              gridTemplateColumns: '550px 400px',
               gap: '24px'
             }}
           >
@@ -1330,8 +1462,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   {/* 원형 그래프 */}
                   <div
                     style={{
-                      width: isMobile ? '300px' : '340px',
-                      height: isMobile ? '300px' : '340px',
+                      width: isMobile ? '300px' : '240px',
+                      height: isMobile ? '300px' : '240px',
                       position: 'relative',
                       flexShrink: 0,
                       display: 'flex',
@@ -1494,28 +1626,37 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#6366f1', '#f97316', '#14b8a6', '#a855f7'];
                       const isInTop10 = idx < 10;
                       const color = isInTop10 ? colors[idx % colors.length] : '#9ca3af';
-                      const isSelected = selectedCategory4 === item.name;
+                      const isSelected = selectedProducts.includes(item.name);
+                      const isDisabled = selectedOptions.length > 0; // 옵션이 선택되면 품목은 비활성화
 
                       return (
                         <div
                           key={idx}
                           onClick={() => {
-                            if (selectedCategory4 === item.name) {
-                              setSelectedCategory4(null);
+                            if (isDisabled) return; // 비활성화된 경우 클릭 무시
+
+                            if (isSelected) {
+                              // 이미 선택된 경우 제거
+                              setSelectedProducts(selectedProducts.filter(p => p !== item.name));
                             } else {
-                              setSelectedCategory4(item.name);
+                              // 최대 5개까지만 선택 가능
+                              if (selectedProducts.length < 5) {
+                                setSelectedProducts([...selectedProducts, item.name]);
+                              }
                             }
                           }}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            marginBottom: '10px',
-                            gap: '10px',
-                            cursor: 'pointer',
-                            padding: '4px 8px',
+                            marginBottom: '4px',
+                            gap: '8px',
+                            cursor: isDisabled ? 'not-allowed' : 'pointer',
+                            padding: '2px 8px',
                             marginLeft: '-8px',
                             borderRadius: '6px',
-                            backgroundColor: isSelected ? '#f3f4f6' : 'transparent',
+                            backgroundColor: isSelected ? '#dbeafe' : 'transparent',
+                            border: isSelected ? '2px solid #3b82f6' : '2px solid transparent',
+                            opacity: isDisabled ? 0.4 : 1,
                             transition: 'all 0.2s ease'
                           }}
                           onMouseEnter={e => {
@@ -1596,23 +1737,53 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>옵션상품 발주 TOP 10</h3>
               <div style={{ maxHeight: '440px', overflowY: 'auto' }}>
                 {optionTop10.length > 0 ? (
-                  optionTop10.map((item, idx) => (
-                    <div key={idx} style={{ marginBottom: '12px' }}>
+                  optionTop10.map((item, idx) => {
+                    const isSelected = selectedOptions.includes(item.name);
+                    const isDisabled = selectedProducts.length > 0; // 품목이 선택되면 옵션은 비활성화
+
+                    return (
                       <div
+                        key={idx}
+                        onClick={() => {
+                          if (isDisabled) return; // 비활성화된 경우 클릭 무시
+
+                          if (isSelected) {
+                            // 이미 선택된 경우 제거
+                            setSelectedOptions(selectedOptions.filter(o => o !== item.name));
+                          } else {
+                            // 최대 5개까지만 선택 가능
+                            if (selectedOptions.length < 5) {
+                              setSelectedOptions([...selectedOptions, item.name]);
+                            }
+                          }
+                        }}
                         style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          marginBottom: '4px'
+                          marginBottom: '3px',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          backgroundColor: isSelected ? '#d1fae5' : 'transparent',
+                          border: isSelected ? '2px solid #10b981' : '2px solid transparent',
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          opacity: isDisabled ? 0.4 : 1,
+                          transition: 'all 0.2s ease'
                         }}
                       >
-                        <span style={{ fontSize: '12px' }}>{idx + 1}. {item.name}</span>
-                        <span style={{ fontSize: '12px', fontWeight: '500' }}>₩{item.amount.toLocaleString()}</span>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginBottom: '4px'
+                          }}
+                        >
+                          <span style={{ fontSize: '12px' }}>{idx + 1}. {item.name}</span>
+                          <span style={{ fontSize: '12px', fontWeight: '500' }}>₩{item.amount.toLocaleString()}</span>
+                        </div>
+                        <div className="border-gray-200" style={{ height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div className="bg-primary" style={{ width: `${item.percent}%`, height: '100%', transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+                        </div>
                       </div>
-                      <div className="border-gray-200" style={{ height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div className="bg-primary" style={{ width: `${item.percent}%`, height: '100%', transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)' }} />
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div style={{ textAlign: 'center', color: '#6b7280', padding: '20px' }}>데이터가 없습니다</div>
                 )}
@@ -1620,21 +1791,93 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             </div>
           </div>
 
-          {/* 마켓별 통계 - 전체 너비 */}
-          <div className="card" style={{ borderRadius: '12px', padding: '20px' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '16px'
-              }}
-            >
-              <h3 style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>마켓별 날짜별 통계</h3>
-              {marketDateStats.totalMarkets > 10 && (
-                <span style={{ fontSize: '11px', color: '#6b7280' }}>상위 10개 + 기타 / 총 {marketDateStats.totalMarkets}개</span>
-              )}
+          {/* 마켓별 통계 */}
+          <div className="card" style={{ borderRadius: '12px', padding: '20px', width: '974px' }}>
+            {/* 탭 헤더 */}
+            <div style={{ marginBottom: '16px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '24px',
+                  borderBottom: '2px solid #e5e7eb',
+                  position: 'relative'
+                }}
+              >
+                <button
+                  onClick={() => setActiveTab('market')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '12px 4px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: activeTab === 'market' ? '#6366f1' : '#6b7280',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    transition: 'color 0.2s'
+                  }}
+                >
+                  마켓별 통계
+                  {activeTab === 'market' && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: '-2px',
+                        left: 0,
+                        right: 0,
+                        height: '2px',
+                        background: '#6366f1'
+                      }}
+                    />
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab('product')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '12px 4px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: activeTab === 'product' ? '#6366f1' : '#6b7280',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    transition: 'color 0.2s'
+                  }}
+                >
+                  품목/옵션별 통계
+                  {activeTab === 'product' && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: '-2px',
+                        left: 0,
+                        right: 0,
+                        height: '2px',
+                        background: '#6366f1'
+                      }}
+                    />
+                  )}
+                </button>
+              </div>
             </div>
+
+            {/* 마켓별 통계 탭 */}
+            {activeTab === 'market' && (
+              <>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '16px'
+                  }}
+                >
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>마켓별 날짜별 통계</h3>
+                  {marketDateStats.totalMarkets > 10 && (
+                    <span style={{ fontSize: '11px', color: '#6b7280' }}>상위 10개 + 기타 / 총 {marketDateStats.totalMarkets}개</span>
+                  )}
+                </div>
 
             {(() => {
               // 조건부 렌더링(IIFE)로 JSX 경계를 명확히 하여 파싱 오류 방지
@@ -1642,62 +1885,119 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 return (
                   <div style={{ position: 'relative' }}>
                     {/* 그래프 영역 */}
-                    <svg viewBox="0 0 500 250" style={{ width: '100%', height: '250px' }}>
-                      {/* 가로 격자선 */}
-                      {[0, 1, 2, 3, 4].map(i => (
-                        <line key={`grid-${i}`} x1="60" y1={30 + i * 40} x2="480" y2={30 + i * 40} stroke="#e5e7eb" strokeWidth="1" />
-                      ))}
-
-                      {/* 각 마켓별 꺾은선 그래프 */}
+                    <svg viewBox="0 0 1200 500" style={{ width: '100%', height: '500px' }}>
                       {(() => {
-                        const maxAmount = Math.max(
-                          ...marketDateStats.marketLines.flatMap(line => line.data.map(d => d.amount)),
-                          1
+                        // 선택된 마켓만 필터링
+                        const filteredLines = marketDateStats.marketLines.filter(line =>
+                          selectedMarkets.includes(line.market)
                         );
+
+                        const maxAmount = Math.max(
+                          ...filteredLines.flatMap(line => line.data.map(d => d.amount)),
+                          10000
+                        );
+
+                        // 최대값의 110%를 10,000원 단위로 올림
+                        const maxY = Math.ceil(maxAmount * 1.1 / 10000) * 10000;
+                        const yStep = maxY / 5;
+
                         const dateCount = marketDateStats.dates.length;
                         const divisor = dateCount > 1 ? dateCount - 1 : 1;
 
-                        return marketDateStats.marketLines.map((line, lineIdx) => {
-                          const points = line.data
-                            .map((d, idx) => {
-                              const x = 60 + (idx / divisor) * 420;
-                              const y = 210 - (d.amount / maxAmount) * 160;
-                              return `${x},${y}`;
-                            })
-                            .join(' ');
+                        // 그래프 영역 설정
+                        const chartLeft = 100;
+                        const chartRight = 1150;
+                        const chartTop = 30;
+                        const chartBottom = 430;
+                        const chartWidth = chartRight - chartLeft;
+                        const chartHeight = chartBottom - chartTop;
 
-                          return (
-                            <g key={lineIdx}>
-                              <polyline
-                                points={points}
-                                fill="none"
-                                stroke={line.color}
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                style={{ transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)' }}
-                              />
-                              {line.data.map((d, idx) => {
-                                const x = 60 + (idx / (divisor || 1)) * 420;
-                                const y = 210 - (d.amount / maxAmount) * 160;
-                                return <circle key={idx} cx={x} cy={y} r="3" fill={line.color} stroke="#fff" strokeWidth="1" style={{ transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)' }} />;
-                              })}
-                            </g>
-                          );
-                        });
-                      })()}
-
-                      {/* X축 레이블 (날짜) */}
-                      {marketDateStats.dates.map((date, idx) => {
-                        const divisor = marketDateStats.dates.length > 1 ? marketDateStats.dates.length - 1 : 1;
-                        const x = 60 + (idx / divisor) * 420;
-                        const displayDate = date.substring(5);
                         return (
-                          <text key={idx} x={x} y="230" textAnchor="middle" fontSize="9" fill="#6b7280">
-                            {displayDate}
-                          </text>
+                          <>
+                            {/* 가로 격자선 및 Y축 레이블 */}
+                            {[0, 1, 2, 3, 4, 5].map(i => {
+                              const y = chartBottom - (i / 5) * chartHeight;
+                              const value = i * yStep;
+                              return (
+                                <g key={`grid-${i}`}>
+                                  <line
+                                    x1={chartLeft}
+                                    y1={y}
+                                    x2={chartRight}
+                                    y2={y}
+                                    stroke="#e5e7eb"
+                                    strokeWidth="1"
+                                  />
+                                  <text
+                                    x={chartLeft - 10}
+                                    y={y + 4}
+                                    fontSize="11"
+                                    fill="#6b7280"
+                                    textAnchor="end"
+                                  >
+                                    ₩{(value / 10000).toFixed(0)}만
+                                  </text>
+                                </g>
+                              );
+                            })}
+
+                            {/* 마켓별 꺾은선 */}
+                            {filteredLines.map((line, lineIdx) => {
+                              const points = line.data
+                                .map((d, idx) => {
+                                  const x = chartLeft + (idx / divisor) * chartWidth;
+                                  const y = chartBottom - (d.amount / maxY) * chartHeight;
+                                  return `${x},${y}`;
+                                })
+                                .join(' ');
+
+                              return (
+                                <g key={lineIdx}>
+                                  <polyline
+                                    points={points}
+                                    fill="none"
+                                    stroke={line.color}
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    style={{ transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)' }}
+                                  />
+                                  {line.data.map((d, idx) => {
+                                    const x = chartLeft + (idx / divisor) * chartWidth;
+                                    const y = chartBottom - (d.amount / maxY) * chartHeight;
+                                    return (
+                                      <circle
+                                        key={idx}
+                                        cx={x}
+                                        cy={y}
+                                        r="3"
+                                        fill={line.color}
+                                        stroke="#fff"
+                                        strokeWidth="1"
+                                        style={{ transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)' }}
+                                      />
+                                    );
+                                  })}
+                                </g>
+                              );
+                            })}
+
+                            {/* X축 레이블 (날짜) */}
+                            {marketDateStats.dates.map((date, idx) => {
+                              const divisor = marketDateStats.dates.length > 1 ? marketDateStats.dates.length - 1 : 1;
+                              const chartLeft = 100;
+                              const chartWidth = 1050;
+                              const x = chartLeft + (idx / divisor) * chartWidth;
+                              const displayDate = date.substring(5);
+                              return (
+                                <text key={idx} x={x} y="460" textAnchor="middle" fontSize="10" fill="#6b7280">
+                                  {displayDate}
+                                </text>
+                              );
+                            })}
+                          </>
                         );
-                      })}
+                      })()}
                     </svg>
 
                     {/* 범례 */}
@@ -1712,8 +2012,38 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     >
                       {marketDateStats.marketLines.map((line, idx) => {
                         const totalAmount = line.data.reduce((sum, d) => sum + d.amount, 0);
+                        const isSelected = selectedMarkets.includes(line.market);
+
                         return (
-                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div
+                            key={idx}
+                            onClick={() => {
+                              if (isSelected && selectedMarkets.length > 1) {
+                                // 선택 해제 (최소 1개는 유지)
+                                setSelectedMarkets(selectedMarkets.filter(m => m !== line.market));
+                              } else if (!isSelected) {
+                                // 선택 추가
+                                setSelectedMarkets([...selectedMarkets, line.market]);
+                              }
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              cursor: 'pointer',
+                              opacity: isSelected ? 1 : 0.4,
+                              padding: '4px 8px',
+                              marginLeft: '-8px',
+                              borderRadius: '4px',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={e => {
+                              (e.currentTarget as HTMLDivElement).style.backgroundColor = '#f3f4f6';
+                            }}
+                            onMouseLeave={e => {
+                              (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                            }}
+                          >
                             <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: line.color }} />
                             <span>{line.market}</span>
                             <span style={{ color: '#6b7280', fontSize: '11px' }}>(₩{totalAmount.toLocaleString()})</span>
@@ -1738,13 +2068,231 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 </div>
               );
             })()}
+              </>
+            )}
+
+            {/* 품목/옵션별 통계 탭 */}
+            {activeTab === 'product' && (
+              <div>
+                {/* 선택 정보 표시 */}
+                {(selectedProducts.length > 0 || selectedOptions.length > 0) && (
+                  <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {selectedProducts.length > 0 && (
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>선택된 품목:</span>
+                        {selectedProducts.map(p => (
+                          <span key={p} style={{ fontSize: '11px', padding: '2px 8px', background: '#dbeafe', color: '#1e40af', borderRadius: '12px' }}>
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {selectedOptions.length > 0 && (
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '4px' }}>선택된 옵션:</span>
+                        {selectedOptions.map(o => (
+                          <span key={o} style={{ fontSize: '11px', padding: '2px 8px', background: '#d1fae5', color: '#065f46', borderRadius: '12px' }}>
+                            {o}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 그래프 */}
+                {productOptionStats.dates.length > 0 && productOptionStats.lines.length > 0 ? (
+                  <div style={{ position: 'relative' }}>
+                    {/* 메인 그래프 */}
+                    <svg viewBox="0 0 1200 500" style={{ width: '100%', height: '500px' }}>
+                      {(() => {
+                        const maxAmount = Math.max(
+                          ...productOptionStats.lines.flatMap(line => line.data.map(d => d.amount)),
+                          10000
+                        );
+
+                        // 최대값의 110%를 10,000원 단위로 올림
+                        const maxY = Math.ceil(maxAmount * 1.1 / 10000) * 10000;
+                        const yStep = maxY / 5;
+
+                        const dateCount = productOptionStats.dates.length;
+                        const divisor = dateCount > 1 ? dateCount - 1 : 1;
+
+                        // 그래프 영역 설정
+                        const chartLeft = 100;
+                        const chartRight = 1150;
+                        const chartTop = 30;
+                        const chartBottom = 430;
+                        const chartWidth = chartRight - chartLeft;
+                        const chartHeight = chartBottom - chartTop;
+
+                        return (
+                          <>
+                            {/* 가로 격자선 및 Y축 레이블 */}
+                            {[0, 1, 2, 3, 4, 5].map(i => {
+                              const y = chartBottom - (i / 5) * chartHeight;
+                              const value = i * yStep;
+                              return (
+                                <g key={`grid-${i}`}>
+                                  <line
+                                    x1={chartLeft}
+                                    y1={y}
+                                    x2={chartRight}
+                                    y2={y}
+                                    stroke="#e5e7eb"
+                                    strokeWidth="1"
+                                  />
+                                  <text
+                                    x={chartLeft - 10}
+                                    y={y + 4}
+                                    fontSize="11"
+                                    fill="#6b7280"
+                                    textAnchor="end"
+                                  >
+                                    ₩{(value / 10000).toFixed(0)}만
+                                  </text>
+                                </g>
+                              );
+                            })}
+
+                            {/* 품목/옵션 × 마켓 조합별 선 */}
+                            {productOptionStats.lines.map((line, lineIdx) => {
+                              const points = line.data
+                                .map((d, idx) => {
+                                  const x = chartLeft + (idx / divisor) * chartWidth;
+                                  const y = chartBottom - (d.amount / maxY) * chartHeight;
+                                  return `${x},${y}`;
+                                })
+                                .join(' ');
+
+                              return (
+                                <g key={lineIdx}>
+                                  <polyline
+                                    points={points}
+                                    fill="none"
+                                    stroke={line.color}
+                                    strokeWidth="2"
+                                    strokeDasharray={line.dashStyle}
+                                  />
+                                  {line.data.map((d, idx) => {
+                                    const x = chartLeft + (idx / divisor) * chartWidth;
+                                    const y = chartBottom - (d.amount / maxY) * chartHeight;
+                                    return (
+                                      <circle
+                                        key={idx}
+                                        cx={x}
+                                        cy={y}
+                                        r="3"
+                                        fill={line.color}
+                                      />
+                                    );
+                                  })}
+                                </g>
+                              );
+                            })}
+
+                            {/* X축 날짜 라벨 */}
+                            {productOptionStats.dates.map((date, idx) => {
+                              const divisor = productOptionStats.dates.length > 1 ? productOptionStats.dates.length - 1 : 1;
+                              const x = chartLeft + (idx / divisor) * chartWidth;
+                              return (
+                                <text
+                                  key={idx}
+                                  x={x}
+                                  y="460"
+                                  fontSize="10"
+                                  fill="#6b7280"
+                                  textAnchor="middle"
+                                >
+                                  {date.slice(5)}
+                                </text>
+                              );
+                            })}
+                          </>
+                        );
+                      })()}
+                    </svg>
+
+                    {/* 범례 */}
+                    <div style={{ display: 'flex', gap: '32px', marginTop: '16px', flexWrap: 'wrap' }}>
+                      {/* 우측: 품목/옵션별 선 스타일 */}
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '8px' }}>
+                          {selectedProducts.length > 0 ? '품목' : '옵션상품'}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {Array.from(new Set(productOptionStats.lines.map(l => l.item))).map((item, idx) => {
+                            const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
+                            return (
+                              <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <svg width="24" height="12">
+                                  <line
+                                    x1="0"
+                                    y1="6"
+                                    x2="24"
+                                    y2="6"
+                                    stroke="#6b7280"
+                                    strokeWidth="2"
+                                    strokeDasharray={dashStyles[idx % dashStyles.length]}
+                                  />
+                                </svg>
+                                <span style={{ fontSize: '11px' }}>{item}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* 하단: 마켓별 색상 (클릭 가능) */}
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '8px' }}>마켓</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                          {Array.from(new Set(productOptionStats.lines.map(l => l.market))).map((market) => {
+                            const line = productOptionStats.lines.find(l => l.market === market);
+                            const isSelected = selectedMarkets.includes(market);
+                            return (
+                              <div
+                                key={market}
+                                onClick={() => {
+                                  if (isSelected && selectedMarkets.length > 1) {
+                                    setSelectedMarkets(selectedMarkets.filter(m => m !== market));
+                                  } else if (!isSelected) {
+                                    setSelectedMarkets([...selectedMarkets, market]);
+                                  }
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  cursor: 'pointer',
+                                  opacity: isSelected ? 1 : 0.4,
+                                  transition: 'opacity 0.2s'
+                                }}
+                              >
+                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: line?.color }} />
+                                <span style={{ fontSize: '11px' }}>{market}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', color: '#6b7280', padding: '40px 20px' }}>
+                    <div style={{ fontSize: '14px', marginBottom: '8px' }}>좌측에서 품목 또는 옵션상품을 선택하세요</div>
+                    <div style={{ fontSize: '12px', color: '#9ca3af' }}>최대 5개까지 선택 가능</div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* 두 번째 행: 최근 7일 + 월별 발주 추이 (1:1) */}
+          {/* 두 번째 행: 최근 7일 + 월별 발주 추이 */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
+              gridTemplateColumns: '475px 475px',
               gap: '24px'
             }}
           >
@@ -1871,6 +2419,15 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               </div>
             </div>
           </div>
+        </div>
+
+        {/* 네 번째 열: 빈 공간 */}
+        <div
+          style={{
+            width: '400px',
+            flexShrink: 0
+          }}
+        >
         </div>
       </div>
 
