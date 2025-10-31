@@ -692,15 +692,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     };
   }, [filteredOrders, selectedProducts, selectedOptions, selectedMarkets, startDate, endDate]);
 
-  return (
-    <div>
-      {/* 발주 캘린더 - 전체 너비 */}
+  // 발주 캘린더 JSX
+  const calendarJSX = (
       <div
         className="card"
         style={{
           borderRadius: '12px',
-          padding: '20px',
-          marginBottom: '40px'
+          padding: '20px'
         }}
       >
         <div
@@ -713,7 +711,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
         >
           <h3
             style={{
-              fontSize: '14px',
+              fontSize: '12px',
               fontWeight: '600',
               margin: 0
             }}
@@ -746,7 +744,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             </button>
             <span
               style={{
-                fontSize: '14px',
+                fontSize: '11px',
                 fontWeight: '500',
                 minWidth: '100px',
                 textAlign: 'center'
@@ -789,7 +787,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               className={idx === 0 ? 'text-danger' : idx === 6 ? 'text-primary' : ''}
               style={{
                 textAlign: 'center',
-                fontSize: '12px',
+                fontSize: '10px',
                 fontWeight: '600',
                 padding: '4px 0'
               }}
@@ -814,7 +812,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               <div
                 key={`prev-${i}`}
                 style={{
-                  padding: '12px 4px',
+                  padding: '4px 4px',
                   minHeight: '80px',
                   display: 'flex',
                   alignItems: 'flex-start',
@@ -823,7 +821,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               >
                 <span
                   style={{
-                    fontSize: '11px',
+                    fontSize: '9px',
                     color: '#999',
                     fontWeight: '400'
                   }}
@@ -859,7 +857,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   border: isToday ? '2px solid' : hasOrder ? '1px solid' : 'none',
                   borderColor: isToday ? '#2563eb' : hasOrder ? '#dee2e6' : undefined,
                   borderRadius: '8px',
-                  padding: '12px 4px',
+                  padding: '4px 4px',
                   minHeight: '80px',
                   cursor: hasOrder ? 'pointer' : 'default',
                   transition: 'all 0.2s',
@@ -893,7 +891,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   <span
                     className={dayOfWeek === 0 || isHoliday ? 'text-danger' : dayOfWeek === 6 || isToday ? 'text-primary' : ''}
                     style={{
-                      fontSize: '13px',
+                      fontSize: '11px',
                       fontWeight: isToday ? '600' : '500'
                     }}
                   >
@@ -902,7 +900,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   {isHoliday && (
                     <span
                       style={{
-                        fontSize: '9px',
+                        fontSize: '7px',
                         color: '#ef4444',
                         fontWeight: '500',
                         whiteSpace: 'nowrap'
@@ -943,7 +941,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: '11px',
+                          fontSize: '9px',
                           fontWeight: '700',
                           cursor: 'pointer',
                           position: 'relative'
@@ -973,7 +971,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: '11px',
+                          fontSize: '9px',
                           fontWeight: '700',
                           cursor: 'pointer',
                           position: 'relative'
@@ -1003,7 +1001,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: '11px',
+                          fontSize: '9px',
                           fontWeight: '700',
                           cursor: 'pointer',
                           position: 'relative'
@@ -1025,7 +1023,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       color: '#ffffff',
                       borderRadius: '3px',
                       padding: '1px 4px',
-                      fontSize: '12px',
+                      fontSize: '9px',
                       fontWeight: '600'
                     }}
                   >
@@ -1043,7 +1041,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               <div
                 key={`next-${i}`}
                 style={{
-                  padding: '12px 4px',
+                  padding: '4px 4px',
                   minHeight: '80px',
                   display: 'flex',
                   alignItems: 'flex-start',
@@ -1052,7 +1050,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               >
                 <span
                   style={{
-                    fontSize: '11px',
+                    fontSize: '9px',
                     color: '#999',
                     fontWeight: '400'
                   }}
@@ -1072,7 +1070,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             marginTop: '16px',
             paddingTop: '12px',
             borderTop: '1px solid rgba(222, 226, 230, 0.5)',
-            fontSize: '11px',
+            fontSize: '9px',
             justifyContent: 'flex-start'
           }}
         >
@@ -1138,7 +1136,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           </div>
         </div>
       </div>
+  );
 
+  return (
+    <div>
       {/* 차트 영역 - Flex 레이아웃 */}
       <div
         style={{
@@ -1413,18 +1414,18 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
         {/* 두 번째/세 번째 열 */}
         <div
           style={{
-            width: '974px',
+            width: '1498px',
             flexShrink: 0,
             display: 'flex',
             flexDirection: 'column',
             gap: '24px'
           }}
         >
-          {/* 첫 번째 행: 발주 TOP 10 + 옵션상품 발주 TOP 10 */}
+          {/* 첫 번째 행: 발주 TOP 10 + 옵션상품 발주 TOP 10 + 발주 캘린더 */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '550px 400px',
+              gridTemplateColumns: '550px 300px 600px',
               gap: '24px'
             }}
           >
@@ -1789,10 +1790,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 )}
               </div>
             </div>
+
+            {/* 발주 캘린더 */}
+            {calendarJSX}
           </div>
 
           {/* 마켓별 통계 */}
-          <div className="card" style={{ borderRadius: '12px', padding: '20px', width: '974px' }}>
+          <div className="card" style={{ borderRadius: '12px', padding: '20px', width: '100%' }}>
             {/* 탭 헤더 */}
             <div style={{ marginBottom: '16px' }}>
               <div
@@ -2292,7 +2296,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '475px 475px',
+              gridTemplateColumns: '1fr 1fr',
               gap: '24px'
             }}
           >
