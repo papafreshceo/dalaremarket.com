@@ -11,24 +11,53 @@ interface DashboardTabProps {
 }
 
 export default function DashboardTab({ isMobile, orders, statusConfig }: DashboardTabProps) {
-  // 부드러운 곡선 경로 생성 함수 (Cardinal spline)
-  const createSmoothPath = (points: { x: number; y: number }[], tension = 0.1) => {
+  // 부드러운 곡선 경로 생성 함수 (Monotone Cubic Interpolation)
+  const createSmoothPath = (points: { x: number; y: number }[]) => {
     if (points.length < 2) return '';
+    if (points.length === 2) {
+      return `M ${points[0].x},${points[0].y} L ${points[1].x},${points[1].y}`;
+    }
 
+    // 각 구간의 기울기 계산
+    const n = points.length;
+    const slopes: number[] = [];
+    const dxs: number[] = [];
+    const dys: number[] = [];
+
+    // 구간별 delta 계산
+    for (let i = 0; i < n - 1; i++) {
+      const dx = points[i + 1].x - points[i].x;
+      const dy = points[i + 1].y - points[i].y;
+      dxs.push(dx);
+      dys.push(dy);
+      slopes.push(dy / dx);
+    }
+
+    // 각 점에서의 접선 기울기 계산 (Fritsch-Carlson method)
+    const tangents: number[] = [slopes[0]];
+    for (let i = 1; i < n - 1; i++) {
+      const m = slopes[i - 1];
+      const mNext = slopes[i];
+      if (m * mNext <= 0) {
+        tangents.push(0);
+      } else {
+        const dx = dxs[i - 1];
+        const dxNext = dxs[i];
+        const common = dx + dxNext;
+        tangents.push(3 * common / ((common + dxNext) / m + (common + dx) / mNext));
+      }
+    }
+    tangents.push(slopes[n - 2]);
+
+    // 베지어 곡선으로 경로 생성
     let path = `M ${points[0].x},${points[0].y}`;
-
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[i === 0 ? 0 : i - 1];
-      const p1 = points[i];
-      const p2 = points[i + 1];
-      const p3 = points[i + 2] || p2;
-
-      const cp1x = p1.x + (p2.x - p0.x) / 6 * tension;
-      const cp1y = p1.y + (p2.y - p0.y) / 6 * tension;
-      const cp2x = p2.x - (p3.x - p1.x) / 6 * tension;
-      const cp2y = p2.y - (p3.y - p1.y) / 6 * tension;
-
-      path += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+    for (let i = 0; i < n - 1; i++) {
+      const dx = dxs[i];
+      const cp1x = points[i].x + dx / 3;
+      const cp1y = points[i].y + tangents[i] * dx / 3;
+      const cp2x = points[i + 1].x - dx / 3;
+      const cp2y = points[i + 1].y - tangents[i + 1] * dx / 3;
+      path += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${points[i + 1].x},${points[i + 1].y}`;
     }
 
     return path;
