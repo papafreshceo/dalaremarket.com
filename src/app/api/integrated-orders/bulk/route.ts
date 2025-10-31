@@ -270,19 +270,24 @@ export async function PUT(request: NextRequest) {
     }
 
     // 각 주문 개별 업데이트
-    const updatePromises = orders.map((order) => {
+    const updatePromises = orders.map(async (order) => {
       if (!order.id) {
         throw new Error('각 주문에 ID가 필요합니다.');
       }
 
       const { id, ...updateData } = order;
 
-      return supabase
+      const result = await supabase
         .from('integrated_orders')
         .update(updateData)
         .eq('id', id)
-        .select()
-        .single();
+        .select();
+
+      if (result.error) {
+        console.error(`주문 ${id} 업데이트 실패:`, result.error);
+      }
+
+      return result;
     });
 
     const results = await Promise.all(updatePromises);
@@ -300,7 +305,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const data = results.map((r) => r.data);
+    const data = results.flatMap((r) => r.data || []);
 
     return NextResponse.json({
       success: true,
