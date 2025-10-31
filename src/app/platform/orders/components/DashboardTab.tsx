@@ -1788,7 +1788,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           </div>
 
           {/* 마켓별 통계 */}
-          <div className="card" style={{ borderRadius: '12px', padding: '20px', width: '100%' }}>
+          <div className="card" style={{ borderRadius: '12px', padding: '20px', width: '100%', background: 'none', boxShadow: 'none' }}>
             {/* 탭 헤더 */}
             <div style={{ marginBottom: '16px' }}>
               <div
