@@ -269,13 +269,33 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // 업데이트 가능한 칼럼 목록 (DB에 실제로 존재하는 칼럼만)
+    const allowedColumns = [
+      'sheet_date', 'market_name', 'sequence_number', 'payment_date', 'order_number',
+      'buyer_name', 'buyer_phone', 'recipient_name', 'recipient_phone', 'recipient_address',
+      'delivery_message', 'option_name', 'quantity', 'option_price', 'delivery_fee',
+      'total_amount', 'settlement_amount', 'seller_id', 'courier_company', 'tracking_number',
+      'shipping_date', 'order_status', 'payment_method', 'market_fee', 'pg_fee',
+      'delivery_fee_paid_by_seller', 'other_fees', 'payment_confirmed_at', 'shipped_at',
+      'delivered_at', 'cancelled_at', 'refunded_at', 'refund_processed_at', 'cancel_reason',
+      'refund_reason', 'customer_id', 'cs_memo', 'admin_memo', 'market_check', 'is_deleted'
+    ];
+
     // 각 주문 개별 업데이트
     const updatePromises = orders.map((order) => {
       if (!order.id) {
         throw new Error('각 주문에 ID가 필요합니다.');
       }
 
-      const { id, ...updateData } = order;
+      const { id, ...allData } = order;
+
+      // 허용된 칼럼만 필터링
+      const updateData: any = {};
+      for (const key of allowedColumns) {
+        if (key in allData) {
+          updateData[key] = allData[key];
+        }
+      }
 
       return supabase
         .from('integrated_orders')

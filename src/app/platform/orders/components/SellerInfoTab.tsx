@@ -27,6 +27,7 @@ interface SellerInfo {
   bank_account?: string;  // 정산계좌번호
   bank_name?: string;  // 은행명
   account_holder?: string;  // 예금주
+  depositor_name?: string;  // 입금자명
 
   // 송장출력 정보
   store_name?: string;  // 업체명
@@ -92,6 +93,7 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
           bank_account: data.bank_account || '',
           bank_name: data.bank_name || '',
           account_holder: data.account_holder || '',
+          depositor_name: data.depositor_name || '',
           store_name: data.store_name || data.business_name || '',
           store_phone: data.store_phone || '',
         };
@@ -159,6 +161,7 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // 기본 필드 업데이트 (depositor_name 제외)
       const { error } = await supabase
         .from('users')
         .update({
@@ -182,6 +185,18 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
         .eq('id', userId);
 
       if (error) throw error;
+
+      // depositor_name 별도 업데이트 (칼럼이 없을 수 있음)
+      if (sellerInfo.depositor_name) {
+        try {
+          await supabase
+            .from('users')
+            .update({ depositor_name: sellerInfo.depositor_name })
+            .eq('id', userId);
+        } catch (e) {
+          console.log('depositor_name 업데이트 건너뜀 (칼럼 없음, 마이그레이션 필요)');
+        }
+      }
 
       toast.success('판매자 정보가 저장되었습니다.');
     } catch (error) {
@@ -820,6 +835,92 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               value={sellerInfo.account_holder || ''}
               onChange={(e) => handleChange('account_holder', e.target.value)}
               placeholder="예금주명"
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                background: 'var(--color-background)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '6px',
+                fontSize: '13px',
+                color: 'var(--color-text)',
+                cursor: 'text'
+              }}
+            />
+          </div>
+        </div>
+        </div>
+
+        {/* 입금 섹션 */}
+        <div style={{
+          background: 'var(--color-surface)',
+          borderRadius: '12px',
+          padding: '16px',
+          border: '1px solid var(--color-border)'
+        }}>
+        <h3 style={{
+          fontSize: '16px',
+          fontWeight: '600',
+          color: 'var(--color-text)',
+          marginBottom: '16px'
+        }}>
+          입금
+        </h3>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '6px'
+            }}>
+              <label style={{
+                fontSize: '13px',
+                fontWeight: '500',
+                color: 'var(--color-text)'
+              }}>
+                입금자명
+              </label>
+
+              {/* 정산계좌 예금주와 동일 체크박스 */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}>
+                <input
+                  type="checkbox"
+                  id="sameAsAccountHolder"
+                  checked={sellerInfo.depositor_name === sellerInfo.account_holder}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      handleChange('depositor_name', sellerInfo.account_holder || '');
+                    } else {
+                      handleChange('depositor_name', '');
+                    }
+                  }}
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    cursor: 'pointer'
+                  }}
+                />
+                <label
+                  htmlFor="sameAsAccountHolder"
+                  style={{
+                    fontSize: '11px',
+                    color: 'var(--color-text-secondary)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  정산계좌 예금주와 동일
+                </label>
+              </div>
+            </div>
+            <input
+              type="text"
+              value={sellerInfo.depositor_name || ''}
+              onChange={(e) => handleChange('depositor_name', e.target.value)}
               style={{
                 width: '100%',
                 padding: '8px 12px',

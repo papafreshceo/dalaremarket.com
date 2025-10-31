@@ -932,8 +932,13 @@ export default function SearchTab() {
   };
 
   // 데이터 저장 핸들러
-  const handleSaveData = async (updatedData: any[]) => {
+  const handleSaveData = async (updatedData?: any[]) => {
     try {
+      // updatedData가 없거나 비어있으면 리턴
+      if (!updatedData || updatedData.length === 0) {
+        return;
+      }
+
       // 변경된 데이터만 추출 (id가 있는 것들)
       const updates = updatedData.filter((row) => row.id);
 

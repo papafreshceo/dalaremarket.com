@@ -2,7 +2,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button, Modal } from '@/components/ui'
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
@@ -63,7 +62,6 @@ interface SupplyStatus {
 
 
 export default function OptionProductsManagementPage() {
-  const router = useRouter()
   const { showToast } = useToast()
 
   const [products, setProducts] = useState<OptionProduct[]>([])
@@ -556,7 +554,8 @@ export default function OptionProductsManagementPage() {
             .eq('option_product_id', product.id)
 
           if (materialsError) {
-            console.error('Materials fetch error for product', product.id, materialsError)
+            console.warn('Materials fetch error for product', product.id, materialsError.message)
+            // 에러 발생 시 빈 배열로 계속 진행
           }
 
           let enrichedMaterials: any[] = []
@@ -570,25 +569,27 @@ export default function OptionProductsManagementPage() {
                   .eq('id', m.raw_material_id)
                   .single()
 
-                if (rawMaterialError) {
-                  console.error('Raw material fetch error for material', m.raw_material_id, rawMaterialError)
+                if (rawMaterialError || !rawMaterial) {
+                  console.warn('Raw material not found or error:', m.raw_material_id, rawMaterialError?.message || 'Material deleted or not accessible')
+                  // 원물을 찾을 수 없으면 null 반환 (나중에 filter로 제거)
+                  return null
                 }
 
                 return {
-                  material_id: rawMaterial?.id,
-                  material_name: rawMaterial?.material_name,
-                  material_code: rawMaterial?.material_code,
+                  material_id: rawMaterial.id,
+                  material_name: rawMaterial.material_name,
+                  material_code: rawMaterial.material_code,
                   quantity: m.quantity,
                   unit_price: m.unit_price,
-                  category_1: rawMaterial?.category_1,
-                  category_2: rawMaterial?.category_2,
-                  category_3: rawMaterial?.category_3,
-                  category_4: rawMaterial?.category_4,
-                  category_5: rawMaterial?.category_5,
-                  standard_unit: rawMaterial?.standard_unit,
-                  latest_price: rawMaterial?.latest_price,
-                  standard_quantity: rawMaterial?.standard_quantity,
-                  last_trade_date: rawMaterial?.last_trade_date,
+                  category_1: rawMaterial.category_1,
+                  category_2: rawMaterial.category_2,
+                  category_3: rawMaterial.category_3,
+                  category_4: rawMaterial.category_4,
+                  category_5: rawMaterial.category_5,
+                  standard_unit: rawMaterial.standard_unit,
+                  latest_price: rawMaterial.latest_price,
+                  standard_quantity: rawMaterial.standard_quantity,
+                  last_trade_date: rawMaterial.last_trade_date,
                   season: rawMaterial?.season,
                   season_start_date: rawMaterial?.season_start_date,
                   season_peak_date: rawMaterial?.season_peak_date,
@@ -599,6 +600,8 @@ export default function OptionProductsManagementPage() {
                 }
               })
             )
+            // null 값 제거 (삭제되었거나 접근 불가능한 원물)
+            enrichedMaterials = enrichedMaterials.filter(m => m !== null)
           }
 
           // 대표 원물 (사용량이 가장 많은 원물, 같으면 첫 번째 원물)의 카테고리 사용
@@ -660,7 +663,7 @@ export default function OptionProductsManagementPage() {
     const { data, error } = await supabase
       .from('supply_status_settings')
       .select('*')
-      .eq('status_type', 'optional_product')
+      .eq('status_type', 'option_products')
       .eq('is_active', true)
       .order('display_order')
     console.log('Supply Statuses:', data)
@@ -805,12 +808,16 @@ export default function OptionProductsManagementPage() {
 
 
 
-  const handleSave = async () => {
+  const handleSave = async (modifiedRows?: OptionProduct[]) => {
     try {
       setIsSaving(true)
 
+      // EditableAdminGrid에서 수정된 행만 전달받음
+      // 전달되지 않으면 전체 filteredProducts 사용 (이전 방식 호환)
+      const rowsToSave = modifiedRows || filteredProducts
+
       // 유효한 행만 필터링 (id가 있고 필수 필드가 있는 행)
-      const validRows = filteredProducts.filter(p => p.id && (p.option_code || p.option_name))
+      const validRows = rowsToSave.filter(p => p.id && (p.option_code || p.option_name))
 
       if (validRows.length === 0) {
         showToast('저장할 데이터가 없습니다.', 'warning')
@@ -1628,13 +1635,6 @@ export default function OptionProductsManagementPage() {
                 </svg>
                 가격 동기화
               </button>
-              <button
-                onClick={() => router.push('/admin/products/option-products/create')}
-                className="bg-blue-600 text-white px-3 rounded hover:bg-blue-700 transition-colors"
-                style={{ fontSize: '14px', height: '32px' }}
-              >
-                상품 추가
-              </button>
             </div>
           </div>
         </div>
@@ -1642,16 +1642,6 @@ export default function OptionProductsManagementPage() {
         <EditableAdminGrid
           key={gridKey}
           data={filteredProducts}
-          onDataChange={(newData) => {
-            // EditableAdminGrid에서 데이터가 변경될 때 호출
-            setFilteredProducts(newData)
-
-            // products 전체도 업데이트
-            setProducts(prev => {
-              const updatedMap = new Map(newData.map(p => [p.id, p]))
-              return prev.map(p => updatedMap.get(p.id) || p)
-            })
-          }}
           forceModified={hasToggleChanges}
           columns={(() => {
             const visibleFields = getVisibleFields(viewMode)
@@ -1659,7 +1649,7 @@ export default function OptionProductsManagementPage() {
               key: field,
               title: FIELD_LABELS[field] || field,
               width: field === 'thumbnail_url' ? 80
-                : field === 'option_code' ? 120
+                : field === 'option_code' ? 'auto'
                 : field === 'option_name' ? 200
                 : field === 'status' ? 90
                 : 110,
@@ -1678,7 +1668,7 @@ export default function OptionProductsManagementPage() {
                 : field === 'invoice_entity' ? invoiceEntities.map(e => e.name)
                 : field === 'shipping_vendor_id' ? vendorPartners.map(p => p.name)
                 : undefined,
-              readOnly: ['thumbnail_url', 'option_code', 'used_material_1', 'used_material_2', 'used_material_3', 'total_cost', 'average_material_price', 'calculated_material_cost', 'seller_margin_rate', 'seller_margin_amount', 'category_1', 'category_2', 'category_3', 'category_4', 'category_5', 'naver_margin_display', 'coupang_margin_display', 'raw_material_partner'].includes(field)
+              readOnly: ['thumbnail_url', 'option_code', 'used_material_1', 'used_material_2', 'used_material_3', 'total_cost', 'average_material_price', 'calculated_material_cost', 'raw_material_cost', 'total_material_cost', 'seller_margin_rate', 'seller_margin_amount', 'category_1', 'category_2', 'category_3', 'category_4', 'category_5', 'naver_margin_display', 'coupang_margin_display', 'raw_material_partner'].includes(field)
                 ? true
                 : field === 'target_seller_margin_rate' ? (row: OptionProduct) => {
                     const mode = (row as any).seller_supply_price_mode

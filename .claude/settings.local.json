@@ -93,7 +93,8 @@
       "Bash(dir:*)",
       "Bash(timeout 5 bash:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\products\\option-products\\create\" rmdir /s /q \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\products\\option-products\\create\")"
     ],
     "deny": [],
     "ask": []

@@ -948,8 +948,15 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     const newModifiedCells = new Set(modifiedCells)
 
     if (!isAddedOrCopied) {
-      // 원본 데이터와 비교
-      const isValueChanged = processedValue !== originalValue
+      // 원본 데이터와 비교 (null, undefined, "" 를 같은 것으로 취급)
+      const normalizeValue = (val: any) => {
+        if (val === null || val === undefined || val === '') return null
+        return val
+      }
+
+      const normalizedProcessed = normalizeValue(processedValue)
+      const normalizedOriginal = normalizeValue(originalValue)
+      const isValueChanged = normalizedProcessed !== normalizedOriginal
 
       // 디버깅용 로그
       if (column?.type === 'dropdown') {
@@ -1814,7 +1821,9 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     }
 
     // readOnly 셀
-    if (!column.readOnly) {
+    if (isReadOnly(column, row)) {
+      classes += 'bg-gray-50 '
+    } else {
       classes += 'cursor-cell '
     }
 
@@ -1863,8 +1872,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           style={{ fontSize: '13px', margin: 0 }}
         >
           <option value="">선택</option>
-          {column.source.map(option => (
-            <option key={option} value={option}>{option}</option>
+          {column.source.map((option, idx) => (
+            <option key={`${option}-${idx}`} value={option}>{option}</option>
           ))}
         </select>
       )

@@ -12,6 +12,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC, formatDateTimeForDisplay } from '@/lib/date';
 import MarketFileUploadModal from '../modals/MarketFileUploadModal';
 import OptionValidationModal from '../modals/OptionValidationModal';
+import SellerInfoValidationModal from '../modals/SellerInfoValidationModal';
 
 interface OrderRegistrationTabProps {
   isMobile: boolean;
@@ -84,6 +85,150 @@ export default function OrderRegistrationTab({
   const [showOptionValidationModal, setShowOptionValidationModal] = useState(false);
   const [validatedOrders, setValidatedOrders] = useState<any[]>([]);
   const [optionProductsMap, setOptionProductsMap] = useState<Map<string, any>>(new Map());
+
+  // 판매자 정보 검증 모달 상태
+  const [showSellerInfoValidationModal, setShowSellerInfoValidationModal] = useState(false);
+
+  // 입금완료 및 발주확정 핸들러 (재사용 가능)
+  const handlePaymentConfirmation = async () => {
+    if (filteredOrders.length === 0) {
+      showModal('alert', '알림', '발주 확정할 주문이 없습니다.');
+      return;
+    }
+
+    // 1단계: 판매자 정보 검증
+    try {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('bank_account, bank_name, account_holder, representative_name, representative_phone, manager_name, manager_phone')
+        .eq('id', userId)
+        .single();
+
+      if (userError) {
+        console.error('사용자 정보 조회 실패:', userError);
+        showModal('alert', '오류', '사용자 정보를 불러오는데 실패했습니다.');
+        return;
+      }
+
+      // depositor_name은 선택적으로 추가 조회 (칼럼이 없을 수도 있음)
+      let depositorName = '';
+      try {
+        const { data: extraData } = await supabase
+          .from('users')
+          .select('depositor_name')
+          .eq('id', userId)
+          .single();
+        depositorName = extraData?.depositor_name || '';
+      } catch (e) {
+        // depositor_name 칼럼이 없으면 무시
+        console.log('depositor_name 칼럼이 없습니다 (마이그레이션 필요)');
+      }
+
+      // 필수 정보 확인
+      const missingFields = [];
+      if (!userData?.bank_account?.trim()) missingFields.push('정산계좌번호');
+      if (!userData?.bank_name?.trim()) missingFields.push('은행명');
+      if (!userData?.account_holder?.trim()) missingFields.push('예금주');
+      if (!depositorName?.trim()) missingFields.push('입금자명');
+      if (!userData?.representative_name?.trim()) missingFields.push('대표자명');
+      if (!userData?.representative_phone?.trim()) missingFields.push('대표자 연락처');
+      if (!userData?.manager_name?.trim()) missingFields.push('담당자명');
+      if (!userData?.manager_phone?.trim()) missingFields.push('담당자 연락처');
+
+      if (missingFields.length > 0) {
+        // 판매자 정보가 불완전하면 검증 모달 표시
+        setShowSellerInfoValidationModal(true);
+        return;
+      }
+    } catch (error) {
+      console.error('판매자 정보 검증 오류:', error);
+      showModal('alert', '오류', '판매자 정보 검증 중 오류가 발생했습니다.');
+      return;
+    }
+
+    // 2단계: 옵션명 검증 시작
+    try {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+
+      // 모든 옵션명 수집 (중복 제거)
+      const uniqueOptionNames = [...new Set(filteredOrders.map(order => order.products).filter(Boolean))];
+
+      console.log('🔍 옵션명 검증 시작:', uniqueOptionNames);
+
+      // option_products에서 공급단가 조회
+      const { data: optionProducts, error: optionError} = await supabase
+        .from('option_products')
+        .select('option_name, option_code, seller_supply_price')
+        .in('option_name', uniqueOptionNames);
+
+      if (optionError) {
+        console.error('❌ 옵션명 조회 오류:', optionError);
+      } else {
+        console.log('✅ 옵션명으로 조회된 데이터:', optionProducts);
+      }
+
+      console.log('💰 최종 조회된 옵션상품:', optionProducts);
+
+      // 옵션상품 Map 저장 (옵션명 소문자 키로 저장)
+      const productMap = new Map<string, any>();
+      (optionProducts || []).forEach((product: any) => {
+        if (product.option_name) {
+          const key = product.option_name.trim().toLowerCase();
+          productMap.set(key, product);
+        }
+      });
+      setOptionProductsMap(productMap);
+
+      // 검증 모달용 주문 데이터 준비
+      const utcTime = getCurrentTimeUTC();
+      const ordersForValidation = filteredOrders.map((order, index) => ({
+        index,
+        orderNumber: order.orderNumber || '',
+        orderer: order.orderer || '',
+        ordererPhone: order.ordererPhone || '',
+        recipient: order.recipient || '',
+        recipientPhone: order.recipientPhone || '',
+        address: order.address || '',
+        deliveryMessage: order.deliveryMessage || '',
+        optionName: order.products || '',
+        optionCode: '',
+        quantity: String(order.quantity || 1),
+        specialRequest: order.specialRequest || '',
+        // DB 저장용 메타데이터 (검증 후 사용)
+        _metadata: {
+          id: order.id, // 기존 주문 ID (업데이트용)
+          sheet_date: order.date?.split('T')[0] || utcTime.split('T')[0],
+          seller_id: userId,
+          created_by: userId,
+          market_name: order.marketName || '플랫폼',
+          payment_date: utcTime,
+          buyer_name: order.orderer || '',
+          buyer_phone: order.ordererPhone || '',
+          recipient_name: order.recipient || '',
+          recipient_phone: order.recipientPhone || '',
+          recipient_address: order.address || '',
+          delivery_message: order.deliveryMessage || '',
+          special_request: order.specialRequest || '',
+          quantity: order.quantity || 1,
+          order_number: order.orderNumber || '',
+          status: 'payment_confirmed' as const,
+          option_name: order.products || '',
+        }
+      }));
+
+      console.log('📋 검증 모달에 전달할 주문 데이터:', ordersForValidation);
+
+      setValidatedOrders(ordersForValidation);
+      setShowOptionValidationModal(true);
+    } catch (error) {
+      console.error('발주확정 처리 오류:', error);
+      showModal('alert', '오류', '발주확정 처리 중 오류가 발생했습니다.');
+    }
+  };
 
   // Modal 상태 관리
   const [modalState, setModalState] = useState<{
@@ -2048,81 +2193,7 @@ export default function OrderRegistrationTab({
           </div>
         </div>
         <button
-          onClick={async () => {
-            if (filteredOrders.length === 0) {
-              showModal('alert', '알림', '발주 확정할 주문이 없습니다.');
-              return;
-            }
-
-            // 옵션명 검증 시작
-            try {
-              const { createClient } = await import('@/lib/supabase/client');
-              const supabase = createClient();
-
-              // 모든 옵션명 수집 (중복 제거)
-              const uniqueOptionNames = [...new Set(filteredOrders.map(order => order.products).filter(Boolean))];
-
-              console.log('🔍 옵션명 검증 시작:', uniqueOptionNames);
-
-              // option_products에서 공급단가 조회
-              const { data: optionProducts, error: optionError} = await supabase
-                .from('option_products')
-                .select('option_name, option_code, seller_supply_price')
-                .in('option_name', uniqueOptionNames);
-
-              if (optionError) {
-                console.error('❌ 옵션명 조회 오류:', optionError);
-              } else {
-                console.log('✅ 옵션명으로 조회된 데이터:', optionProducts);
-              }
-
-              console.log('💰 최종 조회된 옵션상품:', optionProducts);
-
-              // 옵션상품 Map 저장 (옵션명 소문자 키로 저장)
-              const productMap = new Map<string, any>();
-              (optionProducts || []).forEach((product: any) => {
-                if (product.option_name) {
-                  const key = product.option_name.trim().toLowerCase();
-                  productMap.set(key, product);
-                }
-              });
-              setOptionProductsMap(productMap);
-
-              // 검증 모달용 주문 데이터 준비
-              const utcTime = getCurrentTimeUTC();
-              const ordersForValidation = filteredOrders.map((order, index) => ({
-                index,
-                orderNumber: order.orderNumber || '',
-                orderer: order.orderer || '',
-                ordererPhone: order.ordererPhone || '',
-                recipient: order.recipient || '',
-                recipientPhone: order.recipientPhone || '',
-                address: order.address || '',
-                deliveryMessage: order.deliveryMessage || '',
-                optionName: order.products || '',
-                optionCode: '',
-                quantity: String(order.quantity || 1),
-                specialRequest: order.specialRequest || '',
-                // DB 저장용 메타데이터 (검증 후 사용)
-                _metadata: {
-                  id: order.id, // 기존 주문 ID (업데이트용)
-                  sheet_date: order.date?.split('T')[0] || utcTime.split('T')[0],
-                  seller_id: userId,
-                  created_by: userId,
-                  market_name: order.marketName || '플랫폼',
-                  payment_date: utcTime.split('T')[0],
-                  shipping_status: '발주서확정'
-                }
-              }));
-
-              // 검증 모달 표시
-              setValidatedOrders(ordersForValidation);
-              setShowOptionValidationModal(true);
-            } catch (error) {
-              console.error('옵션명 검증 오류:', error);
-              showModal('alert', '오류', '옵션명 검증 중 오류가 발생했습니다.');
-            }
-          }}
+          onClick={handlePaymentConfirmation}
           style={{
             padding: '12px 24px',
             background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
@@ -2556,6 +2627,20 @@ export default function OrderRegistrationTab({
           }
         }}
         optionProducts={optionProductsMap}
+      />
+
+      {/* 판매자 정보 검증 모달 */}
+      <SellerInfoValidationModal
+        isOpen={showSellerInfoValidationModal}
+        onClose={() => setShowSellerInfoValidationModal(false)}
+        onConfirm={() => {
+          // 정보 입력 완료 후 모달 닫고 발주확정 프로세스 재실행
+          setShowSellerInfoValidationModal(false);
+          setTimeout(() => {
+            handlePaymentConfirmation();
+          }, 100);
+        }}
+        userId={userId}
       />
     </div>
   );

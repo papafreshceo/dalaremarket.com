@@ -1110,8 +1110,10 @@ function OrdersPageContent() {
       {/* Main content area */}
       <div style={{
         marginLeft: isMobile ? '0' : '175px',
-        padding: isMobile ? '16px' : '24px',
+        paddingLeft: isMobile ? '16px' : '24px',
+        paddingRight: isMobile ? '16px' : '24px',
         paddingTop: '90px',
+        paddingBottom: isMobile ? '16px' : '24px',
         background: 'var(--color-background)',
         minHeight: '100vh'
       }}>
