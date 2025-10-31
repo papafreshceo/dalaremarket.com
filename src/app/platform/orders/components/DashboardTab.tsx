@@ -2073,8 +2073,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         // 그래프 영역 설정
                         const chartLeft = 100;
                         const chartRight = 1150;
-                        const chartTop = 10;
-                        const chartBottom = 370;
+                        const chartTop = 5;
+                        const chartBottom = 390;
                         const chartWidth = chartRight - chartLeft;
                         const chartHeight = chartBottom - chartTop;
 
@@ -2170,7 +2170,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                 <text
                                   key={idx}
                                   x={x}
-                                  y="385"
+                                  y="395"
                                   fontSize="10"
                                   fill="#6b7280"
                                   textAnchor="middle"
@@ -2311,8 +2311,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         // 그래프 영역 설정
                         const chartLeft = 100;
                         const chartRight = 1150;
-                        const chartTop = 10;
-                        const chartBottom = 370;
+                        const chartTop = 5;
+                        const chartBottom = 390;
                         const chartWidth = chartRight - chartLeft;
                         const chartHeight = chartBottom - chartTop;
 
@@ -2408,7 +2408,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                 <text
                                   key={idx}
                                   x={x}
-                                  y="385"
+                                  y="395"
                                   fontSize="10"
                                   fill="#6b7280"
                                   textAnchor="middle"
