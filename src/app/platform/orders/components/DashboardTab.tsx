@@ -1951,7 +1951,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           </div>
           </div>
 
-          {/* 마켓별 통계 - 전체 너비 */}
+{/* 마켓별 통계 - 전체 너비 */}
           <div className="card" style={{
             borderRadius: '12px',
             padding: '20px'
@@ -2088,13 +2088,16 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 }}>
                   {/* 각 마켓별 꺾은선 그래프 */}
                   {(() => {
-                    // 데이터가 없으면 아무것도 렌더링하지 않음
                     if (marketDateStats.dates.length === 0 || marketDateStats.marketLines.length === 0) {
                       return null;
                     }
 
+<<<<<<< HEAD
                     // 모든 금액 중 최대값 찾기 + 10%
                     const rawMaxAmount = Math.max(
+=======
+                    const maxAmount = Math.max(
+>>>>>>> dev
                       ...marketDateStats.marketLines.flatMap(line =>
                         line.data.map(d => d.amount)
                       ),
@@ -2108,6 +2111,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     const dateCount = marketDateStats.dates.length;
                     const divisor = dateCount > 1 ? dateCount - 1 : 1;
 
+<<<<<<< HEAD
                     // Y축 눈금 값 계산 (5개 구간, 10,000 단위로 반올림)
                     const yAxisValues = [0, 1, 2, 3, 4].map(i => {
                       const value = maxAmount * (1 - i / 4); // 위에서부터 100%, 75%, 50%, 25%, 0%
@@ -2160,6 +2164,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         {/* 마켓별 라인 */}
                         {marketDateStats.marketLines.map((line, lineIdx) => {
                       // 라인의 포인트 계산
+=======
+                    return marketDateStats.marketLines.map((line, lineIdx) => {
+>>>>>>> dev
                       const points = line.data.map((d, idx) => {
                         const x = 60 + (idx / divisor) * 1120; // 1180 - 60 = 1120
                         // Y축: maxAmount는 30(상단), 0은 210(하단)
@@ -2168,8 +2175,12 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       }).join(' ');
 
                       return (
+<<<<<<< HEAD
                         <g key={`${line.market}-${lineIdx}`}>
                           {/* 선 */}
+=======
+                        <g key={lineIdx}>
+>>>>>>> dev
                           <polyline
                             points={points}
                             fill="none"
@@ -2182,8 +2193,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                               opacity: 1
                             }}
                           />
-
-                          {/* 점 */}
                           {line.data.map((d, idx) => {
                             const x = 60 + (idx / divisor) * 1120; // 1180 - 60 = 1120
                             const y = graphBottom - ((d.amount / maxAmount) * graphHeight);
@@ -2233,6 +2242,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   })()}
 
                   {/* X축 레이블 (날짜) */}
+<<<<<<< HEAD
                   {(() => {
                     if (marketDateStats.dates.length === 0) return null;
 
@@ -2273,6 +2283,25 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       );
                     });
                   })()}
+=======
+                  {marketDateStats.dates.length > 0 && marketDateStats.dates.map((date, idx) => {
+                    const divisor = marketDateStats.dates.length > 1 ? marketDateStats.dates.length - 1 : 1;
+                    const x = 60 + (idx / divisor) * 420;
+                    const displayDate = date.substring(5);
+                    return (
+                      <text
+                        key={idx}
+                        x={x}
+                        y="230"
+                        textAnchor="middle"
+                        fontSize="9"
+                        fill="#6b7280"
+                      >
+                        {displayDate}
+                      </text>
+                    );
+                  })}
+>>>>>>> dev
                 </svg>
 
                 {/* 툴팁 */}
