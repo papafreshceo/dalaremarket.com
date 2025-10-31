@@ -1689,10 +1689,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         <div
                           key={idx}
                           onClick={() => {
-                            if (isSelected) {
-                              // 이미 선택된 경우 제거
-                              setSelectedProducts(selectedProducts.filter(p => p !== item.name));
-                            } else {
+                            // 이미 선택된 경우 아무 동작 안함
+                            if (!isSelected) {
                               // 최대 5개까지만 선택 가능
                               if (selectedProducts.length < 5) {
                                 setSelectedProducts([...selectedProducts, item.name]);
@@ -1791,10 +1789,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       <div
                         key={idx}
                         onClick={() => {
-                          if (isSelected) {
-                            // 이미 선택된 경우 제거
-                            setSelectedOptions(selectedOptions.filter(o => o !== item.name));
-                          } else {
+                          // 이미 선택된 경우 아무 동작 안함
+                          if (!isSelected) {
                             // 최대 5개까지만 선택 가능
                             if (selectedOptions.length < 5) {
                               setSelectedOptions([...selectedOptions, item.name]);
