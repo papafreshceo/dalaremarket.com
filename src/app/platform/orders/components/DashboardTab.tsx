@@ -2056,7 +2056,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     {/* 그래프 컨테이너 */}
                     <div style={{ background: '#ffffff', padding: '0 16px', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
                     {/* 메인 그래프 */}
-                    <svg viewBox="0 0 1200 320" style={{ width: '100%', height: '320px' }}>
+                    <svg viewBox="0 0 1200 400" style={{ width: '100%', height: '400px' }}>
                       {(() => {
                         const maxAmount = Math.max(
                           ...productStats.lines.flatMap(line => line.data.map(d => d.amount)),
@@ -2073,8 +2073,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         // 그래프 영역 설정
                         const chartLeft = 100;
                         const chartRight = 1150;
-                        const chartTop = 5;
-                        const chartBottom = 300;
+                        const chartTop = 10;
+                        const chartBottom = 370;
                         const chartWidth = chartRight - chartLeft;
                         const chartHeight = chartBottom - chartTop;
 
@@ -2170,7 +2170,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                 <text
                                   key={idx}
                                   x={x}
-                                  y="310"
+                                  y="385"
                                   fontSize="10"
                                   fill="#6b7280"
                                   textAnchor="middle"
@@ -2294,7 +2294,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     {/* 그래프 컨테이너 */}
                     <div style={{ background: '#ffffff', padding: '0 16px', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
                     {/* 메인 그래프 */}
-                    <svg viewBox="0 0 1200 320" style={{ width: '100%', height: '320px' }}>
+                    <svg viewBox="0 0 1200 400" style={{ width: '100%', height: '400px' }}>
                       {(() => {
                         const maxAmount = Math.max(
                           ...optionStats.lines.flatMap(line => line.data.map(d => d.amount)),
@@ -2311,8 +2311,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         // 그래프 영역 설정
                         const chartLeft = 100;
                         const chartRight = 1150;
-                        const chartTop = 5;
-                        const chartBottom = 300;
+                        const chartTop = 10;
+                        const chartBottom = 370;
                         const chartWidth = chartRight - chartLeft;
                         const chartHeight = chartBottom - chartTop;
 
@@ -2408,7 +2408,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                 <text
                                   key={idx}
                                   x={x}
-                                  y="310"
+                                  y="385"
                                   fontSize="10"
                                   fill="#6b7280"
                                   textAnchor="middle"
