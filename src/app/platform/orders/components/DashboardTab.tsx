@@ -2253,13 +2253,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 )}
 
                 {/* 그래프 */}
-                {productOptionStats.dates.length > 0 && productOptionStats.lines.length > 0 ? (
+                {optionStats.dates.length > 0 && optionStats.lines.length > 0 ? (
                   <div style={{ position: 'relative' }}>
                     {/* 메인 그래프 */}
                     <svg viewBox="0 0 1200 250" style={{ width: '100%', height: '250px' }}>
                       {(() => {
                         const maxAmount = Math.max(
-                          ...productOptionStats.lines.flatMap(line => line.data.map(d => d.amount)),
+                          ...optionStats.lines.flatMap(line => line.data.map(d => d.amount)),
                           10000
                         );
 
@@ -2267,7 +2267,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         const maxY = Math.ceil(maxAmount * 1.1 / 10000) * 10000;
                         const yStep = maxY / 5;
 
-                        const dateCount = productOptionStats.dates.length;
+                        const dateCount = optionStats.dates.length;
                         const divisor = dateCount > 1 ? dateCount - 1 : 1;
 
                         // 그래프 영역 설정
@@ -2315,7 +2315,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                             })}
 
                             {/* 옵션 × 마켓 조합별 선 */}
-                            {productOptionStats.lines.map((line, lineIdx) => {
+                            {optionStats.lines.map((line, lineIdx) => {
                               const points = line.data.map((d, idx) => {
                                 const x = chartLeft + (idx / divisor) * chartWidth;
                                 const y = chartBottom - (d.amount / maxY) * chartHeight;
@@ -2350,7 +2350,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                             y: e.clientY,
                                             item: line.item,
                                             market: line.market,
-                                            date: productOptionStats.dates[idx],
+                                            date: optionStats.dates[idx],
                                             amount: d.amount
                                           });
                                         }}
@@ -2363,8 +2363,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                             })}
 
                             {/* X축 날짜 라벨 */}
-                            {productOptionStats.dates.map((date, idx) => {
-                              const divisor = productOptionStats.dates.length > 1 ? productOptionStats.dates.length - 1 : 1;
+                            {optionStats.dates.map((date, idx) => {
+                              const divisor = optionStats.dates.length > 1 ? optionStats.dates.length - 1 : 1;
                               const x = chartLeft + (idx / divisor) * chartWidth;
                               return (
                                 <text
@@ -2390,16 +2390,16 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       <div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                           {allMarkets.map((market) => {
-                            const isSelected = selectedMarkets.includes(market);
+                            const isSelected = selectedOptionMarkets.includes(market);
                             const color = marketColorMap.get(market);
                             return (
                               <div
                                 key={market}
                                 onClick={() => {
                                   if (isSelected) {
-                                    setSelectedMarkets(selectedMarkets.filter(m => m !== market));
+                                    setSelectedOptionMarkets(selectedOptionMarkets.filter(m => m !== market));
                                   } else {
-                                    setSelectedMarkets([...selectedMarkets, market]);
+                                    setSelectedOptionMarkets([...selectedOptionMarkets, market]);
                                   }
                                 }}
                                 style={{
