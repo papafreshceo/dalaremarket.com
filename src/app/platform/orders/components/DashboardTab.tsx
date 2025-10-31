@@ -2164,7 +2164,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                   key={idx}
                                   x={x}
                                   y="410"
-                                  fontSize="14"
+                                  fontSize="18"
                                   fill="#6b7280"
                                   textAnchor="middle"
                                 >
@@ -2394,7 +2394,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                   key={idx}
                                   x={x}
                                   y="410"
-                                  fontSize="14"
+                                  fontSize="18"
                                   fill="#6b7280"
                                   textAnchor="middle"
                                 >
