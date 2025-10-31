@@ -1622,7 +1622,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           </div>
           </div>
 
-          {/* 마켓별 통계 - 전체 너비 */}
+{/* 마켓별 통계 - 전체 너비 */}
           <div className="card" style={{
             borderRadius: '12px',
             padding: '20px'
@@ -1668,12 +1668,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                   {/* 각 마켓별 꺾은선 그래프 */}
                   {(() => {
-                    // 데이터가 없으면 아무것도 렌더링하지 않음
                     if (marketDateStats.dates.length === 0 || marketDateStats.marketLines.length === 0) {
                       return null;
                     }
 
-                    // 모든 금액 중 최대값 찾기
                     const maxAmount = Math.max(
                       ...marketDateStats.marketLines.flatMap(line =>
                         line.data.map(d => d.amount)
@@ -1685,7 +1683,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     const divisor = dateCount > 1 ? dateCount - 1 : 1;
 
                     return marketDateStats.marketLines.map((line, lineIdx) => {
-                      // 라인의 포인트 계산
                       const points = line.data.map((d, idx) => {
                         const x = 60 + (idx / divisor) * 420;
                         const y = 210 - ((d.amount / maxAmount) * 160);
@@ -1694,7 +1691,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                       return (
                         <g key={lineIdx}>
-                          {/* 선 */}
                           <polyline
                             points={points}
                             fill="none"
@@ -1706,8 +1702,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                               transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
                             }}
                           />
-
-                          {/* 점 */}
                           {line.data.map((d, idx) => {
                             const x = 60 + (idx / divisor) * 420;
                             const y = 210 - ((d.amount / maxAmount) * 160);
@@ -1735,7 +1729,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   {marketDateStats.dates.length > 0 && marketDateStats.dates.map((date, idx) => {
                     const divisor = marketDateStats.dates.length > 1 ? marketDateStats.dates.length - 1 : 1;
                     const x = 60 + (idx / divisor) * 420;
-                    const displayDate = date.substring(5); // MM-DD만 표시
+                    const displayDate = date.substring(5);
                     return (
                       <text
                         key={idx}
