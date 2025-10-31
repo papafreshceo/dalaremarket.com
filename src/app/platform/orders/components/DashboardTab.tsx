@@ -2167,6 +2167,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                             {/* X축 날짜 라벨 */}
                             {productStats.dates.map((date, idx) => {
+                              // 2개 중 1개만 표시 (15개로 제한)
+                              if (idx % 2 !== 0) return null;
+
                               const divisor = productStats.dates.length > 1 ? productStats.dates.length - 1 : 1;
                               const x = chartLeft + (idx / divisor) * chartWidth;
                               return (
