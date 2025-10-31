@@ -4,10 +4,21 @@ import { useState, useEffect } from 'react'
 import UserHeader from '@/components/layout/UserHeader'
 import MobileBottomNav from '@/components/layout/MobileBottomNav'
 import Link from 'next/link'
+import Image from 'next/image'
+
+interface PromotionalImage {
+  id: number
+  image_url: string
+  display_order: number
+  title?: string
+  link_url?: string
+  is_active: boolean
+}
 
 export default function PlatformHome() {
   const [activeTab, setActiveTab] = useState<{ main?: number }>({})
   const [isMobile, setIsMobile] = useState(false)
+  const [promoImages, setPromoImages] = useState<PromotionalImage[]>([])
 
   // 플랫폼 화면 파비콘 설정
   useEffect(() => {
@@ -39,6 +50,23 @@ export default function PlatformHome() {
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // 홍보 이미지 가져오기
+  useEffect(() => {
+    fetch('/api/admin/promotional-images')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          const activeImages = data.data
+            .filter((img: PromotionalImage) => img.is_active)
+            .sort((a: PromotionalImage, b: PromotionalImage) => a.display_order - b.display_order)
+          setPromoImages(activeImages)
+        }
+      })
+      .catch(error => {
+        console.error('홍보 이미지 로드 실패:', error)
+      })
   }, [])
 
   return (
@@ -251,23 +279,67 @@ export default function PlatformHome() {
                 gap: '16px',
                 padding: '0 40px'
               }}>
-                {[1, 2, 3, 4].map(i => (
-                  <div key={i} style={{
-                    aspectRatio: '16/9',
-                    background: `linear-gradient(135deg, hsl(${i * 60}, 70%, 95%) 0%, hsl(${i * 60 + 30}, 70%, 98%) 100%)`,
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#6c757d',
-                    fontSize: '14px'
-                  }}>
-                    상품 홍보 이미지 {i}
-                  </div>
-                ))}
+                {promoImages.length > 0 ? (
+                  promoImages.map((img) => (
+                    <div
+                      key={img.id}
+                      onClick={() => {
+                        if (img.link_url) {
+                          window.open(img.link_url, '_blank')
+                        }
+                      }}
+                      style={{
+                        aspectRatio: '16/9',
+                        borderRadius: '16px',
+                        overflow: 'hidden',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                        cursor: img.link_url ? 'pointer' : 'default',
+                        position: 'relative',
+                        background: '#f3f4f6'
+                      }}
+                    >
+                      {img.image_url ? (
+                        <Image
+                          src={img.image_url}
+                          alt={img.title || `홍보 이미지 ${img.display_order}`}
+                          fill
+                          style={{ objectFit: 'cover' }}
+                          sizes="(max-width: 768px) 100vw, 50vw"
+                        />
+                      ) : (
+                        <div style={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#9ca3af',
+                          fontSize: '14px'
+                        }}>
+                          {img.title || `홍보 이미지 ${img.display_order}`}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  // 로딩 중이거나 이미지가 없을 때 플레이스홀더
+                  [1, 2, 3, 4].map(i => (
+                    <div key={i} style={{
+                      aspectRatio: '16/9',
+                      background: `linear-gradient(135deg, hsl(${i * 60}, 70%, 95%) 0%, hsl(${i * 60 + 30}, 70%, 98%) 100%)`,
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#6c757d',
+                      fontSize: '14px'
+                    }}>
+                      상품 홍보 이미지 {i}
+                    </div>
+                  ))
+                )}
               </div>
 
               {/* 탭 2: 간편 발주시스템 - 2x2 그리드 */}
