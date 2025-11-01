@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Order, StatusConfig, StatsData } from '../types';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import DatePicker from '@/components/ui/DatePicker';
@@ -88,6 +88,28 @@ export default function OrderRegistrationTab({
 
   // 판매자 정보 검증 모달 상태
   const [showSellerInfoValidationModal, setShowSellerInfoValidationModal] = useState(false);
+
+  // 캐시 관련 state
+  const [cashBalance, setCashBalance] = useState<number>(0);
+  const [cashToUse, setCashToUse] = useState<number>(0);
+
+  // 캐시 잔액 조회
+  useEffect(() => {
+    const fetchCashBalance = async () => {
+      try {
+        const response = await fetch('/api/cash');
+        const data = await response.json();
+
+        if (data.success) {
+          setCashBalance(data.balance);
+        }
+      } catch (error) {
+        console.error('캐시 잔액 조회 실패:', error);
+      }
+    };
+
+    fetchCashBalance();
+  }, []);
 
   // 입금완료 및 발주확정 핸들러 (재사용 가능)
   const handlePaymentConfirmation = async () => {
@@ -2178,20 +2200,99 @@ export default function OrderRegistrationTab({
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
-          <div>
-            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>주문건수:</span>
-            <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-text)' }}>
-              {orderSummary.count.toLocaleString()}건
-            </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
+          <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
+            <div>
+              <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>주문건수:</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-text)' }}>
+                {orderSummary.count.toLocaleString()}건
+              </span>
+            </div>
+            <div>
+              <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>공급가 합계:</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-primary)' }}>
+                {orderSummary.totalSupplyPrice.toLocaleString()}원
+              </span>
+            </div>
           </div>
-          <div>
-            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>공급가 합계:</span>
-            <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-primary)' }}>
-              {orderSummary.totalSupplyPrice.toLocaleString()}원
-            </span>
+
+          {/* 캐시 사용 섹션 */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            padding: '16px',
+            background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+            border: '1px solid #fbbf24',
+            borderRadius: '8px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#92400e' }}>
+                💰 보유 캐시: {cashBalance.toLocaleString()}캐시
+              </span>
+              <button
+                onClick={() => {
+                  const maxCash = Math.min(cashBalance, orderSummary.totalSupplyPrice);
+                  setCashToUse(maxCash);
+                }}
+                style={{
+                  padding: '4px 8px',
+                  background: '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#d97706'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#f59e0b'}
+              >
+                전액사용
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: '#92400e', fontWeight: '500', whiteSpace: 'nowrap' }}>사용할 캐시:</span>
+              <input
+                type="number"
+                value={cashToUse}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value) || 0;
+                  const maxCash = Math.min(cashBalance, orderSummary.totalSupplyPrice);
+                  setCashToUse(Math.max(0, Math.min(value, maxCash)));
+                }}
+                min={0}
+                max={Math.min(cashBalance, orderSummary.totalSupplyPrice)}
+                style={{
+                  flex: 1,
+                  padding: '6px 10px',
+                  border: '1px solid #d97706',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#92400e',
+                  background: 'white'
+                }}
+              />
+              <span style={{ fontSize: '12px', color: '#92400e', fontWeight: '500' }}>캐시</span>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              paddingTop: '12px',
+              borderTop: '1px solid #fbbf24'
+            }}>
+              <span style={{ fontSize: '14px', fontWeight: '700', color: '#78350f' }}>최종 입금액:</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: '#78350f' }}>
+                {(orderSummary.totalSupplyPrice - cashToUse).toLocaleString()}원
+              </span>
+            </div>
           </div>
         </div>
+
         <button
           onClick={handlePaymentConfirmation}
           style={{
@@ -2204,7 +2305,8 @@ export default function OrderRegistrationTab({
             fontWeight: '600',
             cursor: 'pointer',
             transition: 'all 0.2s',
-            boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+            boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+            alignSelf: 'flex-start'
           }}
           onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
           onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
@@ -2611,11 +2713,51 @@ export default function OrderRegistrationTab({
               }
             }
 
+            // 캐시 차감 처리
+            if (cashToUse > 0) {
+              try {
+                const cashResponse = await fetch('/api/cash/use', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    amount: cashToUse,
+                    description: `발주서 확정 (${validatedOrders.length}건)`,
+                    metadata: {
+                      orderCount: validatedOrders.length,
+                      totalSupplyPrice: validatedOrders.reduce((sum, order) => sum + (order.supplyPrice || 0), 0),
+                      cashUsed: cashToUse
+                    }
+                  })
+                });
+
+                const cashData = await cashResponse.json();
+
+                if (!cashData.success) {
+                  console.error('캐시 차감 실패:', cashData);
+                  showModal('alert', '경고', `주문은 확정되었으나 캐시 차감에 실패했습니다. 관리자에게 문의해주세요.`);
+                } else {
+                  // 캐시 잔액 업데이트
+                  setCashBalance(cashData.newBalance);
+                  toast.success(`${cashToUse.toLocaleString()}캐시가 차감되었습니다!`);
+                }
+              } catch (cashError) {
+                console.error('캐시 차감 오류:', cashError);
+                showModal('alert', '경고', `주문은 확정되었으나 캐시 처리 중 오류가 발생했습니다.`);
+              }
+            }
+
+            // 캐시 사용 금액 초기화
+            setCashToUse(0);
+
             setShowOptionValidationModal(false);
             setValidatedOrders([]);
             setOptionProductsMap(new Map());
 
-            showModal('alert', '완료', `${validatedOrders.length}건의 주문이 발주 확정되었습니다.`, () => {
+            const message = cashToUse > 0
+              ? `${validatedOrders.length}건의 주문이 발주 확정되었습니다.\n${cashToUse.toLocaleString()}캐시가 차감되었습니다.`
+              : `${validatedOrders.length}건의 주문이 발주 확정되었습니다.`;
+
+            showModal('alert', '완료', message, () => {
               // 주문 목록 새로고침
               if (onRefresh) {
                 onRefresh();

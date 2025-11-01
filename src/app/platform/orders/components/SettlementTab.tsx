@@ -2,10 +2,10 @@
 
 import { Order } from '../types';
 import { useMemo, useState, useEffect } from 'react';
-import ExcelJS from 'exceljs';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { createClient } from '@/lib/supabase/client';
+import { downloadMonthlySettlementExcel, downloadPeriodSettlementExcel } from '@/lib/downloads/settlement-excel';
+import { downloadMonthlyStatementPDF, downloadPeriodStatementPDF } from '@/lib/downloads/statement-pdf';
+import DatePicker from '@/components/ui/DatePicker';
 
 interface SettlementTabProps {
   isMobile: boolean;
@@ -32,6 +32,8 @@ interface UserInfo {
 }
 
 export default function SettlementTab({ isMobile, orders }: SettlementTabProps) {
+  // 탭 상태 관리
+  const [activeTab, setActiveTab] = useState<'월별' | '기간설정'>('월별');
   // 확장/축소된 월 상태 관리
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   // 툴팁 호버 상태 관리 (yearMonth + 'excel' or 'statement')
@@ -40,6 +42,84 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   // 로그인한 사용자 정보
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  // 기간설정 상태 (기본값: 오늘부터 1달 전)
+  const [startDate, setStartDate] = useState<string>(() => {
+    const today = new Date();
+    const oneMonthAgo = new Date(today);
+    oneMonthAgo.setMonth(today.getMonth() - 1);
+    const year = oneMonthAgo.getFullYear();
+    const month = String(oneMonthAgo.getMonth() + 1).padStart(2, '0');
+    const day = String(oneMonthAgo.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
+  const [endDate, setEndDate] = useState<string>(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
+
+  // UTC를 KST(한국시간, UTC+9)로 변환하여 날짜 추출
+  const getKSTDate = (utcDateString: string): string => {
+    const utcDate = new Date(utcDateString);
+    // UTC+9 시간 추가
+    const kstDate = new Date(utcDate.getTime() + (9 * 60 * 60 * 1000));
+    return kstDate.toISOString().substring(0, 10); // YYYY-MM-DD
+  };
+
+  // 기간별 집계 데이터
+  const periodStats = useMemo(() => {
+    const stats = {
+      confirmedCount: 0,
+      confirmedAmount: 0,
+      cancelCount: 0,
+      cancelAmount: 0,
+      shippedCount: 0,
+      shippedAmount: 0,
+      refundAmount: 0
+    };
+
+    // 날짜가 모두 선택되었는지 확인
+    const hasPeriod = startDate && endDate;
+
+    orders.forEach(order => {
+      if (!order.confirmedAt) return;
+
+      // 기간이 선택되지 않았으면 전체 집계, 선택되었으면 기간 내 집계
+      let shouldCount = true;
+      if (hasPeriod) {
+        const confirmedDate = getKSTDate(order.confirmedAt);
+        shouldCount = confirmedDate >= startDate && confirmedDate <= endDate;
+      }
+
+      if (shouldCount) {
+        // 발주확정
+        stats.confirmedCount++;
+        stats.confirmedAmount += order.amount || 0;
+
+        // 취소
+        if (order.status === 'cancelled' || order.status === 'cancelRequested' || order.status === 'refunded') {
+          stats.cancelCount++;
+          stats.cancelAmount += order.amount || 0;
+        }
+
+        // 발송완료
+        if (order.status === 'shipped') {
+          stats.shippedCount++;
+          stats.shippedAmount += order.amount || 0;
+        }
+
+        // 환불
+        if (order.status === 'refunded') {
+          const refundAmt = order.refundAmount || order.amount || 0;
+          stats.refundAmount += refundAmt;
+        }
+      }
+    });
+
+    return stats;
+  }, [orders, startDate, endDate]);
 
   // 기본 회사 정보 및 사용자 정보 로드
   useEffect(() => {
@@ -105,14 +185,6 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
 
     loadInfo();
   }, []);
-
-  // UTC를 KST(한국시간, UTC+9)로 변환하여 날짜 추출
-  const getKSTDate = (utcDateString: string): string => {
-    const utcDate = new Date(utcDateString);
-    // UTC+9 시간 추가
-    const kstDate = new Date(utcDate.getTime() + (9 * 60 * 60 * 1000));
-    return kstDate.toISOString().substring(0, 10); // YYYY-MM-DD
-  };
 
   // 월별 + 일별 정산 데이터 계산 (발주확정일자 기준)
   const monthlySettlements = useMemo(() => {
@@ -222,383 +294,66 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
     });
   };
 
-  // 엑셀 다운로드 함수
+  // 엑셀 다운로드 함수 (유틸리티 함수로 위임)
   const downloadExcel = async (monthData: any) => {
-    const [year, month] = monthData.yearMonth.split('-');
-
-    // 워크북 생성
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(`${year}년 ${month}월`);
-
-    // 열 너비 설정
-    worksheet.columns = [
-      { width: 10 },  // 연번
-      { width: 15 },  // 일자
-      { width: 12 },  // 발주 건수
-      { width: 18 },  // 발주 금액
-      { width: 12 },  // 취소 건수
-      { width: 18 },  // 취소 금액
-      { width: 12 },  // 발송 건수
-      { width: 18 },  // 발송 금액
-      { width: 18 }   // 환불 금액
-    ];
-
-    let currentRow = 1;
-
-    // 제목 (병합)
-    worksheet.mergeCells(`A${currentRow}:I${currentRow}`);
-    const titleCell = worksheet.getCell(`A${currentRow}`);
-    titleCell.value = '거래명세서';
-    titleCell.font = { size: 18, bold: true };
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    worksheet.getRow(currentRow).height = 30;
-    currentRow++;
-
-    // 부제목 (병합)
-    worksheet.mergeCells(`A${currentRow}:I${currentRow}`);
-    const subtitleCell = worksheet.getCell(`A${currentRow}`);
-    subtitleCell.value = `${year}년 ${month}월`;
-    subtitleCell.font = { size: 14, bold: true };
-    subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    worksheet.getRow(currentRow).height = 25;
-    currentRow++;
-
-    // 빈 줄
-    currentRow++;
-
-    // 월별 집계 섹션
-    const summaryTitleCell = worksheet.getCell(`A${currentRow}`);
-    summaryTitleCell.value = '월별 집계';
-    summaryTitleCell.font = { size: 12, bold: true };
-    currentRow++;
-
-    // 월별 집계 헤더
-    const summaryHeaderRow = worksheet.getRow(currentRow);
-    summaryHeaderRow.values = ['구분', '건수', '금액'];
-    summaryHeaderRow.height = 25;
-
-    // 헤더 셀 개별 설정 (A, B, C 컬럼만)
-    ['A', 'B', 'C'].forEach((col) => {
-      const cell = worksheet.getCell(`${col}${currentRow}`);
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF3B82F6' }
-      };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
-      };
-    });
-    currentRow++;
-
-    // 월별 집계 데이터
-    const summaryData = [
-      ['발주', monthData.confirmedCount, monthData.confirmedAmount],
-      ['취소', monthData.cancelCount, monthData.cancelAmount],
-      ['발송', monthData.shippedCount, monthData.shippedAmount],
-      ['환불', '-', monthData.refundAmount],
-    ];
-
-    summaryData.forEach((rowData, index) => {
-      const row = worksheet.getRow(currentRow);
-      row.values = rowData;
-      row.height = 20;
-
-      // 각 셀 개별 설정
-      ['A', 'B', 'C'].forEach((col) => {
-        const cell = worksheet.getCell(`${col}${currentRow}`);
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
-        };
-
-        // 짝수 행에 배경색 추가
-        if (index % 2 === 1) {
-          cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFF3F4F6' }
-          };
-        }
-
-        // C 컬럼(금액)에 숫자 형식 적용
-        if (col === 'C' && typeof cell.value === 'number') {
-          cell.numFmt = '#,##0';
-        }
-      });
-
-      currentRow++;
-    });
-
-    // 빈 줄
-    currentRow++;
-
-    // 일별 상세 섹션
-    const detailTitleCell = worksheet.getCell(`A${currentRow}`);
-    detailTitleCell.value = '일별 상세';
-    detailTitleCell.font = { size: 12, bold: true };
-    currentRow++;
-
-    // 일별 상세 헤더
-    const detailHeaderRow = worksheet.getRow(currentRow);
-    detailHeaderRow.values = ['연번', '일자', '발주 건수', '발주 금액', '취소 건수', '취소 금액', '발송 건수', '발송 금액', '환불 금액'];
-    detailHeaderRow.height = 25;
-
-    // 헤더 셀 개별 설정 (A~I 컬럼)
-    ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'].forEach((col) => {
-      const cell = worksheet.getCell(`${col}${currentRow}`);
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF3B82F6' }
-      };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
-      };
-    });
-    currentRow++;
-
-    // 일별 상세 데이터
-    monthData.dailyData.forEach((day: any) => {
-      const row = worksheet.getRow(currentRow);
-      row.values = [
-        day.no,
-        day.date,
-        day.confirmedCount || '',
-        day.confirmedAmount || '',
-        day.cancelCount || '',
-        day.cancelAmount || '',
-        day.shippedCount || '',
-        day.shippedAmount || '',
-        day.refundAmount || ''
-      ];
-      row.height = 18;
-
-      // 각 셀 개별 설정
-      ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'].forEach((col) => {
-        const cell = worksheet.getCell(`${col}${currentRow}`);
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.font = { size: 10 };
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
-        };
-
-        // 금액 컬럼(D, F, H, I)에 숫자 형식 적용
-        if (['D', 'F', 'H', 'I'].includes(col) && typeof cell.value === 'number') {
-          cell.numFmt = '#,##0';
-        }
-      });
-
-      currentRow++;
-    });
-
-    // 파일 다운로드
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `거래명세서_${year}년${month}월.xlsx`;
-    link.click();
-    window.URL.revokeObjectURL(url);
+    await downloadMonthlySettlementExcel(monthData);
   };
 
-  // PDF 거래명세서 다운로드 함수
+  // PDF 거래명세서 다운로드 함수 (유틸리티 함수로 위임)
   const downloadPDF = async (monthData: any) => {
     const [year, month] = monthData.yearMonth.split('-');
 
-    try {
-      // 해당 월에 발주확정된 주문 중에서 발송완료 상태인 주문만 필터링
-      const shippedOrders = orders.filter(order => {
-        // 1. 발송완료 상태가 아니면 제외
-        if (order.status !== 'shipped') return false;
-
-        // 2. 발주확정일이 없으면 제외
-        if (!order.confirmedAt) return false;
-
-        // 3. 발주확정일이 해당 월인지 확인
-        const confirmedDate = getKSTDate(order.confirmedAt);
-        const orderYearMonth = confirmedDate.substring(0, 7); // YYYY-MM
-        return orderYearMonth === monthData.yearMonth;
-      });
-
-      if (shippedOrders.length === 0) {
-        alert('해당 월에 발주확정되고 발송완료된 주문이 없습니다.');
-        return;
-      }
-
-      // option_name으로 그룹핑하여 통계 집계
-      const optionStats = new Map<string, {
-        optionName: string;
-        count: number;
-        totalAmount: number;
-      }>();
-
-      shippedOrders.forEach(order => {
-        const optionName = order.option_name || order.products;
-        const amount = order.amount || 0;
-
-        if (optionStats.has(optionName)) {
-          const stats = optionStats.get(optionName)!;
-          stats.count += 1;
-          stats.totalAmount += amount;
-        } else {
-          optionStats.set(optionName, {
-            optionName,
-            count: 1,
-            totalAmount: amount
-          });
-        }
-      });
-
-      // option_products 테이블에서 category_4 정보 가져오기
-      const supabase = createClient();
-      const optionNames = Array.from(optionStats.keys());
-
-      const { data: optionProducts, error: optionError } = await supabase
-        .from('option_products')
-        .select('option_name, category_4')
-        .in('option_name', optionNames);
-
-      if (optionError) {
-        console.error('옵션 상품 정보 조회 오류:', optionError);
-      }
-
-      // category_4 맵 생성
-      const categoryMap = new Map<string, string>();
-      if (optionProducts) {
-        optionProducts.forEach((product: any) => {
-          categoryMap.set(product.option_name, product.category_4 || '기타');
-        });
-      }
-
-      // 거래명세서 품목 형식으로 변환
-      const items = Array.from(optionStats.values())
-        .map(stats => ({
-          name: categoryMap.get(stats.optionName) || '기타',  // 품목: category_4
-          spec: stats.optionName,                              // 규격: option_name
-          quantity: 1,                                          // 수량: 1
-          unit: '식',                                          // 단위: 식
-          price: stats.totalAmount,                            // 단가: 금액 합계
-          notes: `${stats.count}건`                            // 비고: 건수 + '건'
-        }))
-        // 가나다순 정렬: 1차 품목명, 2차 규격
-        .sort((a, b) => {
-          const nameCompare = a.name.localeCompare(b.name, 'ko');
-          if (nameCompare !== 0) return nameCompare;
-          return a.spec.localeCompare(b.spec, 'ko');
-        });
-
-      if (items.length === 0) {
-        alert('해당 월에 거래 내역이 없습니다.');
-        return;
-      }
-
-      // 해당 월의 시작일과 종료일 계산
-      const startDate = `${year}-${month}-01`;
-      const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-      const endDate = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
-
-      // 회사 정보가 로드되지 않았으면 대기
-      if (!companyInfo) {
-        alert('회사 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
-        return;
-      }
-
-      // 주소 조합 (주소 + 상세주소)
-      const fullAddress = companyInfo.address_detail
-        ? `${companyInfo.address} ${companyInfo.address_detail}`
-        : companyInfo.address;
-
-      // 구매자 정보 설정 (로그인한 사용자 정보 사용)
-      const buyerInfo = userInfo ? {
-        name: userInfo.name || '구매자명',
-        businessNumber: userInfo.business_number || '',
-        representative: userInfo.representative_name || '',
-        address: userInfo.company_address || '',
-        phone: userInfo.representative_phone || '',
-        email: userInfo.email || ''
-      } : {
-        name: '구매자명',
-        businessNumber: '',
-        representative: '',
-        address: '',
-        phone: '',
-        email: ''
-      };
-
-      // API 호출
-      const response = await fetch('/api/statements/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sellerInfo: {
-            name: companyInfo.company_name,
-            businessNumber: companyInfo.business_number,
-            representative: companyInfo.ceo_name,
-            address: fullAddress,
-            phone: companyInfo.phone,
-            email: companyInfo.email
-          },
-          buyerInfo: buyerInfo,
-          items: items,
-          notes: [
-            `거래명세서 기간: ${startDate} ~ ${endDate}`,
-            `문의사항은 ${companyInfo.phone} 또는 ${companyInfo.email}으로 연락 주시기 바랍니다.`
-          ]
-        })
-      });
-
-      if (response.ok) {
-        // PDF 파일 다운로드
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `거래명세서_${year}년${month}월.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      } else {
-        const error = await response.json();
-        alert(`PDF 생성 실패: ${error.error || '서버 오류'}`);
-      }
-    } catch (error) {
-      console.error('PDF 다운로드 오류:', error);
-      alert('PDF 다운로드 중 오류가 발생했습니다.');
+    // 회사 정보가 로드되지 않았으면 대기
+    if (!companyInfo) {
+      alert('회사 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+      return;
     }
+
+    // 주소 조합 (주소 + 상세주소)
+    const fullAddress = companyInfo.address_detail
+      ? `${companyInfo.address} ${companyInfo.address_detail}`
+      : companyInfo.address;
+
+    // 구매자 정보 설정 (로그인한 사용자 정보 사용)
+    const buyerInfo = userInfo ? {
+      name: userInfo.name || '구매자명',
+      businessNumber: userInfo.business_number || '',
+      representative: userInfo.representative_name || '',
+      address: userInfo.company_address || '',
+      phone: userInfo.representative_phone || '',
+      email: userInfo.email || ''
+    } : {
+      name: '구매자명',
+      businessNumber: '',
+      representative: '',
+      address: '',
+      phone: '',
+      email: ''
+    };
+
+    // 공급자 정보 설정
+    const sellerInfo = {
+      name: companyInfo.company_name,
+      businessNumber: companyInfo.business_number,
+      representative: companyInfo.ceo_name,
+      address: fullAddress,
+      phone: companyInfo.phone,
+      email: companyInfo.email
+    };
+
+    // 유틸리티 함수 호출
+    await downloadMonthlyStatementPDF(year, month, orders, buyerInfo, sellerInfo);
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: 'calc(100% - 200px)', margin: '0 auto' }}>
       {/* 정산 요약 카드 */}
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
           gap: '16px',
-          marginBottom: '24px',
-          maxWidth: 'calc(100% - 200px)',
-          margin: '0 auto 24px auto'
+          marginBottom: '48px'
         }}
       >
         {/* 발주 */}
@@ -693,15 +448,48 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
         </div>
       </div>
 
-      {/* 월별 정산 아코디언 */}
-      <div style={{ marginBottom: '24px', maxWidth: 'calc(100% - 200px)', margin: '0 auto 24px auto' }}>
-        <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600', color: 'var(--color-text)' }}>
-          월별 정산 내역
-        </h3>
+      {/* 탭 및 정산 내역 */}
+      <div style={{ marginBottom: '24px' }}>
+        {/* 탭 헤더 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <button
+            onClick={() => setActiveTab('월별')}
+            style={{
+              padding: '8px 16px',
+              fontSize: '16px',
+              fontWeight: activeTab === '월별' ? '600' : '400',
+              color: activeTab === '월별' ? 'var(--color-text)' : 'var(--color-text-secondary)',
+              background: activeTab === '월별' ? 'var(--color-surface)' : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === '월별' ? '2px solid #3b82f6' : '2px solid transparent',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            월별 정산 내역
+          </button>
+          <button
+            onClick={() => setActiveTab('기간설정')}
+            style={{
+              padding: '8px 16px',
+              fontSize: '16px',
+              fontWeight: activeTab === '기간설정' ? '600' : '400',
+              color: activeTab === '기간설정' ? 'var(--color-text)' : 'var(--color-text-secondary)',
+              background: activeTab === '기간설정' ? 'var(--color-surface)' : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === '기간설정' ? '2px solid #3b82f6' : '2px solid transparent',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            기간설정
+          </button>
+        </div>
 
-        {/* 월별 아코디언 리스트 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {monthlySettlements.map((month, monthIndex) => {
+        {/* 월별 정산 내역 탭 */}
+        {activeTab === '월별' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {monthlySettlements.map((month, monthIndex) => {
             const isExpanded = expandedMonths.has(month.yearMonth);
             const [year, monthNum] = month.yearMonth.split('-');
             const isLast = monthIndex === monthlySettlements.length - 1;
@@ -753,7 +541,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                   </div>
 
                   {/* 년월 */}
-                  <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--color-text)', minWidth: '100px', flexShrink: 0 }}>
+                  <div style={{ fontSize: '15px', fontWeight: '400', color: 'var(--color-text)', minWidth: '100px', flexShrink: 0 }}>
                     {year}년 {monthNum}월
                   </div>
 
@@ -766,21 +554,14 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       justifyContent: 'space-between',
                       padding: '6px 12px',
                       borderRadius: '6px',
-                      background: month.confirmedCount > 0 ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
-                      border: month.confirmedCount > 0 ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid transparent',
+                      background: month.confirmedCount > 0 ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                      border: month.confirmedCount > 0 ? '1px solid rgba(59, 130, 246, 0.15)' : '1px solid transparent',
                       flex: '0 0 auto',
-                      minWidth: '150px',
+                      minWidth: '165px',
                       visibility: month.confirmedCount > 0 ? 'visible' : 'hidden'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '11px', color: '#3b82f6', fontWeight: '500' }}>발주</span>
-                        <span style={{ fontSize: '13px', color: 'var(--color-text)', fontWeight: '600' }}>
-                          {month.confirmedCount}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', textAlign: 'right' }}>
-                        {month.confirmedAmount.toLocaleString()}
-                      </span>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{month.confirmedAmount.toLocaleString()}</span>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {month.confirmedCount}</span>
                     </div>
 
                     {/* 취소 */}
@@ -790,21 +571,14 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       justifyContent: 'space-between',
                       padding: '6px 12px',
                       borderRadius: '6px',
-                      background: month.cancelCount > 0 ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
-                      border: month.cancelCount > 0 ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid transparent',
+                      background: month.cancelCount > 0 ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
+                      border: month.cancelCount > 0 ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid transparent',
                       flex: '0 0 auto',
-                      minWidth: '150px',
+                      minWidth: '165px',
                       visibility: month.cancelCount > 0 ? 'visible' : 'hidden'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: '500' }}>취소</span>
-                        <span style={{ fontSize: '13px', color: 'var(--color-text)', fontWeight: '600' }}>
-                          {month.cancelCount}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', textAlign: 'right' }}>
-                        {month.cancelAmount.toLocaleString()}
-                      </span>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{month.cancelAmount.toLocaleString()}</span>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {month.cancelCount}</span>
                     </div>
 
                     {/* 발송 */}
@@ -814,21 +588,14 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       justifyContent: 'space-between',
                       padding: '6px 12px',
                       borderRadius: '6px',
-                      background: month.shippedCount > 0 ? 'rgba(16, 185, 129, 0.08)' : 'transparent',
-                      border: month.shippedCount > 0 ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid transparent',
+                      background: month.shippedCount > 0 ? 'rgba(16, 185, 129, 0.05)' : 'transparent',
+                      border: month.shippedCount > 0 ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid transparent',
                       flex: '0 0 auto',
-                      minWidth: '150px',
+                      minWidth: '165px',
                       visibility: month.shippedCount > 0 ? 'visible' : 'hidden'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '11px', color: '#10b981', fontWeight: '500' }}>발송</span>
-                        <span style={{ fontSize: '13px', color: 'var(--color-text)', fontWeight: '600' }}>
-                          {month.shippedCount}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', textAlign: 'right' }}>
-                        {month.shippedAmount.toLocaleString()}
-                      </span>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{month.shippedAmount.toLocaleString()}</span>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {month.shippedCount}</span>
                     </div>
 
                     {/* 환불 */}
@@ -838,16 +605,13 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       justifyContent: 'space-between',
                       padding: '6px 12px',
                       borderRadius: '6px',
-                      background: month.refundAmount > 0 ? 'rgba(245, 158, 11, 0.08)' : 'transparent',
-                      border: month.refundAmount > 0 ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid transparent',
+                      background: month.refundAmount > 0 ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
+                      border: month.refundAmount > 0 ? '1px solid rgba(245, 158, 11, 0.15)' : '1px solid transparent',
                       flex: '0 0 auto',
-                      minWidth: '120px',
+                      minWidth: '132px',
                       visibility: month.refundAmount > 0 ? 'visible' : 'hidden'
                     }}>
-                      <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: '500' }}>환불</span>
-                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', textAlign: 'right' }}>
-                        {month.refundAmount.toLocaleString()}
-                      </span>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{month.refundAmount.toLocaleString()}</span>
                     </div>
                   </div>
 
@@ -1188,6 +952,387 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
               </div>
             );
           })}
+          </div>
+        )}
+
+        {/* 기간설정 탭 */}
+        {activeTab === '기간설정' && (
+          <div
+            style={{
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-surface)',
+              boxShadow: '2px 2px 3px rgba(0, 0, 0, 0.15)'
+            }}
+          >
+            <div
+              style={{
+                padding: '18px 20px',
+                background: 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '24px'
+              }}
+            >
+              {/* 날짜 선택 영역 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '240px', flexShrink: 0 }}>
+                <DatePicker
+                  value={startDate ? new Date(startDate) : null}
+                  onChange={(date) => {
+                    if (date) {
+                      const year = date.getFullYear();
+                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                      const day = String(date.getDate()).padStart(2, '0');
+                      setStartDate(`${year}-${month}-${day}`);
+                    } else {
+                      setStartDate('');
+                    }
+                  }}
+                  placeholder="시작일"
+                  maxDate={endDate ? new Date(endDate) : undefined}
+                />
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>~</span>
+                <DatePicker
+                  value={endDate ? new Date(endDate) : null}
+                  onChange={(date) => {
+                    if (date) {
+                      const year = date.getFullYear();
+                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                      const day = String(date.getDate()).padStart(2, '0');
+                      setEndDate(`${year}-${month}-${day}`);
+                    } else {
+                      setEndDate('');
+                    }
+                  }}
+                  placeholder="종료일"
+                  minDate={startDate ? new Date(startDate) : undefined}
+                />
+              </div>
+
+              {/* 통계 배지 그룹 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '60px' }}>
+                {/* 발주 */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  background: periodStats.confirmedCount > 0 ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                  border: periodStats.confirmedCount > 0 ? '1px solid rgba(59, 130, 246, 0.15)' : '1px solid transparent',
+                  flex: '0 0 auto',
+                  minWidth: '165px',
+                  visibility: periodStats.confirmedCount > 0 ? 'visible' : 'hidden'
+                }}>
+                  <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{periodStats.confirmedAmount.toLocaleString()}</span>
+                  <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {periodStats.confirmedCount}</span>
+                </div>
+
+                {/* 취소 */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  background: periodStats.cancelCount > 0 ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
+                  border: periodStats.cancelCount > 0 ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid transparent',
+                  flex: '0 0 auto',
+                  minWidth: '165px',
+                  visibility: periodStats.cancelCount > 0 ? 'visible' : 'hidden'
+                }}>
+                  <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{periodStats.cancelAmount.toLocaleString()}</span>
+                  <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {periodStats.cancelCount}</span>
+                </div>
+
+                {/* 발송 */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  background: periodStats.shippedCount > 0 ? 'rgba(16, 185, 129, 0.05)' : 'transparent',
+                  border: periodStats.shippedCount > 0 ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid transparent',
+                  flex: '0 0 auto',
+                  minWidth: '165px',
+                  visibility: periodStats.shippedCount > 0 ? 'visible' : 'hidden'
+                }}>
+                  <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{periodStats.shippedAmount.toLocaleString()}</span>
+                  <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {periodStats.shippedCount}</span>
+                </div>
+
+                {/* 환불 */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  background: periodStats.refundAmount > 0 ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
+                  border: periodStats.refundAmount > 0 ? '1px solid rgba(245, 158, 11, 0.15)' : '1px solid transparent',
+                  flex: '0 0 auto',
+                  minWidth: '132px',
+                  visibility: periodStats.refundAmount > 0 ? 'visible' : 'hidden'
+                }}>
+                  <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{periodStats.refundAmount.toLocaleString()}</span>
+                  <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {periodStats.refundCount}</span>
+                </div>
+              </div>
+
+              {/* 다운로드 아이콘 영역 */}
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '16px' }}>
+                {/* 엑셀 다운로드 */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={async () => {
+                      if (!startDate || !endDate) {
+                        alert('시작일과 종료일을 모두 선택해주세요.');
+                        return;
+                      }
+                      if (startDate > endDate) {
+                        alert('시작일은 종료일보다 이전이어야 합니다.');
+                        return;
+                      }
+                      await downloadPeriodSettlementExcel(startDate, endDate, orders);
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
+                      setHoveredTooltip('period-excel');
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      setHoveredTooltip(null);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '6px',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'background-color 0.15s ease',
+                      color: 'var(--color-text-secondary)'
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                  </button>
+                  {/* 툴팁 */}
+                  {hoveredTooltip === 'period-excel' && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 'calc(100% + 8px)',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: 'rgba(0, 0, 0, 0.9)',
+                      color: 'white',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      whiteSpace: 'nowrap',
+                      pointerEvents: 'none',
+                      zIndex: 1000,
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)',
+                      animation: 'fadeIn 0.15s ease-in-out'
+                    }}>
+                      엑셀 다운로드
+                      {/* 화살표 */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: 0,
+                        height: 0,
+                        borderLeft: '5px solid transparent',
+                        borderRight: '5px solid transparent',
+                        borderTop: '5px solid rgba(0, 0, 0, 0.9)'
+                      }} />
+                    </div>
+                  )}
+                </div>
+
+                {/* 거래명세서 다운로드 */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={async () => {
+                      if (!startDate || !endDate) {
+                        alert('시작일과 종료일을 모두 선택해주세요.');
+                        return;
+                      }
+                      if (startDate > endDate) {
+                        alert('시작일은 종료일보다 이전이어야 합니다.');
+                        return;
+                      }
+
+                      if (!companyInfo) {
+                        alert('회사 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+                        return;
+                      }
+
+                      const fullAddress = companyInfo.address_detail
+                        ? `${companyInfo.address} ${companyInfo.address_detail}`
+                        : companyInfo.address;
+
+                      const buyerInfo = userInfo ? {
+                        name: userInfo.name || '구매자명',
+                        businessNumber: userInfo.business_number || '',
+                        representative: userInfo.representative_name || '',
+                        address: userInfo.company_address || '',
+                        phone: userInfo.representative_phone || '',
+                        email: userInfo.email || ''
+                      } : {
+                        name: '구매자명',
+                        businessNumber: '',
+                        representative: '',
+                        address: '',
+                        phone: '',
+                        email: ''
+                      };
+
+                      const sellerInfo = {
+                        name: companyInfo.company_name,
+                        businessNumber: companyInfo.business_number,
+                        representative: companyInfo.ceo_name,
+                        address: fullAddress,
+                        phone: companyInfo.phone,
+                        email: companyInfo.email
+                      };
+
+                      await downloadPeriodStatementPDF(startDate, endDate, orders, buyerInfo, sellerInfo);
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
+                      setHoveredTooltip('period-statement');
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      setHoveredTooltip(null);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '6px',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'background-color 0.15s ease',
+                      color: 'var(--color-text-secondary)'
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="16" y1="13" x2="8" y2="13"/>
+                      <line x1="16" y1="17" x2="8" y2="17"/>
+                      <polyline points="10 9 9 9 8 9"/>
+                    </svg>
+                  </button>
+                  {/* 툴팁 */}
+                  {hoveredTooltip === 'period-statement' && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 'calc(100% + 8px)',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: 'rgba(0, 0, 0, 0.9)',
+                      color: 'white',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      whiteSpace: 'nowrap',
+                      pointerEvents: 'none',
+                      zIndex: 1000,
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)',
+                      animation: 'fadeIn 0.15s ease-in-out'
+                    }}>
+                      PDF 다운로드
+                      {/* 화살표 */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: 0,
+                        height: 0,
+                        borderLeft: '5px solid transparent',
+                        borderRight: '5px solid transparent',
+                        borderTop: '5px solid rgba(0, 0, 0, 0.9)'
+                      }} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 안내문구 */}
+        <div style={{
+          marginTop: '24px',
+          padding: '16px 20px',
+          background: 'rgba(59, 130, 246, 0.05)',
+          border: '1px solid rgba(59, 130, 246, 0.15)',
+          borderRadius: '8px',
+          fontSize: '13px',
+          color: 'var(--color-text-secondary)',
+          lineHeight: '1.6'
+        }}>
+          {/* 범례 */}
+          <div style={{ display: 'flex', gap: '24px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '4px',
+                background: 'rgba(59, 130, 246, 0.15)',
+                border: '1px solid rgba(59, 130, 246, 0.3)'
+              }} />
+              <span style={{ fontSize: '12px' }}>발주확정</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '4px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)'
+              }} />
+              <span style={{ fontSize: '12px' }}>취소</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '4px',
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(16, 185, 129, 0.3)'
+              }} />
+              <span style={{ fontSize: '12px' }}>발송완료</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '4px',
+                background: 'rgba(245, 158, 11, 0.15)',
+                border: '1px solid rgba(245, 158, 11, 0.3)'
+              }} />
+              <span style={{ fontSize: '12px' }}>환불</span>
+            </div>
+          </div>
+          <div style={{ borderTop: '1px solid rgba(59, 130, 246, 0.1)', paddingTop: '12px' }}>
+            ※ 통계데이터 거래명세서 금액이 실제 정산금액과 맞지 않은 경우 '셀러피드' 건의란에 오류 제보 부탁드립니다
+          </div>
         </div>
       </div>
     </div>

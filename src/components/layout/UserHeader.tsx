@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { useToast } from '@/components/ui/Toast';
+import { useActivityTracker } from '@/hooks/useActivityTracker';
 
 interface NavItem {
   path: string;
@@ -37,8 +38,19 @@ export default function UserHeader() {
   const supabase = createClient();
   const { showToast } = useToast();
   const [orders, setOrders] = useState<any[]>([]);
-  const [dateFilter, setDateFilter] = useState<'today' | '7days' | '30days' | '90days' | 'all'>('7days');
-  const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [cashBalance, setCashBalance] = useState<number>(0);
+
+  // 활동 시간 추적 (로그인 시에만)
+  useActivityTracker({
+    enabled: !!user,
+    onRewardClaimed: (amount, newBalance) => {
+      setCashBalance(newBalance);
+      showToast(`활동 보상 ${amount}캐시가 지급되었습니다!`, 'success');
+    },
+    onLimitReached: () => {
+      showToast('오늘 활동 보상 한도에 도달했습니다.', 'info');
+    }
+  });
 
   useEffect(() => {
     setIsMounted(true);
@@ -56,38 +68,17 @@ export default function UserHeader() {
     const fetchOrders = async () => {
       if (!user) return;
 
-      // 날짜 필터에 따른 시작 날짜 계산
-      let query = supabase
+      // 최근 7일 주문 가져오기
+      const now = new Date();
+      const startDate = new Date();
+      startDate.setDate(now.getDate() - 6);
+      startDate.setHours(0, 0, 0, 0);
+
+      const { data, error } = await supabase
         .from('integrated_orders')
         .select('id, shipping_status, created_at')
-        .eq('seller_id', user.id);
-
-      if (dateFilter !== 'all') {
-        const now = new Date();
-        let startDate = new Date();
-
-        switch (dateFilter) {
-          case 'today':
-            startDate.setHours(0, 0, 0, 0);
-            break;
-          case '7days':
-            startDate.setDate(now.getDate() - 6);
-            startDate.setHours(0, 0, 0, 0);
-            break;
-          case '30days':
-            startDate.setDate(now.getDate() - 29);
-            startDate.setHours(0, 0, 0, 0);
-            break;
-          case '90days':
-            startDate.setDate(now.getDate() - 89);
-            startDate.setHours(0, 0, 0, 0);
-            break;
-        }
-
-        query = query.gte('created_at', startDate.toISOString());
-      }
-
-      const { data, error } = await query;
+        .eq('seller_id', user.id)
+        .gte('created_at', startDate.toISOString());
 
       if (error) {
         setOrders([]);
@@ -101,7 +92,7 @@ export default function UserHeader() {
     // 30초마다 새로고침
     const interval = setInterval(fetchOrders, 30000);
     return () => clearInterval(interval);
-  }, [user, dateFilter]);
+  }, [user]);
 
   useEffect(() => {
     // 다크모드 감지
@@ -173,6 +164,59 @@ export default function UserHeader() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // 캐시 잔액 조회
+  useEffect(() => {
+    const fetchCashBalance = async () => {
+      if (!user) {
+        setCashBalance(0);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/cash');
+        const data = await response.json();
+
+        if (data.success) {
+          setCashBalance(data.balance);
+        }
+      } catch (error) {
+        console.error('캐시 잔액 조회 실패:', error);
+      }
+    };
+
+    fetchCashBalance();
+
+    // 30초마다 캐시 잔액 갱신
+    const interval = setInterval(fetchCashBalance, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // 로그인 보상 자동 지급
+  useEffect(() => {
+    const claimLoginReward = async () => {
+      if (!user) return;
+
+      try {
+        const response = await fetch('/api/cash/claim-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          setCashBalance(data.newBalance);
+          showToast(`일일 로그인 보상 ${data.amount}캐시가 지급되었습니다!`, 'success');
+        }
+        // alreadyClaimed가 true이면 조용히 무시
+      } catch (error) {
+        console.error('로그인 보상 지급 실패:', error);
+      }
+    };
+
+    claimLoginReward();
+  }, [user]);
+
   // 모달 닫기 메시지 수신
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -238,15 +282,6 @@ export default function UserHeader() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     showToast('로그아웃되었습니다.', 'success');
-  };
-
-  // 날짜 필터 레이블
-  const dateFilterLabels: Record<typeof dateFilter, string> = {
-    today: '오늘',
-    '7days': '최근 7일',
-    '30days': '최근 30일',
-    '90days': '최근 90일',
-    all: '전체'
   };
 
   // 상태별 설정
@@ -569,124 +604,6 @@ export default function UserHeader() {
                     발주관리시스템
                   </button>
 
-                  {/* 날짜 필터 드롭다운 */}
-                  <div style={{ position: 'relative' }}>
-                    <button
-                      onClick={() => setShowDateDropdown(!showDateDropdown)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 12px',
-                        background: 'white',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        color: '#6b7280',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = '#9ca3af';
-                        e.currentTarget.style.background = '#f9fafb';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = '#d1d5db';
-                        e.currentTarget.style.background = 'white';
-                      }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                      </svg>
-                      {dateFilterLabels[dateFilter]}
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{
-                        transform: showDateDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.2s'
-                      }}>
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                      </svg>
-                    </button>
-
-                    {/* 드롭다운 메뉴 */}
-                    {showDateDropdown && (
-                      <>
-                        {/* 오버레이 */}
-                        <div
-                          onClick={() => setShowDateDropdown(false)}
-                          style={{
-                            position: 'fixed',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            zIndex: 999
-                          }}
-                        />
-                        {/* 드롭다운 */}
-                        <div style={{
-                          position: 'absolute',
-                          top: 'calc(100% + 8px)',
-                          right: 0,
-                          background: 'white',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '8px',
-                          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
-                          zIndex: 1000,
-                          minWidth: '140px',
-                          overflow: 'hidden'
-                        }}>
-                          {(['today', '7days', '30days', '90days', 'all'] as const).map((filter) => (
-                            <button
-                              key={filter}
-                              onClick={() => {
-                                setDateFilter(filter);
-                                setShowDateDropdown(false);
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '10px 16px',
-                                textAlign: 'left',
-                                background: dateFilter === filter ? '#f0f9ff' : 'white',
-                                border: 'none',
-                                fontSize: '13px',
-                                fontWeight: dateFilter === filter ? '600' : '400',
-                                color: dateFilter === filter ? '#2563eb' : '#374151',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between'
-                              }}
-                              onMouseEnter={(e) => {
-                                if (dateFilter !== filter) {
-                                  e.currentTarget.style.background = '#f9fafb';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (dateFilter !== filter) {
-                                  e.currentTarget.style.background = 'white';
-                                }
-                              }}
-                            >
-                              {dateFilterLabels[filter]}
-                              {dateFilter === filter && (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="20 6 9 17 4 12"></polyline>
-                                </svg>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
                   {/* 상태 통계 배지들 (0인 항목은 숨김) */}
                   {statsData.map((stat) => {
                     const config = statusConfig[stat.status];
@@ -741,6 +658,29 @@ export default function UserHeader() {
               )}
             {user ? (
               <>
+                {/* 캐시 잔액 표시 */}
+                <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&display=swap" rel="stylesheet" />
+                <div style={{
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  flexShrink: 0,
+                  padding: '0px 8px',
+                  border: '1.5px solid #10b981',
+                  borderRadius: '12px',
+                  background: 'transparent'
+                }}
+                title="달래캐시 잔액">
+                  <span style={{
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    color: '#10b981',
+                    fontFamily: 'Oxanium, monospace',
+                    letterSpacing: '0.5px'
+                  }}>
+                    {cashBalance.toLocaleString()}
+                  </span>
+                </div>
+
                 <span style={{ fontSize: '14px', color: '#495057' }}>
                   {user.email}
                 </span>
@@ -935,6 +875,26 @@ export default function UserHeader() {
             <div style={{ marginTop: '24px', padding: '16px 4px', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
               {user ? (
                 <>
+                  {/* 캐시 잔액 표시 (모바일) */}
+                  <div style={{
+                    marginBottom: '12px',
+                    padding: '1px 10px',
+                    border: '1.5px solid #10b981',
+                    borderRadius: '14px',
+                    background: 'transparent',
+                    display: 'inline-block'
+                  }}>
+                    <span style={{
+                      fontSize: '18px',
+                      fontWeight: '600',
+                      color: '#10b981',
+                      fontFamily: 'Oxanium, monospace',
+                      letterSpacing: '0.5px'
+                    }}>
+                      {cashBalance.toLocaleString()}
+                    </span>
+                  </div>
+
                   <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px' }}>
                     {user.email}
                   </div>

@@ -62,7 +62,7 @@ export function generateStatementHTML(data: StatementData): string {
       <tr>
         <td>1</td>
         <td class="left">${firstItem.name} 외 ${itemCount - 1}건</td>
-        <td>옵션상품 ${firstItem.spec} 외 ${itemCount - 1}건</td>
+        <td>${firstItem.spec} 외 ${itemCount - 1}건</td>
         <td class="right">1</td>
         <td>식</td>
         <td class="right">${data.totalAmount.toLocaleString()}</td>
@@ -292,6 +292,8 @@ export function generateStatementHTML(data: StatementData): string {
             padding: 7px;
             text-align: center;
             font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
         }
 
         .items-table th {
