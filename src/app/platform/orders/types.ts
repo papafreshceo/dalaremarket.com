@@ -30,6 +30,7 @@ export interface Order {
   address?: string;
   deliveryMessage?: string;
   optionName?: string;
+  option_name?: string; // snake_case 버전 (DB/API에서 사용)
   optionCode?: string;
   specialRequest?: string;
   unitPrice?: number; // 공급단가

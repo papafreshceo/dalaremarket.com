@@ -451,7 +451,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
       }>();
 
       shippedOrders.forEach(order => {
-        const optionName = (order as any).option_name || order.products;
+        const optionName = order.option_name || order.products;
         const amount = order.amount || 0;
 
         if (optionStats.has(optionName)) {

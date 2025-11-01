@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
     const docNumber = `TXN-${dateStr}-${docId}`;
 
-    // 2. 금액 계산
+    // 2. 금액 계산 (부가세 없음)
     const items = body.items.map((item: any) => ({
       name: item.name,
       spec: item.spec || '-',
@@ -47,13 +47,13 @@ export async function POST(request: NextRequest) {
       unit: item.unit || 'kg',
       price: item.price,
       supplyAmount: item.quantity * item.price,
-      vat: Math.floor((item.quantity * item.price) * 0.1),
+      vat: 0, // 부가세 없음 (인터페이스 호환성 유지)
       notes: item.notes || ''
     }));
 
     const supplyAmount = items.reduce((sum: number, item: any) => sum + item.supplyAmount, 0);
-    const vatAmount = items.reduce((sum: number, item: any) => sum + item.vat, 0);
-    const totalAmount = supplyAmount + vatAmount;
+    const vatAmount = 0; // 부가세 없음
+    const totalAmount = supplyAmount; // 공급가액 = 총액
 
     // 3. Supabase에 저장 (Service role client 사용 - RLS 우회)
     const { createClient: createServiceClient } = await import('@supabase/supabase-js');
@@ -100,7 +100,17 @@ export async function POST(request: NextRequest) {
     console.log(`[statements/generate] ✅ 문서 생성 성공! ID: ${docId}, 문서번호: ${docNumber}`);
 
     // 4. QR코드 생성
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ||
+      (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : '');
+
+    if (!baseUrl) {
+      console.error('[statements/generate] NEXT_PUBLIC_SITE_URL 환경변수가 설정되지 않았습니다.');
+      return NextResponse.json(
+        { success: false, error: '서버 설정 오류: 사이트 URL이 설정되지 않았습니다.' },
+        { status: 500 }
+      );
+    }
+
     const qrUrl = `${baseUrl}/verify/${docId}`;
     const qrCodeDataUrl = await QRCode.toDataURL(qrUrl, {
       width: 300,
@@ -146,37 +156,39 @@ export async function POST(request: NextRequest) {
     });
 
     // 6. Puppeteer로 PDF 생성
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    let browser;
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
 
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
 
-    const pdf = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: 0,
-        right: 0,
-        bottom: 0,
-        left: 0
+      const pdf = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: {
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0
+        }
+      });
+
+      return new Response(pdf, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(`거래명세서_${docNumber}.pdf`)}"; filename*=UTF-8''${encodeURIComponent(`거래명세서_${docNumber}.pdf`)}`
+        }
+      });
+    } finally {
+      // 에러 발생 여부와 상관없이 브라우저 종료
+      if (browser) {
+        await browser.close();
       }
-    });
-
-    await browser.close();
-
-    // 7. PDF 응답
-    const filename = `거래명세서_${docNumber}.pdf`;
-    const encodedFilename = encodeURIComponent(filename);
-
-    return new Response(pdf, {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`
-      }
-    });
+    }
 
   } catch (error: any) {
     console.error('[statements/generate] 오류:', error);

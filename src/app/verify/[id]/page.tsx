@@ -73,9 +73,52 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
     .eq('id', id);
 
   // 품목 파싱
-  const items = typeof statement.items === 'string'
-    ? JSON.parse(statement.items)
-    : statement.items;
+  let items;
+  try {
+    items = typeof statement.items === 'string'
+      ? JSON.parse(statement.items)
+      : statement.items;
+  } catch (parseError) {
+    console.error('[verify] 품목 데이터 파싱 오류:', parseError);
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f5f5f5',
+        padding: '20px'
+      }}>
+        <div style={{
+          maxWidth: '500px',
+          width: '100%',
+          background: 'white',
+          padding: '40px',
+          borderRadius: '12px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+          textAlign: 'center'
+        }}>
+          <div style={{
+            fontSize: '60px',
+            marginBottom: '20px'
+          }}>⚠️</div>
+          <h1 style={{
+            fontSize: '24px',
+            fontWeight: 'bold',
+            marginBottom: '12px',
+            color: '#dc2626'
+          }}>데이터 오류</h1>
+          <p style={{
+            color: '#666',
+            lineHeight: '1.6'
+          }}>
+            거래명세서 데이터가 손상되었습니다.<br />
+            관리자에게 문의해 주세요.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // 발행일시 포맷
   const issuedAt = new Date(statement.created_at).toLocaleString('ko-KR', {

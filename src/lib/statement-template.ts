@@ -38,7 +38,11 @@ interface StatementData {
 export function generateStatementHTML(data: StatementData): string {
   const itemCount = data.items.length;
   const isOver10Items = itemCount > 10;
-  const totalPages = isOver10Items ? 2 : 1;
+
+  // 전체 페이지 수 계산
+  // - 10개 이하: 1페이지 (요약만)
+  // - 10개 초과: 1페이지(요약) + 세부내역 페이지들 (25행/페이지)
+  const totalPages = isOver10Items ? 1 + Math.ceil(itemCount / 25) : 1;
 
   let itemsHtml = '';
   let emptyRows = '';
@@ -47,8 +51,10 @@ export function generateStatementHTML(data: StatementData): string {
     // 10개 초과 시: 1페이지는 요약만 표시
     const firstItem = data.items[0];
     const totalCount = data.items.reduce((sum, item) => {
-      const noteCount = item.notes ? parseInt(item.notes.replace('건', '')) : 0;
-      return sum + noteCount;
+      if (!item.notes) return sum;
+      const numStr = item.notes.replace('건', '').trim();
+      const noteCount = parseInt(numStr, 10);
+      return sum + (isNaN(noteCount) ? 0 : noteCount);
     }, 0);
 
     // 1행: 요약
@@ -69,7 +75,7 @@ export function generateStatementHTML(data: StatementData): string {
     itemsHtml += `
       <tr style="height: 30px;">
         <td>2</td>
-        <td colspan="7" class="left" style="color: #3b82f6; font-weight: bold;">※ 세부내역은 2페이지를 참조해 주세요</td>
+        <td colspan="7" class="left" style="color: #3b82f6; font-weight: bold;">※ 세부내역 2페이지 참조</td>
       </tr>
     `;
 
@@ -114,16 +120,27 @@ export function generateStatementHTML(data: StatementData): string {
     ? data.notes.map(note => `<li>${note}</li>`).join('')
     : `
       <li>상기 금액을 아래 계좌로 입금하여 주시기 바랍니다.</li>
-      <li>입금계좌: 농협 123-4567-8901-23 (예금주: 달래마켓)</li>
-      <li>문의사항: 02-1234-5678 또는 contact@dalraemarket.com</li>
+      <li>문의사항: ${data.seller.phone} 또는 ${data.seller.email}</li>
     `;
 
-  // 2페이지 세부내역 생성 (품목이 10개 초과일 때만)
-  const detailPageHtml = isOver10Items ? `
+  // 2페이지 이후 세부내역 생성 (품목이 10개 초과일 때만)
+  const detailPageHtml = isOver10Items ? (() => {
+    const itemsPerPage = 25;
+    const detailPageCount = Math.ceil(itemCount / itemsPerPage);
+    let pagesHtml = '';
+
+    for (let pageNum = 0; pageNum < detailPageCount; pageNum++) {
+      const startIdx = pageNum * itemsPerPage;
+      const endIdx = Math.min(startIdx + itemsPerPage, itemCount);
+      const pageItems = data.items.slice(startIdx, endIdx);
+      const currentPageNumber = pageNum + 2; // 첫 페이지는 요약이므로 +2
+      const isLastPage = pageNum === detailPageCount - 1;
+
+      pagesHtml += `
     <!-- 페이지 구분 -->
     <div style="page-break-after: always;"></div>
 
-    <!-- 2페이지: 세부내역 -->
+    <!-- ${currentPageNumber}페이지: 세부내역 -->
     <div class="container">
         <div class="header">
             <h1>거래명세서 (세부내역)</h1>
@@ -135,7 +152,7 @@ export function generateStatementHTML(data: StatementData): string {
                 <strong>발행일시:</strong> ${data.issuedAt}
             </div>
             <div style="text-align: right;">
-                <strong>페이지:</strong> 2 / ${totalPages}
+                <strong>페이지:</strong> ${currentPageNumber} / ${totalPages}
             </div>
         </div>
 
@@ -143,8 +160,8 @@ export function generateStatementHTML(data: StatementData): string {
             <thead>
                 <tr>
                     <th style="width: 6%;">No.</th>
-                    <th style="width: 20%;">품목명</th>
-                    <th style="width: 23%;">규격</th>
+                    <th style="width: 15%;">품목명</th>
+                    <th style="width: 28%;">규격</th>
                     <th style="width: 8%;">수량</th>
                     <th style="width: 7%;">단위</th>
                     <th style="width: 12%;">단가</th>
@@ -153,9 +170,9 @@ export function generateStatementHTML(data: StatementData): string {
                 </tr>
             </thead>
             <tbody>
-                ${data.items.map((item, index) => `
+                ${pageItems.map((item, idx) => `
                   <tr>
-                    <td>${index + 1}</td>
+                    <td>${startIdx + idx + 1}</td>
                     <td class="left">${item.name}</td>
                     <td>${item.spec}</td>
                     <td class="right">${item.quantity.toLocaleString()}</td>
@@ -168,15 +185,15 @@ export function generateStatementHTML(data: StatementData): string {
             </tbody>
         </table>
 
-        <div style="text-align: right; margin-top: 20px; font-size: 16px; font-weight: bold;">
-            합계 금액: ${data.totalAmount.toLocaleString()}원
-        </div>
-
-        <div style="margin-top: 30px; text-align: center; color: #666; font-size: 12px;">
+        <div style="margin-top: 20px; text-align: center; color: #666; font-size: 12px;">
             <p>이 문서는 dalraemarket.com에서 발행된 정식 거래명세서입니다.</p>
         </div>
     </div>
-  ` : '';
+      `;
+    }
+
+    return pagesHtml;
+  })() : '';
 
   return `
 <!DOCTYPE html>
@@ -247,7 +264,7 @@ export function generateStatementHTML(data: StatementData): string {
         }
 
         .company-box {
-            border: 1.5px solid #000;
+            border: none;
             padding: 12px;
         }
 
@@ -271,8 +288,8 @@ export function generateStatementHTML(data: StatementData): string {
 
         .items-table th,
         .items-table td {
-            border: 1px solid #000;
-            padding: 8px;
+            border: 0.5px solid #000;
+            padding: 7px;
             text-align: center;
             font-size: 11px;
         }
@@ -360,7 +377,7 @@ export function generateStatementHTML(data: StatementData): string {
 
         <div class="company-section">
             <div class="company-box">
-                <h3>공급자 정보</h3>
+                <h3>공급자</h3>
                 <p>
                     <strong>상호:</strong> ${data.seller.name}<br>
                     <strong>사업자등록번호:</strong> ${data.seller.businessNumber}<br>
@@ -372,7 +389,7 @@ export function generateStatementHTML(data: StatementData): string {
             </div>
 
             <div class="company-box">
-                <h3>공급받는자 정보</h3>
+                <h3>공급받는자</h3>
                 <p>
                     <strong>상호:</strong> ${data.buyer.name}<br>
                     <strong>사업자등록번호:</strong> ${data.buyer.businessNumber}<br>
@@ -392,8 +409,8 @@ export function generateStatementHTML(data: StatementData): string {
             <thead>
                 <tr>
                     <th style="width: 6%;">No.</th>
-                    <th style="width: 20%;">품목명</th>
-                    <th style="width: 23%;">규격</th>
+                    <th style="width: 15%;">품목명</th>
+                    <th style="width: 28%;">규격</th>
                     <th style="width: 8%;">수량</th>
                     <th style="width: 7%;">단위</th>
                     <th style="width: 12%;">단가</th>
