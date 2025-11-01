@@ -175,6 +175,11 @@ function OrdersPageContent() {
         if (user.email) {
           setUserEmail(user.email);
         }
+      } else {
+        // 비회원 사용자
+        setUserId('guest');
+        setUserEmail('');
+        console.log('[orders] 비회원 사용자 - 샘플 데이터 모드');
       }
     });
 
@@ -249,7 +254,7 @@ function OrdersPageContent() {
       orderNo: order.order_number || order.order_no || `TEMP${order.id}`, // 시스템 발주번호
       orderNumber: order.seller_order_number, // 셀러 주문번호
       products: order.option_name,
-      amount: 0,
+      amount: order.settlement_amount ? parseFloat(order.settlement_amount) : 0,
       quantity: parseInt(order.quantity) || 0,
       status: mapShippingStatus(order.shipping_status),
       date: order.created_at,
@@ -331,10 +336,8 @@ function OrdersPageContent() {
     refunded: { label: '환불완료', color: '#10b981', bg: '#d1fae5' }
   };
 
-  const filteredOrders = orders.filter(order => {
-    // 상태 필터
-    const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
-
+  // 날짜와 검색 필터만 적용 (통계 계산용)
+  const dateAndSearchFilteredOrders = orders.filter(order => {
     // 날짜 필터 (한국 시간 기준)
     let matchesDate = true;
     if (startDate || endDate) {
@@ -372,17 +375,25 @@ function OrdersPageContent() {
       order.recipientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.recipientPhone?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    return matchesStatus && matchesDate && matchesSearch;
+    return matchesDate && matchesSearch;
   });
 
+  // 날짜, 검색, 상태 필터 모두 적용 (테이블 표시용)
+  const filteredOrders = dateAndSearchFilteredOrders.filter(order => {
+    // 상태 필터
+    const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
+    return matchesStatus;
+  });
+
+  // 통계 데이터 (상태 필터 제외, 날짜와 검색 필터만 적용)
   const statsData: StatsData[] = [
-    { status: 'registered', count: filteredOrders.filter(o => o.status === 'registered').length, bgGradient: 'linear-gradient(135deg, #2563eb 0%, #60a5fa 100%)' },
-    { status: 'confirmed', count: filteredOrders.filter(o => o.status === 'confirmed').length, bgGradient: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)' },
-    { status: 'preparing', count: filteredOrders.filter(o => o.status === 'preparing').length, bgGradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' },
-    { status: 'shipped', count: filteredOrders.filter(o => o.status === 'shipped').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' },
-    { status: 'cancelRequested', count: filteredOrders.filter(o => o.status === 'cancelRequested').length, bgGradient: 'linear-gradient(135deg, #f87171 0%, #fca5a5 100%)' },
-    { status: 'cancelled', count: filteredOrders.filter(o => o.status === 'cancelled').length, bgGradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' },
-    { status: 'refunded', count: filteredOrders.filter(o => o.status === 'refunded').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' }
+    { status: 'registered', count: dateAndSearchFilteredOrders.filter(o => o.status === 'registered').length, bgGradient: 'linear-gradient(135deg, #2563eb 0%, #60a5fa 100%)' },
+    { status: 'confirmed', count: dateAndSearchFilteredOrders.filter(o => o.status === 'confirmed').length, bgGradient: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)' },
+    { status: 'preparing', count: dateAndSearchFilteredOrders.filter(o => o.status === 'preparing').length, bgGradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' },
+    { status: 'shipped', count: dateAndSearchFilteredOrders.filter(o => o.status === 'shipped').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' },
+    { status: 'cancelRequested', count: dateAndSearchFilteredOrders.filter(o => o.status === 'cancelRequested').length, bgGradient: 'linear-gradient(135deg, #f87171 0%, #fca5a5 100%)' },
+    { status: 'cancelled', count: dateAndSearchFilteredOrders.filter(o => o.status === 'cancelled').length, bgGradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' },
+    { status: 'refunded', count: dateAndSearchFilteredOrders.filter(o => o.status === 'refunded').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' }
   ];
 
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
@@ -861,6 +872,38 @@ function OrdersPageContent() {
         </div>
       </div>
 
+      {/* 샘플 모드 배너 */}
+      {isSampleMode && (
+        <div style={{
+          position: 'fixed',
+          top: '70px',
+          left: 0,
+          width: '100%',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: '#ffffff',
+          padding: '12px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          zIndex: 1099,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          fontSize: '14px',
+          fontWeight: '500'
+        }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span>
+            {userId === 'guest'
+              ? '샘플 데이터로 미리보기 중입니다. 회원가입 후 실제 주문을 관리하세요.'
+              : '샘플 데이터로 미리보기 중입니다. 첫 주문을 등록하면 실제 데이터로 전환됩니다.'}
+          </span>
+        </div>
+      )}
+
       {/* Overlay (모바일에서 사이드바 열릴 때) */}
       {isMobile && sidebarOpen && (
         <div
@@ -896,55 +939,6 @@ function OrdersPageContent() {
           paddingLeft: isMobile ? '6px' : '12px',
           paddingRight: isMobile ? '6px' : '12px'
         }}>
-          {/* 샘플 모드 배지 및 삭제 버튼 */}
-          {isSampleMode && (
-            <div style={{
-              margin: '0 8px 16px 8px',
-              padding: '12px',
-              background: '#fffbeb',
-              border: '1px solid #fbbf24',
-              borderRadius: '8px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '13px',
-                fontWeight: '500',
-                color: '#92400e'
-              }}>
-                <span style={{ fontSize: '16px' }}>📊</span>
-                <span>샘플 데이터를 보고 계십니다</span>
-              </div>
-              <div style={{
-                fontSize: '11px',
-                color: '#78350f',
-                lineHeight: '1.5'
-              }}>
-                실제 주문서를 업로드하면 자동으로 실제 데이터로 전환됩니다.
-              </div>
-              <button
-                onClick={handleDeleteSampleData}
-                style={{
-                  padding: '6px 12px',
-                  background: '#f59e0b',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  alignSelf: 'flex-start'
-                }}
-              >
-                샘플 데이터 삭제
-              </button>
-            </div>
-          )}
-
           {/* 대시보드 탭 */}
           <button
             onClick={() => handleTabChange('대시보드')}
@@ -1187,10 +1181,11 @@ function OrdersPageContent() {
         marginLeft: isMobile ? '0' : '175px',
         paddingLeft: isMobile ? '16px' : '24px',
         paddingRight: isMobile ? '16px' : '24px',
-        paddingTop: '90px',
+        paddingTop: isSampleMode ? '134px' : '90px',
         paddingBottom: isMobile ? '16px' : '24px',
         background: 'var(--color-background)',
-        minHeight: '100vh'
+        minHeight: '100vh',
+        transition: 'padding-top 0.3s'
       }}>
         {/* Tab Content */}
         {activeTab === '대시보드' && (

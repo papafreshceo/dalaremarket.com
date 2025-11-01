@@ -9,19 +9,28 @@ export default function PlatformLayout({
 }: {
   children: React.ReactNode
 }) {
-  // iframe 안에서 로드되었는지 확인
-  const [isInIframe, setIsInIframe] = useState(false)
+  // iframe 안에서 로드되었는지 확인 - hydration mismatch 방지를 위해 null로 초기화
+  const [isInIframe, setIsInIframe] = useState<boolean | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
+    setIsMounted(true)
     setIsInIframe(window.self !== window.top)
   }, [])
 
   // 플랫폼 화면 파비콘 설정 (더 빠른 타이밍)
   useEffect(() => {
     const updateFavicon = () => {
+      // document.head가 있는지 확인 (null 체크)
+      if (!document.head) return;
+
       // 기존 파비콘 모두 제거
       const existingFavicons = document.querySelectorAll("link[rel*='icon']");
-      existingFavicons.forEach(el => el.remove());
+      existingFavicons.forEach(el => {
+        if (el.parentNode) {
+          el.parentNode.removeChild(el);
+        }
+      });
 
       // 플랫폼용 파비콘 추가 (캐시 무효화)
       const timestamp = Date.now();
@@ -45,11 +54,14 @@ export default function PlatformLayout({
     }
   }, []);
 
+  // mount 전까지 항상 헤더/네비 표시 (hydration mismatch 방지)
+  const showHeaderAndNav = !isMounted || isInIframe === false
+
   return (
     <>
-      {!isInIframe && <UserHeader />}
+      {showHeaderAndNav && <UserHeader />}
       {children}
-      {!isInIframe && <MobileBottomNav />}
+      {showHeaderAndNav && <MobileBottomNav />}
     </>
   )
 }

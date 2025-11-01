@@ -44,6 +44,7 @@ type FilterType = 'all' | CategoryType;
 
 export default function SellerFeedPage() {
   const [isMobile, setIsMobile] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [showWriteModal, setShowWriteModal] = useState(false);
   const [showPostDetail, setShowPostDetail] = useState<Post | null>(null);
@@ -130,6 +131,7 @@ export default function SellerFeedPage() {
   const [tagInput, setTagInput] = useState('');
 
   useEffect(() => {
+    setIsMounted(true);
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768);
     };

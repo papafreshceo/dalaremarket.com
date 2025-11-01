@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
 import { applyOptionMappingToOrdersServer } from '@/lib/option-mapping-utils';
-import sampleOrdersTemplate from '@/lib/sample-orders-template.json';
+import { generateSampleOrders, convertSampleOrdersToDBFormat } from '@/lib/sample-data';
 
 /**
  * GET /api/platform-orders
@@ -18,13 +18,56 @@ export async function GET(request: NextRequest) {
     // 현재 로그인한 사용자 확인
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
+    // 비로그인 사용자인 경우 샘플 데이터 반환
     if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: '인증이 필요합니다.' },
-        { status: 401 }
+      console.log('[GET platform-orders] 비로그인 사용자 - 샘플 데이터 제공');
+
+      // 실제 option_products 조회 (service role 사용으로 RLS 우회)
+      const { createClient: createServiceClient } = await import('@supabase/supabase-js');
+      const supabaseAdmin = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
+
+      const { data: optionProducts, error: opError } = await supabaseAdmin
+        .from('option_products')
+        .select('id, option_name, seller_supply_price')
+        .eq('is_active', true);
+
+      if (opError || !optionProducts || optionProducts.length === 0) {
+        console.warn('[GET platform-orders] 옵션 상품이 없습니다. 빈 샘플 데이터 반환');
+        return NextResponse.json({
+          success: true,
+          data: [],
+          isSample: true,
+          isGuest: true,
+          message: '샘플 데이터를 불러올 수 없습니다.',
+        });
+      }
+
+      // 동적으로 1년치 샘플 데이터 생성 (오늘 기준)
+      const sampleOrdersData = generateSampleOrders(
+        optionProducts.map(op => ({
+          id: op.id,
+          option_name: op.option_name,
+          seller_supply_price: op.seller_supply_price,
+        }))
+      );
+
+      // DB 포맷으로 변환
+      const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, 'guest');
+
+      console.log(`[GET platform-orders] 비회원용 샘플 데이터 생성: ${sampleOrders.length}건 (오늘 기준 1년치)`);
+
+      return NextResponse.json({
+        success: true,
+        data: sampleOrders,
+        isSample: true,
+        isGuest: true,
+      });
     }
 
+    // 로그인 사용자인 경우
     // users 테이블에서 show_sample_data 확인
     const { data: userData, error: userError } = await supabase
       .from('users')
@@ -57,8 +100,14 @@ export async function GET(request: NextRequest) {
     if (showSampleData && (!orders || orders.length === 0)) {
       console.log('[GET platform-orders] 샘플 데이터 모드 활성화');
 
-      // 실제 option_products 조회
-      const { data: optionProducts, error: opError } = await supabase
+      // 실제 option_products 조회 (service role 사용으로 RLS 우회)
+      const { createClient: createServiceClient } = await import('@supabase/supabase-js');
+      const supabaseAdmin = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+
+      const { data: optionProducts, error: opError } = await supabaseAdmin
         .from('option_products')
         .select('id, option_name, seller_supply_price')
         .eq('is_active', true);
@@ -81,22 +130,19 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // 템플릿에 실제 옵션 상품 매핑
-      const sampleOrders = sampleOrdersTemplate.map(template => {
-        // 랜덤 옵션 상품 선택
-        const randomOption = optionProducts[Math.floor(Math.random() * optionProducts.length)];
-        const supplyPrice = randomOption.seller_supply_price || 10000;
+      // 동적으로 1년치 샘플 데이터 생성 (오늘 기준)
+      const sampleOrdersData = generateSampleOrders(
+        optionProducts.map(op => ({
+          id: op.id,
+          option_name: op.option_name,
+          seller_supply_price: op.seller_supply_price,
+        }))
+      );
 
-        return {
-          ...template,
-          option_name: randomOption.option_name,
-          seller_supply_price: supplyPrice,
-          settlement_amount: supplyPrice * template.quantity,
-          seller_id: user.id,
-        };
-      });
+      // DB 포맷으로 변환
+      const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, user.id);
 
-      console.log(`[GET platform-orders] 샘플 데이터 생성 완료: ${sampleOrders.length}건`);
+      console.log(`[GET platform-orders] 회원용 샘플 데이터 생성: ${sampleOrders.length}건 (오늘 기준 1년치)`);
 
       return NextResponse.json({
         success: true,

@@ -33,8 +33,10 @@ export default function ProductsPage() {
   const [hoveredStat, setHoveredStat] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>({});
   const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     const checkMobile = () => {
       if (typeof window !== 'undefined') {
         setIsMobile(window.innerWidth <= 768);

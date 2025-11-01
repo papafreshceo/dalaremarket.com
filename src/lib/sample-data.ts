@@ -88,10 +88,17 @@ function isKoreanHoliday(date: Date): boolean {
 
 /**
  * 1년치 샘플 주문 데이터 생성
+ * 한국 시간(KST, UTC+9) 기준으로 날짜 생성
  */
 export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrder[] {
   const orders: SampleOrder[] = [];
-  const today = new Date();
+
+  // 한국 시간(KST) 기준 오늘 날짜
+  const now = new Date();
+  const kstOffset = 9 * 60; // KST는 UTC+9
+  const kstNow = new Date(now.getTime() + (kstOffset * 60 * 1000));
+  const today = new Date(kstNow.getFullYear(), kstNow.getMonth(), kstNow.getDate());
+
   const oneYearAgo = new Date(today);
   oneYearAgo.setFullYear(today.getFullYear() - 1);
 
@@ -106,7 +113,11 @@ export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrd
   // 1년치 날짜 순회
   for (let d = new Date(oneYearAgo); d <= today; d.setDate(d.getDate() + 1)) {
     const currentDate = new Date(d);
-    const dateString = currentDate.toISOString().split('T')[0];
+    // 로컬 날짜를 YYYY-MM-DD 형식으로 변환 (UTC 변환 없이)
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const day = String(currentDate.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
 
     // 토요일(6)과 일요일(0)은 건너뛰기
     const dayOfWeek = currentDate.getDay();
@@ -119,12 +130,18 @@ export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrd
       continue;
     }
 
-    // 하루 발주금액 목표: 50만원 ~ 100만원 사이 랜덤
-    const dailyBudget = Math.floor(Math.random() * 500000) + 500000;
-    let usedBudget = 0;
+    // 날짜별 주문 건수: 1~20건 랜덤
+    const daysDiff = Math.floor((today.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+    const isToday = daysDiff === 0;
+    const isThisWeek = daysDiff <= 7;
+    const isThisMonth = daysDiff <= 30;
 
-    // 하루에 생성할 주문 개수: 3~8개
-    const ordersPerDay = Math.floor(Math.random() * 6) + 3;
+    // 하루 1~20건
+    const ordersPerDay = Math.floor(Math.random() * 20) + 1;
+
+    // 하루 발주금액 목표: 주문 건수에 비례하여 설정
+    const dailyBudget = ordersPerDay * (Math.floor(Math.random() * 50000) + 50000); // 건당 5~10만원
+    let usedBudget = 0;
 
     for (let i = 0; i < ordersPerDay && usedBudget < dailyBudget; i++) {
       // 랜덤 옵션 상품 선택
@@ -150,37 +167,90 @@ export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrd
 
       usedBudget += orderTotal;
 
-      // 배송 상태: 70% 배송완료, 10% 배송중, 5% 배송대기, 10% 취소완료, 5% 환불완료
-      const rand = Math.random();
+      // 배송 상태: 날짜에 따라 다른 분포 (더 균등하고 자연스럽게)
+      const statusRand = Math.random();
       let shippingStatus: string;
       let invoiceNumber: string | null;
       let shippingCompany: string | null;
 
-      if (rand < 0.7) {
-        // 70% 배송완료
-        shippingStatus = '배송완료';
-        invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
-        shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
-      } else if (rand < 0.8) {
-        // 10% 배송중
-        shippingStatus = '배송중';
-        invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
-        shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
-      } else if (rand < 0.85) {
-        // 5% 배송대기
-        shippingStatus = '배송대기';
-        invoiceNumber = null;
-        shippingCompany = null;
-      } else if (rand < 0.95) {
-        // 10% 취소완료
-        shippingStatus = '취소완료';
-        invoiceNumber = null;
-        shippingCompany = null;
+      if (isToday) {
+        // 오늘: 주로 발주서등록/확정, 가끔 빠른 처리도
+        if (statusRand < 0.5) {
+          shippingStatus = '발주서등록';
+          invoiceNumber = null;
+          shippingCompany = null;
+        } else if (statusRand < 0.8) {
+          shippingStatus = '발주서확정';
+          invoiceNumber = null;
+          shippingCompany = null;
+        } else if (statusRand < 0.95) {
+          shippingStatus = '상품준비중';
+          invoiceNumber = null;
+          shippingCompany = null;
+        } else {
+          // 5% - 당일 발송
+          shippingStatus = '배송중';
+          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
+          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
+        }
+      } else if (isThisWeek) {
+        // 이번주: 다양한 진행 단계
+        if (statusRand < 0.15) {
+          shippingStatus = '발주서확정';
+          invoiceNumber = null;
+          shippingCompany = null;
+        } else if (statusRand < 0.35) {
+          shippingStatus = '상품준비중';
+          invoiceNumber = null;
+          shippingCompany = null;
+        } else if (statusRand < 0.7) {
+          shippingStatus = '배송중';
+          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
+          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
+        } else if (statusRand < 0.998) {
+          shippingStatus = '배송완료';
+          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
+          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
+        } else {
+          // 0.2% - 취소 (매우 드물게)
+          shippingStatus = '취소완료';
+          invoiceNumber = null;
+          shippingCompany = null;
+        }
+      } else if (isThisMonth) {
+        // 이번달: 대부분 배송완료, 일부 진행중
+        if (statusRand < 0.1) {
+          shippingStatus = '배송중';
+          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
+          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
+        } else if (statusRand < 0.997) {
+          shippingStatus = '배송완료';
+          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
+          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
+        } else if (statusRand < 0.999) {
+          shippingStatus = '취소완료';
+          invoiceNumber = null;
+          shippingCompany = null;
+        } else {
+          shippingStatus = '환불완료';
+          invoiceNumber = null;
+          shippingCompany = null;
+        }
       } else {
-        // 5% 환불완료
-        shippingStatus = '환불완료';
-        invoiceNumber = null;
-        shippingCompany = null;
+        // 이전: 모두 완료된 상태
+        if (statusRand < 0.997) {
+          shippingStatus = '배송완료';
+          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
+          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
+        } else if (statusRand < 0.999) {
+          shippingStatus = '취소완료';
+          invoiceNumber = null;
+          shippingCompany = null;
+        } else {
+          shippingStatus = '환불완료';
+          invoiceNumber = null;
+          shippingCompany = null;
+        }
       }
 
       orders.push({
@@ -215,20 +285,35 @@ export function convertSampleOrdersToDBFormat(sampleOrders: SampleOrder[], selle
   ];
 
   return sampleOrders.map(order => {
-    const orderDateTime = order.orderDate + 'T09:00:00Z'; // 오전 9시로 설정
-    const confirmedDateTime = order.orderDate + 'T10:00:00Z'; // 1시간 후 확정
+    // 한국 시간(KST)을 UTC로 변환하는 헬퍼 함수
+    const kstToUTC = (dateStr: string, kstHour: number): string => {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      // 한국 시간으로 Date 객체 생성
+      const kstDate = new Date(year, month - 1, day, kstHour, 0, 0);
+      // UTC로 변환 (KST - 9시간)
+      const utcDate = new Date(kstDate.getTime() - (9 * 60 * 60 * 1000));
+      return utcDate.toISOString();
+    };
+
+    const orderDateTime = kstToUTC(order.orderDate, 9); // KST 오전 9시
+
+    // 발주확정일시: 발주서등록 상태만 null, 나머지는 모두 확정됨
+    const confirmedDateTime = order.shippingStatus === '발주서등록'
+      ? null
+      : kstToUTC(order.orderDate, 10); // KST 오전 10시 확정
+
     const shippedDateTime = order.shippingStatus === '배송완료' || order.shippingStatus === '배송중'
-      ? order.orderDate + 'T14:00:00Z' // 오후 2시 발송
+      ? kstToUTC(order.orderDate, 14) // KST 오후 2시 발송
       : null;
 
     // 취소/환불 관련 필드
     const isCanceled = order.shippingStatus === '취소완료';
     const isRefunded = order.shippingStatus === '환불완료';
     const canceledDateTime = isCanceled || isRefunded
-      ? order.orderDate + 'T12:00:00Z' // 정오에 취소
+      ? kstToUTC(order.orderDate, 12) // KST 정오에 취소
       : null;
     const refundDateTime = isRefunded
-      ? order.orderDate + 'T16:00:00Z' // 오후 4시에 환불 처리
+      ? kstToUTC(order.orderDate, 16) // KST 오후 4시에 환불 처리
       : null;
     const cancelReason = isCanceled || isRefunded
       ? cancelReasons[Math.floor(Math.random() * cancelReasons.length)]

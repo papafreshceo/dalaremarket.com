@@ -387,17 +387,24 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
   const [allProducts, setAllProducts] = useState<Array<{ name: string; category3: string; amount: number; percent: number }>>([]);
   const [optionNameToCategory4, setOptionNameToCategory4] = useState<Map<string, string>>(new Map());
 
-  // 날짜/상태로 필터링 (KST + BASE_FIELD)
-  const filteredOrders = useMemo(() => {
+  // 날짜만 필터링 (통계 계산용)
+  const dateFilteredOrders = useMemo(() => {
     return orders.filter(order => {
       if (startDate && endDate) {
         const base = getBaseDate(order);
         if (!base || !betweenYmdKst(base, startDate, endDate)) return false;
       }
+      return true;
+    });
+  }, [orders, startDate, endDate]);
+
+  // 날짜/상태로 필터링 (차트 표시용)
+  const filteredOrders = useMemo(() => {
+    return dateFilteredOrders.filter(order => {
       if (selectedStatus && order.status !== selectedStatus) return false;
       return true;
     });
-  }, [orders, startDate, endDate, selectedStatus]);
+  }, [dateFilteredOrders, selectedStatus]);
 
   // 옵션상품 TOP 10 (선택된 품목 반영)
   const optionTop10 = useMemo(() => {
@@ -539,10 +546,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     fetchProductTop10();
   }, [filteredOrders]);
 
-  // 상태별 통계 데이터 (건수 + 정산금액, 날짜 필터 적용)
+  // 상태별 통계 데이터 (건수 + 정산금액, 날짜 필터만 적용)
   const statsData = useMemo(() => {
     const calculateStats = (status: Order['status']) => {
-      const filtered = filteredOrders.filter(o => o.status === status);
+      const filtered = dateFilteredOrders.filter(o => o.status === status);
       const count = filtered.length;
       const amount = filtered.reduce((sum, order) => sum + (order.supplyPrice || 0), 0);
       return { count, amount };
@@ -557,7 +564,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       { status: 'cancelled' as const, ...calculateStats('cancelled'), bgGradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' },
       { status: 'refunded' as const, ...calculateStats('refunded'), bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' }
     ];
-  }, [filteredOrders]);
+  }, [dateFilteredOrders]);
 
   // 마켓별 날짜별 통계 (seller_market_name 기준, KST + BASE_FIELD, 필터링된 주문 사용)
   const marketDateStats = useMemo(() => {
@@ -1761,7 +1768,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                   y1={endY1}
                                   x2={endX2}
                                   y2={endY2}
-                                  stroke="rgba(255, 255, 255, 0.6)"
+                                  stroke="var(--color-border)"
                                   strokeWidth="0.8"
                                   style={{ pointerEvents: 'none' }}
                                 />
@@ -1774,13 +1781,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                   y={textY}
                                   textAnchor="middle"
                                   dominantBaseline="middle"
-                                  fill="#ffffff"
+                                  fill="var(--color-text)"
                                   fontSize="10"
                                   fontWeight="700"
                                   style={{
                                     transform: 'rotate(90deg)',
                                     transformOrigin: `${textX}px ${textY}px`,
-                                    textShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
+                                    textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
                                     pointerEvents: 'none'
                                   }}
                                 >
@@ -1806,7 +1813,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                               y1={y1}
                               x2={x2}
                               y2={y2}
-                              stroke="rgba(255, 255, 255, 0.6)"
+                              stroke="var(--color-border)"
                               strokeWidth="0.8"
                               style={{ pointerEvents: 'none' }}
                             />
@@ -1823,14 +1830,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         );
                       })()}
 
-                      {/* 중앙 흰색 원 */}
-                      <defs>
-                        <radialGradient id="centerGradient">
-                          <stop offset="0%" stopColor="#ffffff" />
-                          <stop offset="100%" stopColor="#fafafa" />
-                        </radialGradient>
-                      </defs>
-                      <circle cx="100" cy="100" r="32" fill="url(#centerGradient)" filter="drop-shadow(0 2px 8px rgba(0, 0, 0, 0.08))" />
+                      {/* 중앙 원 (다크모드 대응) */}
+                      <circle cx="100" cy="100" r="32" fill="var(--color-surface)" filter="drop-shadow(0 2px 8px rgba(0, 0, 0, 0.15))" />
                     </svg>
                   </div>
 
@@ -1873,7 +1874,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                             transition: 'all 0.2s ease'
                           }}
                           onMouseEnter={e => {
-                            (e.currentTarget as HTMLDivElement).style.backgroundColor = '#f9fafb';
+                            (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--color-surface-hover)';
                           }}
                           onMouseLeave={e => {
                             (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
@@ -1904,16 +1905,16 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                 whiteSpace: 'nowrap',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
-                                color: '#374151'
+                                color: 'var(--color-text)'
                               }}
                             >
-                              {item.category3 && <span style={{ fontSize: '10px', color: '#9ca3af', fontWeight: '400' }}>{item.category3} / </span>}
+                              {item.category3 && <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)', fontWeight: '400' }}>{item.category3} / </span>}
                               {item.name}
                             </span>
                             <span
                               style={{
                                 whiteSpace: 'nowrap',
-                                color: '#6b7280',
+                                color: 'var(--color-text-secondary)',
                                 fontSize: '11px',
                                 fontWeight: '400'
                               }}
@@ -2091,7 +2092,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                     y1={y}
                                     x2={chartRight}
                                     y2={y}
-                                    stroke="#e5e7eb"
+                                    stroke="var(--color-border)"
                                     strokeWidth="1"
                                   />
                                   {i !== 0 && (
@@ -2099,7 +2100,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                       x={chartLeft - 10}
                                       y={y + 4}
                                       fontSize="18"
-                                      fill="#6b7280"
+                                      fill="var(--color-text-secondary)"
                                       textAnchor="end"
                                     >
                                       {value.toLocaleString()}
@@ -2182,7 +2183,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                   y1={chartTop}
                                   x2={x}
                                   y2={chartBottom}
-                                  stroke="#e5e7eb"
+                                  stroke="var(--color-border)"
                                   strokeWidth="1"
                                   strokeDasharray="4 4"
                                 />
@@ -2234,7 +2235,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                   x={x}
                                   y="410"
                                   fontSize="18"
-                                  fill="#6b7280"
+                                  fill="var(--color-text-secondary)"
                                   textAnchor={anchor}
                                 >
                                   {formattedDate}
@@ -2274,7 +2275,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                 transition: 'all 0.2s ease'
                               }}
                               onMouseEnter={e => {
-                                (e.currentTarget as HTMLDivElement).style.backgroundColor = '#e5e7eb';
+                                (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--color-surface-hover)';
                               }}
                               onMouseLeave={e => {
                                 (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
@@ -2388,7 +2389,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                     y1={y}
                                     x2={chartRight}
                                     y2={y}
-                                    stroke="#e5e7eb"
+                                    stroke="var(--color-border)"
                                     strokeWidth="1"
                                   />
                                   {i !== 0 && (
@@ -2396,7 +2397,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                       x={chartLeft - 10}
                                       y={y + 4}
                                       fontSize="18"
-                                      fill="#6b7280"
+                                      fill="var(--color-text-secondary)"
                                       textAnchor="end"
                                     >
                                       {value.toLocaleString()}
@@ -2479,7 +2480,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                   y1={chartTop}
                                   x2={x}
                                   y2={chartBottom}
-                                  stroke="#e5e7eb"
+                                  stroke="var(--color-border)"
                                   strokeWidth="1"
                                   strokeDasharray="4 4"
                                 />
@@ -2531,7 +2532,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                   x={x}
                                   y="410"
                                   fontSize="18"
-                                  fill="#6b7280"
+                                  fill="var(--color-text-secondary)"
                                   textAnchor={anchor}
                                 >
                                   {formattedDate}
@@ -2571,7 +2572,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                 transition: 'all 0.2s ease'
                               }}
                               onMouseEnter={e => {
-                                (e.currentTarget as HTMLDivElement).style.backgroundColor = '#e5e7eb';
+                                (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--color-surface-hover)';
                               }}
                               onMouseLeave={e => {
                                 (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
@@ -2785,7 +2786,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             top: `${tooltip.y - 60}px`,
             transform: 'translateX(-50%)',
             background: 'rgba(255, 255, 255, 0.98)',
-            border: '1px solid #e5e7eb',
+            border: '1px solid var(--color-border)',
             padding: '8px 10px',
             borderRadius: '6px',
             fontSize: '10px',

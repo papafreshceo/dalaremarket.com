@@ -33,6 +33,7 @@ export default function UserHeader() {
   const [ordersModalLoaded, setOrdersModalLoaded] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
   const supabase = createClient();
   const { showToast } = useToast();
   const [orders, setOrders] = useState<any[]>([]);
@@ -40,6 +41,7 @@ export default function UserHeader() {
   const [showDateDropdown, setShowDateDropdown] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768);
     };

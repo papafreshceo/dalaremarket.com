@@ -777,7 +777,8 @@ export default function SearchTab() {
       if (targetFilters.searchKeyword) params.append('searchKeyword', targetFilters.searchKeyword);
       // ✅ targetStatus는 통계에 적용하지 않음 (전체 상태 집계)
       // if (targetStatus) params.append('shippingStatus', targetStatus); // 제거!
-      if (targetFilters.shippingStatus) params.append('shippingStatus', targetFilters.shippingStatus);
+      // ✅ targetFilters.shippingStatus도 통계에 적용하지 않음 (전체 상태 집계)
+      // if (targetFilters.shippingStatus) params.append('shippingStatus', targetFilters.shippingStatus); // 제거!
       if (targetFilters.vendorName) params.append('vendorName', targetFilters.vendorName);
 
       console.log(`📊 ${logPrefix} 통계 조회 시작:`, Object.fromEntries(params));

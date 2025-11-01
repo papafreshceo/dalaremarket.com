@@ -29,7 +29,7 @@ interface Feature {
 export default function PricingPage() {
   const [billingMode, setBillingMode] = useState<'monthly' | 'yearly'>('monthly');
   const [isMounted, setIsMounted] = useState(false);
-  const [windowWidth, setWindowWidth] = useState(0);
+  const [windowWidth, setWindowWidth] = useState(1200);
 
   useEffect(() => {
     setIsMounted(true);
