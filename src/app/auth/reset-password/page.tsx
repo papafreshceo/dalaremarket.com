@@ -18,16 +18,20 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     // URL hash에서 에러 확인 (#error=access_denied&error_code=otp_expired)
     const hash = window.location.hash
-    if (hash.includes('error=access_denied') || hash.includes('error_code=otp_expired')) {
-      setLinkExpired(true)
-      setError('비밀번호 재설정 링크가 만료되었습니다. 링크는 1시간 동안만 유효합니다.')
-    }
-
-    // URL search params에서도 에러 확인 (?error=access_denied)
     const params = new URLSearchParams(window.location.search)
-    if (params.get('error') === 'access_denied' || params.get('error_code') === 'otp_expired') {
+
+    // Hash에서 파라미터 추출
+    const hashParams = new URLSearchParams(hash.replace('#', ''))
+
+    const errorCode = hashParams.get('error_code') || params.get('error_code')
+    const error = hashParams.get('error') || params.get('error')
+
+    if (errorCode === 'otp_expired') {
       setLinkExpired(true)
       setError('비밀번호 재설정 링크가 만료되었습니다. 링크는 1시간 동안만 유효합니다.')
+    } else if (error === 'access_denied' && !errorCode) {
+      setLinkExpired(true)
+      setError('이 링크는 사용할 수 없습니다. Supabase 설정을 확인해주세요. 관리자에게 문의하세요.')
     }
   }, [])
 
