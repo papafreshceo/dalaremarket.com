@@ -45,6 +45,15 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
   const [isSameAsBusinessName, setIsSameAsBusinessName] = useState(true);
   const [isSameAsEmail, setIsSameAsEmail] = useState(true);
   const [verifying, setVerifying] = useState(false);
+
+  // 회원가입 폼 상태
+  const [signupForm, setSignupForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+  });
+  const [signingUp, setSigningUp] = useState(false);
+
   const supabase = createClient();
 
   useEffect(() => {
@@ -249,35 +258,257 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
     }
   };
 
-  // 비회원 사용자 안내
+  // 회원가입 처리
+  const handleSignup = async () => {
+    // 필수 항목 검증
+    if (!signupForm.name.trim()) {
+      toast.error('이름을 입력해주세요.');
+      return;
+    }
+    if (!signupForm.email.trim()) {
+      toast.error('이메일을 입력해주세요.');
+      return;
+    }
+    if (!signupForm.password.trim()) {
+      toast.error('비밀번호를 입력해주세요.');
+      return;
+    }
+    if (signupForm.password.length < 6) {
+      toast.error('비밀번호는 6자 이상이어야 합니다.');
+      return;
+    }
+
+    try {
+      setSigningUp(true);
+
+      // Supabase 회원가입
+      const { data, error } = await supabase.auth.signUp({
+        email: signupForm.email,
+        password: signupForm.password,
+        options: {
+          data: {
+            name: signupForm.name,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        // users 테이블에 이름 저장
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ name: signupForm.name })
+          .eq('id', data.user.id);
+
+        if (updateError) {
+          console.error('이름 저장 실패:', updateError);
+        }
+
+        showSuccessToast('회원가입이 완료되었습니다. 로그인해주세요.');
+
+        // 폼 초기화
+        setSignupForm({ name: '', email: '', password: '' });
+
+        // 페이지 새로고침 (로그인 상태 갱신)
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
+    } catch (error: any) {
+      console.error('회원가입 오류:', error);
+
+      if (error.message?.includes('already registered')) {
+        toast.error('이미 가입된 이메일입니다.');
+      } else {
+        toast.error('회원가입에 실패했습니다. 다시 시도해주세요.');
+      }
+    } finally {
+      setSigningUp(false);
+    }
+  };
+
+  // 비회원 사용자 안내 및 회원가입 폼
   if (userId === 'guest') {
     return (
       <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '400px',
-        gap: '16px'
+        width: '100%',
+        maxWidth: '600px',
+        margin: '0 auto',
+        padding: '40px 24px'
       }}>
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#9ca3af' }}>
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
+        {/* 안내 헤더 */}
         <div style={{
-          fontSize: '16px',
-          fontWeight: '500',
-          color: 'var(--color-text)'
+          textAlign: 'center',
+          marginBottom: '40px'
         }}>
-          로그인이 필요합니다
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#9ca3af', margin: '0 auto 16px' }}>
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <div style={{
+            fontSize: '20px',
+            fontWeight: '600',
+            color: 'var(--color-text)',
+            marginBottom: '8px'
+          }}>
+            판매자 정보 등록
+          </div>
+          <div style={{
+            fontSize: '14px',
+            color: 'var(--color-text-secondary)'
+          }}>
+            판매자 정보를 등록하려면 먼저 회원가입이 필요합니다
+          </div>
         </div>
+
+        {/* 회원가입 폼 */}
         <div style={{
-          fontSize: '14px',
-          color: 'var(--color-text-secondary)',
-          textAlign: 'center'
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: '12px',
+          padding: '32px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
         }}>
-          판매자 정보를 등록하려면 회원가입 후 로그인해주세요.
+          <h3 style={{
+            fontSize: '18px',
+            fontWeight: '600',
+            color: 'var(--color-text)',
+            marginBottom: '24px'
+          }}>
+            회원가입
+          </h3>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* 이름 */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: 'var(--color-text)',
+                marginBottom: '8px'
+              }}>
+                이름 <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input
+                type="text"
+                value={signupForm.name}
+                onChange={(e) => setSignupForm({ ...signupForm, name: e.target.value })}
+                placeholder="홍길동"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  background: 'var(--color-background)',
+                  color: 'var(--color-text)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* 이메일 */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: 'var(--color-text)',
+                marginBottom: '8px'
+              }}>
+                이메일 <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input
+                type="email"
+                value={signupForm.email}
+                onChange={(e) => setSignupForm({ ...signupForm, email: e.target.value })}
+                placeholder="example@example.com"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  background: 'var(--color-background)',
+                  color: 'var(--color-text)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* 비밀번호 */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: 'var(--color-text)',
+                marginBottom: '8px'
+              }}>
+                비밀번호 <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input
+                type="password"
+                value={signupForm.password}
+                onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
+                placeholder="6자 이상 입력"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  background: 'var(--color-background)',
+                  color: 'var(--color-text)',
+                  boxSizing: 'border-box'
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSignup();
+                }}
+              />
+              <div style={{
+                fontSize: '12px',
+                color: 'var(--color-text-secondary)',
+                marginTop: '6px'
+              }}>
+                비밀번호는 6자 이상이어야 합니다
+              </div>
+            </div>
+
+            {/* 회원가입 버튼 */}
+            <button
+              onClick={handleSignup}
+              disabled={signingUp}
+              style={{
+                width: '100%',
+                padding: '14px',
+                background: signingUp ? '#9ca3af' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '16px',
+                fontWeight: '600',
+                cursor: signingUp ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s',
+                marginTop: '8px'
+              }}
+              onMouseEnter={(e) => {
+                if (!signingUp) {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              {signingUp ? '가입 중...' : '회원가입'}
+            </button>
+          </div>
         </div>
       </div>
     );
