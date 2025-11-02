@@ -64,7 +64,8 @@ export default function ResetPasswordPage() {
 
       setSuccess(true)
       setTimeout(() => {
-        router.push('/')
+        // 현재 도메인의 메인 페이지로 이동
+        window.location.href = window.location.origin
       }, 2000)
     } catch (err) {
       console.error('Password reset error:', err)
