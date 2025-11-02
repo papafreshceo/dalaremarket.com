@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { OptionMapping } from '../types';
 import { Plus, Trash2, Save, Edit2, X } from 'lucide-react';
@@ -24,7 +24,6 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
     user_option_name: '',
     site_option_name: ''
   });
-  const hasShownLoginToast = useRef(false);
 
   // 사이트 옵션명 목록 가져오기
   useEffect(() => {
@@ -57,10 +56,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        if (!hasShownLoginToast.current) {
-          toast.error('로그인이 필요합니다.');
-          hasShownLoginToast.current = true;
-        }
+        toast.error('로그인이 필요합니다.');
         setLoading(false);
         return;
       }

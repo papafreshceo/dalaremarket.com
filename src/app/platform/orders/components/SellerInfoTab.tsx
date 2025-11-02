@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import toast from 'react-hot-toast';
 import { showSuccessToast, showErrorToast } from '../utils/statusToast';
@@ -45,7 +45,6 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
   const [isSameAsBusinessName, setIsSameAsBusinessName] = useState(true);
   const [isSameAsEmail, setIsSameAsEmail] = useState(true);
   const [verifying, setVerifying] = useState(false);
-  const hasShownErrorToast = useRef(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -117,10 +116,7 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
       }
     } catch (error) {
       console.error('Error loading seller info:', error);
-      if (!hasShownErrorToast.current) {
-        toast.error('판매자 정보를 불러오는데 실패했습니다.');
-        hasShownErrorToast.current = true;
-      }
+      toast.error('판매자 정보를 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
