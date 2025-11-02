@@ -29,6 +29,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
   const [smsVerified, setSmsVerified] = useState(false)
   const [smsCountdown, setSmsCountdown] = useState(0)
   const [lastUsedProvider, setLastUsedProvider] = useState<'naver' | 'kakao' | 'google' | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
   const { showToast } = useToast()
@@ -40,13 +41,31 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     }
   }, [isOpen, initialMode])
 
-  // 최근 사용한 로그인 방법 불러오기
+  // 현재 사용자 정보와 최근 사용한 로그인 방법 불러오기
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const lastProvider = localStorage.getItem('lastUsedLoginProvider') as 'naver' | 'kakao' | 'google' | null
-      setLastUsedProvider(lastProvider)
+    const fetchUserProvider = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        setCurrentUserId(user.id)
+
+        // users 테이블에서 last_login_provider 가져오기
+        const { data: userData } = await supabase
+          .from('users')
+          .select('last_login_provider')
+          .eq('id', user.id)
+          .single()
+
+        if (userData?.last_login_provider && userData.last_login_provider !== 'email') {
+          setLastUsedProvider(userData.last_login_provider as 'naver' | 'kakao' | 'google')
+        }
+      }
     }
-  }, [isOpen])
+
+    if (isOpen) {
+      fetchUserProvider()
+    }
+  }, [isOpen, supabase])
 
   // SMS 카운트다운 타이머
   useEffect(() => {
@@ -89,10 +108,11 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
           return
         }
 
-        // 이메일 로그인 성공 시 localStorage에서 제거 (소셜 로그인만 저장)
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('lastUsedLoginProvider')
-        }
+        // 이메일 로그인 성공 시 last_login_provider 업데이트
+        await supabase
+          .from('users')
+          .update({ last_login_provider: 'email' })
+          .eq('id', data.user.id)
 
         onClose()
         showToast('로그인되었습니다.', 'success')
@@ -298,11 +318,6 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
 
   // 네이버 로그인
   const handleNaverLogin = () => {
-    // 최근 사용한 로그인 방법 저장
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('lastUsedLoginProvider', 'naver')
-    }
-
     const state = Math.random().toString(36).substring(7)
     const clientId = process.env.NEXT_PUBLIC_NAVER_CLIENT_ID
     const redirectUri = encodeURIComponent(process.env.NEXT_PUBLIC_NAVER_CALLBACK_URL || 'http://localhost:3002/auth/callback/naver')
@@ -316,11 +331,6 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     try {
       setLoading(true)
       setError(null)
-
-      // 최근 사용한 로그인 방법 저장
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('lastUsedLoginProvider', provider)
-      }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider,

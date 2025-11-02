@@ -97,7 +97,10 @@
       "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\products\\option-products\\create\" rmdir /s /q \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\products\\option-products\\create\")",
       "Bash(git rev-parse:*)",
       "Bash(if exist apply-popups-migration.js del /f apply-popups-migration.js)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(if exist apply-last-login-provider-migration.js del /f apply-last-login-provider-migration.js)"
     ],
     "deny": [],
     "ask": []

@@ -17,6 +17,9 @@ export async function GET(request: NextRequest) {
     }
 
     if (session?.user) {
+      // OAuth provider 확인 (google, kakao 등)
+      const provider = session.user.app_metadata?.provider || 'email'
+
       // users 테이블에 사용자가 있는지 확인
       const { data: existingUser } = await supabase
         .from('users')
@@ -35,12 +38,19 @@ export async function GET(request: NextRequest) {
             phone: session.user.user_metadata?.phone || null,
             role: 'seller',
             approved: true,
+            last_login_provider: provider,
           })
 
         if (insertError) {
           console.error('Failed to create user profile:', insertError)
           // 프로필 생성 실패해도 로그인은 진행
         }
+      } else {
+        // 기존 사용자의 last_login_provider 업데이트
+        await supabase
+          .from('users')
+          .update({ last_login_provider: provider })
+          .eq('id', session.user.id)
       }
 
       // 로그인 성공 - 메인 페이지로 리다이렉트

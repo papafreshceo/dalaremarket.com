@@ -81,7 +81,7 @@ function NaverCallbackContent() {
         }
 
         // 기존 사용자 - 임시 비밀번호로 세션 생성
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: loginData.email,
           password: loginData.temp_password,
         })
@@ -90,6 +90,14 @@ function NaverCallbackContent() {
           console.error('Session creation error:', signInError)
           router.push('/auth/login?error=session_failed')
           return
+        }
+
+        // 최근 로그인 방법 업데이트
+        if (signInData?.user) {
+          await supabase
+            .from('users')
+            .update({ last_login_provider: 'naver' })
+            .eq('id', signInData.user.id)
         }
 
         // 리다이렉트
