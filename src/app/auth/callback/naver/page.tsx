@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function NaverCallbackPage() {
+function NaverCallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -138,5 +138,50 @@ export default function NaverCallbackPage() {
         `}</style>
       </div>
     </div>
+  )
+}
+
+export default function NaverCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#f8f9fa',
+          }}
+        >
+          <div style={{ textAlign: 'center' }}>
+            <div
+              style={{
+                width: '50px',
+                height: '50px',
+                border: '3px solid #f3f3f3',
+                borderTop: '3px solid #03C75A',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                margin: '0 auto 20px',
+              }}
+            ></div>
+            <p style={{ fontSize: '16px', color: '#6b7280' }}>로딩 중...</p>
+            <style jsx>{`
+              @keyframes spin {
+                0% {
+                  transform: rotate(0deg);
+                }
+                100% {
+                  transform: rotate(360deg);
+                }
+              }
+            `}</style>
+          </div>
+        </div>
+      }
+    >
+      <NaverCallbackContent />
+    </Suspense>
   )
 }
