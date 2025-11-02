@@ -86,11 +86,11 @@ export async function POST(request: NextRequest) {
       dailyReward = newDaily;
     }
 
-    // 이미 오늘 최대 한도에 도달했는지 확인
+    // 이미 오늘 최대 한도에 도달했는지 확인 (200 OK로 조용히 반환)
     if (dailyReward.activity_points_earned >= dailyLimit) {
       return NextResponse.json(
         { success: false, error: '오늘 활동 보상 한도에 도달했습니다.', limitReached: true },
-        { status: 400 }
+        { status: 200 }
       );
     }
 
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     if (pointsToGive <= 0) {
       return NextResponse.json(
         { success: false, error: '지급할 캐시가 없습니다.' },
-        { status: 400 }
+        { status: 200 }
       );
     }
 

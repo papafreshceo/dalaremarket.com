@@ -50,11 +50,11 @@ export async function POST(request: NextRequest) {
       .eq('reward_date', today)
       .single();
 
-    // 이미 받았으면 에러 반환
+    // 이미 받았으면 200 OK로 조용히 반환 (에러가 아님)
     if (dailyReward && dailyReward.login_reward_claimed) {
       return NextResponse.json(
         { success: false, error: '오늘 로그인 보상을 이미 받았습니다.', alreadyClaimed: true },
-        { status: 400 }
+        { status: 200 }
       );
     }
 

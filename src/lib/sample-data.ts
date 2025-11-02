@@ -3,6 +3,7 @@
  * - 1년치 주문 데이터
  * - 하루 발주금액 100만원 이하
  * - 실제 사이트의 option_products 기반
+ * - 시드 기반 랜덤 생성으로 일관성 유지
  */
 
 interface OptionProduct {
@@ -25,6 +26,28 @@ interface SampleOrder {
 
 const MARKETS = ['쿠팡', '네이버', '자사몰'];
 const SHIPPING_COMPANIES = ['CJ대한통운', '로젠택배', '한진택배', '우체국택배'];
+
+/**
+ * 시드 기반 랜덤 생성기 (Mulberry32)
+ */
+class SeededRandom {
+  private seed: number;
+
+  constructor(seed: number) {
+    this.seed = seed;
+  }
+
+  next(): number {
+    let t = this.seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+
+  nextInt(min: number, max: number): number {
+    return Math.floor(this.next() * (max - min + 1)) + min;
+  }
+}
 
 /**
  * 한국 공휴일 체크 (양력 공휴일)
@@ -130,33 +153,37 @@ export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrd
       continue;
     }
 
-    // 날짜별 주문 건수: 1~20건 랜덤
+    // 날짜를 시드로 사용 (YYYYMMDD 형식의 숫자)
+    const dateSeed = year * 10000 + (currentDate.getMonth() + 1) * 100 + currentDate.getDate();
+    const rng = new SeededRandom(dateSeed);
+
+    // 날짜별 주문 건수: 1~20건 (시드 기반)
     const daysDiff = Math.floor((today.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
     const isToday = daysDiff === 0;
     const isThisWeek = daysDiff <= 7;
     const isThisMonth = daysDiff <= 30;
 
     // 하루 1~20건
-    const ordersPerDay = Math.floor(Math.random() * 20) + 1;
+    const ordersPerDay = rng.nextInt(1, 20);
 
     // 하루 발주금액 목표: 주문 건수에 비례하여 설정
-    const dailyBudget = ordersPerDay * (Math.floor(Math.random() * 50000) + 50000); // 건당 5~10만원
+    const dailyBudget = ordersPerDay * (rng.nextInt(50000, 100000)); // 건당 5~10만원
     let usedBudget = 0;
 
     for (let i = 0; i < ordersPerDay && usedBudget < dailyBudget; i++) {
-      // 랜덤 옵션 상품 선택
-      const product = optionProducts[Math.floor(Math.random() * optionProducts.length)];
+      // 랜덤 옵션 상품 선택 (시드 기반)
+      const product = optionProducts[rng.nextInt(0, optionProducts.length - 1)];
 
-      // 랜덤 마켓 선택 (20% 확률로 마켓 미지정)
-      const market = Math.random() < 0.2 ? null : MARKETS[Math.floor(Math.random() * MARKETS.length)];
+      // 랜덤 마켓 선택 (20% 확률로 마켓 미지정, 시드 기반)
+      const market = rng.next() < 0.2 ? null : MARKETS[rng.nextInt(0, MARKETS.length - 1)];
 
       // 공급가: 실제 seller_supply_price가 있으면 사용, 없으면 5,000원 ~ 50,000원 랜덤
       const supplyPrice = product.seller_supply_price && product.seller_supply_price > 0
         ? product.seller_supply_price
-        : Math.floor(Math.random() * 45000 / 1000) * 1000 + 5000;
+        : rng.nextInt(5, 50) * 1000;
 
-      // 수량: 1 ~ 5개
-      const quantity = Math.floor(Math.random() * 5) + 1;
+      // 수량: 1 ~ 5개 (시드 기반)
+      const quantity = rng.nextInt(1, 5);
 
       const orderTotal = supplyPrice * quantity;
 
@@ -171,7 +198,7 @@ export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrd
       // 오늘 날짜와 발주확정일(currentDate)의 차이 계산
       const daysFromConfirm = Math.floor((today.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
 
-      const statusRand = Math.random();
+      const statusRand = rng.next();
       let shippingStatus: string;
       let invoiceNumber: string | null;
       let shippingCompany: string | null;
@@ -180,8 +207,8 @@ export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrd
         // 발주확정 후 2일 이상 경과: 99% 발송완료, 0.5% 취소, 0.5% 환불
         if (statusRand < 0.99) {
           shippingStatus = '배송완료';
-          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
-          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
+          invoiceNumber = String(rng.nextInt(100000000000, 999999999999));
+          shippingCompany = SHIPPING_COMPANIES[rng.nextInt(0, SHIPPING_COMPANIES.length - 1)];
         } else if (statusRand < 0.995) {
           shippingStatus = '취소완료';
           invoiceNumber = null;
@@ -203,8 +230,8 @@ export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrd
           shippingCompany = null;
         } else {
           shippingStatus = '배송완료';
-          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
-          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
+          invoiceNumber = String(rng.nextInt(100000000000, 999999999999));
+          shippingCompany = SHIPPING_COMPANIES[rng.nextInt(0, SHIPPING_COMPANIES.length - 1)];
         }
       } else {
         // 발주확정 당일(0일): 30% 발주서등록, 50% 발주서확정, 20% 상품준비중

@@ -23,8 +23,8 @@ const CustomInput = forwardRef<HTMLInputElement, any>(({ value, onClick, placeho
     readOnly
     className={className || "filter-input"}
     style={{
-      width: '70px',
-      padding: '2px 4px',
+      width: '90px',
+      padding: '2px 6px',
       borderRadius: '4px',
       fontSize: '10px',
       height: '20px',

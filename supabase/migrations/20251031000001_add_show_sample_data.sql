@@ -6,3 +6,4 @@ COMMENT ON COLUMN users.show_sample_data IS '샘플 데이터 표시 여부 (첫
 
 -- 기존 사용자는 false로 설정 (이미 주문 데이터가 있을 수 있음)
 UPDATE users SET show_sample_data = false WHERE show_sample_data IS NULL;
+1

@@ -21,8 +21,7 @@ CREATE TABLE IF NOT EXISTS popups (
   width INTEGER DEFAULT 400, -- 팝업 너비 (px)
   height INTEGER DEFAULT 500, -- 팝업 높이 (px)
   position_x INTEGER DEFAULT 100, -- X 좌표
-  position_y INTEGER DEFAULT 100, -- Y 좌표
-
+  position_y INTEGER DEFAULT 100, -- Y 좌표2
   -- 노출 기간
   start_date TIMESTAMPTZ, -- 시작일시
   end_date TIMESTAMPTZ, -- 종료일시

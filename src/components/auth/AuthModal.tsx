@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -9,21 +9,43 @@ import { useToast } from '@/components/ui/Toast'
 interface AuthModalProps {
   isOpen: boolean
   onClose: () => void
-  initialMode?: 'login' | 'register'
+  initialMode?: 'login' | 'findId' | 'resetPassword'
 }
 
 export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalProps) {
-  const [mode, setMode] = useState<'login' | 'register'>(initialMode)
+  const [mode, setMode] = useState<'login' | 'findId' | 'resetPassword'>(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [foundEmail, setFoundEmail] = useState<string | null>(null)
+  const [sendingSms, setSendingSms] = useState(false)
+  const [verifyingSms, setVerifyingSms] = useState(false)
+  const [smsCode, setSmsCode] = useState('')
+  const [smsSent, setSmsSent] = useState(false)
+  const [smsVerified, setSmsVerified] = useState(false)
+  const [smsCountdown, setSmsCountdown] = useState(0)
   const router = useRouter()
   const supabase = createClient()
   const { showToast } = useToast()
+
+  // initialMode가 변경될 때 mode 업데이트
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode)
+    }
+  }, [isOpen, initialMode])
+
+  // SMS 카운트다운 타이머
+  useEffect(() => {
+    if (smsCountdown > 0) {
+      const timer = setTimeout(() => setSmsCountdown(smsCountdown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [smsCountdown])
 
   if (!isOpen) return null
 
@@ -69,62 +91,6 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     }
   }
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-
-    if (password !== confirmPassword) {
-      setError('비밀번호가 일치하지 않습니다.')
-      return
-    }
-
-    if (password.length < 6) {
-      setError('비밀번호는 최소 6자 이상이어야 합니다.')
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-      })
-
-      if (authError) {
-        setError(authError.message)
-        setLoading(false)
-        return
-      }
-
-      if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            id: authData.user.id,
-            email,
-            name,
-            phone,
-            role: 'seller',
-            approved: true,
-          })
-
-        if (profileError) {
-          setError('프로필 생성 중 오류가 발생했습니다.')
-          setLoading(false)
-          return
-        }
-
-        showToast('회원가입이 완료되었습니다. 로그인해주세요.', 'success')
-        setMode('login')
-        setLoading(false)
-      }
-    } catch (err) {
-      setError('회원가입 중 오류가 발생했습니다.')
-      setLoading(false)
-    }
-  }
-
   const handleNameChange = (value: string) => {
     const koreanOnly = value.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣ]/g, '')
     setName(koreanOnly)
@@ -132,12 +98,187 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
 
   const handlePhoneChange = (value: string) => {
     const numbers = value.replace(/[^\d]/g, '')
-    if (numbers.length <= 4) {
+    if (numbers.length <= 3) {
       setPhone(numbers)
-    } else if (numbers.length <= 8) {
-      setPhone(`${numbers.slice(0, 4)}-${numbers.slice(4)}`)
+    } else if (numbers.length <= 7) {
+      setPhone(`${numbers.slice(0, 3)}-${numbers.slice(3)}`)
     } else {
-      setPhone(`${numbers.slice(0, 4)}-${numbers.slice(4, 8)}`)
+      setPhone(`${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`)
+    }
+
+    // 전화번호 변경 시 인증 상태 초기화
+    setSmsSent(false)
+    setSmsVerified(false)
+    setSmsCode('')
+  }
+
+  // SMS 인증번호 발송 (아이디 찾기용)
+  const handleSendSms = async () => {
+    if (!phone.trim()) {
+      setError('전화번호를 입력해주세요.')
+      return
+    }
+
+    const phoneNumbers = phone.replace(/[^\d]/g, '')
+    if (phoneNumbers.length !== 11) {
+      setError('올바른 전화번호를 입력해주세요.')
+      return
+    }
+
+    setSendingSms(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/sms/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'SMS 발송에 실패했습니다.')
+        setSendingSms(false)
+        return
+      }
+
+      setSmsSent(true)
+      setSmsCountdown(180) // 3분
+      showToast('인증번호가 발송되었습니다.', 'success')
+      setSendingSms(false)
+    } catch (err) {
+      console.error('SMS send error:', err)
+      setError('SMS 발송 중 오류가 발생했습니다.')
+      setSendingSms(false)
+    }
+  }
+
+  // SMS 인증번호 확인 (아이디 찾기용)
+  const handleVerifySms = async () => {
+    if (!smsCode.trim()) {
+      setError('인증번호를 입력해주세요.')
+      return
+    }
+
+    setVerifyingSms(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/sms/send', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, code: smsCode }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || '인증번호가 일치하지 않습니다.')
+        setVerifyingSms(false)
+        return
+      }
+
+      setSmsVerified(true)
+      showToast('전화번호 인증이 완료되었습니다.', 'success')
+      setVerifyingSms(false)
+    } catch (err) {
+      console.error('SMS verify error:', err)
+      setError('인증번호 확인 중 오류가 발생했습니다.')
+      setVerifyingSms(false)
+    }
+  }
+
+  // 아이디 찾기
+  const handleFindId = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setSuccess(null)
+    setFoundEmail(null)
+
+    if (!name.trim()) {
+      setError('이름을 입력해주세요.')
+      return
+    }
+
+    if (!phone.trim()) {
+      setError('전화번호를 입력해주세요.')
+      return
+    }
+
+    const phoneNumbers = phone.replace(/[^\d]/g, '')
+    if (phoneNumbers.length !== 11) {
+      setError('올바른 전화번호를 입력해주세요. (11자리)')
+      return
+    }
+
+    if (!smsVerified) {
+      setError('전화번호 인증을 완료해주세요.')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('email')
+        .eq('name', name)
+        .eq('phone', phone)
+        .single()
+
+      if (error || !data) {
+        setError('일치하는 계정을 찾을 수 없습니다.')
+        setLoading(false)
+        return
+      }
+
+      setFoundEmail(data.email)
+      setSuccess('아이디를 찾았습니다!')
+      setLoading(false)
+    } catch (err) {
+      console.error('Find ID error:', err)
+      setError('아이디 찾기 중 오류가 발생했습니다.')
+      setLoading(false)
+    }
+  }
+
+  // 비밀번호 재설정
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setSuccess(null)
+
+    if (!email.trim()) {
+      setError('이메일을 입력해주세요.')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setError('올바른 이메일 형식이 아닙니다.')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      })
+
+      if (error) {
+        setError('비밀번호 재설정 이메일 발송에 실패했습니다.')
+        setLoading(false)
+        return
+      }
+
+      setSuccess('비밀번호 재설정 이메일이 발송되었습니다. 이메일을 확인해주세요.')
+      setLoading(false)
+    } catch (err) {
+      console.error('Reset password error:', err)
+      setError('비밀번호 재설정 중 오류가 발생했습니다.')
+      setLoading(false)
     }
   }
 
@@ -150,66 +291,125 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
       />
 
       {/* Modal */}
-      <div style={{
-        position: 'relative',
-        width: '400px',
-        maxHeight: '90vh',
-        overflowY: 'auto',
-        background: 'white',
-        borderRadius: '16px',
-        padding: '40px',
-        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1)'
-      }}>
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '20px',
-            right: '20px',
-            background: 'transparent',
-            border: 'none',
-            fontSize: '24px',
-            cursor: 'pointer',
-            color: '#9ca3af',
-            lineHeight: 1
-          }}
-        >
-          ×
-        </button>
+      <div
+        className="relative w-full max-w-md mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{
+          background: 'white',
+          borderRadius: '24px',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          padding: '40px',
+          position: 'relative'
+        }}>
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'transparent',
+              border: 'none',
+              fontSize: '24px',
+              color: '#9ca3af',
+              cursor: 'pointer',
+              lineHeight: 1,
+              padding: 0,
+              width: '24px',
+              height: '24px'
+            }}
+          >
+            ×
+          </button>
 
-        <h2 style={{
-          fontSize: '24px',
-          fontWeight: '600',
-          marginBottom: '32px',
-          textAlign: 'center',
-          color: '#212529'
-        }}>{mode === 'login' ? '로그인' : '회원가입'}</h2>
+          <div style={{
+            textAlign: 'center',
+            marginBottom: '32px'
+          }}>
+            <h2 style={{
+              fontSize: '28px',
+              fontWeight: 'bold',
+              color: '#1f2937',
+              marginBottom: '8px'
+            }}>
+              {mode === 'login' ? '로그인' : mode === 'findId' ? '아이디 찾기' : '비밀번호 찾기'}
+            </h2>
+            <p style={{
+              fontSize: '14px',
+              color: '#6b7280'
+            }}>
+              {mode === 'login' ? '달래마켓에 오신 것을 환영합니다' : mode === 'findId' ? '가입하신 정보로 아이디를 찾아드립니다' : '등록된 이메일로 비밀번호 재설정 링크를 보내드립니다'}
+            </p>
+          </div>
 
-        <form onSubmit={mode === 'login' ? handleLogin : handleRegister}>
           {error && (
             <div style={{
               padding: '12px 16px',
-              background: '#fee2e2',
+              background: '#fee',
+              border: '1px solid #fcc',
               borderRadius: '8px',
-              marginBottom: '16px'
+              color: '#c00',
+              fontSize: '13px',
+              marginBottom: '20px'
             }}>
-              <p style={{ fontSize: '14px', color: '#dc2626' }}>{error}</p>
+              {error}
             </div>
           )}
 
-          {mode === 'register' && (
-            <>
+          {success && (
+            <div style={{
+              padding: '12px 16px',
+              background: '#efe',
+              border: '1px solid #cfc',
+              borderRadius: '8px',
+              color: '#060',
+              fontSize: '13px',
+              marginBottom: '20px'
+            }}>
+              {success}
+            </div>
+          )}
+
+          {foundEmail && (
+            <div style={{
+              padding: '16px',
+              background: '#f0f9ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '12px',
+              marginBottom: '20px'
+            }}>
+              <div style={{
+                fontSize: '13px',
+                color: '#1e40af',
+                marginBottom: '8px',
+                fontWeight: '500'
+              }}>
+                찾은 아이디
+              </div>
+              <div style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#1e3a8a'
+              }}>
+                {foundEmail}
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={mode === 'login' ? handleLogin : mode === 'findId' ? handleFindId : handleResetPassword}>
+            {/* 이메일 입력 (로그인, 비밀번호 재설정) */}
+            {(mode === 'login' || mode === 'resetPassword') && (
               <input
-                type="text"
-                placeholder="이름 (한글만)"
-                value={name}
-                onChange={(e) => handleNameChange(e.target.value)}
+                type="email"
+                placeholder="이메일"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 style={{
                   width: '100%',
                   padding: '14px 16px',
-                  border: '2px solid transparent',
+                  border: '1px solid transparent',
                   background: '#f8f9fa',
                   borderRadius: '12px',
                   fontSize: '14px',
@@ -226,31 +426,55 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                   e.currentTarget.style.background = '#f8f9fa'
                 }}
               />
+            )}
 
-              <div style={{ position: 'relative', marginBottom: '12px' }}>
-                <span style={{
-                  position: 'absolute',
-                  left: '16px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
+            {/* 비밀번호 입력 (로그인만) */}
+            {mode === 'login' && (
+              <input
+                type="password"
+                placeholder="비밀번호"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                style={{
+                  width: '100%',
+                  padding: '14px 16px',
+                  border: '1px solid transparent',
+                  background: '#f8f9fa',
+                  borderRadius: '12px',
                   fontSize: '14px',
-                  color: '#495057',
-                  fontWeight: '500',
-                  pointerEvents: 'none'
-                }}>010</span>
+                  marginBottom: '24px',
+                  outline: 'none',
+                  transition: 'all 0.3s'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#2563eb'
+                  e.currentTarget.style.background = '#ffffff'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'transparent'
+                  e.currentTarget.style.background = '#f8f9fa'
+                }}
+              />
+            )}
+
+            {/* 아이디 찾기 입력 필드 */}
+            {mode === 'findId' && (
+              <>
                 <input
-                  type="tel"
-                  placeholder="0000-0000"
-                  value={phone}
-                  onChange={(e) => handlePhoneChange(e.target.value)}
-                  maxLength={9}
+                  type="text"
+                  placeholder="이름 (한글만 입력)"
+                  value={name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  required
                   style={{
                     width: '100%',
-                    padding: '14px 16px 14px 46px',
-                    border: '2px solid transparent',
+                    padding: '14px 16px',
+                    border: '1px solid transparent',
                     background: '#f8f9fa',
                     borderRadius: '12px',
                     fontSize: '14px',
+                    marginBottom: '12px',
                     outline: 'none',
                     transition: 'all 0.3s'
                   }}
@@ -263,256 +487,324 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                     e.currentTarget.style.background = '#f8f9fa'
                   }}
                 />
-              </div>
-            </>
-          )}
 
-          <input
-            type="email"
-            placeholder="이메일"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{
-              width: '100%',
-              padding: '14px 16px',
-              border: '2px solid transparent',
-              background: '#f8f9fa',
-              borderRadius: '12px',
-              fontSize: '14px',
-              marginBottom: '12px',
-              outline: 'none',
-              transition: 'all 0.3s'
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#2563eb'
-              e.currentTarget.style.background = '#ffffff'
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'transparent'
-              e.currentTarget.style.background = '#f8f9fa'
-            }}
-          />
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="tel"
+                      placeholder="전화번호 (010-0000-0000)"
+                      value={phone}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      required
+                      disabled={smsVerified}
+                      style={{
+                        flex: 1,
+                        padding: '14px 16px',
+                        border: '1px solid transparent',
+                        background: smsVerified ? '#e5e7eb' : '#f8f9fa',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        transition: 'all 0.3s'
+                      }}
+                      onFocus={(e) => {
+                        if (!smsVerified) {
+                          e.currentTarget.style.borderColor = '#2563eb'
+                          e.currentTarget.style.background = '#ffffff'
+                        }
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'transparent'
+                        e.currentTarget.style.background = smsVerified ? '#e5e7eb' : '#f8f9fa'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSendSms}
+                      disabled={sendingSms || smsVerified || smsCountdown > 0}
+                      style={{
+                        padding: '14px 20px',
+                        background: smsVerified ? '#10b981' : (sendingSms || smsCountdown > 0) ? '#9ca3af' : '#2563eb',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        cursor: (sendingSms || smsVerified || smsCountdown > 0) ? 'not-allowed' : 'pointer',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.3s'
+                      }}
+                    >
+                      {smsVerified ? '인증완료' : smsCountdown > 0 ? `${Math.floor(smsCountdown / 60)}:${(smsCountdown % 60).toString().padStart(2, '0')}` : sendingSms ? '발송중...' : '인증번호'}
+                    </button>
+                  </div>
+                </div>
 
-          <input
-            type="password"
-            placeholder="비밀번호"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{
-              width: '100%',
-              padding: '14px 16px',
-              border: '2px solid transparent',
-              background: '#f8f9fa',
-              borderRadius: '12px',
-              fontSize: '14px',
-              marginBottom: mode === 'register' ? '12px' : '24px',
-              outline: 'none',
-              transition: 'all 0.3s'
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#2563eb'
-              e.currentTarget.style.background = '#ffffff'
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'transparent'
-              e.currentTarget.style.background = '#f8f9fa'
-            }}
-          />
+                {smsSent && !smsVerified && (
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <input
+                      type="text"
+                      placeholder="인증번호 6자리"
+                      value={smsCode}
+                      onChange={(e) => setSmsCode(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
+                      maxLength={6}
+                      style={{
+                        flex: 1,
+                        padding: '14px 16px',
+                        border: '1px solid transparent',
+                        background: '#f8f9fa',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        transition: 'all 0.3s'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#2563eb'
+                        e.currentTarget.style.background = '#ffffff'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'transparent'
+                        e.currentTarget.style.background = '#f8f9fa'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleVerifySms}
+                      disabled={verifyingSms}
+                      style={{
+                        padding: '14px 20px',
+                        background: verifyingSms ? '#9ca3af' : '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        cursor: verifyingSms ? 'not-allowed' : 'pointer',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.3s'
+                      }}
+                    >
+                      {verifyingSms ? '확인중...' : '확인'}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
 
-          {mode === 'register' && (
-            <input
-              type="password"
-              placeholder="비밀번호 확인"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
+            <button
+              type="submit"
+              disabled={loading}
               style={{
                 width: '100%',
-                padding: '14px 16px',
-                border: '2px solid transparent',
-                background: '#f8f9fa',
-                borderRadius: '12px',
-                fontSize: '14px',
-                marginBottom: '24px',
-                outline: 'none',
-                transition: 'all 0.3s'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#2563eb'
-                e.currentTarget.style.background = '#ffffff'
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'transparent'
-                e.currentTarget.style.background = '#f8f9fa'
-              }}
-            />
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '14px',
-              background: loading ? '#9ca3af' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              marginBottom: '24px',
-              boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
-              transition: 'transform 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) e.currentTarget.style.transform = 'translateY(-2px)'
-            }}
-            onMouseLeave={(e) => {
-              if (!loading) e.currentTarget.style.transform = 'translateY(0)'
-            }}
-          >
-            {loading ? (mode === 'login' ? '로그인 중...' : '처리 중...') : (mode === 'login' ? '이메일로 로그인' : '회원가입')}
-          </button>
-
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ position: 'relative', textAlign: 'center', marginBottom: '24px' }}>
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                width: '100%',
-                height: '1px',
-                background: 'linear-gradient(to right, transparent, #e0e0e0, transparent)'
-              }}></div>
-              <span style={{
-                position: 'relative',
-                background: 'white',
-                padding: '0 16px',
-                fontSize: '12px',
-                color: '#9ca3af',
-                fontWeight: '500'
-              }}>{mode === 'login' ? '간편 로그인' : '간편 가입'}</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <button type="button" style={{
-                width: '100%',
                 padding: '14px',
-                background: '#ffffff',
-                border: '1px solid #e0e0e0',
-                borderRadius: '12px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                transition: 'all 0.2s',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08)'
-              }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                </svg>
-                구글로 {mode === 'login' ? '로그인' : '가입하기'}
-              </button>
-
-              <button type="button" style={{
-                width: '100%',
-                padding: '14px',
-                background: '#FEE500',
-                border: 'none',
-                borderRadius: '12px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'transform 0.2s',
-                boxShadow: '0 2px 8px rgba(254, 229, 0, 0.3)'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
-                카카오로 {mode === 'login' ? '로그인' : '가입하기'}
-              </button>
-
-              <button type="button" style={{
-                width: '100%',
-                padding: '14px',
-                background: '#03C75A',
+                background: loading ? '#9ca3af' : '#2563eb',
                 color: 'white',
                 border: 'none',
                 borderRadius: '12px',
                 fontSize: '14px',
                 fontWeight: '500',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'transform 0.2s',
-                boxShadow: '0 2px 8px rgba(3, 199, 90, 0.3)'
+                cursor: loading ? 'not-allowed' : 'pointer',
+                marginBottom: mode === 'login' ? '16px' : '24px',
+                boxShadow: '0 4px 15px rgba(37, 99, 235, 0.3)',
+                transition: 'transform 0.2s'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
-                네이버로 {mode === 'login' ? '로그인' : '가입하기'}
-              </button>
-            </div>
-          </div>
+              onMouseEnter={(e) => {
+                if (!loading) e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) e.currentTarget.style.transform = 'translateY(0)'
+              }}
+            >
+              {loading
+                ? (mode === 'login' ? '로그인 중...' : mode === 'findId' ? '찾는 중...' : '발송 중...')
+                : (mode === 'login' ? '이메일로 로그인' : mode === 'findId' ? '아이디 찾기' : '비밀번호 재설정 이메일 발송')
+              }
+            </button>
 
-          <div style={{ textAlign: 'center', marginTop: '20px' }}>
-            {mode === 'login' ? (
-              <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                아직 계정이 없으신가요?{' '}
+            {/* 로그인 모드일 때 아이디/비밀번호 찾기 */}
+            {mode === 'login' && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '16px',
+                marginBottom: '24px'
+              }}>
                 <button
                   type="button"
-                  onClick={() => setMode('register')}
+                  onClick={() => {
+                    setMode('findId')
+                    setError(null)
+                    setSuccess(null)
+                    setFoundEmail(null)
+                    setName('')
+                    setPhone('')
+                  }}
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    color: '#2563eb',
+                    color: '#6b7280',
+                    fontSize: '13px',
                     fontWeight: '500',
                     cursor: 'pointer',
-                    textDecoration: 'none'
+                    padding: '4px 8px',
+                    transition: 'color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#2563eb';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#6b7280';
                   }}
                 >
-                  회원가입
+                  아이디 찾기
                 </button>
-              </span>
-            ) : (
-              <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                이미 계정이 있으신가요?{' '}
+                <span style={{ color: '#d1d5db' }}>|</span>
                 <button
                   type="button"
-                  onClick={() => setMode('login')}
+                  onClick={() => {
+                    setMode('resetPassword')
+                    setError(null)
+                    setSuccess(null)
+                    setEmail('')
+                  }}
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    color: '#2563eb',
+                    color: '#6b7280',
+                    fontSize: '13px',
                     fontWeight: '500',
                     cursor: 'pointer',
-                    textDecoration: 'none'
+                    padding: '4px 8px',
+                    transition: 'color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#2563eb';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#6b7280';
                   }}
                 >
-                  로그인
+                  비밀번호 찾기
                 </button>
-              </span>
+              </div>
             )}
-          </div>
-        </form>
+
+            {/* 다른 모드일 때 로그인으로 돌아가기 */}
+            {mode !== 'login' && !foundEmail && (
+              <div style={{
+                textAlign: 'center',
+                marginBottom: '24px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('login')
+                    setError(null)
+                    setSuccess(null)
+                    setEmail('')
+                    setPassword('')
+                    setName('')
+                    setPhone('')
+                    setFoundEmail(null)
+                    setSmsSent(false)
+                    setSmsVerified(false)
+                    setSmsCode('')
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#6b7280',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    padding: '4px 8px',
+                    transition: 'color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#2563eb';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#6b7280';
+                  }}
+                >
+                  ← 로그인으로 돌아가기
+                </button>
+              </div>
+            )}
+
+            {/* 아이디를 찾은 후 로그인으로 이동 */}
+            {foundEmail && (
+              <div style={{
+                textAlign: 'center',
+                marginBottom: '24px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('login')
+                    setEmail(foundEmail)
+                    setFoundEmail(null)
+                    setError(null)
+                    setSuccess(null)
+                    setName('')
+                    setPhone('')
+                    setSmsSent(false)
+                    setSmsVerified(false)
+                    setSmsCode('')
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    background: '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#1d4ed8'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#2563eb'
+                  }}
+                >
+                  이 아이디로 로그인하기
+                </button>
+              </div>
+            )}
+          </form>
+
+          {/* 회원가입 링크 */}
+          {mode === 'login' && (
+            <div style={{
+              textAlign: 'center',
+              fontSize: '13px',
+              color: '#6b7280'
+            }}>
+              계정이 없으신가요?{' '}
+              <Link
+                href="/register"
+                onClick={onClose}
+                style={{
+                  color: '#2563eb',
+                  fontWeight: '500',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.textDecoration = 'underline'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.textDecoration = 'none'
+                }}
+              >
+                회원가입
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

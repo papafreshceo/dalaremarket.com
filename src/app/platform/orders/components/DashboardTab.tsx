@@ -825,13 +825,14 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
   // selectedMarkets 초기화 (마켓 목록 변경 시)
   useEffect(() => {
     const allMarkets = Array.from(new Set(filteredOrders.map(o => o.sellerMarketName || '미지정')));
-    if (selectedProductMarkets.length === 0) {
+    // '전체' 모드가 아닐 때만 자동으로 모든 마켓 선택
+    if (selectedProductMarkets.length === 0 && !showProductMarketTotal) {
       setSelectedProductMarkets(allMarkets);
     }
-    if (selectedOptionMarkets.length === 0) {
+    if (selectedOptionMarkets.length === 0 && !showOptionMarketTotal) {
       setSelectedOptionMarkets(allMarkets);
     }
-  }, [filteredOrders]);
+  }, [filteredOrders, showProductMarketTotal, showOptionMarketTotal]);
 
   // 날짜 범위에 따라 시간 단위 자동 조정 (품목 그래프)
   useEffect(() => {
@@ -868,7 +869,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     const selectedItems = selectedProducts;
     const itemType = 'product';
 
-    if (selectedProductMarkets.length === 0) {
+    // '전체' 모드가 아니고 선택된 마켓이 없으면 빈 데이터 반환
+    if (selectedProductMarkets.length === 0 && !showProductMarketTotal) {
       return { dates: [], lines: [] };
     }
 
@@ -891,8 +893,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
       const marketName = order.sellerMarketName || '미지정';
 
-      // 선택된 마켓만 처리
-      if (!selectedProductMarkets.includes(marketName)) return;
+      // '전체' 모드가 아닐 때만 선택된 마켓 필터링
+      if (!showProductMarketTotal && !selectedProductMarkets.includes(marketName)) return;
 
       // optionName으로 category4 조회
       const optionName = order.optionName || '';
@@ -1071,7 +1073,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
   const optionStats = useMemo(() => {
     const selectedItems = selectedOptions;
 
-    if (selectedOptionMarkets.length === 0) {
+    // '전체' 모드가 아니고 선택된 마켓이 없으면 빈 데이터 반환
+    if (selectedOptionMarkets.length === 0 && !showOptionMarketTotal) {
       return { dates: [], lines: [] };
     }
 
@@ -1094,8 +1097,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
       const marketName = order.sellerMarketName || '미지정';
 
-      // 선택된 마켓만 처리
-      if (!selectedOptionMarkets.includes(marketName)) return;
+      // '전체' 모드가 아닐 때만 선택된 마켓 필터링
+      if (!showOptionMarketTotal && !selectedOptionMarkets.includes(marketName)) return;
 
       // optionName 사용
       const itemName = order.optionName || '미지정';
@@ -2407,9 +2410,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               {/* 품목별 통계 */}
               <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {/* 헤더 컨테이너 */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   {/* 좌측: 제목 + 선택된 품목 태그 */}
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#6366f1', margin: 0 }}>품목</h3>
@@ -2517,7 +2520,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                 {/* 그래프 */}
                 {productStats.dates.length > 0 && productStats.lines.length > 0 ? (
-                  <>
+                  <div>
                     {/* 메인 그래프 */}
                     <svg viewBox="0 0 1200 424" style={{ width: '100%', height: '350px', display: 'block' }}>
                       {(() => {
@@ -2784,17 +2787,29 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         </div>
 
                         {/* 개별 마켓 범례 */}
-                        {!showProductMarketTotal && allMarkets.map((market) => {
+                        {allMarkets.map((market) => {
                           const isSelected = selectedProductMarkets.includes(market);
                           const color = marketColorMap.get(market);
                           return (
                             <div
                               key={market}
                               onClick={() => {
-                                if (isSelected) {
-                                  setSelectedProductMarkets(selectedProductMarkets.filter(m => m !== market));
+                                // '전체' 모드일 때는 '전체' 해제하고 해당 마켓만 활성화
+                                if (showProductMarketTotal) {
+                                  setShowProductMarketTotal(false);
+                                  setSelectedProductMarkets([market]);
                                 } else {
-                                  setSelectedProductMarkets([...selectedProductMarkets, market]);
+                                  // 개별 모드일 때는 토글
+                                  if (isSelected) {
+                                    const newMarkets = selectedProductMarkets.filter(m => m !== market);
+                                    setSelectedProductMarkets(newMarkets);
+                                    // 모든 마켓이 선택 해제되면 '전체' 활성화
+                                    if (newMarkets.length === 0) {
+                                      setShowProductMarketTotal(true);
+                                    }
+                                  } else {
+                                    setSelectedProductMarkets([...selectedProductMarkets, market]);
+                                  }
                                 }
                               }}
                               style={{
@@ -2802,7 +2817,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                 alignItems: 'center',
                                 gap: '6px',
                                 cursor: 'pointer',
-                                opacity: isSelected ? 1 : 0.4,
+                                opacity: showProductMarketTotal ? 0.3 : (isSelected ? 1 : 0.4),
                                 padding: '4px 8px',
                                 marginLeft: '-8px',
                                 borderRadius: '4px',
@@ -2822,7 +2837,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         })}
                       </div>
                     </div>
-                  </>
+                  </div>
                 ) : (
                   <div style={{ textAlign: 'center', color: '#6b7280', padding: '40px 20px' }}>
                     <div style={{ fontSize: '14px', marginBottom: '8px' }}>좌측에서 품목을 선택하세요</div>
@@ -2834,9 +2849,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
               {/* 옵션별 통계 */}
               <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {/* 헤더 컨테이너 */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   {/* 좌측: 제목 + 선택된 옵션 태그 */}
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#8b5cf6', margin: 0 }}>옵션</h3>
@@ -2941,7 +2956,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                 {/* 그래프 */}
                 {optionStats.dates.length > 0 && optionStats.lines.length > 0 ? (
-                  <>
+                  <div>
                     {/* 메인 그래프 */}
                     <svg viewBox="0 0 1200 424" style={{ width: '100%', height: '350px', display: 'block' }}>
                       {(() => {
@@ -3208,17 +3223,29 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         </div>
 
                         {/* 개별 마켓 범례 */}
-                        {!showOptionMarketTotal && allMarkets.map((market) => {
+                        {allMarkets.map((market) => {
                           const isSelected = selectedOptionMarkets.includes(market);
                           const color = marketColorMap.get(market);
                           return (
                             <div
                               key={market}
                               onClick={() => {
-                                if (isSelected) {
-                                  setSelectedOptionMarkets(selectedOptionMarkets.filter(m => m !== market));
+                                // '전체' 모드일 때는 '전체' 해제하고 해당 마켓만 활성화
+                                if (showOptionMarketTotal) {
+                                  setShowOptionMarketTotal(false);
+                                  setSelectedOptionMarkets([market]);
                                 } else {
-                                  setSelectedOptionMarkets([...selectedOptionMarkets, market]);
+                                  // 개별 모드일 때는 토글
+                                  if (isSelected) {
+                                    const newMarkets = selectedOptionMarkets.filter(m => m !== market);
+                                    setSelectedOptionMarkets(newMarkets);
+                                    // 모든 마켓이 선택 해제되면 '전체' 활성화
+                                    if (newMarkets.length === 0) {
+                                      setShowOptionMarketTotal(true);
+                                    }
+                                  } else {
+                                    setSelectedOptionMarkets([...selectedOptionMarkets, market]);
+                                  }
                                 }
                               }}
                               style={{
@@ -3226,7 +3253,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                 alignItems: 'center',
                                 gap: '6px',
                                 cursor: 'pointer',
-                                opacity: isSelected ? 1 : 0.4,
+                                opacity: showOptionMarketTotal ? 0.3 : (isSelected ? 1 : 0.4),
                                 padding: '4px 8px',
                                 marginLeft: '-8px',
                                 borderRadius: '4px',
@@ -3246,7 +3273,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         })}
                       </div>
                     </div>
-                  </>
+                  </div>
                 ) : (
                   <div style={{ textAlign: 'center', color: '#6b7280', padding: '40px 20px' }}>
                     <div style={{ fontSize: '14px', marginBottom: '8px' }}>좌측에서 옵션상품을 선택하세요</div>

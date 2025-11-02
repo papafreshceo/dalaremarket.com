@@ -17,6 +17,7 @@ import ValidationErrorModal from './modals/ValidationErrorModal';
 import OptionValidationModal from './modals/OptionValidationModal';
 import MappingResultModal from './modals/MappingResultModal';
 import { LocalThemeToggle } from './components/LocalThemeToggle';
+import PWAInstallBanner from './components/PWAInstallBanner';
 import * as XLSX from 'xlsx';
 import { validateRequiredColumns } from './utils/validation';
 import toast, { Toaster } from 'react-hot-toast';
@@ -34,6 +35,10 @@ function OrdersPageContent() {
   const [userId, setUserId] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
   const [orders, setOrders] = useState<Order[]>([]);
+  const [cashBalance, setCashBalance] = useState<number>(0);
+  const [creditBalance, setCreditBalance] = useState<number>(0);
+  const [showCashTooltip, setShowCashTooltip] = useState(false);
+  const [showCreditTooltip, setShowCreditTooltip] = useState(false);
 
   const [filterStatus, setFilterStatus] = useState<'all' | Order['status']>(statusParam || 'registered');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -70,6 +75,9 @@ function OrdersPageContent() {
 
   // 새로고침 상태
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // 전체 탭 리셋용 키 (새로고침 시 모든 컴포넌트 리마운트)
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // 샘플 모드 상태
   const [isSampleMode, setIsSampleMode] = useState(false);
@@ -150,9 +158,15 @@ function OrdersPageContent() {
 
         try {
           // 현재 컴포넌트만 새로고침 (데이터 다시 로드)
-          await fetchOrders();
+          await Promise.all([
+            fetchOrders(),
+            fetchBalances(false) // 새로고침 시에는 리필 토스트 표시 안 함
+          ]);
 
-          // 1초 후 새로고침 상태 해제
+          // 모든 탭 컴포넌트 리셋 (필터 상태 초기화)
+          setRefreshKey(prev => prev + 1);
+
+          // fetchOrders 완료 후 1초 더 표시한 다음 상태 해제
           setTimeout(() => {
             setIsRefreshing(false);
           }, 1000);
@@ -188,6 +202,64 @@ function OrdersPageContent() {
     fetchOrders();
   }, []);
 
+  // 캐시 & 크레딧 잔액 조회 함수
+  const fetchBalances = async (showRefillToast: boolean = true) => {
+    if (userId === 'guest' || !userId) {
+      setCashBalance(0);
+      setCreditBalance(0);
+      return;
+    }
+
+    try {
+      // 캐시 조회
+      const cashResponse = await fetch('/api/cash', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      const cashData = await cashResponse.json();
+      if (cashData.success) {
+        setCashBalance(cashData.balance);
+      }
+
+      // 크레딧 일일 리필 (날짜 바뀌면 자동으로 100으로 리필)
+      const creditResponse = await fetch('/api/credits/daily-refill', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        cache: 'no-store'
+      });
+      const creditData = await creditResponse.json();
+      if (creditData.success) {
+        setCreditBalance(creditData.balance);
+
+        // 리필되었을 때만 토스트 표시 (showRefillToast가 true일 때만)
+        if (creditData.refilled && showRefillToast) {
+          toast.success('일일 크레딧 100이 지급되었습니다!', {
+            position: 'top-center',
+            duration: 3000
+          });
+        }
+      }
+    } catch (error) {
+      console.error('잔액 조회 실패:', error);
+    }
+  };
+
+  // 캐시 & 크레딧 잔액 자동 조회
+  useEffect(() => {
+    fetchBalances();
+
+    // 30초마다 갱신
+    const interval = setInterval(() => fetchBalances(), 30000);
+    return () => clearInterval(interval);
+  }, [userId]);
+
   // postMessage로 상태 변경 수신 (최초 1회만)
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -210,7 +282,13 @@ function OrdersPageContent() {
   const fetchOrders = async () => {
     try {
       // API를 통해 주문 조회 (샘플 모드 자동 처리)
-      const response = await fetch('/api/platform-orders');
+      const response = await fetch('/api/platform-orders', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       const result = await response.json();
 
       if (!result.success) {
@@ -682,6 +760,9 @@ function OrdersPageContent() {
 
   return (
     <div className="platform-orders-page" style={{ minHeight: '100vh', background: 'var(--color-background)' }}>
+      {/* PWA 설치 안내 배너 */}
+      <PWAInstallBanner />
+
       {/* 다크모드 스크롤바 스타일 */}
       <style>{`
         * {
@@ -842,6 +923,135 @@ function OrdersPageContent() {
             }}>
               {userEmail || '로그인 정보 없음'}
             </div>
+          )}
+
+          {/* 캐시 & 크레딧 배지 (로그인 정보 바로 옆) */}
+          {!isMobile && userId && userId !== 'guest' && (
+            <>
+              <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&display=swap" rel="stylesheet" />
+
+              {/* 캐시 배지 */}
+              <div
+                style={{
+                  position: 'relative',
+                  display: 'inline-block'
+                }}
+                onMouseEnter={() => setShowCashTooltip(true)}
+                onMouseLeave={() => setShowCashTooltip(false)}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '24px',
+                  padding: '0px 6px',
+                  border: '1.5px solid #10b981',
+                  borderRadius: '6px',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}>
+                  <span style={{
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#10b981',
+                    fontFamily: 'Oxanium, monospace',
+                    letterSpacing: '0.5px',
+                    lineHeight: '1'
+                  }}>
+                    {cashBalance.toLocaleString()}
+                  </span>
+                </div>
+                {showCashTooltip && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: '0',
+                    padding: '8px 12px',
+                    background: 'rgba(0, 0, 0, 0.9)',
+                    color: 'white',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    whiteSpace: 'nowrap',
+                    zIndex: 10000
+                  }}>
+                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>달래캐시</div>
+                    <div style={{ fontSize: '11px', opacity: 0.9 }}>활동/로그인 보상으로 획득</div>
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '100%',
+                      right: '8px',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '5px solid transparent',
+                      borderRight: '5px solid transparent',
+                      borderBottom: '5px solid rgba(0, 0, 0, 0.9)'
+                    }}></div>
+                  </div>
+                )}
+              </div>
+
+              {/* 크레딧 배지 */}
+              <div
+                style={{
+                  position: 'relative',
+                  display: 'inline-block'
+                }}
+                onMouseEnter={() => setShowCreditTooltip(true)}
+                onMouseLeave={() => setShowCreditTooltip(false)}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '24px',
+                  padding: '0px 6px',
+                  border: '1.5px solid #7c3aed',
+                  borderRadius: '6px',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}>
+                  <span style={{
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#7c3aed',
+                    fontFamily: 'Oxanium, monospace',
+                    letterSpacing: '0.5px',
+                    lineHeight: '1'
+                  }}>
+                    {creditBalance.toLocaleString()}
+                  </span>
+                </div>
+                {showCreditTooltip && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: '0',
+                    padding: '8px 12px',
+                    background: 'rgba(0, 0, 0, 0.9)',
+                    color: 'white',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    whiteSpace: 'nowrap',
+                    zIndex: 10000
+                  }}>
+                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>크레딧</div>
+                    <div style={{ fontSize: '11px', opacity: 0.9 }}>업무도구 사용 포인트 (매일 100 리필)</div>
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '100%',
+                      right: '8px',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '5px solid transparent',
+                      borderRight: '5px solid transparent',
+                      borderBottom: '5px solid rgba(0, 0, 0, 0.9)'
+                    }}></div>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
 
@@ -1216,16 +1426,19 @@ function OrdersPageContent() {
       </div>
 
       {/* Main content area */}
-      <div style={{
-        marginLeft: isMobile ? '0' : '175px',
-        paddingLeft: isMobile ? '16px' : '24px',
-        paddingRight: isMobile ? '16px' : '24px',
-        paddingTop: isSampleMode ? '134px' : '90px',
-        paddingBottom: isMobile ? '16px' : '24px',
-        background: 'var(--color-background)',
-        minHeight: '100vh',
-        transition: 'padding-top 0.3s'
-      }}>
+      <div
+        key={refreshKey}
+        style={{
+          marginLeft: isMobile ? '0' : '175px',
+          paddingLeft: isMobile ? '16px' : '24px',
+          paddingRight: isMobile ? '16px' : '24px',
+          paddingTop: isSampleMode ? '134px' : '90px',
+          paddingBottom: isMobile ? '16px' : '24px',
+          background: 'var(--color-background)',
+          minHeight: '100vh',
+          transition: 'padding-top 0.3s'
+        }}
+      >
         {/* Tab Content */}
         {activeTab === '대시보드' && (
           <div style={{

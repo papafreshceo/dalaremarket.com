@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -20,6 +20,7 @@ interface NavItem {
 
 export default function UserHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const [showSubmenu, setShowSubmenu] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -30,8 +31,6 @@ export default function UserHeader() {
   const [expandedSubmenu, setExpandedSubmenu] = useState<string | null>(null);
   const [headerVisible, setHeaderVisible] = useState<boolean>(true);
   const [lastScrollY, setLastScrollY] = useState<number>(0);
-  const [ordersModalOpen, setOrdersModalOpen] = useState<boolean>(false);
-  const [ordersModalLoaded, setOrdersModalLoaded] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -39,6 +38,9 @@ export default function UserHeader() {
   const { showToast } = useToast();
   const [orders, setOrders] = useState<any[]>([]);
   const [cashBalance, setCashBalance] = useState<number>(0);
+  const [creditBalance, setCreditBalance] = useState<number>(0);
+  const [showCashTooltip, setShowCashTooltip] = useState(false);
+  const [showCreditTooltip, setShowCreditTooltip] = useState(false);
 
   // 활동 시간 추적 (로그인 시에만)
   useActivityTracker({
@@ -51,6 +53,28 @@ export default function UserHeader() {
       showToast('오늘 활동 보상 한도에 도달했습니다.', 'info');
     }
   });
+
+  // 발주관리 열기 함수
+  const openOrders = (status?: string | null) => {
+    const isPWACheck = window.matchMedia('(display-mode: standalone)').matches ||
+                       (window.navigator as any).standalone === true;
+    const isMobileCheck = window.innerWidth <= 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    // 모바일이면 항상 라우팅으로 전체화면 전환
+    if (isMobileCheck) {
+      const url = status ? `/platform/orders?status=${status}` : '/platform/orders';
+      router.push(url);
+      return;
+    }
+
+    // 데스크톱: 새 창으로 열기 (주소창 있음, 하지만 PWA 설치 안내 표시)
+    const url = status
+      ? `/platform/orders?status=${status}`
+      : '/platform/orders';
+
+    const windowFeatures = 'width=1400,height=900,resizable=yes,scrollbars=yes';
+    window.open(url, 'dalrea_orders', windowFeatures);
+  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -191,6 +215,42 @@ export default function UserHeader() {
     return () => clearInterval(interval);
   }, [user]);
 
+  // 크레딧 일일 리필 및 잔액 조회
+  useEffect(() => {
+    const handleCreditRefill = async () => {
+      if (!user) {
+        setCreditBalance(0);
+        return;
+      }
+
+      try {
+        // 일일 리필 API 호출 (날짜 바뀌면 자동으로 100으로 리필)
+        const refillResponse = await fetch('/api/credits/daily-refill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const refillData = await refillResponse.json();
+
+        if (refillData.success) {
+          setCreditBalance(refillData.balance);
+
+          // 리필되었을 때만 토스트 표시
+          if (refillData.refilled) {
+            showToast('일일 크레딧 100이 지급되었습니다!', 'success');
+          }
+        }
+      } catch (error) {
+        console.error('크레딧 리필 실패:', error);
+      }
+    };
+
+    handleCreditRefill();
+
+    // 30초마다 크레딧 상태 체크 (날짜 바뀌면 자동 리필)
+    const interval = setInterval(handleCreditRefill, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   // 로그인 보상 자동 지급
   useEffect(() => {
     const claimLoginReward = async () => {
@@ -218,18 +278,6 @@ export default function UserHeader() {
   }, [user]);
 
   // 모달 닫기 메시지 수신
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data.type === 'closeModal') {
-        setOrdersModalOpen(false);
-        setOrdersModalLoaded(false);
-        setSelectedStatus(null); // Reset selected status when modal closes
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
 
   const navItems: NavItem[] = [
     {
@@ -412,7 +460,7 @@ export default function UserHeader() {
                 >
                   {item.text === '발주관리' ? (
                     <button
-                      onClick={() => setOrdersModalOpen(true)}
+                      onClick={() => openOrders()}
                       style={{
                         fontSize: '14px',
                         color: '#212529',
@@ -567,7 +615,7 @@ export default function UserHeader() {
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flex: '0 0 auto' }}>
               {/* 발주관리시스템 버튼 (항상 표시) */}
               <button
-                onClick={() => setOrdersModalOpen(true)}
+                onClick={() => openOrders()}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -624,17 +672,7 @@ export default function UserHeader() {
                     }}
                     onClick={() => {
                       setSelectedStatus(stat.status);
-                      // 모달이 이미 열려있으면 닫았다가 다시 열기
-                      if (ordersModalOpen) {
-                        setOrdersModalOpen(false);
-                        setOrdersModalLoaded(false);
-                        setTimeout(() => {
-                          setOrdersModalOpen(true);
-                        }, 50);
-                      } else {
-                        setOrdersModalLoaded(false);
-                        setOrdersModalOpen(true);
-                      }
+                      openOrders(stat.status);
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = `${config.color}10`;
@@ -655,25 +693,127 @@ export default function UserHeader() {
               <>
                 {/* 캐시 잔액 표시 */}
                 <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&display=swap" rel="stylesheet" />
-                <div style={{
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  flexShrink: 0,
-                  padding: '0px 8px',
-                  border: '1.5px solid #10b981',
-                  borderRadius: '12px',
-                  background: 'transparent'
-                }}
-                title="달래캐시 잔액">
-                  <span style={{
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: '#10b981',
-                    fontFamily: 'Oxanium, monospace',
-                    letterSpacing: '0.5px'
+                <div
+                  style={{
+                    position: 'relative',
+                    display: 'inline-block'
+                  }}
+                  onMouseEnter={() => setShowCashTooltip(true)}
+                  onMouseLeave={() => setShowCashTooltip(false)}
+                >
+                  <div style={{
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '24px',
+                    padding: '0px 6px',
+                    border: '1.5px solid #10b981',
+                    borderRadius: '6px',
+                    background: 'transparent'
                   }}>
-                    {cashBalance.toLocaleString()}
-                  </span>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#10b981',
+                      fontFamily: 'Oxanium, monospace',
+                      letterSpacing: '0.5px',
+                      lineHeight: '1'
+                    }}>
+                      {cashBalance.toLocaleString()}
+                    </span>
+                  </div>
+                  {showCashTooltip && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 8px)',
+                      right: '0',
+                      padding: '8px 12px',
+                      background: 'rgba(0, 0, 0, 0.9)',
+                      color: 'white',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      whiteSpace: 'nowrap',
+                      zIndex: 10000
+                    }}>
+                      <div style={{ fontWeight: '600', marginBottom: '4px' }}>달래캐시</div>
+                      <div style={{ fontSize: '11px', opacity: 0.9 }}>활동/로그인 보상으로 획득</div>
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '100%',
+                        right: '8px',
+                        width: 0,
+                        height: 0,
+                        borderLeft: '5px solid transparent',
+                        borderRight: '5px solid transparent',
+                        borderBottom: '5px solid rgba(0, 0, 0, 0.9)'
+                      }}></div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 툴크레딧 표시 */}
+                <div
+                  style={{
+                    position: 'relative',
+                    display: 'inline-block'
+                  }}
+                  onMouseEnter={() => setShowCreditTooltip(true)}
+                  onMouseLeave={() => setShowCreditTooltip(false)}
+                >
+                  <div style={{
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '24px',
+                    padding: '0px 6px',
+                    border: '1.5px solid #7c3aed',
+                    borderRadius: '6px',
+                    background: 'transparent'
+                  }}>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#7c3aed',
+                      fontFamily: 'Oxanium, monospace',
+                      letterSpacing: '0.5px',
+                      lineHeight: '1'
+                    }}>
+                      {creditBalance.toLocaleString()}
+                    </span>
+                  </div>
+                  {showCreditTooltip && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 8px)',
+                      right: '0',
+                      padding: '8px 12px',
+                      background: 'rgba(0, 0, 0, 0.9)',
+                      color: 'white',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      whiteSpace: 'nowrap',
+                      zIndex: 10000
+                    }}>
+                      <div style={{ fontWeight: '600', marginBottom: '4px' }}>크레딧</div>
+                      <div style={{ fontSize: '11px', opacity: 0.9 }}>업무도구 사용 포인트 (매일 100 리필)</div>
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '100%',
+                        right: '8px',
+                        width: 0,
+                        height: 0,
+                        borderLeft: '5px solid transparent',
+                        borderRight: '5px solid transparent',
+                        borderBottom: '5px solid rgba(0, 0, 0, 0.9)'
+                      }}></div>
+                    </div>
+                  )}
                 </div>
 
                 <span style={{ fontSize: '14px', color: '#495057' }}>
@@ -683,12 +823,12 @@ export default function UserHeader() {
                   <button
                     onClick={() => window.open('/admin/dashboard', '_blank')}
                     style={{
-                      padding: '8px 20px',
+                      padding: '6px 12px',
                       background: '#10b981',
                       color: 'white',
                       border: 'none',
                       borderRadius: '6px',
-                      fontSize: '14px',
+                      fontSize: '12px',
                       cursor: 'pointer'
                     }}
                   >
@@ -698,11 +838,11 @@ export default function UserHeader() {
                 <button
                   onClick={handleLogout}
                   style={{
-                    padding: '8px 20px',
+                    padding: '6px 12px',
                     background: 'white',
                     border: '1px solid #dee2e6',
                     borderRadius: '6px',
-                    fontSize: '14px',
+                    fontSize: '12px',
                     color: '#212529',
                     cursor: 'pointer'
                   }}
@@ -715,11 +855,11 @@ export default function UserHeader() {
                 <button
                   onClick={() => { setAuthModalMode('login'); setAuthModalOpen(true); }}
                   style={{
-                    padding: '8px 20px',
+                    padding: '6px 12px',
                     background: 'white',
                     border: '1px solid #dee2e6',
                     borderRadius: '6px',
-                    fontSize: '14px',
+                    fontSize: '12px',
                     color: '#212529',
                     cursor: 'pointer'
                   }}
@@ -728,14 +868,14 @@ export default function UserHeader() {
                 </button>
 
                 <button
-                  onClick={() => { setAuthModalMode('register'); setAuthModalOpen(true); }}
+                  onClick={() => router.push('/register')}
                   style={{
-                    padding: '8px 20px',
+                    padding: '6px 12px',
                     background: '#2563eb',
                     color: 'white',
                     border: 'none',
                     borderRadius: '6px',
-                    fontSize: '14px',
+                    fontSize: '12px',
                     cursor: 'pointer'
                   }}
                 >
@@ -870,24 +1010,64 @@ export default function UserHeader() {
             <div style={{ marginTop: '24px', padding: '16px 4px', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
               {user ? (
                 <>
-                  {/* 캐시 잔액 표시 (모바일) */}
-                  <div style={{
-                    marginBottom: '12px',
-                    padding: '1px 10px',
-                    border: '1.5px solid #10b981',
-                    borderRadius: '14px',
-                    background: 'transparent',
-                    display: 'inline-block'
-                  }}>
-                    <span style={{
-                      fontSize: '18px',
-                      fontWeight: '600',
-                      color: '#10b981',
-                      fontFamily: 'Oxanium, monospace',
-                      letterSpacing: '0.5px'
-                    }}>
-                      {cashBalance.toLocaleString()}
-                    </span>
+                  {/* 포인트 배지들 (모바일) */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {/* 캐시 잔액 표시 */}
+                      <div>
+                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '2px', fontWeight: '500' }}>달래캐시</div>
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          height: '26px',
+                          padding: '0px 8px',
+                          border: '1.5px solid #10b981',
+                          borderRadius: '8px',
+                          background: 'transparent'
+                        }}>
+                          <span style={{
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            color: '#10b981',
+                            fontFamily: 'Oxanium, monospace',
+                            letterSpacing: '0.5px',
+                            lineHeight: '1'
+                          }}>
+                            {cashBalance.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 툴크레딧 표시 */}
+                      <div>
+                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '2px', fontWeight: '500' }}>크레딧</div>
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          height: '26px',
+                          padding: '0px 8px',
+                          border: '1.5px solid #7c3aed',
+                          borderRadius: '8px',
+                          background: 'transparent'
+                        }}>
+                          <span style={{
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            color: '#7c3aed',
+                            fontFamily: 'Oxanium, monospace',
+                            letterSpacing: '0.5px',
+                            lineHeight: '1'
+                          }}>
+                            {creditBalance.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '4px' }}>
+                      캐시: 활동보상 | 크레딧: 매일 100 리필
+                    </div>
                   </div>
 
                   <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px' }}>
@@ -934,7 +1114,7 @@ export default function UserHeader() {
                     로그인
                   </div>
                   <div
-                    onClick={() => { setAuthModalMode('register'); setAuthModalOpen(true); setMobileMenuOpen(false); }}
+                    onClick={() => { router.push('/register'); setMobileMenuOpen(false); }}
                     style={{
                       padding: '8px 0',
                       fontSize: '15px',
@@ -958,143 +1138,6 @@ export default function UserHeader() {
         initialMode={authModalMode}
       />
 
-      {/* 발주관리 모달 */}
-      {ordersModalOpen && (
-        <>
-          {/* 배경 오버레이 */}
-          <div
-            onClick={() => {
-              setOrdersModalOpen(false);
-              setOrdersModalLoaded(false);
-              setSelectedStatus(null); // Reset selected status when modal closes
-            }}
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0, 0, 0, 0.5)',
-              zIndex: 9998
-            }}
-          />
-
-          {/* 모달 컨텐츠 */}
-          <div style={{
-            position: 'fixed',
-            top: '5vh',
-            left: '5vw',
-            right: '5vw',
-            bottom: '5vh',
-            background: 'transparent',
-            borderRadius: '12px',
-            zIndex: 9999,
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            border: 'none',
-            outline: 'none',
-            boxShadow: 'none'
-          }}>
-            {/* 로딩 화면 */}
-            {!ordersModalLoaded && (
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'var(--color-background)',
-                zIndex: 10001,
-                gap: '24px'
-              }}>
-                {/* 로딩 스피너 */}
-                <div style={{
-                  width: '60px',
-                  height: '60px',
-                  border: '4px solid rgba(37, 99, 235, 0.1)',
-                  borderTop: '4px solid #2563eb',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }} />
-
-                <div style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: 'var(--color-text)',
-                  textAlign: 'center'
-                }}>
-                  발주관리시스템으로 이동중
-                </div>
-
-                <style>{`
-                  @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                  }
-
-                  /* 다크모드 스크롤바 스타일 */
-                  .orders-modal-iframe::-webkit-scrollbar {
-                    width: 12px;
-                  }
-
-                  .orders-modal-iframe::-webkit-scrollbar-track {
-                    background: var(--color-background);
-                  }
-
-                  .orders-modal-iframe::-webkit-scrollbar-thumb {
-                    background: var(--color-border);
-                    border-radius: 6px;
-                  }
-
-                  .orders-modal-iframe::-webkit-scrollbar-thumb:hover {
-                    background: var(--color-text-secondary);
-                  }
-                `}</style>
-              </div>
-            )}
-
-            {/* iframe으로 orders 페이지 로드 */}
-            <iframe
-              key={selectedStatus || 'default'} // Force iframe reload when selectedStatus changes
-              className="orders-modal-iframe"
-              ref={(iframe) => {
-                if (iframe && selectedStatus) {
-                  // iframe이 로드되면 메시지 전송
-                  const sendMessage = () => {
-                    if (iframe.contentWindow) {
-                      iframe.contentWindow.postMessage(
-                        { type: 'setStatus', status: selectedStatus },
-                        window.location.origin
-                      );
-                    }
-                  };
-
-                  // 이미 로드되어 있으면 바로 전송, 아니면 onload 이벤트 대기
-                  if (iframe.contentDocument?.readyState === 'complete') {
-                    setTimeout(sendMessage, 100);
-                  } else {
-                    iframe.addEventListener('load', () => setTimeout(sendMessage, 100), { once: true });
-                  }
-                }
-              }}
-              src={selectedStatus ? `/platform/orders?modal=true&status=${selectedStatus}` : "/platform/orders?modal=true"}
-              onLoad={() => setOrdersModalLoaded(true)}
-              style={{
-                width: '100%',
-                height: '100%',
-                border: 'none',
-                opacity: ordersModalLoaded ? 1 : 0,
-                transition: 'opacity 0.3s'
-              }}
-            />
-          </div>
-        </>
-      )}
     </>
   );
 }

@@ -13,6 +13,15 @@ export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  const handleNaverLogin = () => {
+    const state = Math.random().toString(36).substring(7)
+    const clientId = process.env.NEXT_PUBLIC_NAVER_CLIENT_ID
+    const redirectUri = encodeURIComponent(process.env.NEXT_PUBLIC_NAVER_CALLBACK_URL || 'http://localhost:3002/auth/callback/naver')
+    const naverAuthUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}&auth_type=reprompt`
+
+    window.location.href = naverAuthUrl
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -48,7 +57,7 @@ export default function LoginPage() {
         }
 
         // 리다이렉트 전에 페이지 확인
-        window.location.href = '/platform/dashboard'
+        window.location.href = '/'
       }
     } catch (err) {
       console.error('Login error:', err)  // 에러 상세 확인
@@ -246,24 +255,28 @@ export default function LoginPage() {
                 카카오로 로그인
               </button>
 
-              <button style={{
-                width: '100%',
-                padding: '14px',
-                background: '#03C75A',
-                color: 'white',
-                border: 'none',
-                borderRadius: '12px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'transform 0.2s',
-                boxShadow: '0 2px 8px rgba(3, 199, 90, 0.3)'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
+              <button
+                type="button"
+                onClick={handleNaverLogin}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: '#03C75A',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'transform 0.2s',
+                  boxShadow: '0 2px 8px rgba(3, 199, 90, 0.3)'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              >
                 네이버로 로그인
               </button>
             </div>

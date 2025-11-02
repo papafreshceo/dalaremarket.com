@@ -50,7 +50,9 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
   const [signupForm, setSignupForm] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
+    confirmPassword: '',
     verificationCode: '',
   });
   const [signingUp, setSigningUp] = useState(false);
@@ -346,6 +348,22 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
     }
   };
 
+  // 전화번호 포맷팅 (010-0000-0000)
+  const handlePhoneChange = (value: string) => {
+    const numbers = value.replace(/[^\d]/g, ''); // 숫자만 추출
+    let formatted = numbers;
+
+    if (numbers.length <= 3) {
+      formatted = numbers;
+    } else if (numbers.length <= 7) {
+      formatted = `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+    } else {
+      formatted = `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+    }
+
+    setSignupForm({ ...signupForm, phone: formatted });
+  };
+
   // 회원가입 처리
   const handleSignup = async () => {
     // 필수 항목 검증
@@ -361,12 +379,26 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
       toast.error('이메일 인증을 완료해주세요.');
       return;
     }
+    if (!signupForm.phone.trim()) {
+      toast.error('전화번호를 입력해주세요.');
+      return;
+    }
+    // 전화번호 형식 검증 (010-0000-0000)
+    const phoneNumbers = signupForm.phone.replace(/[^\d]/g, '');
+    if (phoneNumbers.length !== 11) {
+      toast.error('올바른 전화번호 형식이 아닙니다. (11자리)');
+      return;
+    }
     if (!signupForm.password.trim()) {
       toast.error('비밀번호를 입력해주세요.');
       return;
     }
     if (signupForm.password.length < 6) {
       toast.error('비밀번호는 6자 이상이어야 합니다.');
+      return;
+    }
+    if (signupForm.password !== signupForm.confirmPassword) {
+      toast.error('비밀번호가 일치하지 않습니다.');
       return;
     }
 
@@ -380,6 +412,7 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
         options: {
           data: {
             name: signupForm.name,
+            phone: signupForm.phone,
           },
         },
       });
@@ -387,20 +420,23 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
       if (error) throw error;
 
       if (data.user) {
-        // users 테이블에 이름 저장
+        // users 테이블에 이름과 전화번호 저장
         const { error: updateError } = await supabase
           .from('users')
-          .update({ name: signupForm.name })
+          .update({
+            name: signupForm.name,
+            phone: signupForm.phone,
+          })
           .eq('id', data.user.id);
 
         if (updateError) {
-          console.error('이름 저장 실패:', updateError);
+          console.error('사용자 정보 저장 실패:', updateError);
         }
 
         showSuccessToast('회원가입이 완료되었습니다. 로그인해주세요.');
 
         // 폼 초기화
-        setSignupForm({ name: '', email: '', password: '', verificationCode: '' });
+        setSignupForm({ name: '', email: '', phone: '', password: '', confirmPassword: '', verificationCode: '' });
         setCodeSent(false);
         setCodeVerified(false);
         setCountdown(0);
@@ -423,35 +459,65 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
     }
   };
 
+  // 소셜 로그인 처리
+  const handleSocialLogin = async (provider: 'google' | 'kakao' | 'naver') => {
+    try {
+      setSigningUp(true);
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        toast.error(`${provider} 로그인에 실패했습니다.`);
+        setSigningUp(false);
+        return;
+      }
+
+      // 소셜 로그인은 리다이렉트되므로 여기는 실행되지 않음
+    } catch (err) {
+      console.error('Social login error:', err);
+      toast.error('소셜 로그인 중 오류가 발생했습니다.');
+      setSigningUp(false);
+    }
+  };
+
   // 비회원 사용자 안내 및 회원가입 폼
   if (userId === 'guest') {
     return (
       <div style={{
         width: '100%',
-        maxWidth: '600px',
+        maxWidth: '500px',
         margin: '0 auto',
-        padding: '40px 24px'
+        padding: '20px 16px'
       }}>
         {/* 안내 헤더 */}
         <div style={{
           textAlign: 'center',
-          marginBottom: '40px'
+          marginBottom: '24px'
         }}>
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#9ca3af', margin: '0 auto 16px' }}>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#9ca3af', margin: '0 auto 12px' }}>
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="12" y1="8" x2="12" y2="12"></line>
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
           </svg>
           <div style={{
-            fontSize: '20px',
+            fontSize: '18px',
             fontWeight: '600',
             color: 'var(--color-text)',
-            marginBottom: '8px'
+            marginBottom: '6px'
           }}>
             판매자 정보 등록
           </div>
           <div style={{
-            fontSize: '14px',
+            fontSize: '13px',
             color: 'var(--color-text-secondary)'
           }}>
             판매자 정보를 등록하려면 먼저 회원가입이 필요합니다
@@ -463,27 +529,27 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
           background: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
           borderRadius: '12px',
-          padding: '32px',
+          padding: '24px',
           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
         }}>
           <h3 style={{
-            fontSize: '18px',
+            fontSize: '16px',
             fontWeight: '600',
             color: 'var(--color-text)',
-            marginBottom: '24px'
+            marginBottom: '20px'
           }}>
             회원가입
           </h3>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* 이름 */}
             <div>
               <label style={{
                 display: 'block',
-                fontSize: '14px',
+                fontSize: '13px',
                 fontWeight: '500',
                 color: 'var(--color-text)',
-                marginBottom: '8px'
+                marginBottom: '6px'
               }}>
                 이름 <span style={{ color: '#ef4444' }}>*</span>
               </label>
@@ -494,10 +560,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
                 placeholder="홍길동"
                 style={{
                   width: '100%',
-                  padding: '12px',
+                  padding: '10px',
                   border: '1px solid var(--color-border)',
-                  borderRadius: '8px',
-                  fontSize: '14px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
                   background: 'var(--color-background)',
                   color: 'var(--color-text)',
                   boxSizing: 'border-box'
@@ -509,14 +575,14 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
             <div>
               <label style={{
                 display: 'block',
-                fontSize: '14px',
+                fontSize: '13px',
                 fontWeight: '500',
                 color: 'var(--color-text)',
-                marginBottom: '8px'
+                marginBottom: '6px'
               }}>
                 이메일 <span style={{ color: '#ef4444' }}>*</span>
               </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '6px' }}>
                 <input
                   type="email"
                   value={signupForm.email}
@@ -531,10 +597,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
                   placeholder="example@example.com"
                   style={{
                     flex: 1,
-                    padding: '12px',
+                    padding: '10px',
                     border: '1px solid var(--color-border)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
                     background: codeVerified ? 'var(--color-surface)' : 'var(--color-background)',
                     color: 'var(--color-text)',
                     boxSizing: 'border-box'
@@ -544,16 +610,16 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
                   onClick={handleSendVerificationCode}
                   disabled={sendingCode || codeVerified || countdown > 0}
                   style={{
-                    padding: '12px 20px',
+                    padding: '10px 16px',
                     background: codeVerified ? '#10b981' : (sendingCode || countdown > 0) ? '#9ca3af' : '#2563eb',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '14px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
                     fontWeight: '500',
                     cursor: (sendingCode || codeVerified || countdown > 0) ? 'not-allowed' : 'pointer',
                     whiteSpace: 'nowrap',
-                    minWidth: '100px'
+                    minWidth: '90px'
                   }}
                 >
                   {codeVerified ? '인증완료' : sendingCode ? '발송 중...' : countdown > 0 ? `${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}` : '인증번호 발송'}
@@ -561,19 +627,50 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               </div>
             </div>
 
+            {/* 전화번호 */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: 'var(--color-text)',
+                marginBottom: '6px'
+              }}>
+                전화번호 <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input
+                type="tel"
+                value={signupForm.phone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                placeholder="010-0000-0000"
+                maxLength={13}
+                autoComplete="off"
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  background: 'var(--color-background)',
+                  color: 'var(--color-text)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
             {/* 인증번호 입력 */}
             {codeSent && !codeVerified && (
               <div>
                 <label style={{
                   display: 'block',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: '500',
                   color: 'var(--color-text)',
-                  marginBottom: '8px'
+                  marginBottom: '6px'
                 }}>
                   인증번호 <span style={{ color: '#ef4444' }}>*</span>
                 </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '6px' }}>
                   <input
                     type="text"
                     value={signupForm.verificationCode}
@@ -582,10 +679,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
                     maxLength={6}
                     style={{
                       flex: 1,
-                      padding: '12px',
+                      padding: '10px',
                       border: '1px solid var(--color-border)',
-                      borderRadius: '8px',
-                      fontSize: '14px',
+                      borderRadius: '6px',
+                      fontSize: '13px',
                       background: 'var(--color-background)',
                       color: 'var(--color-text)',
                       boxSizing: 'border-box'
@@ -598,25 +695,25 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
                     onClick={handleVerifyCode}
                     disabled={verifyingCode}
                     style={{
-                      padding: '12px 20px',
+                      padding: '10px 16px',
                       background: verifyingCode ? '#9ca3af' : '#10b981',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '14px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
                       fontWeight: '500',
                       cursor: verifyingCode ? 'not-allowed' : 'pointer',
                       whiteSpace: 'nowrap',
-                      minWidth: '100px'
+                      minWidth: '90px'
                     }}
                   >
                     {verifyingCode ? '확인 중...' : '인증확인'}
                   </button>
                 </div>
                 <div style={{
-                  fontSize: '12px',
+                  fontSize: '11px',
                   color: 'var(--color-text-secondary)',
-                  marginTop: '6px'
+                  marginTop: '4px'
                 }}>
                   이메일로 발송된 6자리 인증번호를 입력해주세요
                 </div>
@@ -627,10 +724,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
             <div>
               <label style={{
                 display: 'block',
-                fontSize: '14px',
+                fontSize: '13px',
                 fontWeight: '500',
                 color: 'var(--color-text)',
-                marginBottom: '8px'
+                marginBottom: '6px'
               }}>
                 비밀번호 <span style={{ color: '#ef4444' }}>*</span>
               </label>
@@ -639,12 +736,42 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
                 value={signupForm.password}
                 onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
                 placeholder="6자 이상 입력"
+                autoComplete="new-password"
                 style={{
                   width: '100%',
-                  padding: '12px',
+                  padding: '10px',
                   border: '1px solid var(--color-border)',
-                  borderRadius: '8px',
-                  fontSize: '14px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  background: 'var(--color-background)',
+                  color: 'var(--color-text)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* 비밀번호 확인 */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: 'var(--color-text)',
+                marginBottom: '6px'
+              }}>
+                비밀번호 확인 <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input
+                type="password"
+                value={signupForm.confirmPassword}
+                onChange={(e) => setSignupForm({ ...signupForm, confirmPassword: e.target.value })}
+                placeholder="비밀번호 재입력"
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '6px',
+                  fontSize: '13px',
                   background: 'var(--color-background)',
                   color: 'var(--color-text)',
                   boxSizing: 'border-box'
@@ -653,13 +780,15 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
                   if (e.key === 'Enter') handleSignup();
                 }}
               />
-              <div style={{
-                fontSize: '12px',
-                color: 'var(--color-text-secondary)',
-                marginTop: '6px'
-              }}>
-                비밀번호는 6자 이상이어야 합니다
-              </div>
+              {signupForm.confirmPassword && (
+                <div style={{
+                  fontSize: '11px',
+                  color: signupForm.password === signupForm.confirmPassword ? '#10b981' : '#ef4444',
+                  marginTop: '4px'
+                }}>
+                  {signupForm.password === signupForm.confirmPassword ? '✓ 비밀번호가 일치합니다' : '✗ 비밀번호가 일치하지 않습니다'}
+                </div>
+              )}
             </div>
 
             {/* 회원가입 버튼 */}
@@ -668,16 +797,16 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               disabled={signingUp}
               style={{
                 width: '100%',
-                padding: '14px',
+                padding: '11px',
                 background: signingUp ? '#9ca3af' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                 color: 'white',
                 border: 'none',
-                borderRadius: '8px',
-                fontSize: '16px',
+                borderRadius: '6px',
+                fontSize: '14px',
                 fontWeight: '600',
                 cursor: signingUp ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s',
-                marginTop: '8px'
+                marginTop: '4px'
               }}
               onMouseEnter={(e) => {
                 if (!signingUp) {
@@ -690,8 +819,129 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
                 e.currentTarget.style.boxShadow = 'none';
               }}
             >
-              {signingUp ? '가입 중...' : '회원가입'}
+              {signingUp ? '가입 중...' : '이메일로 가입하기'}
             </button>
+
+            {/* 소셜 로그인 구분선 */}
+            <div style={{ position: 'relative', textAlign: 'center', margin: '16px 0 12px' }}>
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                width: '100%',
+                height: '1px',
+                background: 'linear-gradient(to right, transparent, var(--color-border), transparent)'
+              }}></div>
+              <span style={{
+                position: 'relative',
+                background: 'var(--color-surface)',
+                padding: '0 12px',
+                fontSize: '11px',
+                color: 'var(--color-text-secondary)',
+                fontWeight: '500'
+              }}>간편 가입</span>
+            </div>
+
+            {/* 소셜 로그인 버튼들 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* 구글 */}
+              <button
+                type="button"
+                onClick={() => handleSocialLogin('google')}
+                disabled={signingUp}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  background: '#ffffff',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: signingUp ? 'not-allowed' : 'pointer',
+                  opacity: signingUp ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)'
+                }}
+                onMouseEnter={(e) => {
+                  if (!signingUp) {
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.12)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!signingUp) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.08)';
+                  }
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                구글로 가입하기
+              </button>
+
+              {/* 카카오 */}
+              <button
+                type="button"
+                onClick={() => handleSocialLogin('kakao')}
+                disabled={signingUp}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  background: '#FEE500',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: signingUp ? 'not-allowed' : 'pointer',
+                  opacity: signingUp ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'transform 0.2s',
+                  boxShadow: '0 1px 3px rgba(254, 229, 0, 0.3)'
+                }}
+                onMouseEnter={(e) => !signingUp && (e.currentTarget.style.transform = 'translateY(-1px)')}
+                onMouseLeave={(e) => !signingUp && (e.currentTarget.style.transform = 'translateY(0)')}
+              >
+                카카오로 가입하기
+              </button>
+
+              {/* 네이버 */}
+              <button
+                type="button"
+                onClick={() => handleSocialLogin('naver')}
+                disabled={signingUp}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  background: '#03C75A',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: signingUp ? 'not-allowed' : 'pointer',
+                  opacity: signingUp ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'transform 0.2s',
+                  boxShadow: '0 1px 3px rgba(3, 199, 90, 0.3)'
+                }}
+                onMouseEnter={(e) => !signingUp && (e.currentTarget.style.transform = 'translateY(-1px)')}
+                onMouseLeave={(e) => !signingUp && (e.currentTarget.style.transform = 'translateY(0)')}
+              >
+                네이버로 가입하기
+              </button>
+            </div>
           </div>
         </div>
       </div>
