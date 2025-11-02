@@ -13,15 +13,9 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // 현재 로그인한 사용자 확인
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: '인증이 필요합니다.' },
-        { status: 401 }
-      );
-    }
+    // 현재 로그인한 사용자 확인 (선택적)
+    const { data: { user } } = await supabase.auth.getUser();
+    const isAuthenticated = !!user;
 
     const body = await request.json();
 
@@ -55,49 +49,53 @@ export async function POST(request: NextRequest) {
     const vatAmount = 0; // 부가세 없음
     const totalAmount = supplyAmount; // 공급가액 = 총액
 
-    // 3. Supabase에 저장 (Service role client 사용 - RLS 우회)
-    const { createClient: createServiceClient } = await import('@supabase/supabase-js');
-    const supabaseAdmin = createServiceClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
-    const { error: insertError } = await supabaseAdmin
-      .from('transaction_statements')
-      .insert({
-        id: docId,
-        doc_number: docNumber,
-        seller_id: user.id,
-        buyer_id: body.buyerId || null,
-        seller_name: body.sellerInfo?.name || '달래마켓',
-        seller_business_number: body.sellerInfo?.businessNumber || '107-30-96371',
-        seller_representative: body.sellerInfo?.representative || '대표자',
-        seller_address: body.sellerInfo?.address || '주소',
-        seller_phone: body.sellerInfo?.phone || '02-1234-5678',
-        seller_email: body.sellerInfo?.email || 'contact@dalraemarket.com',
-        buyer_name: body.buyerInfo.name,
-        buyer_business_number: body.buyerInfo.businessNumber || '',
-        buyer_representative: body.buyerInfo.representative || '',
-        buyer_address: body.buyerInfo.address || '',
-        buyer_phone: body.buyerInfo.phone || '',
-        buyer_email: body.buyerInfo.email || '',
-        items: JSON.stringify(items),
-        supply_amount: supplyAmount,
-        vat_amount: vatAmount,
-        total_amount: totalAmount,
-        notes: body.notes || null,
-        status: 'issued'
-      });
-
-    if (insertError) {
-      console.error('[statements/generate] DB 저장 실패:', insertError);
-      return NextResponse.json(
-        { success: false, error: 'DB 저장 실패' },
-        { status: 500 }
+    // 3. Supabase에 저장 (인증된 사용자만 - 비회원은 DB 저장 건너뜀)
+    if (isAuthenticated && user) {
+      const { createClient: createServiceClient } = await import('@supabase/supabase-js');
+      const supabaseAdmin = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
-    }
 
-    console.log(`[statements/generate] ✅ 문서 생성 성공! ID: ${docId}, 문서번호: ${docNumber}`);
+      const { error: insertError } = await supabaseAdmin
+        .from('transaction_statements')
+        .insert({
+          id: docId,
+          doc_number: docNumber,
+          seller_id: user.id,
+          buyer_id: body.buyerId || null,
+          seller_name: body.sellerInfo?.name || '달래마켓',
+          seller_business_number: body.sellerInfo?.businessNumber || '107-30-96371',
+          seller_representative: body.sellerInfo?.representative || '대표자',
+          seller_address: body.sellerInfo?.address || '주소',
+          seller_phone: body.sellerInfo?.phone || '02-1234-5678',
+          seller_email: body.sellerInfo?.email || 'contact@dalraemarket.com',
+          buyer_name: body.buyerInfo.name,
+          buyer_business_number: body.buyerInfo.businessNumber || '',
+          buyer_representative: body.buyerInfo.representative || '',
+          buyer_address: body.buyerInfo.address || '',
+          buyer_phone: body.buyerInfo.phone || '',
+          buyer_email: body.buyerInfo.email || '',
+          items: JSON.stringify(items),
+          supply_amount: supplyAmount,
+          vat_amount: vatAmount,
+          total_amount: totalAmount,
+          notes: body.notes || null,
+          status: 'issued'
+        });
+
+      if (insertError) {
+        console.error('[statements/generate] DB 저장 실패:', insertError);
+        return NextResponse.json(
+          { success: false, error: 'DB 저장 실패' },
+          { status: 500 }
+        );
+      }
+
+      console.log(`[statements/generate] ✅ 문서 생성 성공! ID: ${docId}, 문서번호: ${docNumber}`);
+    } else {
+      console.log(`[statements/generate] 📄 비회원 샘플 PDF 생성 (DB 저장 안 함)`);
+    }
 
     // 4. QR코드 생성
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ||

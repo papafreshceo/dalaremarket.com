@@ -565,97 +565,92 @@ export default function UserHeader() {
           {/* 우측: 발주관리시스템 버튼 + 상태 통계 배지 + 로그인 정보/버튼들 (데스크톱) */}
           {!isMobile && (
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flex: '0 0 auto' }}>
-              {/* 발주관리시스템 버튼 + 상태 통계 배지 (로그인 시) */}
-              {user && (
-                <>
-                  {/* 발주관리시스템 버튼 */}
-                  <button
-                    onClick={() => setOrdersModalOpen(true)}
+              {/* 발주관리시스템 버튼 (항상 표시) */}
+              <button
+                onClick={() => setOrdersModalOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  background: 'white',
+                  border: '1px solid #2563eb',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#2563eb',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#2563eb';
+                  e.currentTarget.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'white';
+                  e.currentTarget.style.color = '#2563eb';
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                발주관리시스템
+              </button>
+
+              {/* 상태 통계 배지들 (로그인 시에만 표시) */}
+              {user && statsData.map((stat) => {
+                const config = statusConfig[stat.status];
+                if (!config || stat.count === 0) return null;
+                return (
+                  <div
+                    key={stat.status}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      padding: '6px 14px',
+                      gap: '3px',
+                      padding: '3px 8px',
+                      borderRadius: '4px',
                       background: 'white',
-                      border: '1px solid #2563eb',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      color: '#2563eb',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
+                      border: `1px solid ${config.color}30`,
+                      fontSize: '11px',
+                      fontWeight: '500',
                       whiteSpace: 'nowrap',
-                      flexShrink: 0
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onClick={() => {
+                      setSelectedStatus(stat.status);
+                      // 모달이 이미 열려있으면 닫았다가 다시 열기
+                      if (ordersModalOpen) {
+                        setOrdersModalOpen(false);
+                        setOrdersModalLoaded(false);
+                        setTimeout(() => {
+                          setOrdersModalOpen(true);
+                        }, 50);
+                      } else {
+                        setOrdersModalLoaded(false);
+                        setOrdersModalOpen(true);
+                      }
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#2563eb';
-                      e.currentTarget.style.color = 'white';
+                      e.currentTarget.style.background = `${config.color}10`;
+                      e.currentTarget.style.borderColor = config.color;
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = 'white';
-                      e.currentTarget.style.color = '#2563eb';
+                      e.currentTarget.style.borderColor = `${config.color}30`;
                     }}
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                      <polyline points="16 17 21 12 16 7"></polyline>
-                      <line x1="21" y1="12" x2="9" y2="12"></line>
-                    </svg>
-                    발주관리시스템
-                  </button>
-
-                  {/* 상태 통계 배지들 (0인 항목은 숨김) */}
-                  {statsData.map((stat) => {
-                    const config = statusConfig[stat.status];
-                    if (!config || stat.count === 0) return null;
-                    return (
-                      <div
-                        key={stat.status}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          background: 'white',
-                          border: `1px solid ${config.color}30`,
-                          fontSize: '11px',
-                          fontWeight: '500',
-                          whiteSpace: 'nowrap',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onClick={() => {
-                          setSelectedStatus(stat.status);
-                          // 모달이 이미 열려있으면 닫았다가 다시 열기
-                          if (ordersModalOpen) {
-                            setOrdersModalOpen(false);
-                            setOrdersModalLoaded(false);
-                            setTimeout(() => {
-                              setOrdersModalOpen(true);
-                            }, 50);
-                          } else {
-                            setOrdersModalLoaded(false);
-                            setOrdersModalOpen(true);
-                          }
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = `${config.color}10`;
-                          e.currentTarget.style.borderColor = config.color;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'white';
-                          e.currentTarget.style.borderColor = `${config.color}30`;
-                        }}
-                      >
-                        <span style={{ color: config.color, fontSize: '8px' }}>●</span>
-                        <span style={{ color: '#6b7280' }}>{config.label}</span>
-                        <span style={{ color: config.color, fontWeight: '600' }}>{stat.count}</span>
-                      </div>
-                    );
-                  })}
-                </>
-              )}
+                    <span style={{ color: config.color, fontSize: '8px' }}>●</span>
+                    <span style={{ color: '#6b7280' }}>{config.label}</span>
+                    <span style={{ color: config.color, fontWeight: '600' }}>{stat.count}</span>
+                  </div>
+                );
+              })}
             {user ? (
               <>
                 {/* 캐시 잔액 표시 */}

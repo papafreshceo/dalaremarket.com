@@ -14,7 +14,7 @@ interface OptionProduct {
 interface SampleOrder {
   orderNumber: string;
   orderDate: string; // YYYY-MM-DD
-  sellerMarketName: string;
+  sellerMarketName: string | null;
   optionName: string;
   quantity: number;
   supplyPrice: number;
@@ -23,7 +23,7 @@ interface SampleOrder {
   shippingCompany: string | null;
 }
 
-const MARKETS = ['쿠팡', '네이버', 'B2B', '자사몰'];
+const MARKETS = ['쿠팡', '네이버', '자사몰'];
 const SHIPPING_COMPANIES = ['CJ대한통운', '로젠택배', '한진택배', '우체국택배'];
 
 /**
@@ -147,8 +147,8 @@ export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrd
       // 랜덤 옵션 상품 선택
       const product = optionProducts[Math.floor(Math.random() * optionProducts.length)];
 
-      // 랜덤 마켓 선택
-      const market = MARKETS[Math.floor(Math.random() * MARKETS.length)];
+      // 랜덤 마켓 선택 (20% 확률로 마켓 미지정)
+      const market = Math.random() < 0.2 ? null : MARKETS[Math.floor(Math.random() * MARKETS.length)];
 
       // 공급가: 실제 seller_supply_price가 있으면 사용, 없으면 5,000원 ~ 50,000원 랜덤
       const supplyPrice = product.seller_supply_price && product.seller_supply_price > 0
@@ -167,87 +167,57 @@ export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrd
 
       usedBudget += orderTotal;
 
-      // 배송 상태: 날짜에 따라 다른 분포 (더 균등하고 자연스럽게)
+      // 배송 상태: 발주확정일로부터 경과 시간에 따라 자연스럽게 변화
+      // 오늘 날짜와 발주확정일(currentDate)의 차이 계산
+      const daysFromConfirm = Math.floor((today.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+
       const statusRand = Math.random();
       let shippingStatus: string;
       let invoiceNumber: string | null;
       let shippingCompany: string | null;
 
-      if (isToday) {
-        // 오늘: 주로 발주서등록/확정, 가끔 빠른 처리도
-        if (statusRand < 0.5) {
+      if (daysFromConfirm >= 2) {
+        // 발주확정 후 2일 이상 경과: 99% 발송완료, 0.5% 취소, 0.5% 환불
+        if (statusRand < 0.99) {
+          shippingStatus = '배송완료';
+          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
+          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
+        } else if (statusRand < 0.995) {
+          shippingStatus = '취소완료';
+          invoiceNumber = null;
+          shippingCompany = null;
+        } else {
+          shippingStatus = '환불완료';
+          invoiceNumber = null;
+          shippingCompany = null;
+        }
+      } else if (daysFromConfirm === 1) {
+        // 발주확정 후 1일: 10% 발주서확정, 30% 상품준비중, 60% 배송완료
+        if (statusRand < 0.10) {
+          shippingStatus = '발주서확정';
+          invoiceNumber = null;
+          shippingCompany = null;
+        } else if (statusRand < 0.40) {
+          shippingStatus = '상품준비중';
+          invoiceNumber = null;
+          shippingCompany = null;
+        } else {
+          shippingStatus = '배송완료';
+          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
+          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
+        }
+      } else {
+        // 발주확정 당일(0일): 30% 발주서등록, 50% 발주서확정, 20% 상품준비중
+        if (statusRand < 0.30) {
           shippingStatus = '발주서등록';
           invoiceNumber = null;
           shippingCompany = null;
-        } else if (statusRand < 0.8) {
+        } else if (statusRand < 0.80) {
           shippingStatus = '발주서확정';
           invoiceNumber = null;
           shippingCompany = null;
-        } else if (statusRand < 0.95) {
+        } else {
           shippingStatus = '상품준비중';
-          invoiceNumber = null;
-          shippingCompany = null;
-        } else {
-          // 5% - 당일 발송
-          shippingStatus = '배송중';
-          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
-          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
-        }
-      } else if (isThisWeek) {
-        // 이번주: 다양한 진행 단계
-        if (statusRand < 0.15) {
-          shippingStatus = '발주서확정';
-          invoiceNumber = null;
-          shippingCompany = null;
-        } else if (statusRand < 0.35) {
-          shippingStatus = '상품준비중';
-          invoiceNumber = null;
-          shippingCompany = null;
-        } else if (statusRand < 0.7) {
-          shippingStatus = '배송중';
-          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
-          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
-        } else if (statusRand < 0.998) {
-          shippingStatus = '배송완료';
-          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
-          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
-        } else {
-          // 0.2% - 취소 (매우 드물게)
-          shippingStatus = '취소완료';
-          invoiceNumber = null;
-          shippingCompany = null;
-        }
-      } else if (isThisMonth) {
-        // 이번달: 대부분 배송완료, 일부 진행중
-        if (statusRand < 0.1) {
-          shippingStatus = '배송중';
-          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
-          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
-        } else if (statusRand < 0.997) {
-          shippingStatus = '배송완료';
-          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
-          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
-        } else if (statusRand < 0.999) {
-          shippingStatus = '취소완료';
-          invoiceNumber = null;
-          shippingCompany = null;
-        } else {
-          shippingStatus = '환불완료';
-          invoiceNumber = null;
-          shippingCompany = null;
-        }
-      } else {
-        // 이전: 모두 완료된 상태
-        if (statusRand < 0.997) {
-          shippingStatus = '배송완료';
-          invoiceNumber = String(Math.floor(Math.random() * 900000000000) + 100000000000);
-          shippingCompany = SHIPPING_COMPANIES[Math.floor(Math.random() * SHIPPING_COMPANIES.length)];
-        } else if (statusRand < 0.999) {
-          shippingStatus = '취소완료';
-          invoiceNumber = null;
-          shippingCompany = null;
-        } else {
-          shippingStatus = '환불완료';
           invoiceNumber = null;
           shippingCompany = null;
         }
@@ -295,16 +265,40 @@ export function convertSampleOrdersToDBFormat(sampleOrders: SampleOrder[], selle
       return utcDate.toISOString();
     };
 
-    const orderDateTime = kstToUTC(order.orderDate, 9); // KST 오전 9시
-
-    // 발주확정일시: 발주서등록 상태만 null, 나머지는 모두 확정됨
+    // order.orderDate를 발주확정일 기준으로 사용
     const confirmedDateTime = order.shippingStatus === '발주서등록'
       ? null
       : kstToUTC(order.orderDate, 10); // KST 오전 10시 확정
 
-    const shippedDateTime = order.shippingStatus === '배송완료' || order.shippingStatus === '배송중'
-      ? kstToUTC(order.orderDate, 14) // KST 오후 2시 발송
-      : null;
+    // 등록일(created_at): 확정일보다 0~2일 전
+    let orderDateTime: string;
+    if (order.shippingStatus === '발주서등록') {
+      // 발주서등록 상태: orderDate가 등록일
+      orderDateTime = kstToUTC(order.orderDate, 9);
+    } else {
+      // 나머지 상태: 확정일보다 0~2일 전에 등록
+      const daysBeforeConfirm = Math.floor(Math.random() * 3); // 0, 1, 2일 전
+      const [year, month, day] = order.orderDate.split('-').map(Number);
+      const confirmDate = new Date(year, month - 1, day);
+      confirmDate.setDate(confirmDate.getDate() - daysBeforeConfirm);
+      const regYear = confirmDate.getFullYear();
+      const regMonth = String(confirmDate.getMonth() + 1).padStart(2, '0');
+      const regDay = String(confirmDate.getDate()).padStart(2, '0');
+      orderDateTime = kstToUTC(`${regYear}-${regMonth}-${regDay}`, 9);
+    }
+
+    // 발송일(shipped_date): 확정일보다 1~5일 후
+    let shippedDateTime: string | null = null;
+    if (order.shippingStatus === '배송완료') {
+      const daysAfterConfirm = Math.floor(Math.random() * 5) + 1; // 1~5일 후
+      const [year, month, day] = order.orderDate.split('-').map(Number);
+      const confirmDate = new Date(year, month - 1, day);
+      confirmDate.setDate(confirmDate.getDate() + daysAfterConfirm);
+      const shipYear = confirmDate.getFullYear();
+      const shipMonth = String(confirmDate.getMonth() + 1).padStart(2, '0');
+      const shipDay = String(confirmDate.getDate()).padStart(2, '0');
+      shippedDateTime = kstToUTC(`${shipYear}-${shipMonth}-${shipDay}`, 14);
+    }
 
     // 취소/환불 관련 필드
     const isCanceled = order.shippingStatus === '취소완료';

@@ -95,9 +95,153 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     return t >= startYmd && t <= endYmd; // 문자열 비교로 안전
   }
 
-  // 집계 기준 필드(원하시는 걸로 통일: registeredAt/confirmedAt/shippedDate 등)
-  const BASE_FIELD: keyof Order = 'registeredAt';
-  const getBaseDate = (o: Order) => fromDbUTC(o[BASE_FIELD] as any);
+  // 주차 계산 (ISO 8601: 월요일 시작, 첫 목요일이 있는 주가 1주차)
+  function getISOWeek(d: Date): { year: number; week: number } {
+    const k = toKst(d);
+    const date = new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()));
+    const dayNum = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return { year: date.getUTCFullYear(), week: weekNo };
+  }
+
+  function yearWeekKey(d: Date) {
+    const { year, week } = getISOWeek(d);
+    return `${year}-W${String(week).padStart(2, '0')}`;
+  }
+
+  function yearMonthKey(d: Date) {
+    const k = toKst(d);
+    const y = k.getUTCFullYear();
+    const m = String(k.getUTCMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  }
+
+  // ISO Week를 해당 주의 월요일 날짜로 변환
+  function weekKeyToMonday(weekKey: string): string {
+    // weekKey 형식: "2025-W41"
+    const [yearStr, weekStr] = weekKey.split('-W');
+    const year = parseInt(yearStr, 10);
+    const week = parseInt(weekStr, 10);
+
+    // ISO Week의 첫 번째 날(월요일) 계산
+    const jan4 = new Date(Date.UTC(year, 0, 4)); // 1월 4일은 항상 1주차에 속함
+    const jan4Day = jan4.getUTCDay() || 7; // 일요일=7
+    const weekOneMonday = new Date(jan4);
+    weekOneMonday.setUTCDate(jan4.getUTCDate() - jan4Day + 1); // 1주차 월요일
+
+    // 해당 주의 월요일 계산
+    const targetMonday = new Date(weekOneMonday);
+    targetMonday.setUTCDate(weekOneMonday.getUTCDate() + (week - 1) * 7);
+
+    // YYYY-MM-DD 형식으로 반환
+    const y = targetMonday.getUTCFullYear();
+    const m = String(targetMonday.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(targetMonday.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // ISO Week를 "2025-10-W1" 형식으로 변환 (해당 월의 몇째주인지)
+  function formatWeekForTooltip(weekKey: string): string {
+    // weekKey 형식: "2025-W41"
+    const mondayDate = weekKeyToMonday(weekKey);
+    const [yearStr, monthStr, dayStr] = mondayDate.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    const day = parseInt(dayStr, 10);
+
+    // 해당 월의 1일 구하기
+    const firstDay = new Date(Date.UTC(year, month - 1, 1));
+    const firstDayOfWeek = firstDay.getUTCDay(); // 0(일) ~ 6(토)
+
+    // 1일이 속한 주의 월요일 구하기
+    const firstMonday = new Date(firstDay);
+    if (firstDayOfWeek === 0) {
+      // 1일이 일요일이면 다음 월요일이 첫째주 시작
+      firstMonday.setUTCDate(2);
+    } else if (firstDayOfWeek === 1) {
+      // 1일이 월요일이면 그대로
+      firstMonday.setUTCDate(1);
+    } else {
+      // 1일이 화~토요일이면 그 주의 월요일 (이전 주로 갈 수 있음)
+      firstMonday.setUTCDate(1 - (firstDayOfWeek - 1));
+    }
+
+    // 해당 월요일과 첫째주 월요일 사이의 주 차이 계산
+    const targetDate = new Date(Date.UTC(year, month - 1, day));
+    const weekDiff = Math.floor((targetDate.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    const weekOfMonth = weekDiff + 1;
+
+    return `${year}-${String(month).padStart(2, '0')}-W${weekOfMonth}`;
+  }
+
+  // startDate와 endDate 사이의 모든 기간 생성 (일/주/월)
+  function getAllPeriods(startYmd: string, endYmd: string, unit: 'day' | 'week' | 'month'): string[] {
+    const start = new Date(startYmd);
+    const end = new Date(endYmd);
+    const periods: string[] = [];
+
+    if (unit === 'day') {
+      // 평일만 생성 (주말 제외)
+      const current = new Date(start);
+      while (current <= end) {
+        const dayOfWeek = current.getDay(); // 0=일요일, 6=토요일
+        // 주말(토, 일) 제외
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          const y = current.getFullYear();
+          const m = String(current.getMonth() + 1).padStart(2, '0');
+          const d = String(current.getDate()).padStart(2, '0');
+          periods.push(`${y}-${m}-${d}`);
+        }
+        current.setDate(current.getDate() + 1);
+      }
+    } else if (unit === 'week') {
+      // 모든 주차 생성
+      const current = new Date(start);
+      const seenWeeks = new Set<string>();
+
+      while (current <= end) {
+        const weekKey = yearWeekKey(current);
+        if (!seenWeeks.has(weekKey)) {
+          periods.push(weekKey);
+          seenWeeks.add(weekKey);
+        }
+        current.setDate(current.getDate() + 1);
+      }
+    } else { // month
+      // 모든 월 생성
+      const startYear = start.getFullYear();
+      const startMonth = start.getMonth();
+      const endYear = end.getFullYear();
+      const endMonth = end.getMonth();
+
+      let currentYear = startYear;
+      let currentMonth = startMonth;
+
+      while (currentYear < endYear || (currentYear === endYear && currentMonth <= endMonth)) {
+        const y = currentYear;
+        const m = String(currentMonth + 1).padStart(2, '0');
+        periods.push(`${y}-${m}`);
+
+        currentMonth++;
+        if (currentMonth > 11) {
+          currentMonth = 0;
+          currentYear++;
+        }
+      }
+    }
+
+    return periods;
+  }
+
+  // 집계 기준 필드: 발주확정일시 기준으로 통계 집계
+  const BASE_FIELD: keyof Order = 'confirmedAt';
+  const getBaseDate = (o: Order) => {
+    // confirmedAt이 없으면 registeredAt 사용 (발주서등록 상태인 경우)
+    const date = fromDbUTC(o.confirmedAt as any) || fromDbUTC(o.registeredAt as any);
+    return date;
+  };
 
   const [hoveredBadge, setHoveredBadge] = useState<{ type: string; amount: number; position: { x: number; y: number } } | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<Order['status'] | null>(null);
@@ -105,8 +249,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
   // 품목/옵션별 통계 상태
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+  const [currentProductForOptions, setCurrentProductForOptions] = useState<string | null>(null); // 옵션 TOP 10 필터용
   const [selectedProductMarkets, setSelectedProductMarkets] = useState<string[]>([]);
   const [selectedOptionMarkets, setSelectedOptionMarkets] = useState<string[]>([]);
+  const [productTimeUnit, setProductTimeUnit] = useState<'day' | 'week' | 'month'>('day');
+  const [optionTimeUnit, setOptionTimeUnit] = useState<'day' | 'week' | 'month'>('day');
+  const [showProductMarketTotal, setShowProductMarketTotal] = useState(false);
+  const [showOptionMarketTotal, setShowOptionMarketTotal] = useState(false);
 
   // 그래프 툴팁 상태
   const [tooltip, setTooltip] = useState<{x: number, y: number, item: string, market: string, date: string, amount: number} | null>(null);
@@ -129,6 +278,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     return formatYmdKst(start);
   });
   const [endDate, setEndDate] = useState(() => formatYmdKst(new Date()));
+  const [activeDateFilter, setActiveDateFilter] = useState<'today' | 'yesterday' | '7days' | '30days' | '90days' | '365days' | 'thisYear' | null>('7days');
 
   // 이번 달 첫날과 마지막 날
   const firstDayOfMonth = useMemo(() => new Date(currentYear, currentMonth - 1, 1), [currentYear, currentMonth]);
@@ -198,23 +348,31 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     start.setDate(start.getDate() - days + 1);
     setStartDate(formatYmdKst(start));
     setEndDate(formatYmdKst(end));
+    if (days === 7) setActiveDateFilter('7days');
+    else if (days === 30) setActiveDateFilter('30days');
+    else if (days === 90) setActiveDateFilter('90days');
+    else if (days === 365) setActiveDateFilter('365days');
+    else setActiveDateFilter(null);
   };
   const handleToday = () => {
     const t = new Date();
     setStartDate(formatYmdKst(t));
     setEndDate(formatYmdKst(t));
+    setActiveDateFilter('today');
   };
   const handleYesterday = () => {
     const y = new Date();
     y.setDate(y.getDate() - 1);
     setStartDate(formatYmdKst(y));
     setEndDate(formatYmdKst(y));
+    setActiveDateFilter('yesterday');
   };
   const handleThisYear = () => {
     const t = new Date();
     const year = toKst(t).getUTCFullYear();
     setStartDate(`${year}-01-01`);
     setEndDate(formatYmdKst(t));
+    setActiveDateFilter('thisYear');
   };
 
   // 날짜별 주문 집계 (발주서확정일 기준) - UTC→KST
@@ -400,23 +558,37 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
   // 날짜/상태로 필터링 (차트 표시용)
   const filteredOrders = useMemo(() => {
-    return dateFilteredOrders.filter(order => {
+    const filtered = dateFilteredOrders.filter(order => {
       if (selectedStatus && order.status !== selectedStatus) return false;
       return true;
     });
+
+    console.log(`[filteredOrders] 선택된 상태: ${selectedStatus}`);
+    console.log(`[filteredOrders] 날짜 필터 후: ${dateFilteredOrders.length}개`);
+    console.log(`[filteredOrders] 상태 필터 후: ${filtered.length}개`);
+    if (filtered.length > 0) {
+      console.log(`[filteredOrders] 첫 주문 샘플:`, {
+        status: filtered[0].status,
+        date: filtered[0].registeredAt,
+        amount: filtered[0].supplyPrice
+      });
+    }
+
+    return filtered;
   }, [dateFilteredOrders, selectedStatus]);
 
-  // 옵션상품 TOP 10 (선택된 품목 반영)
+  // 옵션상품 TOP 10 (현재 선택된 품목만 반영)
   const optionTop10 = useMemo(() => {
     const optionMap: Record<string, number> = {};
 
     filteredOrders.forEach(order => {
-      const optionName = order.optionName || '미지정';
+      const optionName = order.optionName || order.option_name || '미지정';
 
-      // 선택된 품목이 있으면 해당 품목의 옵션만 표시
-      if (selectedProducts.length > 0) {
+      // 현재 선택된 품목이 있으면 해당 품목의 옵션만 표시
+      if (currentProductForOptions) {
         const category4 = optionNameToCategory4.get(optionName);
-        if (!category4 || !selectedProducts.includes(category4)) {
+        // 현재 선택한 품목이 아니면 제외
+        if (!category4 || category4 !== currentProductForOptions) {
           return;
         }
       }
@@ -440,14 +612,14 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     }));
 
     return result;
-  }, [filteredOrders, selectedProducts, optionNameToCategory4]);
+  }, [filteredOrders, currentProductForOptions, optionNameToCategory4]);
 
   useEffect(() => {
     const fetchProductTop10 = async () => {
       // 1) 옵션명별 금액 집계 (필터링된 주문 사용)
       const optionMap: Record<string, number> = {};
       filteredOrders.forEach(order => {
-        const optionName = order.optionName || '미지정';
+        const optionName = order.optionName || order.option_name || '미지정';
         if (!optionMap[optionName]) {
           optionMap[optionName] = 0;
         }
@@ -464,21 +636,19 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
         return;
       }
 
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
+      // API를 통해 조회 (비회원도 가능)
+      const response = await fetch(`/api/option-products?option_names=${encodeURIComponent(uniqueOptions.join(','))}`);
+      const result = await response.json();
 
-      const { data: optionProducts, error } = await supabase
-        .from('option_products')
-        .select('option_name, category_3, category_4')
-        .in('option_name', uniqueOptions);
-
-      if (error) {
-        console.error('품목 조회 실패:', error);
+      if (!result.success || !result.data) {
+        console.error('품목 조회 실패:', result.error);
         setProductTop10([]);
         setAllProducts([]);
         setOptionNameToCategory4(new Map());
         return;
       }
+
+      const optionProducts = result.data;
 
       // 3) category별 재집계 + 매핑 저장
       const categoryMap: Record<string, { category3: string; category4: string; amount: number }> = {};
@@ -581,31 +751,25 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       marketMap.set(marketName, (marketMap.get(marketName) || 0) + (order.supplyPrice || 0));
     });
 
-    // startDate부터 endDate까지 모든 날짜 생성
-    const allDates: string[] = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // 실제 발주가 있는 날짜만 추출 (주말/공휴일 제외)
+    const datesWithOrders = Array.from(dateMarketMap.keys()).sort();
 
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      allDates.push(formatYmdKst(d));
-    }
+    // 15일 초과 시 15개로 샘플링 (시작일과 종료일 반드시 포함)
+    let displayDates = datesWithOrders;
+    if (datesWithOrders.length > 15) {
+      const sampledDates = [datesWithOrders[0]]; // 시작일 추가
 
-    // 30일 초과 시 30개로 샘플링 (시작일과 종료일 반드시 포함)
-    let displayDates = allDates;
-    if (allDates.length > 30) {
-      const sampledDates = [allDates[0]]; // 시작일 추가
-
-      // 중간 날짜들 균등 샘플링 (28개)
-      const middleCount = 28;
+      // 중간 날짜들 균등 샘플링 (13개)
+      const middleCount = 13;
       for (let i = 1; i <= middleCount; i++) {
-        const index = Math.floor((i * (allDates.length - 1)) / (middleCount + 1));
-        if (index > 0 && index < allDates.length - 1 && !sampledDates.includes(allDates[index])) {
-          sampledDates.push(allDates[index]);
+        const index = Math.floor((i * (datesWithOrders.length - 1)) / (middleCount + 1));
+        if (index > 0 && index < datesWithOrders.length - 1 && !sampledDates.includes(datesWithOrders[index])) {
+          sampledDates.push(datesWithOrders[index]);
         }
       }
 
-      sampledDates.push(allDates[allDates.length - 1]); // 종료일 추가
-      displayDates = sampledDates;
+      sampledDates.push(datesWithOrders[datesWithOrders.length - 1]); // 종료일 추가
+      displayDates = sampledDates.sort();
     }
 
     const sortedDates = displayDates;
@@ -669,22 +833,62 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     }
   }, [filteredOrders]);
 
+  // 날짜 범위에 따라 시간 단위 자동 조정 (품목 그래프)
+  useEffect(() => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const daysDiff = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    if (daysDiff <= 7 && (productTimeUnit === 'week' || productTimeUnit === 'month')) {
+      // 7일 이하인데 '주' 또는 '월'이 선택되어 있으면 '일'로 변경
+      setProductTimeUnit('day');
+    } else if (daysDiff <= 31 && productTimeUnit === 'month') {
+      // 31일 이하인데 '월'이 선택되어 있으면 '일'로 변경
+      setProductTimeUnit('day');
+    }
+  }, [startDate, endDate, productTimeUnit]);
+
+  // 날짜 범위에 따라 시간 단위 자동 조정 (옵션 그래프)
+  useEffect(() => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const daysDiff = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    if (daysDiff <= 7 && (optionTimeUnit === 'week' || optionTimeUnit === 'month')) {
+      // 7일 이하인데 '주' 또는 '월'이 선택되어 있으면 '일'로 변경
+      setOptionTimeUnit('day');
+    } else if (daysDiff <= 31 && optionTimeUnit === 'month') {
+      // 31일 이하인데 '월'이 선택되어 있으면 '일'로 변경
+      setOptionTimeUnit('day');
+    }
+  }, [startDate, endDate, optionTimeUnit]);
+
   // 품목별 통계 그래프 데이터
   const productStats = useMemo(() => {
     const selectedItems = selectedProducts;
     const itemType = 'product';
 
-    if (selectedItems.length === 0 || selectedProductMarkets.length === 0) {
+    if (selectedProductMarkets.length === 0) {
       return { dates: [], lines: [] };
     }
 
-    // 날짜별 데이터 맵 생성
+    // 시간 단위별 데이터 맵 생성
     const dateItemMarketMap = new Map<string, Map<string, Map<string, number>>>();
 
     filteredOrders.forEach(order => {
       const b = getBaseDate(order);
       if (!b) return;
-      const dateKey = ymdKst(b);
+
+      // 시간 단위별로 키 생성
+      let dateKey: string;
+      if (productTimeUnit === 'day') {
+        dateKey = ymdKst(b);
+      } else if (productTimeUnit === 'week') {
+        dateKey = yearWeekKey(b);
+      } else { // month
+        dateKey = yearMonthKey(b);
+      }
+
       const marketName = order.sellerMarketName || '미지정';
 
       // 선택된 마켓만 처리
@@ -694,8 +898,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       const optionName = order.optionName || '';
       const itemName = optionNameToCategory4.get(optionName) || '미지정';
 
-      // 선택된 품목/옵션만 처리
-      if (!selectedItems.includes(itemName)) return;
+      // 선택된 품목이 있으면 해당 품목만, 없으면 전체
+      if (selectedItems.length > 0 && !selectedItems.includes(itemName)) return;
 
       if (!dateItemMarketMap.has(dateKey)) {
         dateItemMarketMap.set(dateKey, new Map());
@@ -710,34 +914,38 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       marketMap.set(marketName, (marketMap.get(marketName) || 0) + (order.supplyPrice || 0));
     });
 
-    // startDate부터 endDate까지 모든 날짜 생성
-    const allDates: string[] = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // startDate와 endDate 사이의 모든 기간 생성
+    const allPeriods = getAllPeriods(startDate, endDate, productTimeUnit);
 
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      allDates.push(formatYmdKst(d));
+    console.log(`[품목그래프-${productTimeUnit}] 전체 기간 개수:`, allPeriods.length);
+    console.log(`[품목그래프-${productTimeUnit}] dateItemMarketMap 크기:`, dateItemMarketMap.size);
+
+    // 첫 번째 기간의 데이터 확인
+    if (allPeriods.length > 0) {
+      const firstPeriod = allPeriods[0];
+      const firstData = dateItemMarketMap.get(firstPeriod);
+      console.log(`[품목그래프-${productTimeUnit}] 첫 번째 기간 (${firstPeriod}) 데이터:`, firstData);
     }
 
-    // 30일 초과 시 30개로 샘플링 (시작일과 종료일 반드시 포함)
-    let displayDates = allDates;
-    if (allDates.length > 30) {
-      const sampledDates = [allDates[0]]; // 시작일 추가
+    // 15개 초과 시 15개로 샘플링
+    let displayPeriods = allPeriods;
+    if (allPeriods.length > 15) {
+      const sampledPeriods = [allPeriods[0]]; // 시작 기간 추가
 
-      // 중간 날짜들 균등 샘플링 (28개)
-      const middleCount = 28;
+      // 중간 기간들 균등 샘플링 (13개)
+      const middleCount = 13;
       for (let i = 1; i <= middleCount; i++) {
-        const index = Math.floor((i * (allDates.length - 1)) / (middleCount + 1));
-        if (index > 0 && index < allDates.length - 1 && !sampledDates.includes(allDates[index])) {
-          sampledDates.push(allDates[index]);
+        const index = Math.floor((i * (allPeriods.length - 1)) / (middleCount + 1));
+        if (index > 0 && index < allPeriods.length - 1 && !sampledPeriods.includes(allPeriods[index])) {
+          sampledPeriods.push(allPeriods[index]);
         }
       }
 
-      sampledDates.push(allDates[allDates.length - 1]); // 종료일 추가
-      displayDates = sampledDates;
+      sampledPeriods.push(allPeriods[allPeriods.length - 1]); // 종료 기간 추가
+      displayPeriods = sampledPeriods.sort();
     }
 
-    const sortedDates = displayDates;
+    const sortedDates = displayPeriods;
 
     // 선 스타일 정의
     const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
@@ -761,45 +969,129 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     });
     const allMarketsList = Array.from(allMarketsSet).sort();
 
-    selectedItems.forEach((item, itemIdx) => {
-      selectedProductMarkets.forEach((market) => {
-        const marketIdx = allMarketsList.indexOf(market);
+    // 마켓 전체 표시 모드
+    if (showProductMarketTotal) {
+      // 모든 마켓의 합계를 하나의 선으로 표시
+      if (selectedItems.length === 0) {
+        // 품목 선택 없음: 모든 품목 × 모든 마켓의 합계
         lines.push({
-          label: `${item} - ${market}`,
-          item,
-          market,
-          color: marketColors[marketIdx % marketColors.length],
-          dashStyle: dashStyles[itemIdx % dashStyles.length],
-          data: sortedDates.map(date => ({
-            date,
-            amount: dateItemMarketMap.get(date)?.get(item)?.get(market) || 0
-          }))
+          label: '전체 - 전체',
+          item: '전체',
+          market: '전체',
+          color: '#6b7280', // 회색
+          dashStyle: dashStyles[0],
+          data: sortedDates.map(date => {
+            let total = 0;
+            const dateMap = dateItemMarketMap.get(date);
+            if (dateMap) {
+              dateMap.forEach((marketMap) => {
+                marketMap.forEach((amount) => {
+                  total += amount;
+                });
+              });
+            }
+            return { date, amount: total };
+          })
         });
-      });
-    });
+      } else {
+        // 품목 선택됨: 선택된 품목 × 모든 마켓의 합계
+        selectedItems.forEach((item, itemIdx) => {
+          lines.push({
+            label: `${item} - 전체`,
+            item,
+            market: '전체',
+            color: '#6b7280', // 회색
+            dashStyle: dashStyles[itemIdx % dashStyles.length],
+            data: sortedDates.map(date => {
+              let total = 0;
+              const itemMap = dateItemMarketMap.get(date)?.get(item);
+              if (itemMap) {
+                itemMap.forEach((amount) => {
+                  total += amount;
+                });
+              }
+              return { date, amount: total };
+            })
+          });
+        });
+      }
+    } else {
+      // 개별 마켓 표시 모드
+      // 선택된 품목이 없으면 전체 합계로 표시
+      if (selectedItems.length === 0) {
+        selectedProductMarkets.forEach((market) => {
+          const marketIdx = allMarketsList.indexOf(market);
+          lines.push({
+            label: `전체 - ${market}`,
+            item: '전체',
+            market,
+            color: marketColors[marketIdx % marketColors.length],
+            dashStyle: dashStyles[0],
+            data: sortedDates.map(date => {
+              // 해당 날짜/마켓의 모든 품목 합계
+              let total = 0;
+              const dateMap = dateItemMarketMap.get(date);
+              if (dateMap) {
+                dateMap.forEach((marketMap) => {
+                  total += marketMap.get(market) || 0;
+                });
+              }
+              return { date, amount: total };
+            })
+          });
+        });
+      } else {
+        // 선택된 품목이 있으면 품목별로 표시
+        selectedItems.forEach((item, itemIdx) => {
+          selectedProductMarkets.forEach((market) => {
+            const marketIdx = allMarketsList.indexOf(market);
+            lines.push({
+              label: `${item} - ${market}`,
+              item,
+              market,
+              color: marketColors[marketIdx % marketColors.length],
+              dashStyle: dashStyles[itemIdx % dashStyles.length],
+              data: sortedDates.map(date => ({
+                date,
+                amount: dateItemMarketMap.get(date)?.get(item)?.get(market) || 0
+              }))
+            });
+          });
+        });
+      }
+    }
 
     return {
       dates: sortedDates,
-      allDates, // 전체 날짜 배열 추가
       lines
     };
-  }, [filteredOrders, selectedProducts, selectedProductMarkets, startDate, endDate, optionNameToCategory4]);
+  }, [filteredOrders, selectedProducts, selectedProductMarkets, startDate, endDate, optionNameToCategory4, productTimeUnit, showProductMarketTotal]);
 
   // 옵션별 통계 그래프 데이터
   const optionStats = useMemo(() => {
     const selectedItems = selectedOptions;
 
-    if (selectedItems.length === 0 || selectedOptionMarkets.length === 0) {
+    if (selectedOptionMarkets.length === 0) {
       return { dates: [], lines: [] };
     }
 
-    // 날짜별 데이터 맵 생성
+    // 시간 단위별 데이터 맵 생성
     const dateItemMarketMap = new Map<string, Map<string, Map<string, number>>>();
 
     filteredOrders.forEach(order => {
       const b = getBaseDate(order);
       if (!b) return;
-      const dateKey = ymdKst(b);
+
+      // 시간 단위별로 키 생성
+      let dateKey: string;
+      if (optionTimeUnit === 'day') {
+        dateKey = ymdKst(b);
+      } else if (optionTimeUnit === 'week') {
+        dateKey = yearWeekKey(b);
+      } else { // month
+        dateKey = yearMonthKey(b);
+      }
+
       const marketName = order.sellerMarketName || '미지정';
 
       // 선택된 마켓만 처리
@@ -808,8 +1100,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       // optionName 사용
       const itemName = order.optionName || '미지정';
 
-      // 선택된 옵션만 처리
-      if (!selectedItems.includes(itemName)) return;
+      // 선택된 옵션이 있으면 해당 옵션만, 없으면 전체
+      if (selectedItems.length > 0 && !selectedItems.includes(itemName)) return;
 
       if (!dateItemMarketMap.has(dateKey)) {
         dateItemMarketMap.set(dateKey, new Map());
@@ -824,34 +1116,38 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       marketMap.set(marketName, (marketMap.get(marketName) || 0) + (order.supplyPrice || 0));
     });
 
-    // startDate부터 endDate까지 모든 날짜 생성
-    const allDates: string[] = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // startDate와 endDate 사이의 모든 기간 생성
+    const allPeriods = getAllPeriods(startDate, endDate, optionTimeUnit);
 
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      allDates.push(formatYmdKst(d));
+    console.log(`[옵션그래프-${optionTimeUnit}] 전체 기간 개수:`, allPeriods.length);
+    console.log(`[옵션그래프-${optionTimeUnit}] dateItemMarketMap 크기:`, dateItemMarketMap.size);
+
+    // 첫 번째 기간의 데이터 확인
+    if (allPeriods.length > 0) {
+      const firstPeriod = allPeriods[0];
+      const firstData = dateItemMarketMap.get(firstPeriod);
+      console.log(`[옵션그래프-${optionTimeUnit}] 첫 번째 기간 (${firstPeriod}) 데이터:`, firstData);
     }
 
-    // 30일 초과 시 30개로 샘플링 (시작일과 종료일 반드시 포함)
-    let displayDates = allDates;
-    if (allDates.length > 30) {
-      const sampledDates = [allDates[0]]; // 시작일 추가
+    // 15개 초과 시 15개로 샘플링
+    let displayPeriods = allPeriods;
+    if (allPeriods.length > 15) {
+      const sampledPeriods = [allPeriods[0]]; // 시작 기간 추가
 
-      // 중간 날짜들 균등 샘플링 (28개)
-      const middleCount = 28;
+      // 중간 기간들 균등 샘플링 (13개)
+      const middleCount = 13;
       for (let i = 1; i <= middleCount; i++) {
-        const index = Math.floor((i * (allDates.length - 1)) / (middleCount + 1));
-        if (index > 0 && index < allDates.length - 1 && !sampledDates.includes(allDates[index])) {
-          sampledDates.push(allDates[index]);
+        const index = Math.floor((i * (allPeriods.length - 1)) / (middleCount + 1));
+        if (index > 0 && index < allPeriods.length - 1 && !sampledPeriods.includes(allPeriods[index])) {
+          sampledPeriods.push(allPeriods[index]);
         }
       }
 
-      sampledDates.push(allDates[allDates.length - 1]); // 종료일 추가
-      displayDates = sampledDates;
+      sampledPeriods.push(allPeriods[allPeriods.length - 1]); // 종료 기간 추가
+      displayPeriods = sampledPeriods.sort();
     }
 
-    const sortedDates = displayDates;
+    const sortedDates = displayPeriods;
 
     // 선 스타일 정의
     const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
@@ -875,29 +1171,103 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     });
     const allMarketsList = Array.from(allMarketsSet).sort();
 
-    selectedItems.forEach((item, itemIdx) => {
-      selectedOptionMarkets.forEach((market) => {
-        const marketIdx = allMarketsList.indexOf(market);
+    // 마켓 전체 표시 모드
+    if (showOptionMarketTotal) {
+      // 모든 마켓의 합계를 하나의 선으로 표시
+      if (selectedItems.length === 0) {
+        // 옵션 선택 없음: 모든 옵션 × 모든 마켓의 합계
         lines.push({
-          label: `${item} - ${market}`,
-          item,
-          market,
-          color: marketColors[marketIdx % marketColors.length],
-          dashStyle: dashStyles[itemIdx % dashStyles.length],
-          data: sortedDates.map(date => ({
-            date,
-            amount: dateItemMarketMap.get(date)?.get(item)?.get(market) || 0
-          }))
+          label: '전체 - 전체',
+          item: '전체',
+          market: '전체',
+          color: '#6b7280', // 회색
+          dashStyle: dashStyles[0],
+          data: sortedDates.map(date => {
+            let total = 0;
+            const dateMap = dateItemMarketMap.get(date);
+            if (dateMap) {
+              dateMap.forEach((marketMap) => {
+                marketMap.forEach((amount) => {
+                  total += amount;
+                });
+              });
+            }
+            return { date, amount: total };
+          })
         });
-      });
-    });
+      } else {
+        // 옵션 선택됨: 선택된 옵션 × 모든 마켓의 합계
+        selectedItems.forEach((item, itemIdx) => {
+          lines.push({
+            label: `${item} - 전체`,
+            item,
+            market: '전체',
+            color: '#6b7280', // 회색
+            dashStyle: dashStyles[itemIdx % dashStyles.length],
+            data: sortedDates.map(date => {
+              let total = 0;
+              const itemMap = dateItemMarketMap.get(date)?.get(item);
+              if (itemMap) {
+                itemMap.forEach((amount) => {
+                  total += amount;
+                });
+              }
+              return { date, amount: total };
+            })
+          });
+        });
+      }
+    } else {
+      // 개별 마켓 표시 모드
+      // 선택된 옵션이 없으면 전체 합계로 표시
+      if (selectedItems.length === 0) {
+        selectedOptionMarkets.forEach((market) => {
+          const marketIdx = allMarketsList.indexOf(market);
+          lines.push({
+            label: `전체 - ${market}`,
+            item: '전체',
+            market,
+            color: marketColors[marketIdx % marketColors.length],
+            dashStyle: dashStyles[0],
+            data: sortedDates.map(date => {
+              // 해당 날짜/마켓의 모든 옵션 합계
+              let total = 0;
+              const dateMap = dateItemMarketMap.get(date);
+              if (dateMap) {
+                dateMap.forEach((marketMap) => {
+                  total += marketMap.get(market) || 0;
+                });
+              }
+              return { date, amount: total };
+            })
+          });
+        });
+      } else {
+        // 선택된 옵션이 있으면 옵션별로 표시
+        selectedItems.forEach((item, itemIdx) => {
+          selectedOptionMarkets.forEach((market) => {
+            const marketIdx = allMarketsList.indexOf(market);
+            lines.push({
+              label: `${item} - ${market}`,
+              item,
+              market,
+              color: marketColors[marketIdx % marketColors.length],
+              dashStyle: dashStyles[itemIdx % dashStyles.length],
+              data: sortedDates.map(date => ({
+                date,
+                amount: dateItemMarketMap.get(date)?.get(item)?.get(market) || 0
+              }))
+            });
+          });
+        });
+      }
+    }
 
     return {
       dates: sortedDates,
-      allDates, // 전체 날짜 배열 추가
       lines
     };
-  }, [filteredOrders, selectedOptions, selectedOptionMarkets, startDate, endDate]);
+  }, [filteredOrders, selectedOptions, selectedOptionMarkets, startDate, endDate, optionTimeUnit, showOptionMarketTotal]);
 
   // 모든 마켓 목록 추출 (범례 표시용)
   const allMarkets = useMemo(() => {
@@ -1386,7 +1756,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px'
+            gap: '20px',
+            paddingBottom: '8px'
           }}
         >
           {/* 날짜 필터 */}
@@ -1413,9 +1784,25 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   fontSize: '12px'
                 }}
               >
-                <DatePicker value={startDate} onChange={date => setStartDate(date)} placeholder="시작일" maxDate={endDate || undefined} />
+                <DatePicker
+                  value={startDate}
+                  onChange={date => {
+                    setStartDate(date);
+                    setActiveDateFilter(null);
+                  }}
+                  placeholder="시작일"
+                  maxDate={endDate || undefined}
+                />
                 <span style={{ color: '#6b7280', fontSize: '12px' }}>~</span>
-                <DatePicker value={endDate} onChange={date => setEndDate(date)} placeholder="종료일" minDate={startDate || undefined} />
+                <DatePicker
+                  value={endDate}
+                  onChange={date => {
+                    setEndDate(date);
+                    setActiveDateFilter(null);
+                  }}
+                  placeholder="종료일"
+                  minDate={startDate || undefined}
+                />
               </div>
 
               {/* 빠른 선택 버튼 */}
@@ -1434,9 +1821,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     borderRadius: '4px',
                     fontSize: '11px',
                     cursor: 'pointer',
-                    fontWeight: '400',
-                    border: '1px solid',
-                    color: 'var(--color-text)',
+                    fontWeight: activeDateFilter === 'today' ? '600' : '400',
+                    border: activeDateFilter === 'today' ? '1px solid #3b82f6' : '1px solid',
+                    color: activeDateFilter === 'today' ? '#3b82f6' : 'var(--color-text)',
+                    backgroundColor: activeDateFilter === 'today' ? 'rgba(59, 130, 246, 0.05)' : undefined,
                     boxSizing: 'border-box',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1454,9 +1842,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     borderRadius: '4px',
                     fontSize: '11px',
                     cursor: 'pointer',
-                    fontWeight: '400',
-                    border: '1px solid',
-                    color: 'var(--color-text)',
+                    fontWeight: activeDateFilter === 'yesterday' ? '600' : '400',
+                    border: activeDateFilter === 'yesterday' ? '1px solid #3b82f6' : '1px solid',
+                    color: activeDateFilter === 'yesterday' ? '#3b82f6' : 'var(--color-text)',
+                    backgroundColor: activeDateFilter === 'yesterday' ? 'rgba(59, 130, 246, 0.05)' : undefined,
                     boxSizing: 'border-box',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1474,9 +1863,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     borderRadius: '4px',
                     fontSize: '11px',
                     cursor: 'pointer',
-                    fontWeight: '400',
-                    border: '1px solid',
-                    color: 'var(--color-text)',
+                    fontWeight: activeDateFilter === '7days' ? '600' : '400',
+                    border: activeDateFilter === '7days' ? '1px solid #3b82f6' : '1px solid',
+                    color: activeDateFilter === '7days' ? '#3b82f6' : 'var(--color-text)',
+                    backgroundColor: activeDateFilter === '7days' ? 'rgba(59, 130, 246, 0.05)' : undefined,
                     boxSizing: 'border-box',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1494,9 +1884,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     borderRadius: '4px',
                     fontSize: '11px',
                     cursor: 'pointer',
-                    fontWeight: '400',
-                    border: '1px solid',
-                    color: 'var(--color-text)',
+                    fontWeight: activeDateFilter === '30days' ? '600' : '400',
+                    border: activeDateFilter === '30days' ? '1px solid #3b82f6' : '1px solid',
+                    color: activeDateFilter === '30days' ? '#3b82f6' : 'var(--color-text)',
+                    backgroundColor: activeDateFilter === '30days' ? 'rgba(59, 130, 246, 0.05)' : undefined,
                     boxSizing: 'border-box',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1514,9 +1905,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     borderRadius: '4px',
                     fontSize: '11px',
                     cursor: 'pointer',
-                    fontWeight: '400',
-                    border: '1px solid',
-                    color: 'var(--color-text)',
+                    fontWeight: activeDateFilter === '90days' ? '600' : '400',
+                    border: activeDateFilter === '90days' ? '1px solid #3b82f6' : '1px solid',
+                    color: activeDateFilter === '90days' ? '#3b82f6' : 'var(--color-text)',
+                    backgroundColor: activeDateFilter === '90days' ? 'rgba(59, 130, 246, 0.05)' : undefined,
                     boxSizing: 'border-box',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1534,9 +1926,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     borderRadius: '4px',
                     fontSize: '11px',
                     cursor: 'pointer',
-                    fontWeight: '400',
-                    border: '1px solid',
-                    color: 'var(--color-text)',
+                    fontWeight: activeDateFilter === '365days' ? '600' : '400',
+                    border: activeDateFilter === '365days' ? '1px solid #3b82f6' : '1px solid',
+                    color: activeDateFilter === '365days' ? '#3b82f6' : 'var(--color-text)',
+                    backgroundColor: activeDateFilter === '365days' ? 'rgba(59, 130, 246, 0.05)' : undefined,
                     boxSizing: 'border-box',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1554,9 +1947,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     borderRadius: '4px',
                     fontSize: '11px',
                     cursor: 'pointer',
-                    fontWeight: '400',
-                    border: '1px solid',
-                    color: 'var(--color-text)',
+                    fontWeight: activeDateFilter === 'thisYear' ? '600' : '400',
+                    border: activeDateFilter === 'thisYear' ? '1px solid #3b82f6' : '1px solid',
+                    color: activeDateFilter === 'thisYear' ? '#3b82f6' : 'var(--color-text)',
+                    backgroundColor: activeDateFilter === 'thisYear' ? 'rgba(59, 130, 246, 0.05)' : undefined,
                     boxSizing: 'border-box',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1580,15 +1974,17 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               return (
                 <div
                   key={stat.status}
-                  className="card"
+                  className={isSelected ? '' : 'card'}
                   onClick={() => setSelectedStatus(isSelected ? null : stat.status)}
                   style={{
                     borderRadius: '6px',
-                    padding: '6px 8px',
+                    padding: '6px 12px',
+                    margin: '0 4px',
                     cursor: 'pointer',
-                    border: isSelected ? `2px solid ${config.color}` : '1px solid transparent',
-                    boxShadow: isSelected ? `0 0 0 2px ${config.color}20` : undefined,
-                    transform: isSelected ? 'scale(1.01)' : undefined,
+                    background: 'var(--color-card-bg)',
+                    boxShadow: isSelected
+                      ? `0 0 0 2px ${config.color}40, 0 4px 6px -1px ${config.color}40`
+                      : '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
                     transition: 'all 0.2s ease'
                   }}
                 >
@@ -1854,12 +2250,12 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         <div
                           key={idx}
                           onClick={() => {
-                            // 이미 선택된 경우 아무 동작 안함
-                            if (!isSelected) {
-                              // 최대 5개까지만 선택 가능
-                              if (selectedProducts.length < 5) {
-                                setSelectedProducts([...selectedProducts, item.name]);
-                              }
+                            // 옵션 TOP 10 필터는 항상 업데이트
+                            setCurrentProductForOptions(item.name);
+
+                            // 그래프에는 이미 선택되지 않았고, 3개 미만일 때만 추가
+                            if (!isSelected && selectedProducts.length < 3) {
+                              setSelectedProducts([...selectedProducts, item.name]);
                             }
                           }}
                           style={{
@@ -1954,10 +2350,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       <div
                         key={idx}
                         onClick={() => {
-                          // 이미 선택된 경우 아무 동작 안함
+                          // 이미 선택된 경우 아무 동작 안함 (해제는 그래프 배지에서만)
                           if (!isSelected) {
-                            // 최대 5개까지만 선택 가능
-                            if (selectedOptions.length < 5) {
+                            // 최대 3개까지만 선택 가능
+                            if (selectedOptions.length < 3) {
                               setSelectedOptions([...selectedOptions, item.name]);
                             }
                           }
@@ -2005,45 +2401,110 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                 {/* 헤더 컨테이너 */}
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '8px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#6366f1', margin: 0 }}>품목</h3>
-                  {selectedProducts.map((p, idx) => {
-                    const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
-                    return (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  {/* 좌측: 제목 + 선택된 품목 태그 */}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#6366f1', margin: 0 }}>품목</h3>
+                    {selectedProducts.length === 0 ? (
                       <div
-                        key={p}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
                           gap: '4px',
-                          background: '#ffffff',
-                          padding: '3px 6px',
+                          background: 'var(--color-surface)',
+                          padding: '3px 8px',
                           borderRadius: '8px',
-                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
+                          border: '1px solid var(--color-border)'
                         }}
                       >
-                        <svg width="20" height="10">
-                          <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
-                            strokeDasharray={dashStyles[idx % dashStyles.length]} />
-                        </svg>
-                        <span style={{ fontSize: '10px', color: '#374151' }}>{p}</span>
+                        <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>전체</span>
+                      </div>
+                    ) : (
+                      selectedProducts.map((p, idx) => {
+                        const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
+                        return (
+                          <div
+                            key={p}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: 'var(--color-surface)',
+                              padding: '3px 6px',
+                              borderRadius: '8px',
+                              border: '1px solid var(--color-border)'
+                            }}
+                          >
+                            <svg width="20" height="10">
+                              <line x1="0" y1="5" x2="20" y2="5" stroke="var(--color-text-secondary)" strokeWidth="1.5"
+                                strokeDasharray={dashStyles[idx % dashStyles.length]} />
+                            </svg>
+                            <span style={{ fontSize: '10px', color: 'var(--color-text)' }}>{p}</span>
+                            <button
+                              onClick={() => setSelectedProducts(selectedProducts.filter(item => item !== p))}
+                              style={{
+                                fontSize: '10px',
+                                color: 'var(--color-text-secondary)',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                marginLeft: '2px'
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* 우측: 시간 단위 버튼 */}
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {(['day', 'week', 'month'] as const).map((unit) => {
+                      const labels = { day: '일', week: '주', month: '월' };
+                      const isActive = productTimeUnit === unit;
+
+                      // 날짜 범위 계산
+                      const start = new Date(startDate);
+                      const end = new Date(endDate);
+                      const daysDiff = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+                      // 버튼 활성화 조건
+                      let isDisabled = false;
+                      if (daysDiff <= 7) {
+                        // 7일 이하: '주', '월' 비활성화
+                        isDisabled = unit === 'week' || unit === 'month';
+                      } else if (daysDiff <= 31) {
+                        // 7일 초과 31일 이하: '월' 비활성화
+                        isDisabled = unit === 'month';
+                      }
+                      // 31일 초과: 모든 버튼 활성화
+
+                      return (
                         <button
-                          onClick={() => setSelectedProducts(selectedProducts.filter(item => item !== p))}
+                          key={unit}
+                          onClick={() => !isDisabled && setProductTimeUnit(unit)}
+                          disabled={isDisabled}
                           style={{
-                            fontSize: '10px',
-                            color: '#9ca3af',
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: 0,
-                            marginLeft: '2px'
+                            fontSize: '11px',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            border: isActive ? '1px solid #6366f1' : '1px solid var(--color-border)',
+                            background: isDisabled ? 'var(--color-surface)' : isActive ? 'rgba(99, 102, 241, 0.1)' : 'var(--color-surface)',
+                            color: isDisabled ? 'var(--color-text-disabled)' : isActive ? '#6366f1' : 'var(--color-text-secondary)',
+                            fontWeight: isActive ? '600' : '400',
+                            cursor: isDisabled ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.15s',
+                            opacity: isDisabled ? 0.5 : 1
                           }}
                         >
-                          ✕
+                          {labels[unit]}
                         </button>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* 그래프 */}
@@ -2071,6 +2532,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         const chartBottom = 390;
                         const chartWidth = chartRight - chartLeft;
                         const chartHeight = chartBottom - chartTop;
+
+                        // X축 좌우 여백 (차트 폭의 5%씩)
+                        const xPadding = chartWidth * 0.05;
+                        const usableWidth = chartWidth - 2 * xPadding;
 
                         return (
                           <>
@@ -2113,15 +2578,32 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                             {/* 품목 × 마켓 조합별 선 */}
                             {productStats.lines.map((line, lineIdx) => {
                               const points = line.data.map((d, idx) => {
-                                const x = chartLeft + (idx / divisor) * chartWidth;
+                                const x = chartLeft + xPadding + (idx / divisor) * usableWidth;
                                 const y = chartBottom - (d.amount / maxY) * chartHeight;
                                 return { x, y };
                               });
 
                               const smoothPath = createSmoothPath(points);
 
+                              // 전체 마켓일 때 area fill용 path 생성
+                              const isMarketTotal = line.market === '전체';
+                              let areaPath = '';
+                              if (isMarketTotal && points.length > 0) {
+                                const firstPoint = points[0];
+                                const lastPoint = points[points.length - 1];
+                                areaPath = smoothPath + ` L ${lastPoint.x},${chartBottom} L ${firstPoint.x},${chartBottom} Z`;
+                              }
+
                               return (
                                 <g key={lineIdx} clipPath="url(#chart-clip-product)">
+                                  {/* 전체 마켓일 때만 영역 채우기 */}
+                                  {isMarketTotal && (
+                                    <path
+                                      d={areaPath}
+                                      fill="rgba(107, 115, 128, 0.1)"
+                                      stroke="none"
+                                    />
+                                  )}
                                   <path
                                     d={smoothPath}
                                     fill="none"
@@ -2130,7 +2612,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                     strokeDasharray={line.dashStyle}
                                   />
                                   {line.data.map((d, idx) => {
-                                    const x = chartLeft + (idx / divisor) * chartWidth;
+                                    const x = chartLeft + xPadding + (idx / divisor) * usableWidth;
                                     const y = chartBottom - (d.amount / maxY) * chartHeight;
                                     return (
                                       <g key={idx}>
@@ -2142,12 +2624,21 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                           fill="transparent"
                                           style={{ cursor: 'pointer' }}
                                           onMouseEnter={(e) => {
+                                            // 시간 단위에 따라 날짜 포맷 변경
+                                            let displayDate = productStats.dates[idx];
+                                            if (productTimeUnit === 'week') {
+                                              displayDate = formatWeekForTooltip(productStats.dates[idx]);
+                                            } else if (productTimeUnit === 'month') {
+                                              // 월 형식 그대로 (YYYY-MM)
+                                              displayDate = productStats.dates[idx];
+                                            }
+
                                             setTooltip({
                                               x: e.clientX,
                                               y: e.clientY - 40,
                                               item: line.item,
                                               market: line.market,
-                                              date: productStats.dates[idx],
+                                              date: displayDate,
                                               amount: d.amount
                                             });
                                           }}
@@ -2169,13 +2660,12 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                             })}
 
                             {/* 매월 1일 세로 격자선 */}
-                            {productStats.allDates && productStats.allDates.map((date, idx) => {
+                            {productStats.dates && productStats.dates.map((date, idx) => {
                               const day = parseInt(date.slice(8, 10), 10);
                               if (day !== 1) return null;
 
                               // 전체 날짜 기준으로 X 좌표 계산
-                              const divisor = productStats.allDates.length > 1 ? productStats.allDates.length - 1 : 1;
-                              const x = chartLeft + (idx / divisor) * chartWidth;
+                              const x = chartLeft + xPadding + (idx / divisor) * usableWidth;
                               return (
                                 <line
                                   key={`grid-${idx}`}
@@ -2191,29 +2681,27 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                             })}
 
                             {/* X축 날짜 라벨 */}
-                            {productStats.allDates && productStats.allDates.map((date, idx) => {
-                              const totalDays = productStats.allDates.length;
-                              const day = parseInt(date.slice(8, 10), 10);
+                            {productStats.dates && productStats.dates.map((date, idx) => {
+                              const totalPeriods = productStats.dates.length;
 
                               // 날짜 표시 로직
                               let shouldShow = false;
 
-                              // 시작일과 종료일은 무조건 표시
-                              if (idx === 0 || idx === totalDays - 1) {
+                              // 월보기와 주보기는 모든 라벨 표시 (15개 이하로 제한됨)
+                              if (productTimeUnit === 'month' || productTimeUnit === 'week') {
                                 shouldShow = true;
-                              } else if (totalDays <= 30) {
-                                // 30일 이하: 2개 중 1개만 표시
+                              }
+                              // 시작과 종료는 무조건 표시
+                              else if (idx === 0 || idx === totalPeriods - 1) {
+                                shouldShow = true;
+                              } else if (totalPeriods <= 30) {
+                                // 30개 이하: 2개 중 1개만 표시
                                 if (idx % 2 === 0) {
                                   shouldShow = true;
                                 }
-                              } else if (totalDays <= 90) {
-                                // 31~90일: 매월 1일과 15일만 표시
-                                if (day === 1 || day === 15) {
-                                  shouldShow = true;
-                                }
                               } else {
-                                // 90일 초과: 매월 1일만 표시
-                                if (day === 1) {
+                                // 30개 초과: 3개 중 1개만 표시
+                                if (idx % 3 === 0) {
                                   shouldShow = true;
                                 }
                               }
@@ -2221,13 +2709,25 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                               if (!shouldShow) return null;
 
                               // 전체 날짜 기준으로 X 좌표 계산
-                              const divisor = productStats.allDates.length > 1 ? productStats.allDates.length - 1 : 1;
-                              const x = chartLeft + (idx / divisor) * chartWidth;
-                              // mm/dd 형식
-                              const formattedDate = date.slice(5, 7) + '/' + date.slice(8, 10);
+                              const x = chartLeft + xPadding + (idx / divisor) * usableWidth;
+
+                              // 시간 단위별 레이블 형식
+                              let formattedDate: string;
+                              if (productTimeUnit === 'day') {
+                                // mm/dd 형식
+                                formattedDate = date.slice(5, 7) + '/' + date.slice(8, 10);
+                              } else if (productTimeUnit === 'week') {
+                                // YYYY-WXX -> 해당 주 월요일 날짜 (mm/dd)
+                                const mondayDate = weekKeyToMonday(date);
+                                formattedDate = mondayDate.slice(5, 7) + '/' + mondayDate.slice(8, 10);
+                              } else {
+                                // YYYY-MM -> MM월
+                                const month = date.slice(5, 7);
+                                formattedDate = month + '월';
+                              }
 
                               // 시작일은 왼쪽 정렬, 마지막은 오른쪽 정렬, 나머지는 중앙 정렬
-                              const anchor = idx === 0 ? "start" : idx === totalDays - 1 ? "end" : "middle";
+                              const anchor = idx === 0 ? "start" : idx === totalPeriods - 1 ? "end" : "middle";
 
                               return (
                                 <text
@@ -2249,8 +2749,34 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                     {/* 범례 컨테이너 */}
                     <div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                        {allMarkets.map((market) => {
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+                        {/* 전체 버튼 */}
+                        <div
+                          onClick={() => setShowProductMarketTotal(!showProductMarketTotal)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            cursor: 'pointer',
+                            opacity: showProductMarketTotal ? 1 : 0.4,
+                            padding: '4px 8px',
+                            marginLeft: '-8px',
+                            borderRadius: '4px',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={e => {
+                            (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--color-surface-hover)';
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#6b7280' }} />
+                          <span style={{ fontSize: '11px', fontWeight: showProductMarketTotal ? '600' : '400' }}>전체</span>
+                        </div>
+
+                        {/* 개별 마켓 범례 */}
+                        {!showProductMarketTotal && allMarkets.map((market) => {
                           const isSelected = selectedProductMarkets.includes(market);
                           const color = marketColorMap.get(market);
                           return (
@@ -2302,45 +2828,107 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                 {/* 헤더 컨테이너 */}
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '8px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#8b5cf6', margin: 0 }}>옵션</h3>
-                  {selectedOptions.map((o, idx) => {
-                    const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
-                    return (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  {/* 좌측: 제목 + 선택된 옵션 태그 */}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#8b5cf6', margin: 0 }}>옵션</h3>
+                    {selectedOptions.length === 0 ? (
                       <div
-                        key={o}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
                           gap: '4px',
-                          background: '#ffffff',
-                          padding: '3px 6px',
+                          background: 'var(--color-surface)',
+                          padding: '3px 8px',
                           borderRadius: '8px',
-                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)'
+                          border: '1px solid var(--color-border)'
                         }}
                       >
-                        <svg width="20" height="10">
-                          <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
-                            strokeDasharray={dashStyles[idx % dashStyles.length]} />
-                        </svg>
-                        <span style={{ fontSize: '10px', color: '#374151' }}>{o}</span>
+                        <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>전체</span>
+                      </div>
+                    ) : (
+                      selectedOptions.map((o, idx) => {
+                        const dashStyles = ['0', '4 4', '8 4', '2 2', '8 4 2 4'];
+                        return (
+                          <div
+                            key={o}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: 'var(--color-surface)',
+                              padding: '3px 6px',
+                              borderRadius: '8px',
+                              border: '1px solid var(--color-border)'
+                            }}
+                          >
+                            <svg width="20" height="10">
+                              <line x1="0" y1="5" x2="20" y2="5" stroke="#6b7280" strokeWidth="1.5"
+                                strokeDasharray={dashStyles[idx % dashStyles.length]} />
+                            </svg>
+                            <span style={{ fontSize: '10px', color: 'var(--color-text)' }}>{o}</span>
+                            <button
+                              onClick={() => setSelectedOptions(selectedOptions.filter(item => item !== o))}
+                              style={{
+                                fontSize: '10px',
+                                color: 'var(--color-text-secondary)',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                marginLeft: '2px'
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* 우측: 시간 단위 버튼 */}
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {(['day', 'week', 'month'] as const).map((unit) => {
+                      const labels = { day: '일', week: '주', month: '월' };
+                      const isActive = optionTimeUnit === unit;
+
+                      // 날짜 범위 계산
+                      const start = new Date(startDate);
+                      const end = new Date(endDate);
+                      const daysDiff = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+                      // 버튼 활성화 조건
+                      let isDisabled = false;
+                      if (daysDiff <= 7) {
+                        isDisabled = unit === 'week' || unit === 'month';
+                      } else if (daysDiff <= 31) {
+                        isDisabled = unit === 'month';
+                      }
+
+                      return (
                         <button
-                          onClick={() => setSelectedOptions(selectedOptions.filter(item => item !== o))}
+                          key={unit}
+                          onClick={() => !isDisabled && setOptionTimeUnit(unit)}
+                          disabled={isDisabled}
                           style={{
-                            fontSize: '10px',
-                            color: '#9ca3af',
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: 0,
-                            marginLeft: '2px'
+                            fontSize: '11px',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            border: isActive ? '1px solid #8b5cf6' : '1px solid var(--color-border)',
+                            background: isDisabled ? 'var(--color-surface)' : isActive ? 'rgba(139, 92, 246, 0.1)' : 'var(--color-surface)',
+                            color: isDisabled ? 'var(--color-text-disabled)' : isActive ? '#8b5cf6' : 'var(--color-text-secondary)',
+                            fontWeight: isActive ? '600' : '400',
+                            cursor: isDisabled ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.15s',
+                            opacity: isDisabled ? 0.5 : 1
                           }}
                         >
-                          ✕
+                          {labels[unit]}
                         </button>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* 그래프 */}
@@ -2368,6 +2956,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         const chartBottom = 390;
                         const chartWidth = chartRight - chartLeft;
                         const chartHeight = chartBottom - chartTop;
+
+                        // X축 좌우 여백 (차트 폭의 5%씩)
+                        const xPadding = chartWidth * 0.05;
+                        const usableWidth = chartWidth - 2 * xPadding;
 
                         return (
                           <>
@@ -2410,15 +3002,32 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                             {/* 옵션 × 마켓 조합별 선 */}
                             {optionStats.lines.map((line, lineIdx) => {
                               const points = line.data.map((d, idx) => {
-                                const x = chartLeft + (idx / divisor) * chartWidth;
+                                const x = chartLeft + xPadding + (idx / divisor) * usableWidth;
                                 const y = chartBottom - (d.amount / maxY) * chartHeight;
                                 return { x, y };
                               });
 
                               const smoothPath = createSmoothPath(points);
 
+                              // 전체 마켓일 때 area fill용 path 생성
+                              const isMarketTotal = line.market === '전체';
+                              let areaPath = '';
+                              if (isMarketTotal && points.length > 0) {
+                                const firstPoint = points[0];
+                                const lastPoint = points[points.length - 1];
+                                areaPath = smoothPath + ` L ${lastPoint.x},${chartBottom} L ${firstPoint.x},${chartBottom} Z`;
+                              }
+
                               return (
                                 <g key={lineIdx} clipPath="url(#chart-clip-option)">
+                                  {/* 전체 마켓일 때만 영역 채우기 */}
+                                  {isMarketTotal && (
+                                    <path
+                                      d={areaPath}
+                                      fill="rgba(107, 115, 128, 0.1)"
+                                      stroke="none"
+                                    />
+                                  )}
                                   <path
                                     d={smoothPath}
                                     fill="none"
@@ -2427,7 +3036,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                     strokeDasharray={line.dashStyle}
                                   />
                                   {line.data.map((d, idx) => {
-                                    const x = chartLeft + (idx / divisor) * chartWidth;
+                                    const x = chartLeft + xPadding + (idx / divisor) * usableWidth;
                                     const y = chartBottom - (d.amount / maxY) * chartHeight;
                                     return (
                                       <g key={idx}>
@@ -2439,12 +3048,21 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                                           fill="transparent"
                                           style={{ cursor: 'pointer' }}
                                           onMouseEnter={(e) => {
+                                            // 시간 단위에 따라 날짜 포맷 변경
+                                            let displayDate = optionStats.dates[idx];
+                                            if (optionTimeUnit === 'week') {
+                                              displayDate = formatWeekForTooltip(optionStats.dates[idx]);
+                                            } else if (optionTimeUnit === 'month') {
+                                              // 월 형식 그대로 (YYYY-MM)
+                                              displayDate = optionStats.dates[idx];
+                                            }
+
                                             setTooltip({
                                               x: e.clientX,
                                               y: e.clientY - 40,
                                               item: line.item,
                                               market: line.market,
-                                              date: optionStats.dates[idx],
+                                              date: displayDate,
                                               amount: d.amount
                                             });
                                           }}
@@ -2466,13 +3084,12 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                             })}
 
                             {/* 매월 1일 세로 격자선 */}
-                            {optionStats.allDates && optionStats.allDates.map((date, idx) => {
+                            {optionStats.dates && optionStats.dates.map((date, idx) => {
                               const day = parseInt(date.slice(8, 10), 10);
                               if (day !== 1) return null;
 
                               // 전체 날짜 기준으로 X 좌표 계산
-                              const divisor = optionStats.allDates.length > 1 ? optionStats.allDates.length - 1 : 1;
-                              const x = chartLeft + (idx / divisor) * chartWidth;
+                              const x = chartLeft + xPadding + (idx / divisor) * usableWidth;
                               return (
                                 <line
                                   key={`grid-${idx}`}
@@ -2488,29 +3105,27 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                             })}
 
                             {/* X축 날짜 라벨 */}
-                            {optionStats.allDates && optionStats.allDates.map((date, idx) => {
-                              const totalDays = optionStats.allDates.length;
-                              const day = parseInt(date.slice(8, 10), 10);
+                            {optionStats.dates && optionStats.dates.map((date, idx) => {
+                              const totalPeriods = optionStats.dates.length;
 
                               // 날짜 표시 로직
                               let shouldShow = false;
 
-                              // 시작일과 종료일은 무조건 표시
-                              if (idx === 0 || idx === totalDays - 1) {
+                              // 월보기와 주보기는 모든 라벨 표시 (15개 이하로 제한됨)
+                              if (optionTimeUnit === 'month' || optionTimeUnit === 'week') {
                                 shouldShow = true;
-                              } else if (totalDays <= 30) {
-                                // 30일 이하: 2개 중 1개만 표시
+                              }
+                              // 시작과 종료는 무조건 표시
+                              else if (idx === 0 || idx === totalPeriods - 1) {
+                                shouldShow = true;
+                              } else if (totalPeriods <= 30) {
+                                // 30개 이하: 2개 중 1개만 표시
                                 if (idx % 2 === 0) {
                                   shouldShow = true;
                                 }
-                              } else if (totalDays <= 90) {
-                                // 31~90일: 매월 1일과 15일만 표시
-                                if (day === 1 || day === 15) {
-                                  shouldShow = true;
-                                }
                               } else {
-                                // 90일 초과: 매월 1일만 표시
-                                if (day === 1) {
+                                // 30개 초과: 3개 중 1개만 표시
+                                if (idx % 3 === 0) {
                                   shouldShow = true;
                                 }
                               }
@@ -2518,13 +3133,25 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                               if (!shouldShow) return null;
 
                               // 전체 날짜 기준으로 X 좌표 계산
-                              const divisor = optionStats.allDates.length > 1 ? optionStats.allDates.length - 1 : 1;
-                              const x = chartLeft + (idx / divisor) * chartWidth;
-                              // mm/dd 형식
-                              const formattedDate = date.slice(5, 7) + '/' + date.slice(8, 10);
+                              const x = chartLeft + xPadding + (idx / divisor) * usableWidth;
+
+                              // 시간 단위별 레이블 형식
+                              let formattedDate: string;
+                              if (optionTimeUnit === 'day') {
+                                // mm/dd 형식
+                                formattedDate = date.slice(5, 7) + '/' + date.slice(8, 10);
+                              } else if (optionTimeUnit === 'week') {
+                                // YYYY-WXX -> 해당 주 월요일 날짜 (mm/dd)
+                                const mondayDate = weekKeyToMonday(date);
+                                formattedDate = mondayDate.slice(5, 7) + '/' + mondayDate.slice(8, 10);
+                              } else {
+                                // YYYY-MM -> MM월
+                                const month = date.slice(5, 7);
+                                formattedDate = month + '월';
+                              }
 
                               // 시작일은 왼쪽 정렬, 마지막은 오른쪽 정렬, 나머지는 중앙 정렬
-                              const anchor = idx === 0 ? "start" : idx === totalDays - 1 ? "end" : "middle";
+                              const anchor = idx === 0 ? "start" : idx === totalPeriods - 1 ? "end" : "middle";
 
                               return (
                                 <text
@@ -2546,8 +3173,34 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                     {/* 범례 컨테이너 */}
                     <div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                        {allMarkets.map((market) => {
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+                        {/* 전체 버튼 */}
+                        <div
+                          onClick={() => setShowOptionMarketTotal(!showOptionMarketTotal)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            cursor: 'pointer',
+                            opacity: showOptionMarketTotal ? 1 : 0.4,
+                            padding: '4px 8px',
+                            marginLeft: '-8px',
+                            borderRadius: '4px',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={e => {
+                            (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--color-surface-hover)';
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#6b7280' }} />
+                          <span style={{ fontSize: '11px', fontWeight: showOptionMarketTotal ? '600' : '400' }}>전체</span>
+                        </div>
+
+                        {/* 개별 마켓 범례 */}
+                        {!showOptionMarketTotal && allMarkets.map((market) => {
                           const isSelected = selectedOptionMarkets.includes(market);
                           const color = marketColorMap.get(market);
                           return (
@@ -2607,7 +3260,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           >
             {/* 최근 7일 발주 현황 */}
             <div className="card" style={{ borderRadius: '12px', padding: '20px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>최근 7일 발주 현황</h3>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: 'var(--color-text)' }}>최근 7일 발주 현황</h3>
               <div
                 style={{
                   display: 'flex',
@@ -2642,8 +3295,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                           marginBottom: '4px'
                         }}
                       >
-                        <span style={{ fontSize: '9px', color: '#6b7280' }}>{item.count}건</span>
-                        <span style={{ fontSize: '10px', color: '#495057', fontWeight: '500' }}>₩{item.amount.toLocaleString()}</span>
+                        <span style={{ fontSize: '9px', color: 'var(--color-text-secondary)' }}>{item.count}건</span>
+                        <span style={{ fontSize: '10px', color: 'var(--color-text)', fontWeight: '500' }}>₩{item.amount.toLocaleString()}</span>
                       </div>
                       <div
                         style={{
@@ -2663,8 +3316,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                           marginTop: '4px'
                         }}
                       >
-                        <span style={{ fontSize: '10px', fontWeight: '500' }}>{item.day}</span>
-                        <span style={{ fontSize: '9px', color: '#6b7280' }}>{item.date}</span>
+                        <span style={{ fontSize: '10px', fontWeight: '500', color: 'var(--color-text)' }}>{item.day}</span>
+                        <span style={{ fontSize: '9px', color: 'var(--color-text-secondary)' }}>{item.date}</span>
                       </div>
                     </div>
                   );
@@ -2674,7 +3327,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
             {/* 월별 발주 추이 */}
             <div className="card" style={{ borderRadius: '12px', padding: '20px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>월별 발주 추이 (최근 7개월)</h3>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: 'var(--color-text)' }}>월별 발주 추이 (최근 7개월)</h3>
               <div
                 style={{
                   display: 'flex',
@@ -2709,8 +3362,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                           marginBottom: '4px'
                         }}
                       >
-                        <span style={{ fontSize: '9px', color: '#6b7280' }}>{stat.count}건</span>
-                        <span style={{ fontSize: '10px', color: '#495057', fontWeight: '500' }}>₩{stat.amount.toLocaleString()}</span>
+                        <span style={{ fontSize: '9px', color: 'var(--color-text-secondary)' }}>{stat.count}건</span>
+                        <span style={{ fontSize: '10px', color: 'var(--color-text)', fontWeight: '500' }}>₩{stat.amount.toLocaleString()}</span>
                       </div>
                       <div
                         style={{
@@ -2721,7 +3374,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                           transition: 'height 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
                         }}
                       />
-                      <span style={{ fontSize: '10px', fontWeight: '500', marginTop: '4px' }}>{stat.month}</span>
+                      <span style={{ fontSize: '10px', fontWeight: '500', marginTop: '4px', color: 'var(--color-text)' }}>{stat.month}</span>
                     </div>
                   );
                 })}
