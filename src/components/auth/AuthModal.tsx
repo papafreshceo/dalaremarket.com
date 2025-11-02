@@ -305,7 +305,8 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     setLoading(true)
 
     try {
-      const redirectUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+      // window.location.origin을 우선 사용 (프로덕션에서도 정확한 URL 사용)
+      const redirectUrl = window.location.origin
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${redirectUrl}/auth/reset-password`,
       })
