@@ -282,6 +282,45 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     }
   }
 
+  // 네이버 로그인
+  const handleNaverLogin = () => {
+    const state = Math.random().toString(36).substring(7)
+    const clientId = process.env.NEXT_PUBLIC_NAVER_CLIENT_ID
+    const redirectUri = encodeURIComponent(process.env.NEXT_PUBLIC_NAVER_CALLBACK_URL || 'http://localhost:3002/auth/callback/naver')
+    const naverAuthUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}&auth_type=reprompt`
+
+    window.location.href = naverAuthUrl
+  }
+
+  // 소셜 로그인
+  const handleSocialLogin = async (provider: 'google' | 'kakao') => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      })
+
+      if (error) {
+        setError(`${provider} 로그인에 실패했습니다.`)
+        setLoading(false)
+        return
+      }
+    } catch (err) {
+      console.error('Social login error:', err)
+      setError('소셜 로그인 중 오류가 발생했습니다.')
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       {/* Backdrop */}
@@ -776,6 +815,143 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
               </div>
             )}
           </form>
+
+          {/* 소셜 로그인 (로그인 모드일 때만) */}
+          {mode === 'login' && (
+            <>
+              {/* 소셜 로그인 구분선 */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                margin: '24px 0 16px'
+              }}>
+                <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }}></div>
+                <span style={{
+                  fontSize: '13px',
+                  color: '#6b7280',
+                  fontWeight: '500'
+                }}>간편 로그인</span>
+                <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }}></div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
+                {/* 네이버 로그인 */}
+                <button
+                  type="button"
+                  onClick={handleNaverLogin}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: '#03C75A',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#02b350'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#03C75A'
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                    <path d="M13.5 3.5H6.5C4.567 3.5 3 5.067 3 7V13C3 14.933 4.567 16.5 6.5 16.5H13.5C15.433 16.5 17 14.933 17 13V7C17 5.067 15.433 3.5 13.5 3.5Z" fill="white"/>
+                    <path d="M10 6.5C8.067 6.5 6.5 8.067 6.5 10C6.5 11.933 8.067 13.5 10 13.5C11.933 13.5 13.5 11.933 13.5 10C13.5 8.067 11.933 6.5 10 6.5Z" fill="#03C75A"/>
+                  </svg>
+                  네이버로 시작하기
+                </button>
+
+                {/* 카카오 로그인 */}
+                <button
+                  type="button"
+                  onClick={() => handleSocialLogin('kakao')}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: '#FEE500',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#000000',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.currentTarget.style.background = '#fdd835'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!loading) {
+                      e.currentTarget.style.background = '#FEE500'
+                    }
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 18 18">
+                    <path fill="#000000" d="M9 3c-3.866 0-7 2.463-7 5.5 0 1.894 1.214 3.556 3.068 4.568l-.75 2.75a.3.3 0 00.434.345L8.28 14.32c.238.02.479.03.72.03 3.866 0 7-2.463 7-5.5S12.866 3 9 3z"/>
+                  </svg>
+                  카카오로 시작하기
+                </button>
+
+                {/* 구글 로그인 */}
+                <button
+                  type="button"
+                  onClick={() => handleSocialLogin('google')}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.currentTarget.style.background = '#f9fafb'
+                      e.currentTarget.style.borderColor = '#d1d5db'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!loading) {
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.borderColor = '#e5e7eb'
+                    }
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 18 18">
+                    <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 002.38-5.88c0-.57-.05-.66-.15-1.18z"/>
+                    <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 01-7.18-2.54H1.83v2.07A8 8 0 008.98 17z"/>
+                    <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 010-3.04V5.41H1.83a8 8 0 000 7.18l2.67-2.07z"/>
+                    <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 001.83 5.4L4.5 7.49a4.77 4.77 0 014.48-3.3z"/>
+                  </svg>
+                  구글로 시작하기
+                </button>
+              </div>
+            </>
+          )}
 
           {/* 회원가입 링크 */}
           {mode === 'login' && (
