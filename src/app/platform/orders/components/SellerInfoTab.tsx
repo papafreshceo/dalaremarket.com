@@ -51,8 +51,14 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
     name: '',
     email: '',
     password: '',
+    verificationCode: '',
   });
   const [signingUp, setSigningUp] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [codeVerified, setCodeVerified] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [countdown, setCountdown] = useState(0);
 
   const supabase = createClient();
 
@@ -61,6 +67,14 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
       loadSellerInfo();
     }
   }, [userId]);
+
+  // 인증번호 카운트다운 타이머
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
 
   // 사업자명과 동일 체크박스가 체크되어 있으면 사업자명을 스토어명에 자동 반영
   useEffect(() => {
@@ -258,6 +272,80 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
     }
   };
 
+  // 이메일 인증번호 발송
+  const handleSendVerificationCode = async () => {
+    if (!signupForm.email.trim()) {
+      toast.error('이메일을 입력해주세요.');
+      return;
+    }
+
+    // 이메일 형식 검증
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(signupForm.email)) {
+      toast.error('올바른 이메일 형식이 아닙니다.');
+      return;
+    }
+
+    try {
+      setSendingCode(true);
+
+      // Supabase OTP 발송
+      const { error } = await supabase.auth.signInWithOtp({
+        email: signupForm.email,
+        options: {
+          shouldCreateUser: false, // 회원가입은 따로 처리
+        },
+      });
+
+      if (error) throw error;
+
+      setCodeSent(true);
+      setCountdown(180); // 3분 타이머
+      toast.success('인증번호가 발송되었습니다. 이메일을 확인해주세요.');
+    } catch (error: any) {
+      console.error('인증번호 발송 오류:', error);
+      toast.error('인증번호 발송에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
+  // 인증번호 확인
+  const handleVerifyCode = async () => {
+    if (!signupForm.verificationCode.trim()) {
+      toast.error('인증번호를 입력해주세요.');
+      return;
+    }
+
+    try {
+      setVerifyingCode(true);
+
+      // Supabase OTP 확인
+      const { error } = await supabase.auth.verifyOtp({
+        email: signupForm.email,
+        token: signupForm.verificationCode,
+        type: 'email',
+      });
+
+      if (error) {
+        if (error.message.includes('expired')) {
+          toast.error('인증번호가 만료되었습니다. 다시 발송해주세요.');
+        } else {
+          toast.error('인증번호가 일치하지 않습니다.');
+        }
+        return;
+      }
+
+      setCodeVerified(true);
+      toast.success('이메일 인증이 완료되었습니다.');
+    } catch (error: any) {
+      console.error('인증번호 확인 오류:', error);
+      toast.error('인증번호 확인에 실패했습니다.');
+    } finally {
+      setVerifyingCode(false);
+    }
+  };
+
   // 회원가입 처리
   const handleSignup = async () => {
     // 필수 항목 검증
@@ -267,6 +355,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
     }
     if (!signupForm.email.trim()) {
       toast.error('이메일을 입력해주세요.');
+      return;
+    }
+    if (!codeVerified) {
+      toast.error('이메일 인증을 완료해주세요.');
       return;
     }
     if (!signupForm.password.trim()) {
@@ -308,7 +400,10 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
         showSuccessToast('회원가입이 완료되었습니다. 로그인해주세요.');
 
         // 폼 초기화
-        setSignupForm({ name: '', email: '', password: '' });
+        setSignupForm({ name: '', email: '', password: '', verificationCode: '' });
+        setCodeSent(false);
+        setCodeVerified(false);
+        setCountdown(0);
 
         // 페이지 새로고침 (로그인 상태 갱신)
         setTimeout(() => {
@@ -421,23 +516,112 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
               }}>
                 이메일 <span style={{ color: '#ef4444' }}>*</span>
               </label>
-              <input
-                type="email"
-                value={signupForm.email}
-                onChange={(e) => setSignupForm({ ...signupForm, email: e.target.value })}
-                placeholder="example@example.com"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  background: 'var(--color-background)',
-                  color: 'var(--color-text)',
-                  boxSizing: 'border-box'
-                }}
-              />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="email"
+                  value={signupForm.email}
+                  onChange={(e) => {
+                    setSignupForm({ ...signupForm, email: e.target.value });
+                    // 이메일 변경 시 인증 상태 초기화
+                    setCodeSent(false);
+                    setCodeVerified(false);
+                    setCountdown(0);
+                  }}
+                  disabled={codeVerified}
+                  placeholder="example@example.com"
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: codeVerified ? 'var(--color-surface)' : 'var(--color-background)',
+                    color: 'var(--color-text)',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <button
+                  onClick={handleSendVerificationCode}
+                  disabled={sendingCode || codeVerified || countdown > 0}
+                  style={{
+                    padding: '12px 20px',
+                    background: codeVerified ? '#10b981' : (sendingCode || countdown > 0) ? '#9ca3af' : '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: (sendingCode || codeVerified || countdown > 0) ? 'not-allowed' : 'pointer',
+                    whiteSpace: 'nowrap',
+                    minWidth: '100px'
+                  }}
+                >
+                  {codeVerified ? '인증완료' : sendingCode ? '발송 중...' : countdown > 0 ? `${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}` : '인증번호 발송'}
+                </button>
+              </div>
             </div>
+
+            {/* 인증번호 입력 */}
+            {codeSent && !codeVerified && (
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: 'var(--color-text)',
+                  marginBottom: '8px'
+                }}>
+                  인증번호 <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    value={signupForm.verificationCode}
+                    onChange={(e) => setSignupForm({ ...signupForm, verificationCode: e.target.value })}
+                    placeholder="6자리 인증번호 입력"
+                    maxLength={6}
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      background: 'var(--color-background)',
+                      color: 'var(--color-text)',
+                      boxSizing: 'border-box'
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleVerifyCode();
+                    }}
+                  />
+                  <button
+                    onClick={handleVerifyCode}
+                    disabled={verifyingCode}
+                    style={{
+                      padding: '12px 20px',
+                      background: verifyingCode ? '#9ca3af' : '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: verifyingCode ? 'not-allowed' : 'pointer',
+                      whiteSpace: 'nowrap',
+                      minWidth: '100px'
+                    }}
+                  >
+                    {verifyingCode ? '확인 중...' : '인증확인'}
+                  </button>
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  color: 'var(--color-text-secondary)',
+                  marginTop: '6px'
+                }}>
+                  이메일로 발송된 6자리 인증번호를 입력해주세요
+                </div>
+              </div>
+            )}
 
             {/* 비밀번호 */}
             <div>
