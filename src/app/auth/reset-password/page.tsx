@@ -10,8 +10,26 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [linkExpired, setLinkExpired] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  // URL에서 에러 확인
+  useEffect(() => {
+    // URL hash에서 에러 확인 (#error=access_denied&error_code=otp_expired)
+    const hash = window.location.hash
+    if (hash.includes('error=access_denied') || hash.includes('error_code=otp_expired')) {
+      setLinkExpired(true)
+      setError('비밀번호 재설정 링크가 만료되었습니다. 링크는 1시간 동안만 유효합니다.')
+    }
+
+    // URL search params에서도 에러 확인 (?error=access_denied)
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('error') === 'access_denied' || params.get('error_code') === 'otp_expired') {
+      setLinkExpired(true)
+      setError('비밀번호 재설정 링크가 만료되었습니다. 링크는 1시간 동안만 유효합니다.')
+    }
+  }, [])
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,6 +69,10 @@ export default function ResetPasswordPage() {
     }
   }
 
+  const handleBackToLogin = () => {
+    router.push('/')
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -86,7 +108,50 @@ export default function ResetPasswordPage() {
           새로운 비밀번호를 입력해주세요
         </p>
 
-        {success ? (
+        {linkExpired ? (
+          <div>
+            <div style={{
+              padding: '20px',
+              background: '#fee2e2',
+              borderRadius: '12px',
+              marginBottom: '20px'
+            }}>
+              <p style={{ fontSize: '16px', color: '#dc2626', fontWeight: '600', marginBottom: '8px' }}>
+                링크가 만료되었습니다
+              </p>
+              <p style={{ fontSize: '14px', color: '#dc2626', marginBottom: '12px' }}>
+                비밀번호 재설정 링크는 1시간 동안만 유효합니다.
+              </p>
+              <p style={{ fontSize: '14px', color: '#6b7280' }}>
+                메인 페이지로 돌아가서 로그인 창의 "비밀번호 찾기"를 다시 클릭해주세요.
+              </p>
+            </div>
+            <button
+              onClick={handleBackToLogin}
+              style={{
+                width: '100%',
+                padding: '14px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                transition: 'transform 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
+            >
+              로그인 페이지로 돌아가기
+            </button>
+          </div>
+        ) : success ? (
           <div style={{
             padding: '20px',
             background: '#d1fae5',

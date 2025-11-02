@@ -305,17 +305,19 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     setLoading(true)
 
     try {
+      const redirectUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: `${redirectUrl}/auth/reset-password`,
       })
 
       if (error) {
+        console.error('Reset password error:', error)
         setError('비밀번호 재설정 이메일 발송에 실패했습니다.')
         setLoading(false)
         return
       }
 
-      setSuccess('비밀번호 재설정 이메일이 발송되었습니다. 이메일을 확인해주세요.')
+      setSuccess('비밀번호 재설정 이메일이 발송되었습니다. 이메일을 확인해주세요. (링크는 1시간 동안 유효합니다)')
       setLoading(false)
     } catch (err) {
       console.error('Reset password error:', err)
