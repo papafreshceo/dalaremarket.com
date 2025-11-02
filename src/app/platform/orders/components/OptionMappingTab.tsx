@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { OptionMapping } from '../types';
 import { Plus, Trash2, Save, Edit2, X } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
 interface OptionMappingTabProps {
   isMobile: boolean;
@@ -204,8 +204,6 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
 
   return (
     <div>
-      <Toaster position="top-center" />
-
       {/* 헤더 */}
       <div style={{ marginBottom: '24px' }}>
         <h2 style={{
