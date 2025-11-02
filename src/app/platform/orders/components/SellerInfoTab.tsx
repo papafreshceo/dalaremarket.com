@@ -69,6 +69,12 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
 
   const loadSellerInfo = async () => {
     try {
+      // 비회원 사용자인 경우
+      if (userId === 'guest') {
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -242,6 +248,40 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
       setSellerInfo(prev => ({ ...prev, [field]: value }));
     }
   };
+
+  // 비회원 사용자 안내
+  if (userId === 'guest') {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '400px',
+        gap: '16px'
+      }}>
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#9ca3af' }}>
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <div style={{
+          fontSize: '16px',
+          fontWeight: '500',
+          color: 'var(--color-text)'
+        }}>
+          로그인이 필요합니다
+        </div>
+        <div style={{
+          fontSize: '14px',
+          color: 'var(--color-text-secondary)',
+          textAlign: 'center'
+        }}>
+          판매자 정보를 등록하려면 회원가입 후 로그인해주세요.
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
