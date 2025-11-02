@@ -867,7 +867,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                     <path d="M13.5 3.5H6.5C4.567 3.5 3 5.067 3 7V13C3 14.933 4.567 16.5 6.5 16.5H13.5C15.433 16.5 17 14.933 17 13V7C17 5.067 15.433 3.5 13.5 3.5Z" fill="white"/>
                     <path d="M10 6.5C8.067 6.5 6.5 8.067 6.5 10C6.5 11.933 8.067 13.5 10 13.5C11.933 13.5 13.5 11.933 13.5 10C13.5 8.067 11.933 6.5 10 6.5Z" fill="#03C75A"/>
                   </svg>
-                  네이버로 시작하기
+                  네이버로 로그인
                 </button>
 
                 {/* 카카오 로그인 */}
@@ -905,7 +905,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                   <svg width="18" height="18" viewBox="0 0 18 18">
                     <path fill="#000000" d="M9 3c-3.866 0-7 2.463-7 5.5 0 1.894 1.214 3.556 3.068 4.568l-.75 2.75a.3.3 0 00.434.345L8.28 14.32c.238.02.479.03.72.03 3.866 0 7-2.463 7-5.5S12.866 3 9 3z"/>
                   </svg>
-                  카카오로 시작하기
+                  카카오로 로그인
                 </button>
 
                 {/* 구글 로그인 */}
@@ -947,7 +947,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                     <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 010-3.04V5.41H1.83a8 8 0 000 7.18l2.67-2.07z"/>
                     <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 001.83 5.4L4.5 7.49a4.77 4.77 0 014.48-3.3z"/>
                   </svg>
-                  구글로 시작하기
+                  구글로 로그인
                 </button>
               </div>
             </>
