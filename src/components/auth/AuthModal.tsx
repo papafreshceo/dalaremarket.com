@@ -89,7 +89,15 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
       })
 
       if (error) {
-        setError(error.message)
+        console.error('Login error details:', error)
+        // 한글 에러 메시지로 변환
+        let errorMessage = error.message
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = '이메일 또는 비밀번호가 올바르지 않습니다.'
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = '이메일 인증이 완료되지 않았습니다.'
+        }
+        setError(errorMessage)
         setLoading(false)
         return
       }
