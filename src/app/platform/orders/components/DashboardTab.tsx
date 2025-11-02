@@ -1295,7 +1295,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
         className="card"
         style={{
           borderRadius: '12px',
-          padding: '20px'
+          padding: 'clamp(12px, 3%, 20px)',
+          fontSize: 'clamp(10px, 1.2vw, 14px)'
         }}
       >
         <div
@@ -1308,7 +1309,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
         >
           <h3
             style={{
-              fontSize: '12px',
+              fontSize: '0.86em',
               fontWeight: '600',
               margin: 0
             }}
@@ -1742,14 +1743,17 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
         style={{
           display: 'flex',
           gap: '24px',
-          alignItems: 'flex-start'
+          alignItems: 'flex-start',
+          maxWidth: '100%',
+          overflow: 'visible'
         }}
       >
         {/* 첫 번째 열: 날짜 필터 & 통계 카드 - Sticky */}
         <div
           style={{
-            width: '240px',
-            flexShrink: 0,
+            minWidth: '200px',
+            width: '11.2%',
+            flexShrink: 1,
             position: 'sticky',
             top: '80px',
             maxHeight: 'calc(100vh - 96px)',
@@ -2037,8 +2041,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
         {/* 두 번째/세 번째 열 */}
         <div
           style={{
-            width: '1498px',
-            flexShrink: 0,
+            flex: '1 1 auto',
+            minWidth: '800px',
             display: 'flex',
             flexDirection: 'column',
             gap: '24px'
@@ -2048,7 +2052,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '550px 300px 600px',
+              gridTemplateColumns: '1.83fr 1fr 2fr',
               gap: '24px'
             }}
           >
@@ -2057,15 +2061,16 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               className="card"
               style={{
                 borderRadius: '12px',
-                padding: '20px',
+                padding: 'clamp(12px, 3%, 20px)',
                 display: 'flex',
                 flexDirection: 'column',
-                minHeight: '500px'
+                minHeight: '500px',
+                fontSize: 'clamp(10px, 1.2vw, 14px)'
               }}
             >
               <h3
                 style={{
-                  fontSize: '14px',
+                  fontSize: '1em',
                   fontWeight: '600',
                   marginBottom: '16px'
                 }}
@@ -2086,10 +2091,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   {/* 원형 그래프 */}
                   <div
                     style={{
-                      width: isMobile ? '300px' : '240px',
-                      height: isMobile ? '300px' : '240px',
+                      width: isMobile ? '300px' : 'min(240px, 40%)',
+                      height: isMobile ? '300px' : 'auto',
+                      aspectRatio: '1',
                       position: 'relative',
-                      flexShrink: 0,
+                      flexShrink: 1,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center'
@@ -2098,6 +2104,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     <svg
                       viewBox="0 0 200 200"
                       style={{
+                        width: '100%',
+                        height: '100%',
                         transform: 'rotate(-90deg)',
                         filter: 'drop-shadow(0 8px 16px rgba(0, 0, 0, 0.15))'
                       }}
@@ -2339,8 +2347,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             </div>
 
             {/* 옵션상품 발주 TOP 10 */}
-            <div className="card" style={{ borderRadius: '12px', padding: '20px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>옵션상품 발주 TOP 10</h3>
+            <div className="card" style={{ borderRadius: '12px', padding: 'clamp(12px, 3%, 20px)', fontSize: 'clamp(10px, 1.2vw, 14px)' }}>
+              <h3 style={{ fontSize: '1em', fontWeight: '600', marginBottom: '16px' }}>옵션상품 발주 TOP 10</h3>
               <div style={{ maxHeight: '440px', overflowY: 'auto' }}>
                 {optionTop10.length > 0 ? (
                   optionTop10.map((item, idx) => {
@@ -3383,14 +3391,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           </div>
         </div>
 
-        {/* 네 번째 열: 빈 공간 */}
-        <div
-          style={{
-            width: '400px',
-            flexShrink: 0
-          }}
-        >
-        </div>
       </div>
 
       {/* 커스텀 툴팁 */}

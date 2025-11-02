@@ -1229,8 +1229,6 @@ function OrdersPageContent() {
         {/* Tab Content */}
         {activeTab === '대시보드' && (
           <div style={{
-            maxWidth: '1800px',
-            margin: '0 auto',
             width: '100%'
           }}>
             <DashboardTab
