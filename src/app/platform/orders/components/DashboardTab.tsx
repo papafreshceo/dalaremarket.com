@@ -1298,8 +1298,12 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
         className="card"
         style={{
           borderRadius: '12px',
-          padding: 'clamp(12px, 3%, 20px)',
-          fontSize: 'clamp(10px, 1.2vw, 14px)'
+          padding: '16px',
+          fontSize: '14px',
+          height: '480px',
+          maxHeight: '480px',
+          display: 'flex',
+          flexDirection: 'column'
         }}
       >
         <div
@@ -1740,12 +1744,12 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
   );
 
   return (
-    <div>
+    <div style={{ display: 'block', width: '100%' }}>
       {/* 차트 영역 - Flex 레이아웃 */}
       <div
         style={{
           display: 'flex',
-          gap: '24px',
+          gap: '20px',
           alignItems: 'flex-start',
           maxWidth: '100%',
           overflow: 'visible'
@@ -1764,7 +1768,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             display: 'flex',
             flexDirection: 'column',
             gap: '20px',
-            paddingBottom: '8px'
+            paddingBottom: '8px',
+            zIndex: 1000
           }}
         >
           {/* 날짜 필터 */}
@@ -2044,11 +2049,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
         {/* 두 번째/세 번째 열 */}
         <div
           style={{
-            flex: '1 1 auto',
+            flex: '0 1 auto',
             minWidth: '800px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '24px'
+            gap: '20px'
           }}
         >
           {/* 첫 번째 행: 발주 TOP 10 + 옵션상품 발주 TOP 10 + 발주 캘린더 */}
@@ -2056,7 +2061,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             style={{
               display: 'grid',
               gridTemplateColumns: '1.83fr 1fr 2fr',
-              gap: '24px'
+              gap: '20px',
+              flex: '0 0 auto'
             }}
           >
             {/* 품목 발주 TOP 10 */}
@@ -2064,11 +2070,12 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               className="card"
               style={{
                 borderRadius: '12px',
-                padding: 'clamp(12px, 3%, 20px)',
+                padding: '16px',
                 display: 'flex',
                 flexDirection: 'column',
-                minHeight: '500px',
-                fontSize: 'clamp(10px, 1.2vw, 14px)'
+                height: '480px',
+                maxHeight: '480px',
+                fontSize: '14px'
               }}
             >
               <h3
@@ -2085,7 +2092,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   style={{
                     display: 'flex',
                     flexDirection: isMobile ? 'column' : 'row',
-                    gap: '32px',
+                    gap: '24px',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flex: 1
@@ -2350,9 +2357,17 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             </div>
 
             {/* 옵션상품 발주 TOP 10 */}
-            <div className="card" style={{ borderRadius: '12px', padding: 'clamp(12px, 3%, 20px)', fontSize: 'clamp(10px, 1.2vw, 14px)' }}>
+            <div className="card" style={{
+              borderRadius: '12px',
+              padding: '16px',
+              fontSize: '14px',
+              height: '480px',
+              maxHeight: '480px',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
               <h3 style={{ fontSize: '1em', fontWeight: '600', marginBottom: '16px' }}>옵션상품 발주 TOP 10</h3>
-              <div style={{ maxHeight: '440px', overflowY: 'auto' }}>
+              <div style={{ maxHeight: '440px', overflowY: 'auto', flex: 1 }}>
                 {optionTop10.length > 0 ? (
                   optionTop10.map((item, idx) => {
                     const isSelected = selectedOptions.includes(item.name);
@@ -2407,12 +2422,12 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
           <div className="card" style={{ borderRadius: '12px', padding: '20px', width: '100%', background: 'none', boxShadow: 'none' }}>
             {/* 탭 헤더 */}
             {/* 품목별 / 옵션별 통계 좌우 배치 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', gridAutoRows: 'min-content' }}>
               {/* 품목별 통계 */}
               <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'block' }}>
                 {/* 헤더 컨테이너 */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', minHeight: '40px', marginBottom: '0' }}>
                   {/* 좌측: 제목 + 선택된 품목 태그 */}
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#6366f1', margin: 0 }}>품목</h3>
@@ -2520,9 +2535,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                 {/* 그래프 */}
                 {productStats.dates.length > 0 && productStats.lines.length > 0 ? (
-                  <div>
+                  <>
+                  <div style={{ height: '300px', marginTop: '8px', marginBottom: '16px', clear: 'both' }}>
                     {/* 메인 그래프 */}
-                    <svg viewBox="0 0 1200 424" style={{ width: '100%', height: '350px', display: 'block' }}>
+                    <svg viewBox="0 0 1200 424" style={{ width: '100%', height: '100%', display: 'block' }}>
                       {(() => {
                         const maxAmount = Math.max(
                           ...productStats.lines.flatMap(line => line.data.map(d => d.amount)),
@@ -2539,7 +2555,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         // 그래프 영역 설정
                         const chartLeft = 100;
                         const chartRight = 1120; // 오른쪽 여백 확보 (1150 -> 1120)
-                        const chartTop = 5;
+                        const chartTop = 30;
                         const chartBottom = 390;
                         const chartWidth = chartRight - chartLeft;
                         const chartHeight = chartBottom - chartTop;
@@ -2757,10 +2773,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         );
                       })()}
                     </svg>
+                  </div>
 
-                    {/* 범례 컨테이너 */}
-                    <div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+                  {/* 범례 컨테이너 */}
+                  <div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
                         {/* 전체 버튼 */}
                         <div
                           onClick={() => setShowProductMarketTotal(!showProductMarketTotal)}
@@ -2837,11 +2854,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         })}
                       </div>
                     </div>
-                  </div>
+                  </>
                 ) : (
-                  <div style={{ textAlign: 'center', color: '#6b7280', padding: '40px 20px' }}>
-                    <div style={{ fontSize: '14px', marginBottom: '8px' }}>좌측에서 품목을 선택하세요</div>
-                    <div style={{ fontSize: '12px', color: '#9ca3af' }}>최대 5개까지 선택 가능</div>
+                  <div style={{ height: '300px', marginTop: '8px', marginBottom: '16px', clear: 'both', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                    <div style={{ textAlign: 'center', color: '#6b7280' }}>
+                      <div style={{ fontSize: '14px', marginBottom: '8px' }}>좌측에서 품목을 선택하세요</div>
+                      <div style={{ fontSize: '12px', color: '#9ca3af' }}>최대 5개까지 선택 가능</div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2849,9 +2868,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
               {/* 옵션별 통계 */}
               <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'block' }}>
                 {/* 헤더 컨테이너 */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', minHeight: '40px', marginBottom: '0' }}>
                   {/* 좌측: 제목 + 선택된 옵션 태그 */}
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#8b5cf6', margin: 0 }}>옵션</h3>
@@ -2956,9 +2975,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
                 {/* 그래프 */}
                 {optionStats.dates.length > 0 && optionStats.lines.length > 0 ? (
-                  <div>
+                  <>
+                  <div style={{ height: '300px', marginTop: '8px', marginBottom: '16px', clear: 'both' }}>
                     {/* 메인 그래프 */}
-                    <svg viewBox="0 0 1200 424" style={{ width: '100%', height: '350px', display: 'block' }}>
+                    <svg viewBox="0 0 1200 424" style={{ width: '100%', height: '100%', display: 'block' }}>
                       {(() => {
                         const maxAmount = Math.max(
                           ...optionStats.lines.flatMap(line => line.data.map(d => d.amount)),
@@ -2975,7 +2995,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         // 그래프 영역 설정
                         const chartLeft = 100;
                         const chartRight = 1120; // 오른쪽 여백 확보 (1150 -> 1120)
-                        const chartTop = 5;
+                        const chartTop = 30;
                         const chartBottom = 390;
                         const chartWidth = chartRight - chartLeft;
                         const chartHeight = chartBottom - chartTop;
@@ -3193,10 +3213,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         );
                       })()}
                     </svg>
+                  </div>
 
-                    {/* 범례 컨테이너 */}
-                    <div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+                  {/* 범례 컨테이너 */}
+                  <div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
                         {/* 전체 버튼 */}
                         <div
                           onClick={() => setShowOptionMarketTotal(!showOptionMarketTotal)}
@@ -3273,11 +3294,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         })}
                       </div>
                     </div>
-                  </div>
+                  </>
                 ) : (
-                  <div style={{ textAlign: 'center', color: '#6b7280', padding: '40px 20px' }}>
-                    <div style={{ fontSize: '14px', marginBottom: '8px' }}>좌측에서 옵션상품을 선택하세요</div>
-                    <div style={{ fontSize: '12px', color: '#9ca3af' }}>최대 5개까지 선택 가능</div>
+                  <div style={{ height: '300px', marginTop: '8px', marginBottom: '16px', clear: 'both', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                    <div style={{ textAlign: 'center', color: '#6b7280' }}>
+                      <div style={{ fontSize: '14px', marginBottom: '8px' }}>좌측에서 옵션상품을 선택하세요</div>
+                      <div style={{ fontSize: '12px', color: '#9ca3af' }}>최대 5개까지 선택 가능</div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -3290,7 +3313,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
-              gap: '24px'
+              gap: '20px'
             }}
           >
             {/* 최근 7일 발주 현황 */}
