@@ -759,7 +759,13 @@ function OrdersPageContent() {
   };
 
   return (
-    <div className="platform-orders-page" style={{ minHeight: '100vh', background: 'var(--color-background)' }}>
+    <div className="platform-orders-page" style={{
+      minHeight: '100vh',
+      width: '100%',
+      maxWidth: '1920px',
+      margin: '0 auto',
+      background: 'var(--color-background)'
+    }}>
       {/* PWA 설치 안내 배너 */}
       <PWAInstallBanner />
 
