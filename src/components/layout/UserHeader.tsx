@@ -72,7 +72,10 @@ export default function UserHeader() {
       ? `/platform/orders?status=${status}`
       : '/platform/orders';
 
-    const windowFeatures = 'width=1400,height=900,resizable=yes,scrollbars=yes';
+    // Full HD 화면 크기 또는 사용자 화면 크기에 맞춤
+    const screenWidth = window.screen.width;
+    const screenHeight = window.screen.height;
+    const windowFeatures = `width=${screenWidth},height=${screenHeight},left=0,top=0,resizable=yes,scrollbars=yes`;
     window.open(url, 'dalrea_orders', windowFeatures);
   };
 
