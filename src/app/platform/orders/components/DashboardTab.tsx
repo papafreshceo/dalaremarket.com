@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Order, StatusConfig, StatsData } from '../types';
 import DatePicker from '@/components/ui/DatePicker';
+import MyRankingWidget from './MyRankingWidget';
 
 interface DashboardTabProps {
   isMobile: boolean;
@@ -2044,6 +2045,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                 </div>
               );
             })}
+
+          {/* 내 순위 위젯 */}
+          <div style={{ margin: '0 4px' }}>
+            <MyRankingWidget />
+          </div>
         </div>
 
         {/* 두 번째/세 번째 열 */}

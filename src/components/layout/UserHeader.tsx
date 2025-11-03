@@ -318,6 +318,7 @@ export default function UserHeader() {
       ]
     },
     { path: '/platform/pricing', text: '요금제' },
+    { path: '/platform/ranking', text: '🏆 셀러랭킹' },
     { path: '/platform/winwin', text: 'Win-Win', special: true },
     { path: '/platform/notice', text: '공지사항' },
     {

@@ -359,7 +359,8 @@ function OrdersPageContent() {
       refundAmount: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined, // 환불액 (정산금액과 동일)
       refundedAt: order.refund_processed_at, // 환불일
       marketName: order.market_name || '미지정', // 마켓명
-      sellerMarketName: order.seller_market_name || '미지정' // 셀러 마켓명
+      sellerMarketName: order.seller_market_name || '미지정', // 셀러 마켓명
+      priceUpdatedAt: order.price_updated_at // 공급가 갱신 일시
     }));
 
     setOrders(convertedOrders);

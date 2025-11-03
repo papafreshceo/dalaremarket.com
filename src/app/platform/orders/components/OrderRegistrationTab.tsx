@@ -5,7 +5,7 @@ import { Order, StatusConfig, StatsData } from '../types';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import DatePicker from '@/components/ui/DatePicker';
 import { Modal } from '@/components/ui/Modal';
-import { Download, Upload } from 'lucide-react';
+import { Download, Upload, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import toast, { Toaster } from 'react-hot-toast';
@@ -92,6 +92,53 @@ export default function OrderRegistrationTab({
   // 캐시 관련 state
   const [cashBalance, setCashBalance] = useState<number>(0);
   const [cashToUse, setCashToUse] = useState<number>(0);
+  const [isCashEnabled, setIsCashEnabled] = useState<boolean>(false);
+
+  // 공급가 갱신 상태
+  const [isPriceUpdated, setIsPriceUpdated] = useState<boolean>(false);
+  const [isUpdatingPrice, setIsUpdatingPrice] = useState<boolean>(false);
+
+  // 필터 상태 변경 시 공급가 갱신 상태 확인
+  useEffect(() => {
+    // 발주서등록 상태가 아니면 초기화
+    if (filterStatus !== 'registered') {
+      setIsPriceUpdated(false);
+      setIsCashEnabled(false);
+      setCashToUse(0);
+      return;
+    }
+
+    // 주문이 없으면 갱신 불필요 (입금완료 버튼에서 체크됨)
+    if (filteredOrders.length === 0) {
+      setIsPriceUpdated(false);
+      setIsCashEnabled(false);
+      setCashToUse(0);
+      return;
+    }
+
+    // 오늘 날짜 (한국 시간 기준)
+    const today = new Date();
+    const koreaToday = new Date(today.getTime() + (9 * 60 * 60 * 1000));
+    const todayStr = koreaToday.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // 모든 주문이 오늘 갱신되었는지 체크 (하나라도 오늘이 아니면 갱신 필요)
+    const allUpdatedToday = filteredOrders.every(order => {
+      if (!order.priceUpdatedAt) return false; // 갱신 이력 없음
+
+      const updatedDate = new Date(order.priceUpdatedAt);
+      const koreaUpdatedDate = new Date(updatedDate.getTime() + (9 * 60 * 60 * 1000));
+      const updatedDateStr = koreaUpdatedDate.toISOString().split('T')[0];
+
+      return updatedDateStr === todayStr; // 오늘이어야 함
+    });
+
+    // 모든 주문이 오늘 갱신되었을 때만 다음 단계 진행 가능
+    setIsPriceUpdated(allUpdatedToday);
+    if (!allUpdatedToday) {
+      setIsCashEnabled(false);
+      setCashToUse(0);
+    }
+  }, [filterStatus, filteredOrders]);
 
   // 캐시 잔액 조회
   useEffect(() => {
@@ -110,6 +157,105 @@ export default function OrderRegistrationTab({
 
     fetchCashBalance();
   }, []);
+
+  // 공급가 갱신 핸들러
+  const handlePriceUpdate = async () => {
+    if (filteredOrders.length === 0) {
+      showModal('alert', '알림', '처리할 주문이 없습니다.');
+      return;
+    }
+
+    setIsUpdatingPrice(true);
+
+    try {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+
+      // 모든 옵션명 수집 (중복 제거)
+      const uniqueOptionNames = [...new Set(filteredOrders.map(order => order.products).filter(Boolean))];
+
+      console.log('🔍 공급가 갱신 - 옵션명:', uniqueOptionNames);
+
+      // option_products에서 최신 공급단가 조회
+      const { data: optionProducts, error: optionError } = await supabase
+        .from('option_products')
+        .select('option_name, seller_supply_price')
+        .in('option_name', uniqueOptionNames);
+
+      if (optionError) {
+        console.error('❌ 옵션 상품 조회 오류:', optionError);
+        showModal('alert', '오류', '옵션 상품 조회 중 오류가 발생했습니다.');
+        setIsUpdatingPrice(false);
+        return;
+      }
+
+      console.log('✅ 조회된 옵션 상품:', optionProducts);
+
+      // 옵션명 -> 공급단가 맵 생성
+      const priceMap = new Map<string, number>();
+      (optionProducts || []).forEach((product: any) => {
+        if (product.option_name && product.seller_supply_price) {
+          const key = product.option_name.trim().toLowerCase();
+          priceMap.set(key, Number(product.seller_supply_price));
+        }
+      });
+
+      // 각 주문의 공급가 업데이트
+      let updatedCount = 0;
+      let notFoundCount = 0;
+      const now = getCurrentTimeUTC();
+
+      for (const order of filteredOrders) {
+        const optionName = order.products || '';
+        const key = optionName.trim().toLowerCase();
+        const newUnitPrice = priceMap.get(key);
+
+        if (newUnitPrice === undefined) {
+          console.warn(`⚠️ 공급단가를 찾을 수 없음: ${optionName}`);
+          notFoundCount++;
+          continue;
+        }
+
+        const quantity = Number(order.quantity) || 1;
+        const newSupplyPrice = newUnitPrice * quantity;
+
+        // DB 업데이트 (price_updated_at 필드에 갱신 일시 저장)
+        const { error: updateError } = await supabase
+          .from('integrated_orders')
+          .update({
+            seller_supply_price: newUnitPrice.toString(),
+            settlement_amount: newSupplyPrice.toString(),
+            price_updated_at: now
+          })
+          .eq('id', order.id);
+
+        if (updateError) {
+          console.error(`❌ 주문 ${order.id} 업데이트 오류:`, updateError);
+        } else {
+          updatedCount++;
+        }
+      }
+
+      setIsUpdatingPrice(false);
+      setIsPriceUpdated(true);
+
+      const message = notFoundCount > 0
+        ? `${updatedCount}건의 공급가가 업데이트되었습니다.\n(${notFoundCount}건은 공급단가를 찾을 수 없어 제외되었습니다.)`
+        : `${updatedCount}건의 공급가가 최신 공급단가로 업데이트되었습니다.`;
+
+      showModal('alert', '완료', message, () => {
+        // 주문 목록 새로고침
+        if (onRefresh) {
+          onRefresh();
+        }
+      });
+
+    } catch (error) {
+      console.error('공급가 갱신 오류:', error);
+      showModal('alert', '오류', '공급가 업데이트 중 오류가 발생했습니다.');
+      setIsUpdatingPrice(false);
+    }
+  };
 
   // 입금완료 및 발주확정 핸들러 (재사용 가능)
   const handlePaymentConfirmation = async () => {
@@ -2121,202 +2267,314 @@ export default function OrderRegistrationTab({
           />
         </div>
 
-        {/* 발주서 관리 버튼들 - 우측 */}
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={() => setShowMarketFileUploadModal(true)}
-            className="bg-purple hover:bg-purple-hover"
-            style={{
-              padding: '6px 16px',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              height: '28px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <Upload size={14} />
-            마켓파일 업로드
-          </button>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="bg-primary hover:bg-primary-hover"
-            style={{
-              padding: '6px 16px',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              height: '28px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <Upload size={14} />
-            발주서 업로드
-          </button>
-          <button
-            onClick={handleDownloadTemplate}
-            className="bg-success hover:bg-success-hover"
-            style={{
-              padding: '6px 16px',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              height: '28px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <Download size={14} />
-            발주서 양식
-          </button>
-        </div>
+        {/* 발주서 관리 버튼들 - 우측 (발주서등록 상태만) */}
+        {filterStatus === 'registered' && (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => setShowMarketFileUploadModal(true)}
+              className="bg-purple hover:bg-purple-hover"
+              style={{
+                padding: '6px 16px',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                height: '28px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Upload size={14} />
+              마켓파일 업로드
+            </button>
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="bg-primary hover:bg-primary-hover"
+              style={{
+                padding: '6px 16px',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                height: '28px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Upload size={14} />
+              발주서 업로드
+            </button>
+            <button
+              onClick={handleDownloadTemplate}
+              className="bg-success hover:bg-success-hover"
+              style={{
+                padding: '6px 16px',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                height: '28px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Download size={14} />
+              발주서 양식
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* 주문 요약 및 발주확정 버튼 */}
-      <div style={{
-        marginBottom: '16px',
-        padding: '16px',
-        background: 'var(--color-surface)',
-        borderRadius: '8px',
-        border: '1px solid var(--color-border)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
+      {/* 주문 요약 섹션 (주문이 있을 때 모든 상태에서 표시) */}
+      {filteredOrders.length > 0 && (
+        <div style={{
+          marginBottom: '16px',
+          padding: '16px',
+          background: 'var(--color-surface)',
+          borderRadius: '8px',
+          border: '1px solid var(--color-border)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-          <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
             <div>
-              <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>주문건수:</span>
+              <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>주문건수</span>
               <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-text)' }}>
                 {orderSummary.count.toLocaleString()}건
               </span>
             </div>
             <div>
-              <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>공급가 합계:</span>
+              <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>공급가 합계</span>
               <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-primary)' }}>
                 {orderSummary.totalSupplyPrice.toLocaleString()}원
               </span>
             </div>
-          </div>
 
-          {/* 캐시 사용 섹션 */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-            padding: '16px',
-            background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-            border: '1px solid #fbbf24',
-            borderRadius: '8px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#92400e' }}>
-                💰 보유 캐시: {cashBalance.toLocaleString()}캐시
-              </span>
+            {/* 공급가 갱신 버튼 (발주서등록 상태일 때만) */}
+            {filterStatus === 'registered' && !isPriceUpdated ? (
               <button
-                onClick={() => {
-                  const maxCash = Math.min(cashBalance, orderSummary.totalSupplyPrice);
-                  setCashToUse(maxCash);
-                }}
+                onClick={handlePriceUpdate}
+                disabled={isUpdatingPrice}
                 style={{
-                  padding: '4px 8px',
-                  background: '#f59e0b',
+                  padding: '6px 14px',
+                  background: isUpdatingPrice ? '#9ca3af' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '11px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
                   fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  cursor: isUpdatingPrice ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 2px 4px rgba(245, 158, 11, 0.2)',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#d97706'}
-                onMouseLeave={(e) => e.currentTarget.style.background = '#f59e0b'}
+                onMouseEnter={(e) => {
+                  if (!isUpdatingPrice) e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!isUpdatingPrice) e.currentTarget.style.transform = 'translateY(0)';
+                }}
               >
-                전액사용
+                <RefreshCw size={14} className={isUpdatingPrice ? 'animate-spin' : ''} />
+                {isUpdatingPrice ? '처리 중...' : '공급가'}
               </button>
-            </div>
+            ) : filterStatus === 'registered' ? (
+              <div style={{
+                padding: '6px 14px',
+                background: '#d1fae5',
+                color: '#059669',
+                border: '1px solid #10b981',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '600',
+                whiteSpace: 'nowrap'
+              }}>
+                ✓ 완료
+              </div>
+            ) : null}
 
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', color: '#92400e', fontWeight: '500', whiteSpace: 'nowrap' }}>사용할 캐시:</span>
-              <input
-                type="number"
-                value={cashToUse}
-                onChange={(e) => {
-                  const value = parseInt(e.target.value) || 0;
-                  const maxCash = Math.min(cashBalance, orderSummary.totalSupplyPrice);
-                  setCashToUse(Math.max(0, Math.min(value, maxCash)));
-                }}
-                min={0}
-                max={Math.min(cashBalance, orderSummary.totalSupplyPrice)}
-                style={{
-                  flex: 1,
-                  padding: '6px 10px',
-                  border: '1px solid #d97706',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  color: '#92400e',
-                  background: 'white'
-                }}
-              />
-              <span style={{ fontSize: '12px', color: '#92400e', fontWeight: '500' }}>캐시</span>
-            </div>
+            {/* 캐시 사용 - 공급가 갱신 후에만 활성화 (발주서등록 상태일 때만) */}
+            {filterStatus === 'registered' && isPriceUpdated && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {!isCashEnabled ? (
+                <button
+                  onClick={() => setIsCashEnabled(true)}
+                  style={{
+                    padding: '4px 10px',
+                    background: 'transparent',
+                    color: '#10b981',
+                    border: '1px solid #10b981',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap',
+                    outline: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#d1fae5';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  캐시사용
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      setIsCashEnabled(false);
+                      setCashToUse(0);
+                    }}
+                    style={{
+                      padding: '4px 10px',
+                      background: '#10b981',
+                      color: 'white',
+                      border: '1px solid #10b981',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap',
+                      outline: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#059669';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#10b981';
+                    }}
+                  >
+                    캐시사용
+                  </button>
+                  <input
+                    type="number"
+                    value={cashToUse}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 0;
+                      const maxCash = Math.min(cashBalance, orderSummary.totalSupplyPrice);
+                      setCashToUse(Math.max(0, Math.min(value, maxCash)));
+                    }}
+                    min={0}
+                    max={Math.min(cashBalance, orderSummary.totalSupplyPrice)}
+                    placeholder="0"
+                    style={{
+                      width: '100px',
+                      height: '26px',
+                      padding: '0 8px',
+                      border: '1px solid #10b981',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#10b981',
+                      background: 'transparent',
+                      textAlign: 'right',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      const maxCash = Math.min(cashBalance, orderSummary.totalSupplyPrice);
+                      setCashToUse(maxCash);
+                    }}
+                    style={{
+                      height: '26px',
+                      padding: '0 8px',
+                      background: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      outline: 'none'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
+                  >
+                    전액
+                  </button>
+                </>
+              )}
+              </div>
+            )}
 
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              paddingTop: '12px',
-              borderTop: '1px solid #fbbf24'
-            }}>
-              <span style={{ fontSize: '14px', fontWeight: '700', color: '#78350f' }}>최종 입금액:</span>
-              <span style={{ fontSize: '18px', fontWeight: '700', color: '#78350f' }}>
-                {(orderSummary.totalSupplyPrice - cashToUse).toLocaleString()}원
-              </span>
-            </div>
+            {/* 구분선 - 공급가 갱신 후에만 (발주서등록 상태일 때만) */}
+            {filterStatus === 'registered' && isPriceUpdated && (
+              <div style={{ width: '1px', height: '24px', background: 'var(--color-border)', margin: '0 12px' }}></div>
+            )}
+
+            {/* 최종 입금액 - 공급가 갱신 후에만 (발주서등록 상태일 때만) */}
+            {filterStatus === 'registered' && isPriceUpdated && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', fontWeight: '700', color: '#10b981' }}>최종 입금액</span>
+                <span style={{ fontSize: '18px', fontWeight: '700', color: '#10b981' }}>
+                  {(orderSummary.totalSupplyPrice - cashToUse).toLocaleString()}원
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
-        <button
-          onClick={handlePaymentConfirmation}
-          style={{
-            padding: '12px 24px',
-            background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
-            alignSelf: 'flex-start'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-        >
-          💳 입금완료 및 발주확정
-        </button>
-      </div>
+        {/* 발주확정 버튼 (발주서등록 상태일 때만) */}
+        {filterStatus === 'registered' && (
+          <button
+            onClick={handlePaymentConfirmation}
+            disabled={!isPriceUpdated}
+            style={{
+              padding: '12px 24px',
+              alignSelf: 'center',
+              background: !isPriceUpdated
+                ? '#9ca3af'
+                : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '600',
+              transition: 'all 0.2s',
+              boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+              alignSelf: 'flex-start'
+            }}
+            onMouseEnter={(e) => {
+              if (isPriceUpdated) e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              if (isPriceUpdated) e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            💳 입금완료 및 발주확정
+          </button>
+        )}
+        </div>
+      )}
 
-      {/* 일괄 삭제 버튼 (발주서등록 단계만) */}
-      {filterStatus === 'registered' && (
+      {/* 일괄 삭제 버튼 (발주서등록 단계이고 주문이 있을 때만) */}
+      {filterStatus === 'registered' && filteredOrders.length > 0 && (
         <div className="mb-3 flex justify-start gap-2">
           <button
             onClick={handleBatchDelete}
@@ -2456,7 +2714,49 @@ export default function OrderRegistrationTab({
         </div>
       )}
 
-      {/* 발주 테이블 */}
+      {/* 주문이 없을 때 안내 문구 (발주서등록 상태만) */}
+      {filterStatus === 'registered' && filteredOrders.length === 0 && (
+        <div style={{
+          padding: '60px 20px',
+          textAlign: 'center',
+          background: 'var(--color-surface)',
+          borderRadius: '12px',
+          border: '2px dashed var(--color-border)',
+          marginTop: '20px'
+        }}>
+          <div style={{
+            fontSize: '48px',
+            marginBottom: '20px',
+            opacity: 0.3
+          }}>
+            📦
+          </div>
+          <h3 style={{
+            fontSize: '18px',
+            fontWeight: '600',
+            color: 'var(--color-text)',
+            marginBottom: '12px'
+          }}>
+            등록된 주문이 없습니다
+          </h3>
+          <p style={{
+            fontSize: '14px',
+            color: 'var(--color-text-secondary)',
+            marginBottom: '8px'
+          }}>
+            상단의 "마켓파일 업로드" 또는 "발주서 업로드" 버튼을 사용하여
+          </p>
+          <p style={{
+            fontSize: '14px',
+            color: 'var(--color-text-secondary)'
+          }}>
+            주문을 등록해주세요
+          </p>
+        </div>
+      )}
+
+      {/* 발주 테이블 (주문이 있을 때만) */}
+      {filteredOrders.length > 0 && (
       <EditableAdminGrid
         key={`grid-${refreshTrigger}`}
         data={filteredOrders}
@@ -2476,7 +2776,94 @@ export default function OrderRegistrationTab({
           const selectedIds = indices.map(index => filteredOrders[index]?.id).filter(Boolean);
           setSelectedOrders(selectedIds);
         }}
+        getRowStyle={filterStatus === 'registered' ? (row: Order) => {
+          if (!row.priceUpdatedAt) {
+            // 미갱신 - 빨간색 계열
+            return {
+              backgroundColor: '#fef2f2',
+            };
+          }
+
+          // 오늘 날짜 체크 (한국 시간 기준)
+          const today = new Date();
+          const koreaToday = new Date(today.getTime() + (9 * 60 * 60 * 1000));
+          const todayStr = koreaToday.toISOString().split('T')[0];
+
+          const updatedDate = new Date(row.priceUpdatedAt);
+          const koreaUpdatedDate = new Date(updatedDate.getTime() + (9 * 60 * 60 * 1000));
+          const updatedDateStr = koreaUpdatedDate.toISOString().split('T')[0];
+
+          const isToday = updatedDateStr === todayStr;
+
+          if (isToday) {
+            // 오늘 갱신 완료 - 녹색 계열
+            return {
+              backgroundColor: '#f0fdf4',
+            };
+          } else {
+            // 과거 갱신 - 주황색 계열
+            return {
+              backgroundColor: '#fffbeb',
+            };
+          }
+        } : undefined}
       />
+      )}
+
+      {/* 테이블 아래 설명 문구 (발주서등록 상태이고 주문이 있을 때만) */}
+      {filterStatus === 'registered' && filteredOrders.length > 0 && (
+        <div style={{
+          marginTop: '16px',
+          padding: '16px 20px',
+          background: '#f8fafc',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0'
+        }}>
+          <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+            <div style={{ flex: 1 }}>
+              <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>
+                📌 행 배경색 안내
+              </h4>
+              <div style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.6' }}>
+                <div style={{ marginBottom: '4px' }}>
+                  <span style={{ display: 'inline-block', width: '16px', height: '16px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '3px', marginRight: '8px', verticalAlign: 'middle' }}></span>
+                  <span style={{ color: '#ef4444', fontWeight: '600' }}>빨간색</span>: 공급가 미갱신 (처음 등록된 주문)
+                </div>
+                <div style={{ marginBottom: '4px' }}>
+                  <span style={{ display: 'inline-block', width: '16px', height: '16px', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '3px', marginRight: '8px', verticalAlign: 'middle' }}></span>
+                  <span style={{ color: '#f59e0b', fontWeight: '600' }}>주황색</span>: 과거 갱신됨 (어제 이전 공급단가로 갱신)
+                </div>
+                <div>
+                  <span style={{ display: 'inline-block', width: '16px', height: '16px', backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '3px', marginRight: '8px', verticalAlign: 'middle' }}></span>
+                  <span style={{ color: '#10b981', fontWeight: '600' }}>녹색</span>: 오늘 갱신 완료 (최신 공급단가 적용)
+                </div>
+              </div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>
+                ℹ️ 발주확정 절차
+              </h4>
+              <div style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.6' }}>
+                <div style={{ marginBottom: '4px' }}>
+                  1. <span style={{ fontWeight: '600', color: '#f59e0b' }}>공급가 갱신</span> 버튼을 클릭하여 최신 공급단가로 업데이트
+                </div>
+                <div style={{ marginBottom: '4px' }}>
+                  2. 모든 주문이 <span style={{ fontWeight: '600', color: '#10b981' }}>녹색</span>으로 변경되면 캐시 사용 가능
+                </div>
+                <div>
+                  3. 입금완료 및 발주확정 실행 (다음 단계로 이관)
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
+            <p style={{ fontSize: '11px', color: '#94a3b8', lineHeight: '1.5' }}>
+              <strong>참고:</strong> 공급가 갱신은 매일 최신 공급단가를 반영하기 위해 필요합니다.
+              어제 이전에 갱신된 주문(주황색)은 오늘 다시 갱신해야 합니다.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Modal 컴포넌트 */}
       {modalState.type && (
@@ -2687,6 +3074,12 @@ export default function OrderRegistrationTab({
 
             // 각 주문에 발주번호 생성 및 업데이트
             const now = getCurrentTimeUTC();
+
+            // 총 공급가 계산
+            const totalSupplyPrice = validatedOrders.reduce((sum, order) => sum + (order.supplyPrice || 0), 0);
+            // 주문당 캐시 차감액 계산
+            const cashPerOrder = cashToUse / validatedOrders.length;
+
             for (let i = 0; i < validatedOrders.length; i++) {
               const order = validatedOrders[i];
               const orderNo = generateOrderNumber(userEmail, i + 1);
@@ -2694,15 +3087,21 @@ export default function OrderRegistrationTab({
               const unitPrice = order.unitPrice || 0;
               const supplyPrice = order.supplyPrice || (unitPrice * quantity);
 
+              // 주문별 최종입금액 계산 (공급가 - 캐시사용액 비율 분배)
+              const orderCashDeduction = totalSupplyPrice > 0 ? (supplyPrice / totalSupplyPrice) * cashToUse : 0;
+              const finalPaymentAmount = supplyPrice - orderCashDeduction;
+
               const { error } = await supabase
                 .from('integrated_orders')
                 .update({
                   shipping_status: '발주서확정',
                   order_number: orderNo,
                   confirmed_at: now,
+                  seller_id: userId, // 셀러 ID 저장
                   option_name: order.optionName, // 수정된 옵션명
                   seller_supply_price: unitPrice,
-                  settlement_amount: supplyPrice
+                  settlement_amount: supplyPrice,
+                  final_payment_amount: Math.round(finalPaymentAmount).toString() // 최종입금액 저장
                 })
                 .eq('id', order._metadata.id);
 
@@ -2753,16 +3152,17 @@ export default function OrderRegistrationTab({
             setValidatedOrders([]);
             setOptionProductsMap(new Map());
 
+            // 토스트로 완료 메시지 표시
             const message = cashToUse > 0
-              ? `${validatedOrders.length}건의 주문이 발주 확정되었습니다.\n${cashToUse.toLocaleString()}캐시가 차감되었습니다.`
-              : `${validatedOrders.length}건의 주문이 발주 확정되었습니다.`;
+              ? `${validatedOrders.length}건의 주문이 발주 확정되었습니다! (${cashToUse.toLocaleString()}캐시 차감)`
+              : `${validatedOrders.length}건의 주문이 발주 확정되었습니다!`;
 
-            showModal('alert', '완료', message, () => {
-              // 주문 목록 새로고침
-              if (onRefresh) {
-                onRefresh();
-              }
-            });
+            toast.success(message);
+
+            // 주문 목록 새로고침
+            if (onRefresh) {
+              onRefresh();
+            }
           } catch (error) {
             console.error('발주확정 오류:', error);
             showModal('alert', '오류', '발주 확정 중 오류가 발생했습니다.');

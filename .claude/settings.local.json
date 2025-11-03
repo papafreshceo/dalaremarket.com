@@ -100,7 +100,9 @@
       "Bash(git log:*)",
       "Bash(git checkout:*)",
       "Bash(git merge:*)",
-      "Bash(if exist apply-last-login-provider-migration.js del /f apply-last-login-provider-migration.js)"
+      "Bash(if exist apply-last-login-provider-migration.js del /f apply-last-login-provider-migration.js)",
+      "Bash(if exist check-orders.js del /f check-orders.js)",
+      "Bash(database/migrations/all_seller_ranking_tables.sql)"
     ],
     "deny": [],
     "ask": []

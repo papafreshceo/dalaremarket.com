@@ -37,6 +37,7 @@ interface EditableAdminGridProps<T = any> {
   validateRow?: (row: T) => boolean  // 행 유효성 검사 (false 반환 시 해당 행 스킵)
   excludeEmptyColumns?: string[]  // 모든 값이 비어있으면 스킵할 컬럼들 (예: ['category_1', 'category_2'])
   transformBeforeSave?: (row: T) => T  // DB 저장 전 데이터 변환 함수 (예: 이름→ID 변환)
+  getRowStyle?: (row: T, rowIndex: number) => React.CSSProperties  // 행 스타일 함수
   height?: string
   rowHeight?: number
   showRowNumbers?: boolean
@@ -78,6 +79,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   validateRow,
   excludeEmptyColumns,
   transformBeforeSave,
+  getRowStyle,
   height = '900px',
   rowHeight = 26,
   showRowNumbers = true,
@@ -2491,16 +2493,21 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
             </tr>
           </thead>
           <tbody>
-            {filteredData.map((row, rowIndex) => (
+            {filteredData.map((row, rowIndex) => {
+              const rowStyle = getRowStyle ? getRowStyle(row, rowIndex) : {};
+              const rowBgColor = rowStyle.backgroundColor;
+
+              return (
               <tr
                 key={rowIndex}
                 style={{
                   contentVisibility: 'auto',
                   contain: 'layout style paint',
+                  ...rowStyle,
                 }}
               >
                 {enableCheckbox && (
-                  <td key="checkbox" className="border border-gray-200 px-2 py-1 text-center align-middle">
+                  <td key="checkbox" className="border border-gray-200 px-2 py-1 text-center align-middle" style={{ backgroundColor: rowBgColor }}>
                     <input
                       type="checkbox"
                       checked={selectedRowIds.has(getRowId(row))}
@@ -2510,7 +2517,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   </td>
                 )}
                 {showRowNumbers && (
-                  <td key="row-number" className="border border-gray-200 px-2 py-1 text-xs text-center align-middle text-text-tertiary">
+                  <td key="row-number" className="border border-gray-200 px-2 py-1 text-xs text-center align-middle text-text-tertiary" style={{ backgroundColor: rowBgColor }}>
                     {startIndex + rowIndex + 1}
                   </td>
                 )}
@@ -2529,6 +2536,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                         minWidth: width,
                         maxWidth: width,
                         userSelect: isDragging ? 'none' : 'text',
+                        backgroundColor: rowBgColor,
                         ...customStyle
                       }}
                       onMouseDown={(e) => handleCellMouseDown(rowIndex, column.key, e)}
@@ -2548,7 +2556,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   )
                 })}
                 {enableDelete && (
-                  <td key="delete-btn" className="border border-gray-200 px-2 py-1 text-center align-middle" style={{ height: rowHeight, width: 100 }}>
+                  <td key="delete-btn" className="border border-gray-200 px-2 py-1 text-center align-middle" style={{ height: rowHeight, width: 100, backgroundColor: rowBgColor }}>
                     <button
                       onClick={() => onDelete?.(rowIndex)}
                       className="px-3 py-0.5 bg-danger-100 text-danger rounded hover:bg-danger-200 whitespace-nowrap"
@@ -2559,7 +2567,8 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   </td>
                 )}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

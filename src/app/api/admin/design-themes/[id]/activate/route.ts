@@ -1,0 +1,50 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+
+// 테마 활성화
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const supabase = await createClient();
+
+    // 트리거가 자동으로 다른 테마들을 비활성화하지만, 명시적으로 처리
+    const { error: deactivateError } = await supabase
+      .from('design_themes')
+      .update({ is_active: false })
+      .neq('id', params.id);
+
+    if (deactivateError) {
+      console.error('Deactivate themes error:', deactivateError);
+    }
+
+    // 선택한 테마 활성화
+    const { data: theme, error } = await supabase
+      .from('design_themes')
+      .update({ is_active: true })
+      .eq('id', params.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Activate theme error:', error);
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: theme,
+      message: '테마가 활성화되었습니다.'
+    });
+  } catch (error: any) {
+    console.error('POST /api/admin/design-themes/[id]/activate error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}

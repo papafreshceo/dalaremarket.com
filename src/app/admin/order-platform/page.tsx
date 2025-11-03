@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { RefreshCw, ChevronDown, ChevronUp, Search, Calendar } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC, formatDateTimeForDisplay } from '@/lib/date';
+import AdminSettlementTab from './components/AdminSettlementTab';
+import AdminRankingTab from './components/AdminRankingTab';
 
 interface Order {
   id: number;
@@ -15,6 +17,7 @@ interface Order {
   quantity: string;
   seller_supply_price?: string;
   settlement_amount?: string;
+  final_payment_amount?: string;
   payment_confirmed_at?: string;
   confirmed_at?: string;
   cancel_requested_at?: string;
@@ -22,6 +25,13 @@ interface Order {
   refund_processed_at?: string;
   created_at: string;
   sheet_date: string;
+}
+
+interface ConfirmedBatch {
+  confirmed_at: string;
+  총금액: number;
+  주문건수: number;
+  입금확인: boolean;
 }
 
 interface SellerStats {
@@ -47,9 +57,11 @@ interface SellerStats {
   환불완료_건수: number;
   환불완료_수량: number;
   환불완료액: number;
+  발주확정_배치?: ConfirmedBatch[];
 }
 
 export default function OrderPlatformPage() {
+  const [activeTab, setActiveTab] = useState<'주문관리' | '셀러별정산내역' | '셀러랭킹'>('주문관리');
   const [orders, setOrders] = useState<Order[]>([]);
   const [sellerStats, setSellerStats] = useState<SellerStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,7 +84,16 @@ export default function OrderPlatformPage() {
     return `${year}-${month}-${day}`;
   };
 
-  const [startDate, setStartDate] = useState<string>(getTodayDate());
+  const get30DaysAgoDate = () => {
+    const today = new Date();
+    today.setDate(today.getDate() - 30);
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [startDate, setStartDate] = useState<string>(get30DaysAgoDate());
   const [endDate, setEndDate] = useState<string>(getTodayDate());
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -190,9 +211,13 @@ export default function OrderPlatformPage() {
       if (!status) return; // shipping_status가 없으면 통계에서 제외
       const quantity = Number(order.quantity) || 0;
       const settlementAmount = Number(order.settlement_amount) || 0;
+      // 최종입금액 (발주확정 시 저장된 값, 없으면 정산금액 사용)
+      const finalAmount = Number(order.final_payment_amount) || settlementAmount;
 
-      // 모든 주문의 금액을 총금액에 합산
-      stats.총금액 += settlementAmount;
+      // 발주서확정 상태의 주문만 총금액에 합산 (입금확인 대상 금액)
+      if (status === '발주서확정') {
+        stats.총금액 += finalAmount;
+      }
 
       if (order.payment_confirmed_at) {
         stats.입금확인 = true;
@@ -244,6 +269,63 @@ export default function OrderPlatformPage() {
     });
 
     const statsArray = Array.from(statsMap.values());
+
+    // 발주확정 배치 계산 (confirmed_at별 그룹화)
+    statsArray.forEach(stat => {
+      // 발주서확정 + 결제완료 상태의 주문 모두 확인 (confirmed_at이 있는 것만)
+      const sellerOrdersWithConfirmedAt = orderData.filter(order =>
+        (order.seller_id || '미지정') === stat.seller_id &&
+        (order.shipping_status === '발주서확정' || order.shipping_status === '결제완료') &&
+        order.confirmed_at
+      );
+
+      if (sellerOrdersWithConfirmedAt.length > 0) {
+        // confirmed_at별로 그룹화
+        const batchMap = new Map<string, ConfirmedBatch>();
+
+        sellerOrdersWithConfirmedAt.forEach(order => {
+          const confirmedAt = order.confirmed_at!;
+          const finalAmount = Number(order.final_payment_amount) || Number(order.settlement_amount) || 0;
+          const isPaymentConfirmed = order.shipping_status === '결제완료';
+
+          if (!batchMap.has(confirmedAt)) {
+            batchMap.set(confirmedAt, {
+              confirmed_at: confirmedAt,
+              총금액: 0,
+              주문건수: 0,
+              입금확인: false
+            });
+          }
+
+          const batch = batchMap.get(confirmedAt)!;
+
+          // 금액은 발주서확정 + 결제완료 모두 포함 (입금확인 취소 시 표시용)
+          batch.총금액 += finalAmount;
+
+          // 건수는 발주서확정 상태만 포함 (입금 대기중인 건수)
+          if (order.shipping_status === '발주서확정') {
+            batch.주문건수 += 1;
+          }
+        });
+
+        // 각 배치의 입금확인 상태 계산
+        batchMap.forEach((batch, confirmedAt) => {
+          const batchOrders = sellerOrdersWithConfirmedAt.filter(o => o.confirmed_at === confirmedAt);
+          const allPaymentConfirmed = batchOrders.every(o => o.shipping_status === '결제완료');
+          batch.입금확인 = allPaymentConfirmed;
+        });
+
+        // 발주서확정 상태의 주문이 있는 배치만 포함
+        const batches = Array.from(batchMap.values()).filter(b => b.주문건수 > 0);
+
+        if (batches.length > 0) {
+          stat.발주확정_배치 = batches.sort((a, b) =>
+            new Date(b.confirmed_at).getTime() - new Date(a.confirmed_at).getTime()
+          );
+        }
+      }
+    });
+
     statsArray.sort((a, b) => (b.업로드_건수 + b.발주서확정_건수 + b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수 + b.환불완료_건수) - (a.업로드_건수 + a.발주서확정_건수 + a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수 + a.환불완료_건수));
 
     // 합계 계산
@@ -278,17 +360,32 @@ export default function OrderPlatformPage() {
     setSellerStats(statsArray);
   };
 
-  const handlePaymentCheckToggle = async (sellerId: string) => {
+  const handlePaymentCheckToggle = async (sellerId: string, confirmedAt?: string) => {
     const currentStat = sellerStats.find(s => s.seller_id === sellerId);
     if (!currentStat) return;
 
-    const newCheckState = !currentStat.입금확인;
+    // 실제 orders 데이터에서 배치의 현재 상태 확인
+    let currentBatchIsConfirmed = false;
+    if (confirmedAt) {
+      const batchOrders = orders.filter(order =>
+        (order.seller_id || '미지정') === sellerId &&
+        order.confirmed_at === confirmedAt
+      );
+      // 해당 배치의 모든 주문이 결제완료 상태면 입금확인 완료 상태
+      currentBatchIsConfirmed = batchOrders.length > 0 && batchOrders.every(o => o.shipping_status === '결제완료');
+    }
+
+    // 토글: 현재 입금확인 완료 상태면 취소(false), 아니면 확인(true)
+    const newCheckState = confirmedAt
+      ? !currentBatchIsConfirmed
+      : !currentStat.입금확인;
 
     if (newCheckState) {
       const sellerOrders = orders.filter(order => {
         const orderSellerId = order.seller_id || '미지정';
         const status = order.shipping_status;
-        return orderSellerId === sellerId && status === '발주서확정';
+        const matchesBatch = confirmedAt ? order.confirmed_at === confirmedAt : true;
+        return orderSellerId === sellerId && status === '발주서확정' && matchesBatch;
       });
 
       if (sellerOrders.length === 0) {
@@ -326,25 +423,41 @@ export default function OrderPlatformPage() {
         if (result.success) {
           // 로컬 상태 업데이트 - orders 업데이트
           setOrders(prev => prev.map(order => {
-            if (order.seller_id === sellerId && order.shipping_status === '발주서확정') {
+            const matchesBatch = confirmedAt ? order.confirmed_at === confirmedAt : true;
+            if (order.seller_id === sellerId && order.shipping_status === '발주서확정' && matchesBatch) {
               return { ...order, shipping_status: '결제완료', payment_confirmed_at: now };
             }
             return order;
           }));
 
-          // sellerStats 업데이트
+          // sellerStats 업데이트 (배치별 입금확인 상태 업데이트)
           setSellerStats(prev =>
-            prev.map(stat =>
-              stat.seller_id === sellerId
-                ? { ...stat, 입금확인: true }
-                : stat
-            )
+            prev.map(stat => {
+              if (stat.seller_id === sellerId) {
+                if (confirmedAt && stat.발주확정_배치) {
+                  // 특정 배치의 입금확인 상태 업데이트
+                  const updatedBatches = stat.발주확정_배치.map(batch =>
+                    batch.confirmed_at === confirmedAt
+                      ? { ...batch, 입금확인: true }
+                      : batch
+                  );
+                  // 모든 배치가 입금확인되었는지 체크
+                  const allConfirmed = updatedBatches.every(b => b.입금확인);
+                  return { ...stat, 발주확정_배치: updatedBatches, 입금확인: allConfirmed };
+                } else {
+                  // 전체 입금확인
+                  return { ...stat, 입금확인: true };
+                }
+              }
+              return stat;
+            })
           );
 
           // total stat도 업데이트
           setTimeout(() => {
             const updatedOrders = orders.map(order => {
-              if (order.seller_id === sellerId && order.shipping_status === '발주서확정') {
+              const matchesBatch = confirmedAt ? order.confirmed_at === confirmedAt : true;
+              if (order.seller_id === sellerId && order.shipping_status === '발주서확정' && matchesBatch) {
                 return { ...order, shipping_status: '결제완료', payment_confirmed_at: now };
               }
               return order;
@@ -352,7 +465,8 @@ export default function OrderPlatformPage() {
             calculateSellerStats(updatedOrders);
           }, 0);
 
-          toast.success(`${result.count}건의 주문이 결제완료로 변경되었습니다.`);
+          const batchInfo = confirmedAt ? ` (${formatDateTimeForDisplay(confirmedAt).slice(0, 16)} 배치)` : '';
+          toast.success(`${result.count}건의 주문이 결제완료로 변경되었습니다.${batchInfo}`);
         } else {
           toast.error('상태 변경 실패: ' + result.error);
         }
@@ -364,7 +478,8 @@ export default function OrderPlatformPage() {
       const sellerOrders = orders.filter(order => {
         const orderSellerId = order.seller_id || '미지정';
         const status = order.shipping_status;
-        return orderSellerId === sellerId && status === '결제완료';
+        const matchesBatch = confirmedAt ? order.confirmed_at === confirmedAt : true;
+        return orderSellerId === sellerId && status === '결제완료' && matchesBatch;
       });
 
       if (sellerOrders.length === 0) {
@@ -400,25 +515,41 @@ export default function OrderPlatformPage() {
         if (result.success) {
           // 로컬 상태 업데이트 - orders 업데이트
           setOrders(prev => prev.map(order => {
-            if (order.seller_id === sellerId && order.shipping_status === '결제완료') {
+            const matchesBatch = confirmedAt ? order.confirmed_at === confirmedAt : true;
+            if (order.seller_id === sellerId && order.shipping_status === '결제완료' && matchesBatch) {
               return { ...order, shipping_status: '발주서확정', payment_confirmed_at: null };
             }
             return order;
           }));
 
-          // sellerStats 업데이트
+          // sellerStats 업데이트 (배치별 입금확인 상태 업데이트)
           setSellerStats(prev =>
-            prev.map(stat =>
-              stat.seller_id === sellerId
-                ? { ...stat, 입금확인: false }
-                : stat
-            )
+            prev.map(stat => {
+              if (stat.seller_id === sellerId) {
+                if (confirmedAt && stat.발주확정_배치) {
+                  // 특정 배치의 입금확인 상태 취소
+                  const updatedBatches = stat.발주확정_배치.map(batch =>
+                    batch.confirmed_at === confirmedAt
+                      ? { ...batch, 입금확인: false }
+                      : batch
+                  );
+                  // 모든 배치가 입금확인되었는지 체크
+                  const allConfirmed = updatedBatches.every(b => b.입금확인);
+                  return { ...stat, 발주확정_배치: updatedBatches, 입금확인: allConfirmed };
+                } else {
+                  // 전체 입금확인 취소
+                  return { ...stat, 입금확인: false };
+                }
+              }
+              return stat;
+            })
           );
 
           // total stat도 업데이트
           setTimeout(() => {
             const updatedOrders = orders.map(order => {
-              if (order.seller_id === sellerId && order.shipping_status === '결제완료') {
+              const matchesBatch = confirmedAt ? order.confirmed_at === confirmedAt : true;
+              if (order.seller_id === sellerId && order.shipping_status === '결제완료' && matchesBatch) {
                 return { ...order, shipping_status: '발주서확정', payment_confirmed_at: null };
               }
               return order;
@@ -426,7 +557,8 @@ export default function OrderPlatformPage() {
             calculateSellerStats(updatedOrders);
           }, 0);
 
-          toast.success(`${result.count}건의 주문이 발주서확정으로 변경되었습니다.`);
+          const batchInfo = confirmedAt ? ` (${formatDateTimeForDisplay(confirmedAt).slice(0, 16)} 배치)` : '';
+          toast.success(`${result.count}건의 주문이 발주서확정으로 변경되었습니다.${batchInfo}`);
         } else {
           toast.error('상태 변경 실패: ' + result.error);
         }
@@ -795,8 +927,13 @@ export default function OrderPlatformPage() {
       if (!status) return; // shipping_status가 없으면 통계에서 제외
       const quantity = Number(order.quantity) || 0;
       const settlementAmount = Number(order.settlement_amount) || 0;
+      // 최종입금액 (발주확정 시 저장된 값, 없으면 정산금액 사용)
+      const finalAmount = Number(order.final_payment_amount) || settlementAmount;
 
-      stats.총금액 += settlementAmount;
+      // 발주서확정 상태의 주문만 총금액에 합산 (입금확인 대상 금액)
+      if (status === '발주서확정') {
+        stats.총금액 += finalAmount;
+      }
 
       if (order.payment_confirmed_at) {
         stats.입금확인 = true;
@@ -848,6 +985,63 @@ export default function OrderPlatformPage() {
     });
 
     const statsArray = Array.from(statsMap.values());
+
+    // 발주확정 배치 계산 (confirmed_at별 그룹화)
+    statsArray.forEach(stat => {
+      // 발주서확정 + 결제완료 상태의 주문 모두 확인 (confirmed_at이 있는 것만)
+      const sellerOrdersWithConfirmedAt = filteredOrders.filter(order =>
+        (order.seller_id || '미지정') === stat.seller_id &&
+        (order.shipping_status === '발주서확정' || order.shipping_status === '결제완료') &&
+        order.confirmed_at
+      );
+
+      if (sellerOrdersWithConfirmedAt.length > 0) {
+        // confirmed_at별로 그룹화
+        const batchMap = new Map<string, ConfirmedBatch>();
+
+        sellerOrdersWithConfirmedAt.forEach(order => {
+          const confirmedAt = order.confirmed_at!;
+          const finalAmount = Number(order.final_payment_amount) || Number(order.settlement_amount) || 0;
+          const isPaymentConfirmed = order.shipping_status === '결제완료';
+
+          if (!batchMap.has(confirmedAt)) {
+            batchMap.set(confirmedAt, {
+              confirmed_at: confirmedAt,
+              총금액: 0,
+              주문건수: 0,
+              입금확인: false
+            });
+          }
+
+          const batch = batchMap.get(confirmedAt)!;
+
+          // 금액은 발주서확정 + 결제완료 모두 포함 (입금확인 취소 시 표시용)
+          batch.총금액 += finalAmount;
+
+          // 건수는 발주서확정 상태만 포함 (입금 대기중인 건수)
+          if (order.shipping_status === '발주서확정') {
+            batch.주문건수 += 1;
+          }
+        });
+
+        // 각 배치의 입금확인 상태 계산
+        batchMap.forEach((batch, confirmedAt) => {
+          const batchOrders = sellerOrdersWithConfirmedAt.filter(o => o.confirmed_at === confirmedAt);
+          const allPaymentConfirmed = batchOrders.every(o => o.shipping_status === '결제완료');
+          batch.입금확인 = allPaymentConfirmed;
+        });
+
+        // 발주서확정 상태의 주문이 있는 배치만 포함 (입금확인 완료된 배치도 표시)
+        const batches = Array.from(batchMap.values()).filter(b => b.주문건수 > 0 || b.입금확인);
+
+        if (batches.length > 0) {
+          stat.발주확정_배치 = batches.sort((a, b) =>
+            new Date(b.confirmed_at).getTime() - new Date(a.confirmed_at).getTime()
+          );
+        }
+      }
+    });
+
     statsArray.sort((a, b) => (b.업로드_건수 + b.발주서확정_건수 + b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수 + b.환불완료_건수) - (a.업로드_건수 + a.발주서확정_건수 + a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수 + a.환불완료_건수));
 
     const totalStats: SellerStats = {
@@ -916,6 +1110,45 @@ export default function OrderPlatformPage() {
           </button>
         </div>
 
+        {/* 탭 메뉴 */}
+        <div className="bg-white border-b border-gray-200 mb-4">
+          <div className="flex gap-0">
+            <button
+              onClick={() => setActiveTab('주문관리')}
+              className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+                activeTab === '주문관리'
+                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              주문관리
+            </button>
+            <button
+              onClick={() => setActiveTab('셀러별정산내역')}
+              className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+                activeTab === '셀러별정산내역'
+                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              셀러별 정산내역
+            </button>
+            <button
+              onClick={() => setActiveTab('셀러랭킹')}
+              className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+                activeTab === '셀러랭킹'
+                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              🏆 셀러 랭킹
+            </button>
+          </div>
+        </div>
+
+        {/* 주문관리 탭 컨텐츠 */}
+        {activeTab === '주문관리' && (
+          <>
         {/* 날짜 필터 및 검색 필터 */}
         <div className="bg-white border border-gray-200 p-4 mb-4 rounded-lg">
           <div className="flex flex-wrap gap-4 items-center">
@@ -1000,10 +1233,10 @@ export default function OrderPlatformPage() {
         <div className="bg-gray-100 border-b border-gray-300">
           <div className="grid grid-cols-14 gap-4 px-6 py-3 text-xs font-semibold text-gray-700 uppercase">
             <div className="col-span-2"></div>
-            <div className="col-span-1 text-center">금액</div>
-            <div className="col-span-1 text-center">입금확인</div>
             <div className="col-span-1 text-center">업로드</div>
             <div className="col-span-1 text-center">발주서확정</div>
+            <div className="col-span-1 text-center">최종입금액</div>
+            <div className="col-span-1 text-center">입금확인</div>
             <div className="col-span-1 text-center">결제완료</div>
             <div className="col-span-1 text-center">상품준비중</div>
             <div className="col-span-1 text-center">발송완료</div>
@@ -1027,16 +1260,16 @@ export default function OrderPlatformPage() {
                   {totalExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   합계
                 </div>
-                <div className="col-span-1 text-center font-bold text-blue-600">
-                  {totalStat.총금액 > 0 ? `${totalStat.총금액.toLocaleString()}원` : '-'}
-                </div>
-                <div className="col-span-1"></div>
                 <div className="col-span-1 text-center font-semibold text-purple-700">
                   {totalStat.업로드_건수 > 0 ? totalStat.업로드_건수 : '-'}
                 </div>
                 <div className="col-span-1 text-center font-semibold text-indigo-700">
                   {totalStat.발주서확정_건수 > 0 ? totalStat.발주서확정_건수 : '-'}
                 </div>
+                <div className="col-span-1 text-center font-bold text-blue-600">
+                  {totalStat.총금액 > 0 ? `${totalStat.총금액.toLocaleString()}원` : '-'}
+                </div>
+                <div className="col-span-1"></div>
                 <div className="col-span-1 text-center font-semibold text-blue-700">
                   {totalStat.결제완료_건수 > 0 ? totalStat.결제완료_건수 : '-'}
                 </div>
@@ -1086,33 +1319,47 @@ export default function OrderPlatformPage() {
                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     {stat.seller_name}
                   </div>
-                  <div className="col-span-1 text-center font-semibold text-blue-600">
-                    {stat.총금액 > 0 ? `${stat.총금액.toLocaleString()}원` : '-'}
-                  </div>
-                  <div className="col-span-1 flex justify-center">
-                    {stat.발주서확정_건수 > 0 || stat.결제완료_건수 > 0 ? (
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePaymentCheckToggle(stat.seller_id);
-                        }}
-                        className="w-11 h-6 rounded-full cursor-pointer relative transition-colors"
-                        style={{ backgroundColor: stat.입금확인 ? '#0891B2' : '#D1D5DB' }}
-                      >
-                        <div
-                          className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all"
-                          style={{ left: stat.입금확인 ? '22px' : '2px' }}
-                        />
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400">-</span>
-                    )}
-                  </div>
                   <div className="col-span-1 text-center font-semibold text-purple-700">
                     {stat.업로드_건수 > 0 ? stat.업로드_건수 : '-'}
                   </div>
                   <div className="col-span-1 text-center font-semibold text-indigo-700">
                     {stat.발주서확정_건수 > 0 ? stat.발주서확정_건수 : '-'}
+                  </div>
+                  <div className="col-span-1 text-center font-semibold text-blue-600">
+                    {stat.총금액 > 0 ? `${stat.총금액.toLocaleString()}원` : '-'}
+                  </div>
+                  <div className="col-span-1 flex justify-center">
+                    {stat.발주확정_배치 && stat.발주확정_배치.length > 0 ? (
+                      (() => {
+                        const pendingBatches = stat.발주확정_배치.filter(b => !b.입금확인).length;
+                        const confirmedBatches = stat.발주확정_배치.filter(b => b.입금확인).length;
+                        return (
+                          <span
+                            className="text-xs font-medium cursor-help"
+                            title={`입금 대기: ${pendingBatches}개 | 입금 완료: ${confirmedBatches}개 (클릭하여 배치 확인)`}
+                          >
+                            <span className="text-orange-600">{pendingBatches}</span>
+                            {confirmedBatches > 0 && (
+                              <span className="text-cyan-600"> / {confirmedBatches}</span>
+                            )}
+                            <span className="text-gray-500"> 배치</span>
+                          </span>
+                        );
+                      })()
+                    ) : stat.결제완료_건수 > 0 ? (
+                      <div
+                        className="w-11 h-6 rounded-full relative opacity-50 cursor-not-allowed"
+                        style={{ backgroundColor: '#0891B2' }}
+                        title="발주서확정 상태의 주문만 입금확인 가능"
+                      >
+                        <div
+                          className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow"
+                          style={{ left: '22px' }}
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">-</span>
+                    )}
                   </div>
                   <div className="col-span-1 text-center font-semibold text-blue-700">
                     {stat.결제완료_건수 > 0 ? stat.결제완료_건수 : '-'}
@@ -1141,6 +1388,56 @@ export default function OrderPlatformPage() {
 
               {isExpanded && (
                 <div className="border-t border-gray-200 bg-gray-50">
+                  {/* 발주확정 배치 정보 */}
+                  {stat.발주확정_배치 && stat.발주확정_배치.length > 0 && (
+                    <div className="px-6 py-4 bg-blue-50 border-b border-blue-200">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3">발주확정 배치 (입금확인 대상)</h4>
+                      <div className="space-y-2">
+                        {stat.발주확정_배치.map((batch, idx) => (
+                          <div
+                            key={batch.confirmed_at}
+                            className="flex items-center justify-between p-3 rounded-lg border"
+                            style={{
+                              backgroundColor: batch.입금확인 ? '#f0fdfa' : '#ffffff',
+                              borderColor: batch.입금확인 ? '#5eead4' : '#bfdbfe'
+                            }}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="text-xs text-gray-500">배치 {idx + 1}</div>
+                              <div className="text-sm font-medium text-gray-700">
+                                {formatDateTimeForDisplay(batch.confirmed_at).replace('. ', '-').replace('. ', '-').replace('. ', ' ')}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                {batch.주문건수 > 0 ? `${batch.주문건수}건` : '입금완료'}
+                              </div>
+                              <div className="text-sm font-semibold text-blue-600">
+                                {batch.총금액.toLocaleString()}원
+                              </div>
+                              {batch.입금확인 && (
+                                <span className="text-xs px-2 py-1 bg-cyan-100 text-cyan-700 rounded-full font-medium">
+                                  입금확인 완료
+                                </span>
+                              )}
+                            </div>
+                            <div>
+                              <div
+                                onClick={() => handlePaymentCheckToggle(stat.seller_id, batch.confirmed_at)}
+                                className="w-11 h-6 rounded-full cursor-pointer relative transition-colors"
+                                style={{ backgroundColor: batch.입금확인 ? '#0891B2' : '#D1D5DB' }}
+                                title={batch.입금확인 ? '클릭하여 입금확인 취소' : '클릭하여 입금확인'}
+                              >
+                                <div
+                                  className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all"
+                                  style={{ left: batch.입금확인 ? '22px' : '2px' }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="max-h-[600px] overflow-y-auto">
                     <table className="w-full seller-detail-table">
                       <thead className="bg-gray-100 sticky top-0">
@@ -1258,6 +1555,22 @@ export default function OrderPlatformPage() {
             </div>
           );
         })}
+      </>
+    )}
+
+        {/* 셀러별 정산내역 탭 컨텐츠 */}
+        {activeTab === '셀러별정산내역' && (
+          <div className="bg-white border border-gray-200 p-6 rounded-lg">
+            <AdminSettlementTab integratedOrders={orders} sellerNames={sellerNames} />
+          </div>
+        )}
+
+        {/* 셀러 랭킹 탭 컨텐츠 */}
+        {activeTab === '셀러랭킹' && (
+          <div className="bg-white border border-gray-200 p-6 rounded-lg">
+            <AdminRankingTab />
+          </div>
+        )}
       </div>
     </div>
   );
