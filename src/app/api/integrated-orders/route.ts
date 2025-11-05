@@ -240,6 +240,13 @@ export async function PUT(request: NextRequest) {
 
     const { id, ...updateData } = body;
 
+    // 상태 변경 전 기존 주문 정보 조회
+    const { data: existingOrder } = await supabase
+      .from('integrated_orders')
+      .select('status, amount, seller_id')
+      .eq('id', id)
+      .single();
+
     const { data, error } = await supabase
       .from('integrated_orders')
       .update(updateData)
@@ -253,6 +260,12 @@ export async function PUT(request: NextRequest) {
         { success: false, error: error.message },
         { status: 500 }
       );
+    }
+
+    // 발송완료 상태로 변경된 경우 랭킹 집계
+    if (existingOrder && existingOrder.status !== 'shipped' && updateData.status === 'shipped') {
+      const { trackOrderShipped } = await import('@/lib/seller-performance');
+      await trackOrderShipped(data.seller_id, data.amount || 0);
     }
 
     return NextResponse.json({ success: true, data });

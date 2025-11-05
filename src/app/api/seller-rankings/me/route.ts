@@ -26,7 +26,16 @@ export async function GET(request: NextRequest) {
     // 내 최신 랭킹 조회
     const { data: myRanking, error: rankingError } = await supabase
       .from('seller_rankings')
-      .select('*')
+      .select(`
+        *,
+        users!seller_rankings_seller_id_fkey (
+          id,
+          name,
+          profile_name,
+          email,
+          business_name
+        )
+      `)
       .eq('seller_id', user.id)
       .eq('period_type', periodType)
       .order('period_start', { ascending: false })

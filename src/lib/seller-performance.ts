@@ -64,51 +64,34 @@ async function getOrCreateDailyPerformance(sellerId: string, date: string) {
 
 /**
  * 주문 등록 시 호출
- * 주문 건수만 증가시킴 (매출은 발주확정 시 추가)
+ * 주문 건수는 발송완료 시에만 집계하므로 여기서는 아무 것도 하지 않음
  */
 export async function trackOrderRegistered(sellerId: string) {
-  try {
-    const today = getTodayKST();
-    const supabase = await createClient();
-
-    // 기존 레코드 가져오기 또는 생성
-    const { data: performance } = await getOrCreateDailyPerformance(sellerId, today);
-
-    if (!performance) {
-      console.error('Failed to get or create daily performance');
-      return { success: false };
-    }
-
-    // 주문 건수 증가
-    const { error } = await supabase
-      .from('seller_performance_daily')
-      .update({
-        order_count: (performance.order_count || 0) + 1,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', performance.id);
-
-    if (error) {
-      console.error('Failed to update order count:', error);
-      return { success: false, error };
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error('trackOrderRegistered error:', error);
-    return { success: false, error };
-  }
+  // 발송완료 상태에서만 집계하므로 여기서는 처리하지 않음
+  return { success: true };
 }
 
 /**
  * 발주확정 시 호출
- * 매출액 추가 및 평균 발주확정 시간 업데이트
+ * 발주확정 시간만 기록 (건수/금액은 발송완료 시 집계)
  */
 export async function trackOrderConfirmed(
   sellerId: string,
   orderAmount: number,
   registeredAt: string,
   confirmedAt: string
+) {
+  // 발송완료 시에만 집계하므로 발주확정 시에는 처리하지 않음
+  return { success: true };
+}
+
+/**
+ * 발송완료 시 호출
+ * 주문 건수 +1, 매출액 추가
+ */
+export async function trackOrderShipped(
+  sellerId: string,
+  orderAmount: number
 ) {
   try {
     const today = getTodayKST();
@@ -122,35 +105,24 @@ export async function trackOrderConfirmed(
       return { success: false };
     }
 
-    // 발주확정 시간 계산 (시간 단위)
-    const confirmHours = getHoursDiff(registeredAt, confirmedAt);
-    const newTotalConfirmHours = (performance.total_confirm_hours || 0) + confirmHours;
-    const confirmedOrderCount = (performance.order_count || 0);  // 발주확정된 주문 수
-    const newAvgConfirmHours = confirmedOrderCount > 0 ? newTotalConfirmHours / confirmedOrderCount : confirmHours;
-
-    // 당일 발주확정 여부
-    const isSameDay = confirmHours < 24;
-
-    // 업데이트
+    // 주문 건수 +1, 매출액 추가
     const { error } = await supabase
       .from('seller_performance_daily')
       .update({
+        order_count: (performance.order_count || 0) + 1,
         total_sales: (performance.total_sales || 0) + orderAmount,
-        total_confirm_hours: newTotalConfirmHours,
-        avg_confirm_hours: newAvgConfirmHours,
-        same_day_confirm_count: (performance.same_day_confirm_count || 0) + (isSameDay ? 1 : 0),
         updated_at: new Date().toISOString()
       })
       .eq('id', performance.id);
 
     if (error) {
-      console.error('Failed to update order confirmation:', error);
+      console.error('Failed to update order shipped:', error);
       return { success: false, error };
     }
 
     return { success: true };
   } catch (error) {
-    console.error('trackOrderConfirmed error:', error);
+    console.error('trackOrderShipped error:', error);
     return { success: false, error };
   }
 }
@@ -268,5 +240,337 @@ export async function getTodayPerformance(sellerId: string) {
   } catch (error) {
     console.error('getTodayPerformance error:', error);
     return { data: null, error };
+  }
+}
+
+/**
+ * 활동점수 업데이트
+ * weekly_consecutive_bonus + monthly_consecutive_bonus + post_score + comment_score + login_score
+ */
+async function updateActivityScore(sellerId: string, date: string) {
+  const supabase = await createClient();
+
+  const { data: performance } = await supabase
+    .from('seller_performance_daily')
+    .select('weekly_consecutive_bonus, monthly_consecutive_bonus, post_score, comment_score, login_score')
+    .eq('seller_id', sellerId)
+    .eq('date', date)
+    .single();
+
+  if (!performance) return;
+
+  const activityScore =
+    (performance.weekly_consecutive_bonus || 0) +
+    (performance.monthly_consecutive_bonus || 0) +
+    (performance.post_score || 0) +
+    (performance.comment_score || 0) +
+    (performance.login_score || 0);
+
+  await supabase
+    .from('seller_performance_daily')
+    .update({ activity_score: activityScore })
+    .eq('seller_id', sellerId)
+    .eq('date', date);
+}
+
+/**
+ * 특정 날짜가 공휴일인지 확인
+ */
+async function isHoliday(date: string): Promise<boolean> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from('holidays')
+    .select('id')
+    .eq('holiday_date', date)
+    .single();
+
+  return !!data;
+}
+
+/**
+ * 특정 날짜가 주말인지 확인 (토요일=6, 일요일=0)
+ */
+function isWeekend(date: string): boolean {
+  const day = new Date(date).getDay();
+  return day === 0 || day === 6;
+}
+
+/**
+ * 특정 날짜가 영업일인지 확인
+ */
+async function isBusinessDay(date: string): Promise<boolean> {
+  if (isWeekend(date)) return false;
+  if (await isHoliday(date)) return false;
+  return true;
+}
+
+/**
+ * 해당 주의 마지막 영업일 찾기 (금요일 기준, 공휴일이면 이전 영업일)
+ */
+async function getLastBusinessDayOfWeek(date: string): Promise<string> {
+  const targetDate = new Date(date);
+  const dayOfWeek = targetDate.getDay();
+
+  // 해당 주의 금요일 찾기
+  const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
+  const friday = new Date(targetDate);
+  friday.setDate(targetDate.getDate() + daysUntilFriday);
+
+  // 금요일부터 역순으로 영업일 찾기
+  for (let i = 0; i <= 4; i++) {
+    const checkDate = new Date(friday);
+    checkDate.setDate(friday.getDate() - i);
+    const dateStr = checkDate.toISOString().split('T')[0];
+
+    if (await isBusinessDay(dateStr)) {
+      return dateStr;
+    }
+  }
+
+  return date; // 실패 시 원래 날짜 반환
+}
+
+/**
+ * 해당 월의 마지막 영업일 찾기
+ */
+async function getLastBusinessDayOfMonth(date: string): Promise<string> {
+  const targetDate = new Date(date);
+  const year = targetDate.getFullYear();
+  const month = targetDate.getMonth();
+
+  // 해당 월의 마지막 날 찾기
+  const lastDay = new Date(year, month + 1, 0);
+
+  // 마지막 날부터 역순으로 영업일 찾기
+  for (let i = 0; i <= 10; i++) {
+    const checkDate = new Date(lastDay);
+    checkDate.setDate(lastDay.getDate() - i);
+    const dateStr = checkDate.toISOString().split('T')[0];
+
+    if (await isBusinessDay(dateStr)) {
+      return dateStr;
+    }
+  }
+
+  return date; // 실패 시 원래 날짜 반환
+}
+
+/**
+ * 주간/월간 연속 발주 보너스 계산 및 업데이트
+ * 주간: 일요일~금요일 6일 연속 발주 시, 금요일에 보너스 가산
+ * 월간: 해당 월 영업일에 모두 발주 시, 월의 마지막 영업일에 보너스 가산
+ */
+export async function trackConsecutiveOrder(sellerId: string) {
+  try {
+    const today = getTodayKST();
+    const supabase = await createClient();
+
+    // 설정에서 보너스 점수 조회
+    const { data: settings } = await supabase
+      .from('ranking_score_settings')
+      .select('weekly_consecutive_bonus, monthly_consecutive_bonus')
+      .eq('id', '00000000-0000-0000-0000-000000000001')
+      .single();
+
+    const weeklyBonus = settings?.weekly_consecutive_bonus || 50;
+    const monthlyBonus = settings?.monthly_consecutive_bonus || 500;
+
+    const todayDate = new Date(today);
+
+    // 주간 보너스 체크 (일요일~금요일 6일 연속 발주 시, 금요일에 가산)
+    let weeklyBonusPoints = 0;
+    const dayOfWeek = todayDate.getDay();
+
+    if (dayOfWeek === 5) {
+      // 오늘이 금요일인 경우, 일요일~금요일 6일 연속발주 체크
+      const weekStart = new Date(todayDate);
+      weekStart.setDate(weekStart.getDate() - 5); // 이번 주 일요일
+      const weekStartStr = weekStart.toISOString().split('T')[0];
+
+      // 일요일~금요일 6일 목록 생성
+      const daysThisWeek: string[] = [];
+      for (let i = 0; i < 6; i++) {
+        const checkDate = new Date(weekStart);
+        checkDate.setDate(weekStart.getDate() + i);
+        const dateStr = checkDate.toISOString().split('T')[0];
+        daysThisWeek.push(dateStr);
+      }
+
+      // 이번 주 6일 발주 기록 조회
+      const { data: weekOrders } = await supabase
+        .from('seller_performance_daily')
+        .select('date, order_count')
+        .eq('seller_id', sellerId)
+        .gte('date', weekStartStr)
+        .lte('date', today);
+
+      // 6일 모두 발주가 있는지 확인
+      const ordersMap = new Map(weekOrders?.map(o => [o.date, o.order_count || 0]) || []);
+      const allDaysHaveOrders = daysThisWeek.every(day => (ordersMap.get(day) || 0) > 0);
+
+      if (allDaysHaveOrders) {
+        weeklyBonusPoints = weeklyBonus;
+      }
+    }
+
+    // 월간 보너스 체크
+    let monthlyBonusPoints = 0;
+    const lastBusinessDayOfMonth = await getLastBusinessDayOfMonth(today);
+
+    if (today === lastBusinessDayOfMonth) {
+      // 오늘이 해당 월의 마지막 영업일인 경우, 월간 연속발주 체크
+      const monthStart = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
+      const monthStartStr = monthStart.toISOString().split('T')[0];
+
+      // 이번 달 영업일 목록 생성
+      const businessDaysThisMonth: string[] = [];
+      const monthEnd = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
+
+      for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+
+        if (dateStr > today) break;
+        if (await isBusinessDay(dateStr)) {
+          businessDaysThisMonth.push(dateStr);
+        }
+      }
+
+      // 이번 달 영업일 발주 기록 조회
+      const { data: monthOrders } = await supabase
+        .from('seller_performance_daily')
+        .select('date, order_count')
+        .eq('seller_id', sellerId)
+        .gte('date', monthStartStr)
+        .lte('date', today);
+
+      // 모든 영업일에 발주가 있는지 확인
+      const ordersMap = new Map(monthOrders?.map(o => [o.date, o.order_count || 0]) || []);
+      const allDaysHaveOrders = businessDaysThisMonth.every(day => (ordersMap.get(day) || 0) > 0);
+
+      if (allDaysHaveOrders && businessDaysThisMonth.length > 0) {
+        monthlyBonusPoints = monthlyBonus;
+      }
+    }
+
+    // 보너스가 있는 경우에만 업데이트
+    if (weeklyBonusPoints > 0 || monthlyBonusPoints > 0) {
+      const { data: performance } = await getOrCreateDailyPerformance(sellerId, today);
+      if (!performance) return { success: false };
+
+      await supabase
+        .from('seller_performance_daily')
+        .update({
+          weekly_consecutive_bonus: weeklyBonusPoints,
+          monthly_consecutive_bonus: monthlyBonusPoints,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', performance.id);
+
+      await updateActivityScore(sellerId, today);
+
+      return { success: true, weeklyBonus: weeklyBonusPoints, monthlyBonus: monthlyBonusPoints };
+    }
+
+    return { success: true, weeklyBonus: 0, monthlyBonus: 0 };
+  } catch (error) {
+    console.error('trackConsecutiveOrder error:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * 셀러피드 게시글 작성 점수 추가
+ * 1게시글 = 5점
+ */
+export async function trackPostCreated(sellerId: string) {
+  try {
+    const today = getTodayKST();
+    const supabase = await createClient();
+
+    const { data: performance } = await getOrCreateDailyPerformance(sellerId, today);
+    if (!performance) return { success: false };
+
+    const postScore = (performance.post_score || 0) + 5;
+
+    await supabase
+      .from('seller_performance_daily')
+      .update({
+        post_score: postScore,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', performance.id);
+
+    await updateActivityScore(sellerId, today);
+
+    return { success: true };
+  } catch (error) {
+    console.error('trackPostCreated error:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * 답글 작성 점수 추가
+ * 1답글 = 2점
+ */
+export async function trackCommentCreated(sellerId: string) {
+  try {
+    const today = getTodayKST();
+    const supabase = await createClient();
+
+    const { data: performance } = await getOrCreateDailyPerformance(sellerId, today);
+    if (!performance) return { success: false };
+
+    const commentScore = (performance.comment_score || 0) + 2;
+
+    await supabase
+      .from('seller_performance_daily')
+      .update({
+        comment_score: commentScore,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', performance.id);
+
+    await updateActivityScore(sellerId, today);
+
+    return { success: true };
+  } catch (error) {
+    console.error('trackCommentCreated error:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * 로그인 점수 추가
+ * 1일 1회 = 3점
+ */
+export async function trackLogin(sellerId: string) {
+  try {
+    const today = getTodayKST();
+    const supabase = await createClient();
+
+    const { data: performance } = await getOrCreateDailyPerformance(sellerId, today);
+    if (!performance) return { success: false };
+
+    // 오늘 이미 로그인 점수를 받았는지 확인
+    if ((performance.login_score || 0) > 0) {
+      return { success: true, alreadyTracked: true };
+    }
+
+    await supabase
+      .from('seller_performance_daily')
+      .update({
+        login_score: 3,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', performance.id);
+
+    await updateActivityScore(sellerId, today);
+
+    return { success: true };
+  } catch (error) {
+    console.error('trackLogin error:', error);
+    return { success: false, error };
   }
 }

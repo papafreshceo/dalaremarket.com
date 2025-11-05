@@ -11,15 +11,18 @@ import { ConfirmProvider } from '@/components/ui/ConfirmModal'
 import { LogoutButton } from '@/components/ui/LogoutButton'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { FloatingHtmlBuilder } from '@/components/admin/FloatingHtmlBuilder'
+import { CalendarPopup } from '@/components/admin/CalendarPopup'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-// React Query 클라이언트 설정
+// React Query 클라이언트 설정 (최적화)
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5분간 데이터를 fresh로 간주
-      gcTime: 1000 * 60 * 30, // 30분간 캐시 유지
+      staleTime: 1000 * 60 * 10, // 10분간 데이터를 fresh로 간주 (5분 -> 10분)
+      gcTime: 1000 * 60 * 60, // 60분간 캐시 유지 (30분 -> 60분)
       refetchOnWindowFocus: false, // 윈도우 포커스 시 자동 refetch 비활성화
+      refetchOnMount: false, // 마운트 시 자동 refetch 비활성화
+      refetchOnReconnect: false, // 재연결 시 자동 refetch 비활성화
       retry: 1, // 실패 시 1회만 재시도
     },
   },
@@ -36,6 +39,7 @@ export default function AdminLayout({
   const [user, setUser] = useState<any>(null)
   const [userData, setUserData] = useState<any>(null)
   const [showHtmlBuilder, setShowHtmlBuilder] = useState(false)
+  const [showCalendarPopup, setShowCalendarPopup] = useState(false)
   const [themeLoaded, setThemeLoaded] = useState(false)
   const supabase = createClient()
 
@@ -235,6 +239,15 @@ export default function AdminLayout({
       )
     },
     {
+      name: '회원관리',
+      href: '/admin/members',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      )
+    },
+    {
       name: '설정',
       href: '/admin/settings',
       icon: (
@@ -320,6 +333,17 @@ export default function AdminLayout({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
               </span>
+            </button>
+
+            {/* 달력 아이콘 */}
+            <button
+              onClick={() => setShowCalendarPopup(!showCalendarPopup)}
+              className="p-2 rounded-lg hover:bg-surface-hover transition-colors group"
+              title="일정 관리"
+            >
+              <svg className="w-5 h-5 text-text-tertiary group-hover:text-text transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
             </button>
 
             {/* 설정 아이콘 */}
@@ -457,6 +481,12 @@ export default function AdminLayout({
         <FloatingHtmlBuilder
           isOpen={showHtmlBuilder}
           onClose={() => setShowHtmlBuilder(false)}
+        />
+
+        {/* 달력 팝업 */}
+        <CalendarPopup
+          isOpen={showCalendarPopup}
+          onClose={() => setShowCalendarPopup(false)}
         />
       </ToastProvider>
     </QueryClientProvider>

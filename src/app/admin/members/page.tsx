@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Search, Filter, Download, UserPlus, ChevronUp, ChevronDown } from 'lucide-react';
+import { TierRow } from '@/components/TierBadge';
 
 interface Member {
   id: string;
@@ -253,6 +254,11 @@ export default function MembersPage() {
             전체 회원 정보를 조회하고 관리합니다
           </p>
         </div>
+      </div>
+
+      {/* 티어 배지 */}
+      <div style={{ marginBottom: '24px' }}>
+        <TierRow />
       </div>
 
       {/* 역할별 통계 카드 + 검색 */}

@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import {
-  Palette, Users, Bell, Shield, Database, Mail, Globe, Key,
+  Palette, Bell, Shield, Database, Mail, Globe, Key,
   FileText, Building2, TrendingUp, Package, Truck, CreditCard,
   Image, Layout, MessageSquare, UserPlus, Settings, Wrench,
-  ClipboardList, FileSpreadsheet, ShoppingCart, Tags, UserCog, Award
+  ClipboardList, FileSpreadsheet, ShoppingCart, Tags, UserCog, Award, TrendingUp as ChartUp, Calendar
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -145,17 +145,19 @@ export default function SettingsPage() {
           color: 'from-amber-500 to-yellow-500',
           badge: 'NEW'
         },
-      ]
-    },
-    {
-      category: '회원관리',
-      cards: [
         {
-          title: '회원 목록',
-          description: '전체 회원 정보를 조회하고 관리합니다',
-          icon: Users,
-          href: '/admin/members',
+          title: '랭킹 점수 산정',
+          description: '랭킹 시스템의 점수 계산 기준을 설정합니다',
+          icon: ChartUp,
+          href: '/admin/settings/ranking-score',
           color: 'from-blue-500 to-cyan-500',
+        },
+        {
+          title: '일정 관리',
+          description: '공휴일/휴무일/할일/상품정보 등을 관리합니다',
+          icon: Calendar,
+          href: '/admin/settings/holidays',
+          color: 'from-red-500 to-orange-500',
         },
       ]
     },

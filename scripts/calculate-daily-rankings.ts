@@ -102,9 +102,7 @@ async function calculateDailyScores() {
       .update({
         sales_score: score.sales_score,
         order_count_score: score.order_count_score,
-        confirm_speed_score: score.confirm_speed_score,
-        cancel_rate_score: score.cancel_rate_score,
-        data_quality_score: score.data_quality_score,
+        activity_score: score.activity_score,
         total_score: score.total_score
       })
       .eq('seller_id', score.seller_id)
@@ -166,24 +164,14 @@ async function generateRankings(periodType: 'daily' | 'weekly' | 'monthly', scor
         seller_id: p.seller_id,
         total_sales: 0,
         order_count: 0,
-        avg_confirm_hours: 0,
-        cancel_rate: 0,
-        error_rate: 0
+        activity_score: 0
       });
     }
 
     const seller = sellerMap.get(p.seller_id)!;
     seller.total_sales += p.total_sales || 0;
     seller.order_count += p.order_count || 0;
-
-    // 평균 계산을 위한 누적
-    const prevTotal = seller.avg_confirm_hours * (seller.order_count - (p.order_count || 0));
-    const newTotal = prevTotal + ((p.avg_confirm_hours || 0) * (p.order_count || 0));
-    seller.avg_confirm_hours = seller.order_count > 0 ? newTotal / seller.order_count : 0;
-
-    // 취소율, 오류율도 평균
-    seller.cancel_rate = (seller.cancel_rate + (p.cancel_rate || 0)) / 2;
-    seller.error_rate = (seller.error_rate + (p.error_rate || 0)) / 2;
+    seller.activity_score = (seller.activity_score || 0) + (p.activity_score || 0);
   });
 
   // 점수 계산 및 순위 부여
@@ -216,17 +204,11 @@ async function generateRankings(periodType: 'daily' | 'weekly' | 'monthly', scor
         period_end: periodEnd,
         total_sales: seller.total_sales,
         order_count: seller.order_count,
-        avg_confirm_hours: seller.avg_confirm_hours,
-        cancel_rate: seller.cancel_rate,
-        data_quality_rate: 100 - seller.error_rate,
+        activity_score: score.activity_score,
         sales_score: score.sales_score,
         order_count_score: score.order_count_score,
-        confirm_speed_score: score.confirm_speed_score,
-        cancel_rate_score: score.cancel_rate_score,
-        data_quality_score: score.data_quality_score,
         total_score: score.total_score,
         rank: score.rank,
-        tier: score.tier,
         prev_rank: prevRanking?.rank || null,
         rank_change: rankChange,
         prev_total_score: prevRanking?.total_score || null,

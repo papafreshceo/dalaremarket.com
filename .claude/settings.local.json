@@ -116,7 +116,16 @@
       "Bash(if exist check-settlement-fields.js del /f check-settlement-fields.js)",
       "Bash(timeout 3 bash:*)",
       "Bash(/dev/null)",
-      "Bash(nul)"
+      "Bash(nul)",
+      "Bash(if exist databasemigrationsadd_is_active_to_users.sql del /f databasemigrationsadd_is_active_to_users.sql)",
+      "Bash(if exist databasemigrationsapply-is-active.js del /f databasemigrationsapply-is-active.js)",
+      "Bash(Select-String -Pattern \"tier-criteria|Error|Failed\")",
+      "Bash(Select-Object -First 20)",
+      "Bash(exit 0)",
+      "Bash(if exist \"database\\migrations\\apply-tier-point-settings-columns.js\" del /f \"database\\migrations\\apply-tier-point-settings-columns.js\")",
+      "Bash(timeout 30 curl:*)",
+      "Bash(timeout 20 curl:*)",
+      "Bash(timeout 15 curl:*)"
     ],
     "deny": [],
     "ask": []

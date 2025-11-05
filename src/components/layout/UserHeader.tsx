@@ -191,93 +191,74 @@ export default function UserHeader() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 캐시 잔액 조회
+  // 캐시/크레딧 통합 관리 (최적화)
   useEffect(() => {
-    const fetchCashBalance = async () => {
-      if (!user) {
-        setCashBalance(0);
-        return;
-      }
+    if (!user) {
+      setCashBalance(0);
+      setCreditBalance(0);
+      return;
+    }
 
+    let isFirstLoad = true;
+    let loginRewardClaimed = false;
+
+    const fetchBalances = async () => {
       try {
-        const response = await fetch('/api/cash');
-        const data = await response.json();
+        // 병렬로 API 호출하여 성능 개선
+        const [cashRes, creditRes, loginRes] = await Promise.all([
+          fetch('/api/cash'),
+          fetch('/api/credits/daily-refill', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          }),
+          // 로그인 보상은 첫 로드 시에만 시도
+          isFirstLoad && !loginRewardClaimed
+            ? fetch('/api/cash/claim-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+              })
+            : Promise.resolve(null)
+        ]);
 
-        if (data.success) {
-          setCashBalance(data.balance);
+        // 캐시 잔액 업데이트
+        const cashData = await cashRes.json();
+        if (cashData.success) {
+          setCashBalance(cashData.balance);
         }
-      } catch (error) {
-        console.error('캐시 잔액 조회 실패:', error);
-      }
-    };
 
-    fetchCashBalance();
-
-    // 30초마다 캐시 잔액 갱신
-    const interval = setInterval(fetchCashBalance, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
-
-  // 크레딧 일일 리필 및 잔액 조회
-  useEffect(() => {
-    const handleCreditRefill = async () => {
-      if (!user) {
-        setCreditBalance(0);
-        return;
-      }
-
-      try {
-        // 일일 리필 API 호출 (날짜 바뀌면 자동으로 100으로 리필)
-        const refillResponse = await fetch('/api/credits/daily-refill', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        const refillData = await refillResponse.json();
-
-        if (refillData.success) {
-          setCreditBalance(refillData.balance);
+        // 크레딧 리필 및 잔액 업데이트
+        const creditData = await creditRes.json();
+        if (creditData.success) {
+          setCreditBalance(creditData.balance);
 
           // 리필되었을 때만 토스트 표시
-          if (refillData.refilled) {
+          if (creditData.refilled) {
             showToast('일일 크레딧 100이 지급되었습니다!', 'success');
           }
         }
-      } catch (error) {
-        console.error('크레딧 리필 실패:', error);
-      }
-    };
 
-    handleCreditRefill();
-
-    // 30초마다 크레딧 상태 체크 (날짜 바뀌면 자동 리필)
-    const interval = setInterval(handleCreditRefill, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
-
-  // 로그인 보상 자동 지급
-  useEffect(() => {
-    const claimLoginReward = async () => {
-      if (!user) return;
-
-      try {
-        const response = await fetch('/api/cash/claim-login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          setCashBalance(data.newBalance);
-          showToast(`일일 로그인 보상 ${data.amount}캐시가 지급되었습니다!`, 'success');
+        // 로그인 보상 처리 (첫 로드 시에만)
+        if (loginRes && !loginRewardClaimed) {
+          const loginData = await loginRes.json();
+          if (loginData.success) {
+            setCashBalance(loginData.newBalance);
+            showToast(`일일 로그인 보상 ${loginData.amount}캐시가 지급되었습니다!`, 'success');
+            loginRewardClaimed = true;
+          }
         }
-        // alreadyClaimed가 true이면 조용히 무시
+
+        isFirstLoad = false;
       } catch (error) {
-        console.error('로그인 보상 지급 실패:', error);
+        console.error('잔액 조회 실패:', error);
       }
     };
 
-    claimLoginReward();
+    // 초기 로드
+    fetchBalances();
+
+    // 60초마다 갱신 (30초 -> 60초로 변경하여 부하 감소)
+    const interval = setInterval(fetchBalances, 60000);
+    return () => clearInterval(interval);
   }, [user]);
 
   // 모달 닫기 메시지 수신
