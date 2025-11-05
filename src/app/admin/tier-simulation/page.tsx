@@ -478,22 +478,22 @@ export default function TierSimulationPage() {
                     {criteria.tier}
                   </div>
                   <input
-                    type="number"
-                    value={criteria.minOrderCount}
+                    type="text"
+                    value={criteria.minOrderCount.toLocaleString()}
                     onChange={(e) => {
                       const newCriteria = [...tierCriteria];
-                      newCriteria[index].minOrderCount = parseInt(e.target.value) || 0;
+                      newCriteria[index].minOrderCount = parseInt(e.target.value.replace(/,/g, '')) || 0;
                       setTierCriteria(newCriteria);
                     }}
                     placeholder="건수"
                     style={{ width: '100%', padding: '6px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '12px', marginBottom: '4px' }}
                   />
                   <input
-                    type="number"
-                    value={criteria.minTotalSales}
+                    type="text"
+                    value={criteria.minTotalSales.toLocaleString()}
                     onChange={(e) => {
                       const newCriteria = [...tierCriteria];
-                      newCriteria[index].minTotalSales = parseInt(e.target.value) || 0;
+                      newCriteria[index].minTotalSales = parseInt(e.target.value.replace(/,/g, '')) || 0;
                       setTierCriteria(newCriteria);
                     }}
                     placeholder="금액"
@@ -514,9 +514,9 @@ export default function TierSimulationPage() {
                   발주 1일당 점수
                 </label>
                 <input
-                  type="number"
-                  value={pointsPerDay}
-                  onChange={(e) => setPointsPerDay(parseInt(e.target.value) || 0)}
+                  type="text"
+                  value={pointsPerDay.toLocaleString()}
+                  onChange={(e) => setPointsPerDay(parseInt(e.target.value.replace(/,/g, '')) || 0)}
                   style={{ width: '100%', padding: '6px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '12px' }}
                 />
               </div>
@@ -531,11 +531,11 @@ export default function TierSimulationPage() {
                       {criteria.tier}
                     </span>
                     <input
-                      type="number"
-                      value={criteria.requiredPoints}
+                      type="text"
+                      value={criteria.requiredPoints.toLocaleString()}
                       onChange={(e) => {
                         const newCriteria = [...accumulatedPointCriteria];
-                        newCriteria[index].requiredPoints = parseInt(e.target.value) || 0;
+                        newCriteria[index].requiredPoints = parseInt(e.target.value.replace(/,/g, '')) || 0;
                         setAccumulatedPointCriteria(newCriteria);
                       }}
                       style={{ flex: 1, padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
@@ -566,22 +566,22 @@ export default function TierSimulationPage() {
                     style={{ width: '14px', height: '14px' }}
                   />
                   <input
-                    type="number"
-                    value={milestone.days}
+                    type="text"
+                    value={milestone.days.toLocaleString()}
                     onChange={(e) => {
                       const newMilestones = [...milestones];
-                      newMilestones[index].days = parseInt(e.target.value) || 0;
+                      newMilestones[index].days = parseInt(e.target.value.replace(/,/g, '')) || 0;
                       setMilestones(newMilestones);
                     }}
                     style={{ width: '60px', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
                   />
                   <span style={{ fontSize: '11px' }}>일 →</span>
                   <input
-                    type="number"
-                    value={milestone.bonus}
+                    type="text"
+                    value={milestone.bonus.toLocaleString()}
                     onChange={(e) => {
                       const newMilestones = [...milestones];
-                      newMilestones[index].bonus = parseInt(e.target.value) || 0;
+                      newMilestones[index].bonus = parseInt(e.target.value.replace(/,/g, '')) || 0;
                       setMilestones(newMilestones);
                     }}
                     style={{ width: '60px', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
@@ -629,22 +629,22 @@ export default function TierSimulationPage() {
                       style={{ width: '14px', height: '14px' }}
                     />
                     <input
-                      type="number"
-                      value={bonus.days}
+                      type="text"
+                      value={bonus.days.toLocaleString()}
                       onChange={(e) => {
                         const newBonuses = [...consecutiveBonuses];
-                        newBonuses[index].days = parseInt(e.target.value) || 0;
+                        newBonuses[index].days = parseInt(e.target.value.replace(/,/g, '')) || 0;
                         setConsecutiveBonuses(newBonuses);
                       }}
                       style={{ width: '50px', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
                     />
                     <span style={{ fontSize: '11px' }}>일 →</span>
                     <input
-                      type="number"
-                      value={bonus.bonus}
+                      type="text"
+                      value={bonus.bonus.toLocaleString()}
                       onChange={(e) => {
                         const newBonuses = [...consecutiveBonuses];
-                        newBonuses[index].bonus = parseInt(e.target.value) || 0;
+                        newBonuses[index].bonus = parseInt(e.target.value.replace(/,/g, '')) || 0;
                         setConsecutiveBonuses(newBonuses);
                       }}
                       style={{ width: '50px', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
@@ -676,22 +676,22 @@ export default function TierSimulationPage() {
                     />
                     <span style={{ fontSize: '11px' }}>월</span>
                     <input
-                      type="number"
-                      value={bonus.minDays}
+                      type="text"
+                      value={bonus.minDays.toLocaleString()}
                       onChange={(e) => {
                         const newBonuses = [...monthlyBonuses];
-                        newBonuses[index].minDays = parseInt(e.target.value) || 0;
+                        newBonuses[index].minDays = parseInt(e.target.value.replace(/,/g, '')) || 0;
                         setMonthlyBonuses(newBonuses);
                       }}
                       style={{ width: '45px', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
                     />
                     <span style={{ fontSize: '11px' }}>일+ →</span>
                     <input
-                      type="number"
-                      value={bonus.bonus}
+                      type="text"
+                      value={bonus.bonus.toLocaleString()}
                       onChange={(e) => {
                         const newBonuses = [...monthlyBonuses];
-                        newBonuses[index].bonus = parseInt(e.target.value) || 0;
+                        newBonuses[index].bonus = parseInt(e.target.value.replace(/,/g, '')) || 0;
                         setMonthlyBonuses(newBonuses);
                       }}
                       style={{ width: '45px', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
