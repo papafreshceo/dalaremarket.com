@@ -127,13 +127,10 @@ export default function EditNoticePage() {
   if (fetching) {
     return (
       <div style={{
-        padding: '24px',
-        paddingTop: '90px',
-        background: '#f5f5f5',
-        minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        minHeight: '400px'
       }}>
         <div style={{ color: '#6c757d' }}>로딩 중...</div>
       </div>
@@ -141,13 +138,7 @@ export default function EditNoticePage() {
   }
 
   return (
-    <div style={{
-      padding: '24px',
-      paddingTop: '90px',
-      background: '#f5f5f5',
-      minHeight: '100vh'
-    }}>
-      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         {/* 헤더 */}
         <div style={{
           display: 'flex',
@@ -379,7 +370,6 @@ export default function EditNoticePage() {
             </div>
           </div>
         </form>
-      </div>
     </div>
   );
 }

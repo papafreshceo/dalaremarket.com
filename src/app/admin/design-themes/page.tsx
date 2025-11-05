@@ -17,6 +17,7 @@ interface DesignTheme {
 export default function DesignThemesPage() {
   const [themes, setThemes] = useState<DesignTheme[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingTheme, setEditingTheme] = useState<DesignTheme | null>(null);
   const [previewTheme, setPreviewTheme] = useState<DesignTheme | null>(null);
@@ -82,18 +83,81 @@ export default function DesignThemesPage() {
     setShowModal(true);
   };
 
+  const parseCSSToJSON = (cssText: string): Record<string, string> | null => {
+    try {
+      // 이미 JSON 형식인지 확인
+      const trimmed = cssText.trim();
+      if (trimmed.startsWith('{')) {
+        return JSON.parse(trimmed);
+      }
+
+      // CSS 형식 파싱
+      const variables: Record<string, string> = {};
+
+      // :root { } 블록 추출
+      const rootMatch = cssText.match(/:root\s*\{([^}]+)\}/s);
+      if (rootMatch) {
+        const rootContent = rootMatch[1];
+        const lines = rootContent.split(';');
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || !trimmedLine.includes(':')) continue;
+
+          const colonIndex = trimmedLine.indexOf(':');
+          const varName = trimmedLine.substring(0, colonIndex).trim();
+          const varValue = trimmedLine.substring(colonIndex + 1).trim();
+
+          if (varName.startsWith('--')) {
+            variables[varName] = varValue;
+          }
+        }
+      }
+
+      // .dark { } 블록은 별도로 저장하지 않고 무시
+      // (프론트엔드에서 다크 모드는 별도로 처리)
+
+      return Object.keys(variables).length > 0 ? variables : null;
+    } catch (error) {
+      return null;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (submitting) return;
+
+    setSubmitting(true);
+
     try {
-      // JSON 유효성 검사
-      const cssVars = JSON.parse(formData.css_variables);
+      // JSON 또는 CSS 형식 파싱
+      let cssVars;
+      try {
+        // 먼저 JSON으로 파싱 시도
+        cssVars = JSON.parse(formData.css_variables);
+      } catch (parseError) {
+        // JSON이 아니면 CSS 형식으로 파싱 시도
+        cssVars = parseCSSToJSON(formData.css_variables);
+
+        if (!cssVars) {
+          toast.error('올바른 형식이 아닙니다.\nJSON 형식 또는 CSS :root { } 형식으로 입력해주세요.');
+          setSubmitting(false);
+          return;
+        }
+      }
 
       const url = editingTheme
         ? `/api/admin/design-themes/${editingTheme.id}`
         : '/api/admin/design-themes';
 
       const method = editingTheme ? 'PATCH' : 'POST';
+
+      console.log('Submitting to:', url, 'Method:', method, 'Data:', {
+        name: formData.name,
+        description: formData.description,
+        css_variables: cssVars
+      });
 
       const response = await fetch(url, {
         method,
@@ -106,17 +170,21 @@ export default function DesignThemesPage() {
       });
 
       const result = await response.json();
+      console.log('Response:', result);
 
       if (result.success) {
-        toast.success(editingTheme ? '테마가 수정되었습니다.' : '테마가 생성되었습니다.');
+        toast.success(editingTheme ? '✅ 테마가 수정되었습니다!' : '✅ 테마가 생성되었습니다!');
         setShowModal(false);
-        fetchThemes();
+        setEditingTheme(null);
+        await fetchThemes();
       } else {
         toast.error(result.error || '작업 실패');
       }
     } catch (error: any) {
       console.error('Submit error:', error);
-      toast.error(error.message || '유효하지 않은 JSON 형식입니다.');
+      toast.error(error.message || '서버 요청 중 오류가 발생했습니다.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -467,10 +535,22 @@ export default function DesignThemesPage() {
                   display: 'block',
                   fontSize: '14px',
                   fontWeight: '600',
-                  marginBottom: '8px'
+                  marginBottom: '4px'
                 }}>
-                  CSS 변수 (JSON) *
+                  CSS 변수 *
                 </label>
+                <div style={{
+                  fontSize: '12px',
+                  color: '#6b7280',
+                  marginBottom: '8px',
+                  padding: '8px',
+                  backgroundColor: '#f3f4f6',
+                  borderRadius: '4px'
+                }}>
+                  <strong>JSON 또는 CSS 형식 모두 가능:</strong><br/>
+                  JSON: {`{ "--color-primary": "#2563eb" }`}<br/>
+                  CSS: {`:root { --color-primary: #2563eb; }`}
+                </div>
                 <textarea
                   value={formData.css_variables}
                   onChange={(e) => setFormData({ ...formData, css_variables: e.target.value })}
@@ -485,7 +565,7 @@ export default function DesignThemesPage() {
                     fontFamily: 'monospace',
                     resize: 'vertical'
                   }}
-                  placeholder='{"--color-primary": "#000000"}'
+                  placeholder='{"--color-primary": "#2563eb", "--color-text": "#111827"}'
                 />
               </div>
 
@@ -512,18 +592,36 @@ export default function DesignThemesPage() {
                 </button>
                 <button
                   type="submit"
+                  disabled={submitting}
                   style={{
                     padding: '12px 24px',
-                    background: '#000000',
+                    background: submitting ? '#94a3b8' : '#000000',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '8px',
                     fontSize: '14px',
                     fontWeight: '600',
-                    cursor: 'pointer'
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    opacity: submitting ? 0.7 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
                   }}
                 >
-                  {editingTheme ? '수정하기' : '추가하기'}
+                  {submitting && (
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      border: '2px solid #ffffff',
+                      borderTopColor: 'transparent',
+                      borderRadius: '50%',
+                      animation: 'spin 0.6s linear infinite'
+                    }} />
+                  )}
+                  {submitting
+                    ? (editingTheme ? '수정 중...' : '추가 중...')
+                    : (editingTheme ? '수정하기' : '추가하기')
+                  }
                 </button>
               </div>
             </form>

@@ -820,9 +820,33 @@ export default function UserHeader() {
                   )}
                 </div>
 
-                <span style={{ fontSize: '14px', color: '#495057' }}>
-                  {user.email}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '14px', color: '#495057' }}>
+                    {user.email}
+                  </span>
+                  <button
+                    onClick={() => window.location.href = '/platform/profile'}
+                    style={{
+                      padding: '4px',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '4px',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#f1f3f5'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    title="회원정보"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#495057" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.25M15.54 15.54l4.24 4.25M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"></path>
+                    </svg>
+                  </button>
+                </div>
                 {(userRole === 'admin' || userRole === 'employee' || userRole === 'super_admin') && (
                   <button
                     onClick={() => window.open('/admin/dashboard', '_blank')}
@@ -918,7 +942,7 @@ export default function UserHeader() {
                       setExpandedSubmenu(expandedSubmenu === item.path ? null : item.path);
                     } else if (item.text === '발주관리') {
                       e.preventDefault();
-                      setOrdersModalOpen(true);
+                      openOrders();
                       setMobileMenuOpen(false);
                     } else {
                       setMobileMenuOpen(false);

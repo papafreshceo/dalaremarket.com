@@ -875,7 +875,12 @@ function OrdersPageContent() {
               if (isModalMode) {
                 window.parent.postMessage({ type: 'closeModal' }, '*');
               } else {
-                router.push('/');
+                // 새 창으로 열린 경우 창 닫기, 아니면 메인 페이지로 이동
+                if (window.opener) {
+                  window.close();
+                } else {
+                  router.push('/');
+                }
               }
             }}
             style={{

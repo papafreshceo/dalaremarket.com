@@ -4,15 +4,16 @@ import { createClient } from '@/lib/supabase/server';
 // 특정 테마 조회
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
 
     const { data: theme, error } = await supabase
       .from('design_themes')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (error) {
@@ -39,9 +40,10 @@ export async function GET(
 // 테마 수정
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
     const body = await request.json();
 
@@ -52,10 +54,12 @@ export async function PATCH(
     if (description !== undefined) updateData.description = description;
     if (css_variables !== undefined) updateData.css_variables = css_variables;
 
+    console.log('Updating theme:', id, 'with data:', updateData);
+
     const { data: theme, error } = await supabase
       .from('design_themes')
       .update(updateData)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single();
 
@@ -83,16 +87,17 @@ export async function PATCH(
 // 테마 삭제
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
 
     // 활성화된 테마는 삭제 불가
     const { data: theme } = await supabase
       .from('design_themes')
       .select('is_active')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (theme?.is_active) {
@@ -105,7 +110,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('design_themes')
       .delete()
-      .eq('id', params.id);
+      .eq('id', id);
 
     if (error) {
       console.error('Delete theme error:', error);

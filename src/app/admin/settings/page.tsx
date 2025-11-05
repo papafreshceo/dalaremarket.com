@@ -5,69 +5,69 @@ import {
   Palette, Users, Bell, Shield, Database, Mail, Globe, Key,
   FileText, Building2, TrendingUp, Package, Truck, CreditCard,
   Image, Layout, MessageSquare, UserPlus, Settings, Wrench,
-  ClipboardList, FileSpreadsheet, ShoppingCart, Tags
+  ClipboardList, FileSpreadsheet, ShoppingCart, Tags, UserCog, Award
 } from 'lucide-react';
 
 export default function SettingsPage() {
   const settingsCategories = [
     {
-      category: '핵심 설정',
+      category: '기본 데이터 관리',
       cards: [
         {
-          title: '디자인 테마',
-          description: '플랫폼 전체 디자인 테마를 관리하고 CSS 변수를 설정합니다',
-          icon: Palette,
-          href: '/admin/design-themes',
-          color: 'from-purple-500 to-pink-500',
-          badge: 'NEW'
+          title: 'CS 유형 설정',
+          description: 'CS 유형을 관리합니다 (환불, 재발송 등)',
+          icon: ClipboardList,
+          href: '/admin/settings/cs-types',
+          color: 'from-amber-500 to-yellow-500',
         },
         {
-          title: '보안 설정',
-          description: '보안 정책 및 인증 방법을 설정합니다',
-          icon: Shield,
-          href: '/admin/settings/security',
-          color: 'from-red-500 to-orange-500',
-          badge: 'NEW'
-        },
-        {
-          title: '사이트 정보',
-          description: '사이트명, 로고, SEO 설정을 관리합니다',
-          icon: Globe,
-          href: '/admin/settings/site',
-          color: 'from-teal-500 to-green-500',
-        },
-        {
-          title: '회사 정보',
-          description: '회사 기본 정보 및 사업자 정보를 관리합니다',
+          title: '거래처 유형',
+          description: '거래처 유형을 추가 및 수정합니다',
           icon: Building2,
-          href: '/admin/settings/company',
-          color: 'from-blue-600 to-cyan-600',
-        },
-      ]
-    },
-    {
-      category: '사용자 및 권한',
-      cards: [
-        {
-          title: '사용자 관리',
-          description: '직원 및 고객 계정을 관리합니다',
-          icon: Users,
-          href: '/admin/settings/users',
-          color: 'from-blue-500 to-cyan-500',
+          href: '/admin/settings/partner-types',
+          color: 'from-slate-500 to-gray-500',
         },
         {
-          title: '사용자 초대',
-          description: '관리자 및 직원을 초대합니다',
-          icon: UserPlus,
-          href: '/admin/settings/invite',
-          color: 'from-indigo-500 to-purple-500',
+          title: '카테고리',
+          description: '원물 분류 체계를 관리합니다',
+          icon: Tags,
+          href: '/admin/settings/categories',
+          color: 'from-lime-500 to-green-500',
         },
         {
-          title: '권한 설정',
-          description: '역할별 접근 권한을 설정합니다',
-          icon: Shield,
-          href: '/admin/settings/permissions',
-          color: 'from-violet-500 to-purple-500',
+          title: '공급상태 설정',
+          description: '원물/옵션상품 공급상태를 관리합니다',
+          icon: TrendingUp,
+          href: '/admin/settings/supply-status',
+          color: 'from-green-600 to-emerald-600',
+        },
+        {
+          title: '마켓 매핑 설정',
+          description: '마켓별 엑셀 필드 매핑을 설정합니다',
+          icon: FileSpreadsheet,
+          href: '/admin/settings/mapping',
+          color: 'from-blue-600 to-indigo-600',
+        },
+        {
+          title: '택배사 설정',
+          description: '택배사별 헤더명 매핑을 관리합니다',
+          icon: Truck,
+          href: '/admin/settings/courier-settings',
+          color: 'from-indigo-600 to-violet-600',
+        },
+        {
+          title: '벤더사 양식',
+          description: '벤더사별 엑셀 양식을 설정합니다',
+          icon: FileText,
+          href: '/admin/settings/vendor-templates',
+          color: 'from-violet-600 to-purple-600',
+        },
+        {
+          title: '마켓송장 양식',
+          description: '마켓별 송장파일 양식을 설정합니다',
+          icon: FileSpreadsheet,
+          href: '/admin/settings/market-invoice-templates',
+          color: 'from-purple-600 to-pink-600',
         },
       ]
     },
@@ -130,66 +130,86 @@ export default function SettingsPage() {
           href: '/admin/settings/chatbot',
           color: 'from-cyan-500 to-blue-500',
         },
+        {
+          title: '관리자 닉네임',
+          description: '셀러피드에서 사용할 관리자 닉네임을 관리합니다',
+          icon: UserCog,
+          href: '/admin/settings/admin-nicknames',
+          color: 'from-violet-500 to-purple-500',
+        },
+        {
+          title: '티어 등급 기준',
+          description: '판매자 등급 기준 및 할인율을 설정합니다',
+          icon: Award,
+          href: '/admin/settings/tier-criteria',
+          color: 'from-amber-500 to-yellow-500',
+          badge: 'NEW'
+        },
       ]
     },
     {
-      category: '기본 데이터 관리',
+      category: '회원관리',
       cards: [
         {
-          title: 'CS 유형 설정',
-          description: 'CS 유형을 관리합니다 (환불, 재발송 등)',
-          icon: ClipboardList,
-          href: '/admin/settings/cs-types',
-          color: 'from-amber-500 to-yellow-500',
+          title: '회원 목록',
+          description: '전체 회원 정보를 조회하고 관리합니다',
+          icon: Users,
+          href: '/admin/members',
+          color: 'from-blue-500 to-cyan-500',
+        },
+      ]
+    },
+    {
+      category: '핵심 설정',
+      cards: [
+        {
+          title: '디자인 테마',
+          description: '플랫폼 전체 디자인 테마를 관리하고 CSS 변수를 설정합니다',
+          icon: Palette,
+          href: '/admin/design-themes',
+          color: 'from-purple-500 to-pink-500',
+          badge: 'NEW'
         },
         {
-          title: '거래처 유형',
-          description: '거래처 유형을 추가 및 수정합니다',
+          title: '보안 설정',
+          description: '보안 정책 및 인증 방법을 설정합니다',
+          icon: Shield,
+          href: '/admin/settings/security',
+          color: 'from-red-500 to-orange-500',
+          badge: 'NEW'
+        },
+        {
+          title: '사이트 정보',
+          description: '사이트명, 로고, SEO 설정을 관리합니다',
+          icon: Globe,
+          href: '/admin/settings/site',
+          color: 'from-teal-500 to-green-500',
+        },
+        {
+          title: '회사 정보',
+          description: '회사 기본 정보 및 사업자 정보를 관리합니다',
           icon: Building2,
-          href: '/admin/settings/partner-types',
-          color: 'from-slate-500 to-gray-500',
+          href: '/admin/settings/company',
+          color: 'from-blue-600 to-cyan-600',
+        },
+      ]
+    },
+    {
+      category: '권한 관리',
+      cards: [
+        {
+          title: '사용자 초대',
+          description: '관리자 및 직원을 초대합니다',
+          icon: UserPlus,
+          href: '/admin/settings/invite',
+          color: 'from-indigo-500 to-purple-500',
         },
         {
-          title: '카테고리',
-          description: '원물 분류 체계를 관리합니다',
-          icon: Tags,
-          href: '/admin/settings/categories',
-          color: 'from-lime-500 to-green-500',
-        },
-        {
-          title: '공급상태 설정',
-          description: '원물/옵션상품 공급상태를 관리합니다',
-          icon: TrendingUp,
-          href: '/admin/settings/supply-status',
-          color: 'from-green-600 to-emerald-600',
-        },
-        {
-          title: '마켓 매핑 설정',
-          description: '마켓별 엑셀 필드 매핑을 설정합니다',
-          icon: FileSpreadsheet,
-          href: '/admin/settings/mapping',
-          color: 'from-blue-600 to-indigo-600',
-        },
-        {
-          title: '택배사 설정',
-          description: '택배사별 헤더명 매핑을 관리합니다',
-          icon: Truck,
-          href: '/admin/settings/courier-settings',
-          color: 'from-indigo-600 to-violet-600',
-        },
-        {
-          title: '벤더사 양식',
-          description: '벤더사별 엑셀 양식을 설정합니다',
-          icon: FileText,
-          href: '/admin/settings/vendor-templates',
-          color: 'from-violet-600 to-purple-600',
-        },
-        {
-          title: '마켓송장 양식',
-          description: '마켓별 송장파일 양식을 설정합니다',
-          icon: FileSpreadsheet,
-          href: '/admin/settings/market-invoice-templates',
-          color: 'from-purple-600 to-pink-600',
+          title: '권한 설정',
+          description: '역할별 접근 권한을 설정합니다',
+          icon: Shield,
+          href: '/admin/settings/permissions',
+          color: 'from-violet-500 to-purple-500',
         },
       ]
     },

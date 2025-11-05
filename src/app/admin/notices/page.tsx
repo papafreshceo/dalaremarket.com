@@ -121,11 +121,7 @@ export default function AdminNoticesPage() {
   };
 
   return (
-    <div style={{
-      background: '#f5f5f5',
-      minHeight: 'calc(100vh - 64px)'
-    }}>
-      <div style={{ maxWidth: '1440px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '1440px', margin: '0 auto' }}>
         {/* 헤더 */}
         <div style={{
           display: 'flex',
@@ -368,7 +364,6 @@ export default function AdminNoticesPage() {
             </table>
           )}
         </div>
-      </div>
     </div>
   );
 }

@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
           id,
           name,
           email,
-          company_name
+          business_name
         )
       `)
       .eq('period_type', periodType)

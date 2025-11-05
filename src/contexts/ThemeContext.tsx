@@ -15,15 +15,37 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   // localStorage에서 초기 테마 읽기 (관리자 화면에서만)
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
-      const savedTheme = localStorage.getItem('theme') as Theme
-      return savedTheme || 'light'
-    }
-    return 'light'
-  })
+  const [theme, setTheme] = useState<Theme>('light')
   const [userId, setUserId] = useState<string | null>(null)
   const supabase = createClient()
+
+  // 초기 로드 시 테마 적용
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+      const savedTheme = localStorage.getItem('theme') as Theme
+      const initialTheme = savedTheme || 'light'
+
+      setTheme(initialTheme)
+
+      // HTML 클래스 적용
+      if (initialTheme === 'dark') {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
+    }
+  }, [])
+
+  // 테마 변경 시 HTML 클래스 업데이트
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
+    }
+  }, [theme])
 
   useEffect(() => {
     // 사용자 ID만 로드
@@ -43,8 +65,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
 
     const newTheme = theme === 'light' ? 'dark' : 'light'
+
     setTheme(newTheme)
-    document.documentElement.classList.toggle('dark', newTheme === 'dark')
+
+    // HTML 클래스 적용
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+
+    // localStorage에 저장
+    localStorage.setItem('theme', newTheme)
 
     if (userId) {
       // DB에 저장
@@ -54,13 +86,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         .eq('id', userId)
 
       if (error) {
-        // DB 저장 실패 시 로컬 스토리지에 저장
-        console.warn('Failed to save theme to DB, using localStorage:', error)
-        localStorage.setItem('theme', newTheme)
+        console.warn('Failed to save theme to DB:', error)
       }
-    } else {
-      // 로그인하지 않은 경우 로컬 스토리지에 저장
-      localStorage.setItem('theme', newTheme)
     }
   }
 

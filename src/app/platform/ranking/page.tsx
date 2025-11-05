@@ -27,7 +27,7 @@ interface SellerRanking {
   rank_change: number | null;
   users: {
     name: string;
-    company_name?: string;
+    business_name?: string;
   };
 }
 
@@ -391,7 +391,7 @@ export default function RankingPage() {
           }}>
             <thead>
               <tr style={{ background: '#fef3c7', color: '#000000', borderBottom: '2px solid #000000' }}>
-                {['RANK', 'CHANGE', 'SELLER', 'TIER', 'SCORE', 'SALES', 'ORDERS', 'SPEED', 'CANCEL'].map((header) => (
+                {['RANK', 'CHANGE', 'SELLER', 'TIER', 'SCORE', 'SALES', 'ORDERS', 'CANCEL'].map((header) => (
                   <th
                     key={header}
                     style={{
@@ -412,7 +412,7 @@ export default function RankingPage() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={8}
                     style={{
                       padding: '60px',
                       textAlign: 'center',
@@ -425,7 +425,7 @@ export default function RankingPage() {
               ) : rankings.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={8}
                     style={{
                       padding: '60px',
                       textAlign: 'center',
@@ -503,12 +503,12 @@ export default function RankingPage() {
                             </span>
                           )}
                         </div>
-                        {ranking.users.company_name && (
+                        {ranking.users.business_name && (
                           <div style={{
                             fontSize: '13px',
                             color: '#64748b'
                           }}>
-                            {ranking.users.company_name}
+                            {ranking.users.business_name}
                           </div>
                         )}
                       </td>
@@ -568,16 +568,6 @@ export default function RankingPage() {
                         color: '#475569',
                         fontFamily: 'var(--font-mono)'
                       }}>
-                        {ranking.avg_confirm_hours.toFixed(1)}h
-                      </td>
-                      <td style={{
-                        padding: '20px 16px',
-                        textAlign: 'right',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        color: '#475569',
-                        fontFamily: 'var(--font-mono)'
-                      }}>
                         {ranking.cancel_rate.toFixed(1)}%
                       </td>
                     </tr>
@@ -608,15 +598,13 @@ export default function RankingPage() {
           </h3>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
+            gridTemplateColumns: 'repeat(3, 1fr)',
             gap: '24px'
           }}>
             {[
-              { label: 'SALES', weight: '30%', desc: 'vs. Top Seller' },
-              { label: 'ORDERS', weight: '20%', desc: 'vs. Top Count' },
-              { label: 'SPEED', weight: '20%', desc: '< 1h = 100' },
-              { label: 'CANCEL', weight: '20%', desc: '< 1% = 100' },
-              { label: 'QUALITY', weight: '10%', desc: '0 Error = 100' }
+              { label: 'SALES', weight: '50%', desc: 'vs. Top Seller' },
+              { label: 'ORDERS', weight: '30%', desc: 'vs. Top Count' },
+              { label: 'CANCEL', weight: '20%', desc: '< 1% = 100' }
             ].map((item) => (
               <div key={item.label}>
                 <div style={{

@@ -4,16 +4,17 @@ import { createClient } from '@/lib/supabase/server';
 // 테마 활성화
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
 
     // 트리거가 자동으로 다른 테마들을 비활성화하지만, 명시적으로 처리
     const { error: deactivateError } = await supabase
       .from('design_themes')
       .update({ is_active: false })
-      .neq('id', params.id);
+      .neq('id', id);
 
     if (deactivateError) {
       console.error('Deactivate themes error:', deactivateError);
@@ -23,7 +24,7 @@ export async function POST(
     const { data: theme, error } = await supabase
       .from('design_themes')
       .update({ is_active: true })
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single();
 

@@ -76,13 +76,7 @@ export default function CreateNoticePage() {
   };
 
   return (
-    <div style={{
-      padding: '24px',
-      paddingTop: '90px',
-      background: '#f5f5f5',
-      minHeight: '100vh'
-    }}>
-      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         {/* 헤더 */}
         <div style={{
           display: 'flex',
@@ -314,7 +308,6 @@ export default function CreateNoticePage() {
             </div>
           </div>
         </form>
-      </div>
     </div>
   );
 }

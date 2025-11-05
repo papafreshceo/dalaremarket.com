@@ -102,7 +102,21 @@
       "Bash(git merge:*)",
       "Bash(if exist apply-last-login-provider-migration.js del /f apply-last-login-provider-migration.js)",
       "Bash(if exist check-orders.js del /f check-orders.js)",
-      "Bash(database/migrations/all_seller_ranking_tables.sql)"
+      "Bash(database/migrations/all_seller_ranking_tables.sql)",
+      "Bash(npx next build)",
+      "Bash(Select-String -Pattern \"Error|Failed|Success|Production\")",
+      "Bash(Select-Object -First 10)",
+      "Bash(echo:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(if exist \"src\\app\\api\\user\\check-profile-name\" rmdir /s /q \"src\\app\\api\\user\\check-profile-name\")",
+      "Bash(if exist databasemigrationsapply-rename-nickname.js del /f databasemigrationsapply-rename-nickname.js)",
+      "Bash(if exist \"database\\migrations\\apply-display-nickname.js\" del /f \"database\\migrations\\apply-display-nickname.js\")",
+      "Bash(if exist databasemigrationsapply-tier-criteria.js del /f databasemigrationsapply-tier-criteria.js)",
+      "Bash(if exist create-default-theme.js del /f create-default-theme.js)",
+      "Bash(if exist check-settlement-fields.js del /f check-settlement-fields.js)",
+      "Bash(timeout 3 bash:*)",
+      "Bash(/dev/null)",
+      "Bash(nul)"
     ],
     "deny": [],
     "ask": []
