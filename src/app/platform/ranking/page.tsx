@@ -107,6 +107,17 @@ export default function RankingPage() {
   const [showScoreTooltip, setShowScoreTooltip] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
 
+  // 점수 설정 state
+  const [scoreSettings, setScoreSettings] = useState<{
+    sales_per_point: number;
+    orders_per_point: number;
+    weekly_consecutive_bonus: number;
+    monthly_consecutive_bonus: number;
+    post_score: number;
+    comment_score: number;
+    login_score: number;
+  } | null>(null);
+
   const fetchRankings = async () => {
     setLoading(true);
     try {
@@ -212,7 +223,29 @@ export default function RankingPage() {
   useEffect(() => {
     fetchRankings();
     fetchParticipation();
+    fetchScoreSettings();
   }, [periodType]);
+
+  const fetchScoreSettings = async () => {
+    try {
+      const response = await fetch('/api/admin/ranking-score-settings');
+      const result = await response.json();
+
+      if (result.success && result.settings) {
+        setScoreSettings({
+          sales_per_point: result.settings.sales_per_point,
+          orders_per_point: result.settings.orders_per_point,
+          weekly_consecutive_bonus: result.settings.weekly_consecutive_bonus,
+          monthly_consecutive_bonus: result.settings.monthly_consecutive_bonus,
+          post_score: result.settings.post_score,
+          comment_score: result.settings.comment_score,
+          login_score: result.settings.login_score
+        });
+      }
+    } catch (error) {
+      console.error('점수 설정 조회 실패:', error);
+    }
+  };
 
   const fetchTierInfo = async () => {
     setTierGuideLoading(true);
@@ -922,6 +955,212 @@ export default function RankingPage() {
             </tbody>
           </table>
         </div>
+
+        {/* 점수 산정 방식 안내 */}
+        {scoreSettings && (
+          <div style={{
+            marginTop: '32px',
+            background: '#ffffff',
+            border: '2px solid #000000',
+            padding: '32px',
+            boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 0.15)'
+          }}>
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: '900',
+              color: '#000000',
+              marginBottom: '16px',
+              fontFamily: 'var(--font-sans)',
+              letterSpacing: '0.05em'
+            }}>
+              점수 산정 방식
+            </h3>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '16px',
+              marginBottom: '24px'
+            }}>
+              {/* 발주금액 점수 */}
+              <div style={{
+                padding: '16px',
+                background: '#f9fafb',
+                border: '2px solid #000000'
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '900',
+                  color: '#64748b',
+                  marginBottom: '8px',
+                  letterSpacing: '0.05em'
+                }}>
+                  발주금액 점수
+                </div>
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: '900',
+                  color: '#000000',
+                  fontFamily: 'var(--font-mono)'
+                }}>
+                  {scoreSettings.sales_per_point.toLocaleString()}원당 1점
+                </div>
+              </div>
+
+              {/* 발주건수 점수 */}
+              <div style={{
+                padding: '16px',
+                background: '#f9fafb',
+                border: '2px solid #000000'
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '900',
+                  color: '#64748b',
+                  marginBottom: '8px',
+                  letterSpacing: '0.05em'
+                }}>
+                  발주건수 점수
+                </div>
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: '900',
+                  color: '#000000',
+                  fontFamily: 'var(--font-mono)'
+                }}>
+                  1건당 {scoreSettings.orders_per_point}점
+                </div>
+              </div>
+
+              {/* 주간 연속발주 보너스 */}
+              <div style={{
+                padding: '16px',
+                background: '#f9fafb',
+                border: '2px solid #000000'
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '900',
+                  color: '#64748b',
+                  marginBottom: '8px',
+                  letterSpacing: '0.05em'
+                }}>
+                  주간 연속발주 보너스
+                </div>
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: '900',
+                  color: '#000000',
+                  fontFamily: 'var(--font-mono)'
+                }}>
+                  {scoreSettings.weekly_consecutive_bonus}점
+                </div>
+                <div style={{
+                  fontSize: '11px',
+                  color: '#64748b',
+                  marginTop: '4px'
+                }}>
+                  매주 토요일 가산 (일~금 발주 시)
+                </div>
+              </div>
+
+              {/* 월간 연속발주 보너스 */}
+              <div style={{
+                padding: '16px',
+                background: '#f9fafb',
+                border: '2px solid #000000'
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '900',
+                  color: '#64748b',
+                  marginBottom: '8px',
+                  letterSpacing: '0.05em'
+                }}>
+                  월간 연속발주 보너스
+                </div>
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: '900',
+                  color: '#000000',
+                  fontFamily: 'var(--font-mono)'
+                }}>
+                  {scoreSettings.monthly_consecutive_bonus}점
+                </div>
+                <div style={{
+                  fontSize: '11px',
+                  color: '#64748b',
+                  marginTop: '4px'
+                }}>
+                  다음달 1일 가산 (토요일 제외 전일 발주 시)
+                </div>
+              </div>
+
+              {/* 활동 점수 */}
+              <div style={{
+                padding: '16px',
+                background: '#f9fafb',
+                border: '2px solid #000000'
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '900',
+                  color: '#64748b',
+                  marginBottom: '8px',
+                  letterSpacing: '0.05em'
+                }}>
+                  활동 점수
+                </div>
+                <div style={{
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  color: '#000000',
+                  fontFamily: 'var(--font-mono)'
+                }}>
+                  <div>로그인: {scoreSettings.login_score}점</div>
+                  <div>게시글: {scoreSettings.post_score}점</div>
+                  <div>댓글: {scoreSettings.comment_score}점</div>
+                </div>
+              </div>
+            </div>
+
+            {/* 중요 안내 */}
+            <div style={{
+              padding: '20px',
+              background: '#fef3c7',
+              border: '2px solid #f59e0b',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px'
+            }}>
+              <div style={{
+                fontSize: '20px',
+                flexShrink: 0
+              }}>
+                ⚠️
+              </div>
+              <div>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: '900',
+                  color: '#000000',
+                  marginBottom: '4px',
+                  fontFamily: 'var(--font-sans)'
+                }}>
+                  셀러 등급은 랭킹과 무관합니다
+                </div>
+                <div style={{
+                  fontSize: '13px',
+                  color: '#64748b',
+                  lineHeight: '1.6',
+                  fontFamily: 'var(--font-sans)'
+                }}>
+                  셀러 랭킹은 기간별 순위 경쟁이며, 셀러 등급(LIGHT/STANDARD/ADVANCE/ELITE/LEGEND)은 실적 또는 활동점수 누적을 기준으로 별도 산정됩니다.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 랭킹 참여 설정 */}
         <div style={{
