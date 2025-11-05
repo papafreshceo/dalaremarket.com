@@ -15,11 +15,24 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
 
+    // impersonate 헤더 확인
+    const impersonateUserId = request.headers.get('X-Impersonate-User-Id');
+
     // 현재 로그인한 사용자 확인
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    // 비로그인 사용자인 경우 샘플 데이터 반환
-    if (authError || !user) {
+    // 실제 사용할 사용자 ID 결정 (impersonate 우선)
+    const effectiveUserId = impersonateUserId || user?.id;
+
+    if (impersonateUserId) {
+      console.log('[GET platform-orders] Impersonate 모드:', {
+        impersonateUserId,
+        adminUserId: user?.id
+      });
+    }
+
+    // 비로그인 사용자이고 impersonate도 아닌 경우 샘플 데이터 반환
+    if (!effectiveUserId) {
       console.log('[GET platform-orders] 비로그인 사용자 - 샘플 데이터 제공');
 
       // 실제 option_products 조회 (service role 사용으로 RLS 우회)
@@ -67,12 +80,23 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // impersonate 모드인 경우 Service Role 사용 (RLS 우회)
+    let dbClient = supabase;
+
+    if (impersonateUserId) {
+      const { createClient: createServiceClient } = await import('@supabase/supabase-js');
+      dbClient = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+    }
+
     // 로그인 사용자인 경우
     // users 테이블에서 show_sample_data 확인
-    const { data: userData, error: userError } = await supabase
+    const { data: userData, error: userError } = await dbClient
       .from('users')
       .select('show_sample_data')
-      .eq('id', user.id)
+      .eq('id', effectiveUserId)
       .single();
 
     if (userError) {
@@ -82,10 +106,16 @@ export async function GET(request: NextRequest) {
     const showSampleData = userData?.show_sample_data ?? false;
 
     // 실제 주문 데이터 조회
-    const { data: orders, error: ordersError } = await supabase
+    console.log('[GET platform-orders] 주문 조회 시작:', {
+      effectiveUserId,
+      isImpersonate: !!impersonateUserId,
+      usingServiceRole: !!impersonateUserId
+    });
+
+    const { data: orders, error: ordersError } = await dbClient
       .from('integrated_orders')
       .select('*')
-      .eq('seller_id', user.id)
+      .eq('seller_id', effectiveUserId)
       .order('created_at', { ascending: false });
 
     if (ordersError) {
@@ -95,6 +125,13 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    console.log('[GET platform-orders] 주문 조회 결과:', {
+      effectiveUserId,
+      orderCount: orders?.length || 0,
+      isImpersonate: !!impersonateUserId,
+      firstOrderSellerId: orders?.[0]?.seller_id || 'none'
+    });
 
     // 샘플 데이터 반환 조건: show_sample_data가 true이고 실제 주문이 없을 때
     if (showSampleData && (!orders || orders.length === 0)) {
@@ -140,7 +177,7 @@ export async function GET(request: NextRequest) {
       );
 
       // DB 포맷으로 변환
-      const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, user.id);
+      const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, effectiveUserId);
 
       console.log(`[GET platform-orders] 회원용 샘플 데이터 생성: ${sampleOrders.length}건 (오늘 기준 1년치)`);
 

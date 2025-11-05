@@ -183,8 +183,64 @@ function OrdersPageContent() {
   }, []); // fetchOrders는 함수 선언이므로 의존성 불필요
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    const checkImpersonateToken = async () => {
+      const impersonateToken = searchParams.get('impersonate_token');
+
+      if (impersonateToken) {
+        try {
+          // 토큰 검증 및 사용자 정보 가져오기
+          const response = await fetch('/api/admin/verify-impersonate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: impersonateToken }),
+          });
+
+          const data = await response.json();
+
+          if (data.success && data.user) {
+            // sessionStorage에 impersonate 사용자 정보 저장
+            sessionStorage.setItem('impersonate_user', JSON.stringify({
+              userId: data.user.id,
+              email: data.user.email,
+              name: data.user.name,
+              impersonatedBy: data.impersonatedBy,
+            }));
+
+            // URL에서 토큰 제거
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.delete('impersonate_token');
+            window.history.replaceState({}, '', newUrl);
+
+            // 사용자 정보 설정
+            setUserId(data.user.id);
+            setUserEmail(data.user.email);
+
+            toast.success(`${data.user.email}로 전환되었습니다`, {
+              duration: 3000,
+              position: 'top-center',
+            });
+            return;
+          }
+        } catch (error) {
+          console.error('Impersonate 토큰 검증 오류:', error);
+          toast.error('회원 전환에 실패했습니다');
+        }
+      }
+
+      // 일반 로그인 또는 sessionStorage에 저장된 impersonate 정보 확인
+      const storedImpersonate = sessionStorage.getItem('impersonate_user');
+
+      if (storedImpersonate) {
+        const impersonateUser = JSON.parse(storedImpersonate);
+        setUserId(impersonateUser.userId);
+        setUserEmail(impersonateUser.email);
+        return;
+      }
+
+      // 일반 사용자
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
       if (user) {
         setUserId(user.id);
         if (user.email) {
@@ -196,28 +252,47 @@ function OrdersPageContent() {
         setUserEmail('');
         console.log('[orders] 비회원 사용자 - 샘플 데이터 모드');
       }
-    });
+    };
 
-    // integrated_orders에서 데이터 불러오기
-    fetchOrders();
+    const init = async () => {
+      await checkImpersonateToken();
+      // impersonate 정보가 설정된 후에 주문 데이터 불러오기
+      await fetchOrders();
+    };
+
+    init();
   }, []);
 
   // 캐시 & 크레딧 잔액 조회 함수
   const fetchBalances = async (showRefillToast: boolean = true) => {
-    if (userId === 'guest' || !userId) {
+    // impersonate 사용자 정보 확인
+    const impersonateUser = typeof window !== 'undefined'
+      ? JSON.parse(sessionStorage.getItem('impersonate_user') || 'null')
+      : null;
+
+    const effectiveUserId = impersonateUser ? impersonateUser.userId : userId;
+
+    if (effectiveUserId === 'guest' || !effectiveUserId) {
       setCashBalance(0);
       setCreditBalance(0);
       return;
     }
 
     try {
+      const baseHeaders: Record<string, string> = {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      };
+
+      // impersonate 모드인 경우 헤더에 사용자 ID 추가
+      if (impersonateUser) {
+        baseHeaders['X-Impersonate-User-Id'] = impersonateUser.userId;
+      }
+
       // 캐시 조회
       const cashResponse = await fetch('/api/cash', {
         cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
+        headers: baseHeaders
       });
       const cashData = await cashResponse.json();
       if (cashData.success) {
@@ -229,8 +304,7 @@ function OrdersPageContent() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          ...baseHeaders
         },
         cache: 'no-store'
       });
@@ -281,13 +355,30 @@ function OrdersPageContent() {
 
   const fetchOrders = async () => {
     try {
+      // impersonate 사용자 정보 확인
+      const impersonateUser = typeof window !== 'undefined'
+        ? JSON.parse(sessionStorage.getItem('impersonate_user') || 'null')
+        : null;
+
+      console.log('[fetchOrders] Impersonate 정보:', impersonateUser);
+
+      const headers: Record<string, string> = {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      };
+
+      // impersonate 모드인 경우 헤더에 사용자 ID 추가
+      if (impersonateUser) {
+        headers['X-Impersonate-User-Id'] = impersonateUser.userId;
+        console.log('[fetchOrders] X-Impersonate-User-Id 헤더 설정:', impersonateUser.userId);
+      }
+
+      console.log('[fetchOrders] 요청 헤더:', headers);
+
       // API를 통해 주문 조회 (샘플 모드 자동 처리)
       const response = await fetch('/api/platform-orders', {
         cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
+        headers
       });
       const result = await response.json();
 
@@ -759,6 +850,10 @@ function OrdersPageContent() {
     }
   };
 
+  const impersonateUser = typeof window !== 'undefined'
+    ? JSON.parse(sessionStorage.getItem('impersonate_user') || 'null')
+    : null;
+
   return (
     <div className="platform-orders-page" style={{
       minHeight: '100vh',
@@ -767,6 +862,66 @@ function OrdersPageContent() {
     }}>
       {/* PWA 설치 안내 배너 */}
       <PWAInstallBanner />
+
+      {/* 관리자 회원 전환 배너 */}
+      {impersonateUser && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          padding: '12px 20px',
+          textAlign: 'center',
+          fontSize: '14px',
+          fontWeight: '600',
+          zIndex: 10000,
+          boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '20px' }}>👁️</span>
+            <span>
+              <strong>{impersonateUser.email}</strong> 계정 조회 전용 모드
+              <span style={{
+                marginLeft: '8px',
+                padding: '2px 8px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                borderRadius: '4px',
+                fontSize: '12px'
+              }}>
+                읽기 전용
+              </span>
+            </span>
+            <button
+              onClick={() => {
+                sessionStorage.removeItem('impersonate_user');
+                window.close();
+              }}
+              style={{
+                marginLeft: '20px',
+                padding: '6px 16px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '600',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+              }}
+            >
+              종료
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 다크모드 스크롤바 스타일 */}
       <style>{`
