@@ -4,6 +4,9 @@
  * 매일 자정에 실행:
  * 1. seller_performance_daily의 점수 계산
  * 2. seller_rankings 업데이트 (일간/주간/월간)
+ *    - 일간: 매일 계산 (보상 없음, 실시간 표시용)
+ *    - 주간: 토요일에 확정 및 보상 지급
+ *    - 월간: 다음달 1일에 확정 및 보상 지급
  * 3. 배지 자동 부여
  *
  * 실행 방법:
@@ -135,14 +138,16 @@ async function calculateDailyScores() {
 
 /**
  * 2단계: 기간별 랭킹 생성 (일간/주간/월간)
+ * @param finalize 랭킹 확정 및 보상 지급 여부 (주간: 토요일, 월간: 1일)
  */
 async function generateRankings(
   periodType: 'daily' | 'weekly' | 'monthly',
   scores: SellerScore[],
   salesPerPoint: number,
-  ordersPerPoint: number
+  ordersPerPoint: number,
+  finalize: boolean = false
 ) {
-  console.log(`\n📈 랭킹 생성 중 (${periodType})...`);
+  console.log(`\n📈 랭킹 생성 중 (${periodType})...${finalize ? ' [확정 및 보상 지급]' : ''}`);
 
   const today = getTodayKST();
   let periodStart: string;
@@ -198,6 +203,19 @@ async function generateRankings(
   // 점수 계산 및 순위 부여 (설정값 전달)
   const rankingScores = calculateRankings(Array.from(sellerMap.values()), salesPerPoint, ordersPerPoint);
 
+  // 보상 설정 조회 (주간/월간만)
+  let rewardsMap = new Map<number, number>();
+  if (finalize && periodType !== 'daily') {
+    const { data: rewards } = await supabase
+      .from('ranking_rewards_settings')
+      .select('rank, reward_cash')
+      .eq('period_type', periodType);
+
+    if (rewards) {
+      rewards.forEach(r => rewardsMap.set(r.rank, r.reward_cash));
+    }
+  }
+
   // seller_rankings에 저장
   for (const score of rankingScores) {
     // 이전 랭킹 조회 (순위 변동 계산용)
@@ -215,27 +233,39 @@ async function generateRankings(
 
     const seller = sellerMap.get(score.seller_id)!;
 
+    // 보상 캐시 계산
+    const rewardCash = finalize && rewardsMap.has(score.rank || 0) ? rewardsMap.get(score.rank || 0) || 0 : 0;
+
     // Upsert (있으면 업데이트, 없으면 삽입)
+    const rankingData: any = {
+      seller_id: score.seller_id,
+      period_type: periodType,
+      period_start: periodStart,
+      period_end: periodEnd,
+      total_sales: seller.total_sales,
+      order_count: seller.order_count,
+      activity_score: score.activity_score,
+      sales_score: score.sales_score,
+      order_count_score: score.order_count_score,
+      total_score: score.total_score,
+      rank: score.rank,
+      prev_rank: prevRanking?.rank || null,
+      rank_change: rankChange,
+      prev_total_score: prevRanking?.total_score || null,
+      score_change: scoreChange,
+      reward_cash: rewardCash,
+      is_finalized: finalize,
+      updated_at: new Date().toISOString()
+    };
+
+    if (finalize && rewardCash > 0) {
+      rankingData.rewarded_at = new Date().toISOString();
+      console.log(`   💰 ${score.rank}위 (${score.seller_id}): ${rewardCash.toLocaleString()}원 보상`);
+    }
+
     const { error: upsertError } = await supabase
       .from('seller_rankings')
-      .upsert({
-        seller_id: score.seller_id,
-        period_type: periodType,
-        period_start: periodStart,
-        period_end: periodEnd,
-        total_sales: seller.total_sales,
-        order_count: seller.order_count,
-        activity_score: score.activity_score,
-        sales_score: score.sales_score,
-        order_count_score: score.order_count_score,
-        total_score: score.total_score,
-        rank: score.rank,
-        prev_rank: prevRanking?.rank || null,
-        rank_change: rankChange,
-        prev_total_score: prevRanking?.total_score || null,
-        score_change: scoreChange,
-        updated_at: new Date().toISOString()
-      }, {
+      .upsert(rankingData, {
         onConflict: 'seller_id,period_type,period_start'
       });
 
@@ -325,7 +355,13 @@ async function awardBadges() {
  */
 async function main() {
   console.log('🚀 셀러 랭킹 일일 배치 작업 시작...');
-  console.log(`   날짜: ${getTodayKST()}`);
+  const today = getTodayKST();
+  const todayDate = new Date(today);
+  const dayOfWeek = todayDate.getDay(); // 0: 일요일, 6: 토요일
+  const dayOfMonth = todayDate.getDate();
+
+  console.log(`   날짜: ${today}`);
+  console.log(`   요일: ${dayOfWeek === 0 ? '일' : dayOfWeek === 1 ? '월' : dayOfWeek === 2 ? '화' : dayOfWeek === 3 ? '수' : dayOfWeek === 4 ? '목' : dayOfWeek === 5 ? '금' : '토'}요일`);
 
   try {
     // 1. 일일 점수 계산
@@ -334,11 +370,24 @@ async function main() {
       throw new Error('일일 점수 계산 실패');
     }
 
-    // 2. 랭킹 생성 (일간/주간/월간)
+    // 2. 랭킹 생성
     if (scores && scores.length > 0) {
-      await generateRankings('daily', scores, salesPerPoint || 10000, ordersPerPoint || 10);
-      await generateRankings('weekly', scores, salesPerPoint || 10000, ordersPerPoint || 10);
-      await generateRankings('monthly', scores, salesPerPoint || 10000, ordersPerPoint || 10);
+      // 일간 랭킹: 매일 계산 (보상 없음)
+      await generateRankings('daily', scores, salesPerPoint || 10000, ordersPerPoint || 10, false);
+
+      // 주간 랭킹: 토요일에만 확정 및 보상 지급
+      const isSaturday = dayOfWeek === 6;
+      if (isSaturday) {
+        console.log('   🎯 토요일 - 주간 랭킹 확정 및 보상 지급');
+      }
+      await generateRankings('weekly', scores, salesPerPoint || 10000, ordersPerPoint || 10, isSaturday);
+
+      // 월간 랭킹: 1일에만 확정 및 보상 지급 (지난 달 랭킹)
+      const isFirstDayOfMonth = dayOfMonth === 1;
+      if (isFirstDayOfMonth) {
+        console.log('   🎯 1일 - 월간 랭킹 확정 및 보상 지급');
+      }
+      await generateRankings('monthly', scores, salesPerPoint || 10000, ordersPerPoint || 10, isFirstDayOfMonth);
     }
 
     // 3. 배지 부여
