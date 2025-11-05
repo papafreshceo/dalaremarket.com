@@ -308,23 +308,17 @@ export default function RankingPage() {
           color: '#ffffff',
           padding: '12px 16px',
           borderRadius: '6px',
-          fontSize: '11px',
+          fontSize: '12px',
           fontWeight: '400',
-          lineHeight: '1.5',
+          lineHeight: '1.6',
           whiteSpace: 'nowrap',
           zIndex: 9999,
           boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
           border: '1px solid #334155',
           pointerEvents: 'none'
         }}>
-          <div style={{ marginBottom: '6px', fontWeight: '700', fontSize: '12px' }}>점수 계산 기준</div>
-          <div>• 발주확정 금액: 1만원 = 1점</div>
-          <div>• 발주확정 건수: 1건 = 10점</div>
-          <div>• 활동점수: 연속발주/게시글/답글/로그인</div>
-          <div style={{ marginTop: '4px', marginLeft: '12px', fontSize: '10px', opacity: 0.8 }}>
-            - 연속발주: 7일 = 50점, 14일 = 150점, 30일 = 500점<br />
-            - 게시글 작성: 5점 / 답글: 2점 / 로그인: 3점
-          </div>
+          발주금액, 건수, 연속발주, 활동점수 등을<br />
+          종합하여 산출합니다
           {/* 화살표 */}
           <div style={{
             position: 'absolute',
