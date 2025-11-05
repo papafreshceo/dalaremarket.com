@@ -174,7 +174,17 @@ export default function TierSimulationPage() {
       const accumulatedDays = Math.round(daysPerMonth * month);
       const pointsData = calculateAccumulatedPoints(accumulatedDays, month, daysPerMonth, hasConsecutiveStreak);
 
-      const tierByExisting = checkTierByExisting(monthlyOrders, monthlySales);
+      // 과거 3개월 누적 건수/금액 계산 (등급 판정용)
+      const startMonth = Math.max(0, month - 3);
+      let threeMonthOrders = 0;
+      let threeMonthSales = 0;
+
+      for (let i = startMonth; i < month; i++) {
+        threeMonthOrders += monthlyOrders;
+        threeMonthSales += monthlySales;
+      }
+
+      const tierByExisting = checkTierByExisting(threeMonthOrders, threeMonthSales);
       const tierByPoints = checkTierByPoints(pointsData.total);
 
       let newTier = currentTier;
@@ -253,9 +263,12 @@ export default function TierSimulationPage() {
 
             {/* 기존 시스템 */}
             <div style={{ background: 'white', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
-              <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
                 기존 시스템 (건수 + 금액)
               </h3>
+              <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
+                (3개월 누적 기준, 매월 1일 판정)
+              </p>
               {tierCriteria.map((criteria, index) => (
                 <div key={criteria.tier} style={{ marginBottom: '8px' }}>
                   <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '2px', color: getTierColor(criteria.tier) }}>
