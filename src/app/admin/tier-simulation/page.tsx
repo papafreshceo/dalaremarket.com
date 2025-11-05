@@ -63,10 +63,8 @@ export default function TierSimulationPage() {
     { tier: 'LEGEND', minOrderCount: 500, minTotalSales: 50000000 },
   ]);
 
-  // 누적점수 시스템 설정
   const [pointsPerDay, setPointsPerDay] = useState(10);
 
-  // 누적 마일스톤 (연속 없이도 달성 가능)
   const [milestones, setMilestones] = useState<Milestone[]>([
     { days: 30, bonus: 100, enabled: true },
     { days: 90, bonus: 300, enabled: true },
@@ -75,16 +73,14 @@ export default function TierSimulationPage() {
     { days: 730, bonus: 2500, enabled: true },
   ]);
 
-  // 연속성 보너스 (영업일 기준 매일 발주 필요, 주말 제외)
   const [consecutiveBonuses, setConsecutiveBonuses] = useState<ConsecutiveBonus[]>([
-    { days: 5, bonus: 30, enabled: true },    // 1주 연속
-    { days: 21, bonus: 100, enabled: true },  // 1개월 연속 (영업일 기준)
-    { days: 65, bonus: 300, enabled: true },  // 3개월 연속 (영업일 기준)
-    { days: 130, bonus: 500, enabled: true }, // 6개월 연속 (영업일 기준)
-    { days: 260, bonus: 1000, enabled: true }, // 1년 연속 (영업일 기준)
+    { days: 5, bonus: 30, enabled: true },
+    { days: 21, bonus: 100, enabled: true },
+    { days: 65, bonus: 300, enabled: true },
+    { days: 130, bonus: 500, enabled: true },
+    { days: 260, bonus: 1000, enabled: true },
   ]);
 
-  // 월간 발주일수 보너스
   const [monthlyBonuses, setMonthlyBonuses] = useState<MonthlyBonus[]>([
     { minDays: 10, bonus: 30, enabled: true },
     { minDays: 15, bonus: 60, enabled: true },
@@ -98,7 +94,6 @@ export default function TierSimulationPage() {
     { tier: 'LEGEND', requiredPoints: 12000 },
   ]);
 
-  // 시뮬레이션 입력
   const [simulationInput, setSimulationInput] = useState<SimulationInput>({
     daysPerWeek: 5,
     ordersPerDay: 5,
@@ -115,14 +110,12 @@ export default function TierSimulationPage() {
     let consecutivePoints = 0;
     let monthlyPoints = 0;
 
-    // 누적 마일스톤 보너스 (연속성 불필요)
     milestones.forEach(milestone => {
       if (milestone.enabled && totalDays >= milestone.days) {
         milestonePoints += milestone.bonus;
       }
     });
 
-    // 연속성 보너스 (주5일 매일 발주하는 경우만 적용)
     if (hasConsecutive && daysPerWeek === 5) {
       consecutiveBonuses.forEach(bonus => {
         if (bonus.enabled && totalDays >= bonus.days) {
@@ -131,7 +124,6 @@ export default function TierSimulationPage() {
       });
     }
 
-    // 월간 발주일수 보너스
     monthlyBonuses.forEach(bonus => {
       if (bonus.enabled && daysPerMonth >= bonus.minDays) {
         monthlyPoints += bonus.bonus * totalMonths;
@@ -243,7 +235,7 @@ export default function TierSimulationPage() {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1600px', margin: '0 auto' }}>
+    <div style={{ padding: '24px', width: '100%' }}>
       <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '8px' }}>
         등급 승급 시뮬레이션
       </h1>
@@ -251,230 +243,22 @@ export default function TierSimulationPage() {
         발주 패턴과 점수 정책을 조정하여 등급 승급 시기를 시뮬레이션합니다
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '24px', marginBottom: '24px' }}>
-        {/* 왼쪽: 시뮬레이션 입력 */}
-        <div>
-          <div style={{ background: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #e5e7eb', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>
-              발주 패턴 입력
+      <div style={{ display: 'grid', gridTemplateColumns: showDetailedSettings ? '350px 280px 1fr' : '280px 1fr', gap: '16px' }}>
+        {/* 칼럼 1: 세부 설정 (조건부) */}
+        {showDetailedSettings && (
+          <div style={{ background: '#f9fafb', padding: '16px', borderRadius: '12px', border: '2px solid #8b5cf6', maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '12px', color: '#8b5cf6' }}>
+              세부 설정 ⚙️
             </h2>
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
-                주당 발주일 (영업일 기준)
-              </label>
-              <input
-                type="number"
-                value={simulationInput.daysPerWeek}
-                onChange={(e) => {
-                  const newDays = parseInt(e.target.value) || 0;
-                  setSimulationInput({
-                    ...simulationInput,
-                    daysPerWeek: newDays,
-                    // 주5일이 아니면 연속성 보너스 자동 해제
-                    hasConsecutiveStreak: newDays === 5 ? simulationInput.hasConsecutiveStreak : false
-                  });
-                }}
-                style={{ width: '100%', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '6px' }}
-              />
-              <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
-                월~금 기준 (예: 5일 = 매일 발주)
-              </p>
-            </div>
-
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
-                하루 평균 건수
-              </label>
-              <input
-                type="number"
-                value={simulationInput.ordersPerDay}
-                onChange={(e) => setSimulationInput({ ...simulationInput, ordersPerDay: parseInt(e.target.value) || 0 })}
-                style={{ width: '100%', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '6px' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
-                건당 평균 금액
-              </label>
-              <input
-                type="number"
-                value={simulationInput.pricePerOrder}
-                onChange={(e) => setSimulationInput({ ...simulationInput, pricePerOrder: parseInt(e.target.value) || 0 })}
-                style={{ width: '100%', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '6px' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: simulationInput.daysPerWeek === 5 ? 'pointer' : 'not-allowed', opacity: simulationInput.daysPerWeek === 5 ? 1 : 0.5 }}>
-                <input
-                  type="checkbox"
-                  checked={simulationInput.hasConsecutiveStreak && simulationInput.daysPerWeek === 5}
-                  disabled={simulationInput.daysPerWeek !== 5}
-                  onChange={(e) => setSimulationInput({ ...simulationInput, hasConsecutiveStreak: e.target.checked })}
-                  style={{ width: '16px', height: '16px', cursor: simulationInput.daysPerWeek === 5 ? 'pointer' : 'not-allowed' }}
-                />
-                <span style={{ fontSize: '13px', fontWeight: '600' }}>
-                  영업일 기준 매일 발주 (월~금, 연속성 보너스)
-                </span>
-              </label>
-              <p style={{ fontSize: '11px', color: simulationInput.daysPerWeek === 5 ? '#6b7280' : '#ef4444', marginTop: '4px', marginLeft: '24px' }}>
-                {simulationInput.daysPerWeek === 5
-                  ? '주말 제외, 영업일 기준으로 연속 발주할 경우 체크'
-                  : '⚠️ 주5일 발주 시에만 연속성 보너스 적용 가능'}
-              </p>
-            </div>
-
-            <button
-              onClick={runSimulation}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                fontSize: '14px',
-                marginBottom: '12px',
-              }}
-            >
-              시뮬레이션 실행
-            </button>
-
-            {results.length > 0 && (
-              <div style={{ padding: '12px', background: '#f0f9ff', borderRadius: '8px' }}>
-                <div style={{ fontSize: '12px', color: '#0369a1', marginBottom: '4px' }}>
-                  월 평균 실적
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: '600' }}>
-                  {results[0].monthlyOrders}건 / {(results[0].monthlySales / 10000).toFixed(0)}만원
-                </div>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={() => setShowDetailedSettings(!showDetailedSettings)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: showDetailedSettings ? '#8b5cf6' : 'white',
-              color: showDetailedSettings ? 'white' : '#374151',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
-          >
-            {showDetailedSettings ? '세부 설정 닫기' : '세부 설정 열기'} ⚙️
-          </button>
-        </div>
-
-        {/* 오른쪽: 결과 표시 */}
-        <div>
-          {/* 승급 요약 */}
-          {results.length > 0 && (
-            <div style={{ background: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #e5e7eb', marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>
-                승급 요약
-              </h2>
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                {getUpgradeSummary().map((upgrade, index) => (
-                  <div key={index} style={{
-                    padding: '16px 24px',
-                    background: getTierColor(upgrade.tier) + '15',
-                    borderRadius: '8px',
-                    border: `2px solid ${getTierColor(upgrade.tier)}`,
-                  }}>
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: getTierColor(upgrade.tier), marginBottom: '4px' }}>
-                      {upgrade.tier}
-                    </div>
-                    <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                      {upgrade.month}개월 ({upgrade.method === 'existing' ? '건수/금액' : '누적점수'})
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 결과 테이블 */}
-          {results.length > 0 && (
-            <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-              <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
-                    <tr>
-                      <th style={{ padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '600' }}>월</th>
-                      <th style={{ padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '600' }}>누적일</th>
-                      <th style={{ padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '600' }}>누적점수</th>
-                      <th style={{ padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '600' }}>월간실적</th>
-                      <th style={{ padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '600' }}>등급</th>
-                      <th style={{ padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '600' }}>승급</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((result, index) => (
-                      <tr key={index} style={{
-                        borderBottom: '1px solid #f3f4f6',
-                        background: result.upgradedBy ? '#fef3c7' : 'white'
-                      }}>
-                        <td style={{ padding: '10px', textAlign: 'center', fontSize: '13px' }}>{result.month}</td>
-                        <td style={{ padding: '10px', textAlign: 'center', fontSize: '13px' }}>{result.accumulatedDays}일</td>
-                        <td style={{ padding: '10px', textAlign: 'center', fontSize: '13px', fontWeight: '600' }}>
-                          {result.accumulatedPoints.toLocaleString()}점
-                        </td>
-                        <td style={{ padding: '10px', textAlign: 'center', fontSize: '12px' }}>
-                          {result.monthlyOrders}건<br/>
-                          {(result.monthlySales / 10000).toFixed(0)}만원
-                        </td>
-                        <td style={{ padding: '10px', textAlign: 'center' }}>
-                          <span style={{
-                            padding: '4px 12px',
-                            background: getTierColor(result.currentTier),
-                            color: 'white',
-                            borderRadius: '12px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                          }}>
-                            {result.currentTier}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px', textAlign: 'center', fontSize: '12px', fontWeight: '600' }}>
-                          {result.upgradedBy === 'existing' && <span style={{ color: '#3b82f6' }}>건수/금액</span>}
-                          {result.upgradedBy === 'points' && <span style={{ color: '#8b5cf6' }}>누적점수</span>}
-                          {!result.upgradedBy && <span style={{ color: '#d1d5db' }}>-</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 세부 설정 패널 */}
-      {showDetailedSettings && (
-        <div style={{ background: '#f9fafb', padding: '24px', borderRadius: '12px', border: '2px solid #8b5cf6' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '24px', color: '#8b5cf6' }}>
-            세부 설정 ⚙️
-          </h2>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }}>
             {/* 기존 시스템 */}
-            <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>
+            <div style={{ background: 'white', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
                 기존 시스템 (건수 + 금액)
               </h3>
               {tierCriteria.map((criteria, index) => (
-                <div key={criteria.tier} style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: getTierColor(criteria.tier) }}>
+                <div key={criteria.tier} style={{ marginBottom: '8px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '2px', color: getTierColor(criteria.tier) }}>
                     {criteria.tier}
                   </div>
                   <input
@@ -486,7 +270,7 @@ export default function TierSimulationPage() {
                       setTierCriteria(newCriteria);
                     }}
                     placeholder="건수"
-                    style={{ width: '100%', padding: '6px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '12px', marginBottom: '4px' }}
+                    style={{ width: '100%', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px', marginBottom: '2px' }}
                   />
                   <input
                     type="text"
@@ -497,64 +281,60 @@ export default function TierSimulationPage() {
                       setTierCriteria(newCriteria);
                     }}
                     placeholder="금액"
-                    style={{ width: '100%', padding: '6px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '12px' }}
+                    style={{ width: '100%', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
                   />
                 </div>
               ))}
             </div>
 
             {/* 누적점수 기본 설정 */}
-            <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>
+            <div style={{ background: 'white', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
                 누적점수 기본 설정
               </h3>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
+              <div style={{ marginBottom: '8px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '600', display: 'block', marginBottom: '2px' }}>
                   발주 1일당 점수
                 </label>
                 <input
                   type="text"
                   value={pointsPerDay.toLocaleString()}
                   onChange={(e) => setPointsPerDay(parseInt(e.target.value.replace(/,/g, '')) || 0)}
-                  style={{ width: '100%', padding: '6px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '12px' }}
+                  style={{ width: '100%', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
                 />
               </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '8px' }}>
-                  등급별 필요 점수
-                </label>
-                {accumulatedPointCriteria.map((criteria, index) => (
-                  <div key={criteria.tier} style={{ display: 'flex', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', color: getTierColor(criteria.tier), fontWeight: '600', width: '70px' }}>
-                      {criteria.tier}
-                    </span>
-                    <input
-                      type="text"
-                      value={criteria.requiredPoints.toLocaleString()}
-                      onChange={(e) => {
-                        const newCriteria = [...accumulatedPointCriteria];
-                        newCriteria[index].requiredPoints = parseInt(e.target.value.replace(/,/g, '')) || 0;
-                        setAccumulatedPointCriteria(newCriteria);
-                      }}
-                      style={{ flex: 1, padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
-                    />
-                  </div>
-                ))}
-              </div>
+              <label style={{ fontSize: '11px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
+                등급별 필요 점수
+              </label>
+              {accumulatedPointCriteria.map((criteria, index) => (
+                <div key={criteria.tier} style={{ display: 'flex', gap: '4px', marginBottom: '4px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '10px', color: getTierColor(criteria.tier), fontWeight: '600', width: '60px' }}>
+                    {criteria.tier}
+                  </span>
+                  <input
+                    type="text"
+                    value={criteria.requiredPoints.toLocaleString()}
+                    onChange={(e) => {
+                      const newCriteria = [...accumulatedPointCriteria];
+                      newCriteria[index].requiredPoints = parseInt(e.target.value.replace(/,/g, '')) || 0;
+                      setAccumulatedPointCriteria(newCriteria);
+                    }}
+                    style={{ flex: 1, padding: '3px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '10px' }}
+                  />
+                </div>
+              ))}
             </div>
 
             {/* 누적 마일스톤 */}
-            <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>
+            <div style={{ background: 'white', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
                 누적 마일스톤 보너스
               </h3>
-              <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px' }}>
-                (연속 불필요, 누적일수만 체크)
+              <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
+                (연속 불필요)
               </p>
               {milestones.map((milestone, index) => (
-                <div key={index} style={{ marginBottom: '8px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <div key={index} style={{ marginBottom: '6px', display: 'flex', gap: '4px', alignItems: 'center' }}>
                   <input
                     type="checkbox"
                     checked={milestone.enabled}
@@ -563,7 +343,7 @@ export default function TierSimulationPage() {
                       newMilestones[index].enabled = e.target.checked;
                       setMilestones(newMilestones);
                     }}
-                    style={{ width: '14px', height: '14px' }}
+                    style={{ width: '12px', height: '12px' }}
                   />
                   <input
                     type="text"
@@ -573,9 +353,9 @@ export default function TierSimulationPage() {
                       newMilestones[index].days = parseInt(e.target.value.replace(/,/g, '')) || 0;
                       setMilestones(newMilestones);
                     }}
-                    style={{ width: '60px', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
+                    style={{ width: '50px', padding: '3px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '10px' }}
                   />
-                  <span style={{ fontSize: '11px' }}>일 →</span>
+                  <span style={{ fontSize: '10px' }}>일</span>
                   <input
                     type="text"
                     value={milestone.bonus.toLocaleString()}
@@ -584,126 +364,312 @@ export default function TierSimulationPage() {
                       newMilestones[index].bonus = parseInt(e.target.value.replace(/,/g, '')) || 0;
                       setMilestones(newMilestones);
                     }}
-                    style={{ width: '60px', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
+                    style={{ width: '50px', padding: '3px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '10px' }}
                   />
-                  <span style={{ fontSize: '11px' }}>점</span>
+                  <span style={{ fontSize: '10px' }}>점</span>
                 </div>
               ))}
-              <button
-                onClick={() => setMilestones([...milestones, { days: 0, bonus: 0, enabled: true }])}
-                style={{
-                  width: '100%',
-                  padding: '6px',
-                  background: '#f3f4f6',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                  marginTop: '8px',
-                }}
-              >
-                + 마일스톤 추가
-              </button>
             </div>
 
-            {/* 연속성 & 월간 보너스 */}
-            <div>
-              {/* 연속성 보너스 */}
-              <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e5e7eb', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>
-                  연속성 보너스
-                </h3>
-                <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px' }}>
-                  (영업일 기준 매일 발주 필요, 주말 제외)
-                </p>
-                {consecutiveBonuses.map((bonus, index) => (
-                  <div key={index} style={{ marginBottom: '8px', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={bonus.enabled}
-                      onChange={(e) => {
-                        const newBonuses = [...consecutiveBonuses];
-                        newBonuses[index].enabled = e.target.checked;
-                        setConsecutiveBonuses(newBonuses);
-                      }}
-                      style={{ width: '14px', height: '14px' }}
-                    />
-                    <input
-                      type="text"
-                      value={bonus.days.toLocaleString()}
-                      onChange={(e) => {
-                        const newBonuses = [...consecutiveBonuses];
-                        newBonuses[index].days = parseInt(e.target.value.replace(/,/g, '')) || 0;
-                        setConsecutiveBonuses(newBonuses);
-                      }}
-                      style={{ width: '50px', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
-                    />
-                    <span style={{ fontSize: '11px' }}>일 →</span>
-                    <input
-                      type="text"
-                      value={bonus.bonus.toLocaleString()}
-                      onChange={(e) => {
-                        const newBonuses = [...consecutiveBonuses];
-                        newBonuses[index].bonus = parseInt(e.target.value.replace(/,/g, '')) || 0;
-                        setConsecutiveBonuses(newBonuses);
-                      }}
-                      style={{ width: '50px', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
-                    />
-                    <span style={{ fontSize: '11px' }}>점</span>
-                  </div>
-                ))}
-              </div>
+            {/* 연속성 보너스 */}
+            <div style={{ background: 'white', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+                연속성 보너스
+              </h3>
+              <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
+                (주5일만 적용)
+              </p>
+              {consecutiveBonuses.map((bonus, index) => (
+                <div key={index} style={{ marginBottom: '6px', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={bonus.enabled}
+                    onChange={(e) => {
+                      const newBonuses = [...consecutiveBonuses];
+                      newBonuses[index].enabled = e.target.checked;
+                      setConsecutiveBonuses(newBonuses);
+                    }}
+                    style={{ width: '12px', height: '12px' }}
+                  />
+                  <input
+                    type="text"
+                    value={bonus.days.toLocaleString()}
+                    onChange={(e) => {
+                      const newBonuses = [...consecutiveBonuses];
+                      newBonuses[index].days = parseInt(e.target.value.replace(/,/g, '')) || 0;
+                      setConsecutiveBonuses(newBonuses);
+                    }}
+                    style={{ width: '50px', padding: '3px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '10px' }}
+                  />
+                  <span style={{ fontSize: '10px' }}>일</span>
+                  <input
+                    type="text"
+                    value={bonus.bonus.toLocaleString()}
+                    onChange={(e) => {
+                      const newBonuses = [...consecutiveBonuses];
+                      newBonuses[index].bonus = parseInt(e.target.value.replace(/,/g, '')) || 0;
+                      setConsecutiveBonuses(newBonuses);
+                    }}
+                    style={{ width: '50px', padding: '3px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '10px' }}
+                  />
+                  <span style={{ fontSize: '10px' }}>점</span>
+                </div>
+              ))}
+            </div>
 
-              {/* 월간 발주일수 보너스 */}
-              <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>
-                  월간 발주일수 보너스
-                </h3>
-                <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px' }}>
-                  (매월 반복 지급)
-                </p>
-                {monthlyBonuses.map((bonus, index) => (
-                  <div key={index} style={{ marginBottom: '8px', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={bonus.enabled}
-                      onChange={(e) => {
-                        const newBonuses = [...monthlyBonuses];
-                        newBonuses[index].enabled = e.target.checked;
-                        setMonthlyBonuses(newBonuses);
-                      }}
-                      style={{ width: '14px', height: '14px' }}
-                    />
-                    <span style={{ fontSize: '11px' }}>월</span>
-                    <input
-                      type="text"
-                      value={bonus.minDays.toLocaleString()}
-                      onChange={(e) => {
-                        const newBonuses = [...monthlyBonuses];
-                        newBonuses[index].minDays = parseInt(e.target.value.replace(/,/g, '')) || 0;
-                        setMonthlyBonuses(newBonuses);
-                      }}
-                      style={{ width: '45px', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
-                    />
-                    <span style={{ fontSize: '11px' }}>일+ →</span>
-                    <input
-                      type="text"
-                      value={bonus.bonus.toLocaleString()}
-                      onChange={(e) => {
-                        const newBonuses = [...monthlyBonuses];
-                        newBonuses[index].bonus = parseInt(e.target.value.replace(/,/g, '')) || 0;
-                        setMonthlyBonuses(newBonuses);
-                      }}
-                      style={{ width: '45px', padding: '4px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' }}
-                    />
-                    <span style={{ fontSize: '11px' }}>점</span>
-                  </div>
-                ))}
-              </div>
+            {/* 월간 보너스 */}
+            <div style={{ background: 'white', padding: '12px', borderRadius: '8px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+                월간 발주일수 보너스
+              </h3>
+              <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
+                (매월 반복)
+              </p>
+              {monthlyBonuses.map((bonus, index) => (
+                <div key={index} style={{ marginBottom: '6px', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={bonus.enabled}
+                    onChange={(e) => {
+                      const newBonuses = [...monthlyBonuses];
+                      newBonuses[index].enabled = e.target.checked;
+                      setMonthlyBonuses(newBonuses);
+                    }}
+                    style={{ width: '12px', height: '12px' }}
+                  />
+                  <input
+                    type="text"
+                    value={bonus.minDays.toLocaleString()}
+                    onChange={(e) => {
+                      const newBonuses = [...monthlyBonuses];
+                      newBonuses[index].minDays = parseInt(e.target.value.replace(/,/g, '')) || 0;
+                      setMonthlyBonuses(newBonuses);
+                    }}
+                    style={{ width: '40px', padding: '3px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '10px' }}
+                  />
+                  <span style={{ fontSize: '10px' }}>일+</span>
+                  <input
+                    type="text"
+                    value={bonus.bonus.toLocaleString()}
+                    onChange={(e) => {
+                      const newBonuses = [...monthlyBonuses];
+                      newBonuses[index].bonus = parseInt(e.target.value.replace(/,/g, '')) || 0;
+                      setMonthlyBonuses(newBonuses);
+                    }}
+                    style={{ width: '40px', padding: '3px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '10px' }}
+                  />
+                  <span style={{ fontSize: '10px' }}>점</span>
+                </div>
+              ))}
             </div>
           </div>
+        )}
+
+        {/* 칼럼 2: 발주 패턴 입력 */}
+        <div>
+          <div style={{ background: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #e5e7eb', marginBottom: '12px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>
+              발주 패턴 입력
+            </h2>
+
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
+                주당 발주일 (영업일)
+              </label>
+              <input
+                type="number"
+                value={simulationInput.daysPerWeek}
+                onChange={(e) => {
+                  const newDays = parseInt(e.target.value) || 0;
+                  setSimulationInput({
+                    ...simulationInput,
+                    daysPerWeek: newDays,
+                    hasConsecutiveStreak: newDays === 5 ? simulationInput.hasConsecutiveStreak : false
+                  });
+                }}
+                style={{ width: '100%', padding: '6px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px' }}
+              />
+              <p style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}>
+                월~금 기준 (5일 = 매일)
+              </p>
+            </div>
+
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
+                하루 평균 건수
+              </label>
+              <input
+                type="number"
+                value={simulationInput.ordersPerDay}
+                onChange={(e) => setSimulationInput({ ...simulationInput, ordersPerDay: parseInt(e.target.value) || 0 })}
+                style={{ width: '100%', padding: '6px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
+                건당 평균 금액
+              </label>
+              <input
+                type="number"
+                value={simulationInput.pricePerOrder}
+                onChange={(e) => setSimulationInput({ ...simulationInput, pricePerOrder: parseInt(e.target.value) || 0 })}
+                style={{ width: '100%', padding: '6px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: simulationInput.daysPerWeek === 5 ? 'pointer' : 'not-allowed', opacity: simulationInput.daysPerWeek === 5 ? 1 : 0.5 }}>
+                <input
+                  type="checkbox"
+                  checked={simulationInput.hasConsecutiveStreak && simulationInput.daysPerWeek === 5}
+                  disabled={simulationInput.daysPerWeek !== 5}
+                  onChange={(e) => setSimulationInput({ ...simulationInput, hasConsecutiveStreak: e.target.checked })}
+                  style={{ width: '14px', height: '14px', cursor: simulationInput.daysPerWeek === 5 ? 'pointer' : 'not-allowed' }}
+                />
+                <span style={{ fontSize: '12px', fontWeight: '600' }}>
+                  연속성 보너스 적용
+                </span>
+              </label>
+              <p style={{ fontSize: '10px', color: simulationInput.daysPerWeek === 5 ? '#6b7280' : '#ef4444', marginTop: '2px', marginLeft: '20px' }}>
+                {simulationInput.daysPerWeek === 5
+                  ? '주5일 연속 발주'
+                  : '⚠️ 주5일만 가능'}
+              </p>
+            </div>
+
+            <button
+              onClick={runSimulation}
+              style={{
+                width: '100%',
+                padding: '10px',
+                background: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '13px',
+                marginBottom: '10px',
+              }}
+            >
+              시뮬레이션 실행
+            </button>
+
+            {results.length > 0 && (
+              <div style={{ padding: '10px', background: '#f0f9ff', borderRadius: '8px', marginBottom: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#0369a1', marginBottom: '2px' }}>
+                  월 평균 실적
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: '600' }}>
+                  {results[0].monthlyOrders}건 / {(results[0].monthlySales / 10000).toFixed(0)}만원
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => setShowDetailedSettings(!showDetailedSettings)}
+            style={{
+              width: '100%',
+              padding: '10px',
+              background: showDetailedSettings ? '#8b5cf6' : 'white',
+              color: showDetailedSettings ? 'white' : '#374151',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              fontSize: '13px',
+            }}
+          >
+            {showDetailedSettings ? '세부 설정 닫기' : '세부 설정 열기'} ⚙️
+          </button>
         </div>
-      )}
+
+        {/* 칼럼 3: 결과 */}
+        <div>
+          {results.length > 0 && (
+            <>
+              {/* 승급 요약 */}
+              <div style={{ background: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #e5e7eb', marginBottom: '16px' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>
+                  승급 요약
+                </h2>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  {getUpgradeSummary().map((upgrade, index) => (
+                    <div key={index} style={{
+                      padding: '12px 16px',
+                      background: getTierColor(upgrade.tier) + '15',
+                      borderRadius: '8px',
+                      border: `2px solid ${getTierColor(upgrade.tier)}`,
+                    }}>
+                      <div style={{ fontSize: '16px', fontWeight: '700', color: getTierColor(upgrade.tier), marginBottom: '2px' }}>
+                        {upgrade.tier}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                        {upgrade.month}개월 ({upgrade.method === 'existing' ? '건수/금액' : '점수'})
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 결과 테이블 */}
+              <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+                <div style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                      <tr>
+                        <th style={{ padding: '8px', textAlign: 'center', fontSize: '12px', fontWeight: '600' }}>월</th>
+                        <th style={{ padding: '8px', textAlign: 'center', fontSize: '12px', fontWeight: '600' }}>누적일</th>
+                        <th style={{ padding: '8px', textAlign: 'center', fontSize: '12px', fontWeight: '600' }}>누적점수</th>
+                        <th style={{ padding: '8px', textAlign: 'center', fontSize: '12px', fontWeight: '600' }}>월간실적</th>
+                        <th style={{ padding: '8px', textAlign: 'center', fontSize: '12px', fontWeight: '600' }}>등급</th>
+                        <th style={{ padding: '8px', textAlign: 'center', fontSize: '12px', fontWeight: '600' }}>승급</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.map((result, index) => (
+                        <tr key={index} style={{
+                          borderBottom: '1px solid #f3f4f6',
+                          background: result.upgradedBy ? '#fef3c7' : 'white'
+                        }}>
+                          <td style={{ padding: '6px', textAlign: 'center', fontSize: '12px' }}>{result.month}</td>
+                          <td style={{ padding: '6px', textAlign: 'center', fontSize: '12px' }}>{result.accumulatedDays}일</td>
+                          <td style={{ padding: '6px', textAlign: 'center', fontSize: '12px', fontWeight: '600' }}>
+                            {result.accumulatedPoints.toLocaleString()}점
+                          </td>
+                          <td style={{ padding: '6px', textAlign: 'center', fontSize: '11px' }}>
+                            {result.monthlyOrders}건<br/>
+                            {(result.monthlySales / 10000).toFixed(0)}만원
+                          </td>
+                          <td style={{ padding: '6px', textAlign: 'center' }}>
+                            <span style={{
+                              padding: '3px 8px',
+                              background: getTierColor(result.currentTier),
+                              color: 'white',
+                              borderRadius: '10px',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                            }}>
+                              {result.currentTier}
+                            </span>
+                          </td>
+                          <td style={{ padding: '6px', textAlign: 'center', fontSize: '11px', fontWeight: '600' }}>
+                            {result.upgradedBy === 'existing' && <span style={{ color: '#3b82f6' }}>건수/금액</span>}
+                            {result.upgradedBy === 'points' && <span style={{ color: '#8b5cf6' }}>점수</span>}
+                            {!result.upgradedBy && <span style={{ color: '#d1d5db' }}>-</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
