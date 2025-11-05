@@ -61,18 +61,18 @@ export default function RankingScoreSettingsPage() {
       if (result.success) {
         const s = result.settings;
         setUiSettings({
-          sales_amount: s.sales_per_point,
-          sales_points: 1,
-          orders_count: 1,
-          orders_points: s.orders_per_point,
+          sales_amount: s.sales_amount || s.sales_per_point,
+          sales_points: s.sales_points || 1,
+          orders_count: s.orders_count || 1,
+          orders_points: s.orders_points_input || s.orders_per_point,
           weekly_bonus: s.weekly_consecutive_bonus || 50,
           monthly_bonus: s.monthly_consecutive_bonus || 500,
-          post_count: 1,
-          post_points: s.post_score,
-          comment_count: 1,
-          comment_points: s.comment_score,
-          login_count: 1,
-          login_points: s.login_score
+          post_count: s.post_count || 1,
+          post_points: s.post_points_input || s.post_score,
+          comment_count: s.comment_count || 1,
+          comment_points: s.comment_points_input || s.comment_score,
+          login_count: s.login_count || 1,
+          login_points: s.login_points_input || s.login_score
         });
       } else {
         toast.error('설정 조회 실패');
@@ -88,14 +88,26 @@ export default function RankingScoreSettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const settings: RankingScoreSettings = {
+      const settings: any = {
+        // 계산값 (실제 점수 계산에 사용)
         sales_per_point: Math.round(uiSettings.sales_amount / uiSettings.sales_points),
         orders_per_point: Math.round(uiSettings.orders_points / uiSettings.orders_count),
         weekly_consecutive_bonus: uiSettings.weekly_bonus,
         monthly_consecutive_bonus: uiSettings.monthly_bonus,
         post_score: Math.round(uiSettings.post_points / uiSettings.post_count),
         comment_score: Math.round(uiSettings.comment_points / uiSettings.comment_count),
-        login_score: Math.round(uiSettings.login_points / uiSettings.login_count)
+        login_score: Math.round(uiSettings.login_points / uiSettings.login_count),
+        // UI 표시용 값들 (입력한 값 그대로 저장)
+        sales_amount: uiSettings.sales_amount,
+        sales_points: uiSettings.sales_points,
+        orders_count: uiSettings.orders_count,
+        orders_points_input: uiSettings.orders_points,
+        post_count: uiSettings.post_count,
+        post_points_input: uiSettings.post_points,
+        comment_count: uiSettings.comment_count,
+        comment_points_input: uiSettings.comment_points,
+        login_count: uiSettings.login_count,
+        login_points_input: uiSettings.login_points
       };
 
       const response = await fetch('/api/admin/ranking-score-settings', {

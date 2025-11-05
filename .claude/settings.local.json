@@ -125,7 +125,8 @@
       "Bash(if exist \"database\\migrations\\apply-tier-point-settings-columns.js\" del /f \"database\\migrations\\apply-tier-point-settings-columns.js\")",
       "Bash(timeout 30 curl:*)",
       "Bash(timeout 20 curl:*)",
-      "Bash(timeout 15 curl:*)"
+      "Bash(timeout 15 curl:*)",
+      "Bash(if exist check-db-via-api.js del /f check-db-via-api.js)"
     ],
     "deny": [],
     "ask": []

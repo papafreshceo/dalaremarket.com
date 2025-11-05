@@ -61,7 +61,18 @@ export async function PUT(request: NextRequest) {
       monthly_consecutive_bonus,
       post_score,
       comment_score,
-      login_score
+      login_score,
+      // UI 표시용 값들
+      sales_amount,
+      sales_points,
+      orders_count,
+      orders_points_input,
+      post_count,
+      post_points_input,
+      comment_count,
+      comment_points_input,
+      login_count,
+      login_points_input
     } = body;
 
     // 필수 필드 검증
@@ -106,6 +117,17 @@ export async function PUT(request: NextRequest) {
         post_score,
         comment_score,
         login_score,
+        // UI 표시용 값들
+        sales_amount,
+        sales_points,
+        orders_count,
+        orders_points_input,
+        post_count,
+        post_points_input,
+        comment_count,
+        comment_points_input,
+        login_count,
+        login_points_input,
         updated_at: new Date().toISOString()
       })
       .eq('id', '00000000-0000-0000-0000-000000000001')
