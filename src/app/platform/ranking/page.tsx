@@ -629,7 +629,7 @@ export default function RankingPage() {
           }}>
             <thead>
               <tr style={{ background: '#fef3c7', color: '#000000', borderBottom: '2px solid #000000' }}>
-                {['RANK', 'CHANGE', 'SELLER', 'TIER', 'SCORE', 'SALES', 'ORDERS', 'CANCEL'].map((header) => (
+                {['RANK', 'CHANGE', 'SELLER', 'SCORE', 'SALES', 'ORDERS', 'CANCEL'].map((header) => (
                   <th
                     key={header}
                     style={{
@@ -678,7 +678,7 @@ export default function RankingPage() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={7}
                     style={{
                       padding: '60px',
                       textAlign: 'center',
@@ -691,7 +691,7 @@ export default function RankingPage() {
               ) : rankings.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={7}
                     style={{
                       padding: '60px',
                       textAlign: 'center',
@@ -752,14 +752,24 @@ export default function RankingPage() {
                               textAlign: 'center'
                             }}>
                               <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
                                 fontSize: '14px',
                                 fontWeight: '700',
                                 color: '#000000',
                                 fontFamily: 'var(--font-sans)'
                               }}>
+                                <div style={{ transform: 'scale(0.8)' }}>
+                                  <TierBadge
+                                    tier={myRanking.tier.toLowerCase() as 'light' | 'standard' | 'advance' | 'elite' | 'legend'}
+                                    iconOnly={true}
+                                    glow={0}
+                                  />
+                                </div>
                                 {myRanking.users?.profile_name || myRanking.users?.name || 'Unknown'}
                                 <span style={{
-                                  marginLeft: '8px',
                                   padding: '2px 8px',
                                   background: '#000000',
                                   color: '#ffffff',
@@ -769,18 +779,6 @@ export default function RankingPage() {
                                 }}>
                                   ME
                                 </span>
-                              </div>
-                            </td>
-                            <td style={{
-                              padding: '8px 12px',
-                              textAlign: 'center'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                <TierBadge
-                                  tier={myRanking.tier.toLowerCase() as 'light' | 'standard' | 'advance' | 'elite' | 'legend'}
-                                  iconOnly={true}
-                                  glow={0}
-                                />
                               </div>
                             </td>
                             <td style={{
@@ -874,15 +872,25 @@ export default function RankingPage() {
                         textAlign: 'center'
                       }}>
                         <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
                           fontSize: '14px',
                           fontWeight: '700',
                           color: '#000000',
                           fontFamily: 'var(--font-sans)'
                         }}>
+                          <div style={{ transform: 'scale(0.8)' }}>
+                            <TierBadge
+                              tier={ranking.tier.toLowerCase() as 'light' | 'standard' | 'advance' | 'elite' | 'legend'}
+                              iconOnly={true}
+                              glow={0}
+                            />
+                          </div>
                           {ranking.users.profile_name || ranking.users.name}
                           {isMe && (
                             <span style={{
-                              marginLeft: '8px',
                               padding: '2px 8px',
                               background: '#000000',
                               color: '#ffffff',
@@ -893,18 +901,6 @@ export default function RankingPage() {
                               ME
                             </span>
                           )}
-                        </div>
-                      </td>
-                      <td style={{
-                        padding: '8px 12px',
-                        textAlign: 'center'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                          <TierBadge
-                            tier={ranking.tier.toLowerCase() as 'light' | 'standard' | 'advance' | 'elite' | 'legend'}
-                            iconOnly={true}
-                            glow={0}
-                          />
                         </div>
                       </td>
                       <td style={{
