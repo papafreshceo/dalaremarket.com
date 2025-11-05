@@ -75,13 +75,13 @@ export default function TierSimulationPage() {
     { days: 730, bonus: 2500, enabled: true },
   ]);
 
-  // 연속성 보너스 (매일 연속 발주 필요)
+  // 연속성 보너스 (영업일 기준 매일 발주 필요, 주말 제외)
   const [consecutiveBonuses, setConsecutiveBonuses] = useState<ConsecutiveBonus[]>([
-    { days: 7, bonus: 30, enabled: true },
-    { days: 30, bonus: 100, enabled: true },
-    { days: 90, bonus: 300, enabled: true },
-    { days: 180, bonus: 500, enabled: true },
-    { days: 365, bonus: 1000, enabled: true },
+    { days: 5, bonus: 30, enabled: true },    // 1주 연속
+    { days: 21, bonus: 100, enabled: true },  // 1개월 연속 (영업일 기준)
+    { days: 65, bonus: 300, enabled: true },  // 3개월 연속 (영업일 기준)
+    { days: 130, bonus: 500, enabled: true }, // 6개월 연속 (영업일 기준)
+    { days: 260, bonus: 1000, enabled: true }, // 1년 연속 (영업일 기준)
   ]);
 
   // 월간 발주일수 보너스
@@ -100,7 +100,7 @@ export default function TierSimulationPage() {
 
   // 시뮬레이션 입력
   const [simulationInput, setSimulationInput] = useState<SimulationInput>({
-    daysPerWeek: 3,
+    daysPerWeek: 5,
     ordersPerDay: 5,
     pricePerOrder: 15000,
     hasConsecutiveStreak: false,
@@ -261,7 +261,7 @@ export default function TierSimulationPage() {
 
             <div style={{ marginBottom: '12px' }}>
               <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
-                주당 발주일
+                주당 발주일 (영업일 기준)
               </label>
               <input
                 type="number"
@@ -269,6 +269,9 @@ export default function TierSimulationPage() {
                 onChange={(e) => setSimulationInput({ ...simulationInput, daysPerWeek: parseInt(e.target.value) || 0 })}
                 style={{ width: '100%', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '6px' }}
               />
+              <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
+                월~금 기준 (예: 5일 = 매일 발주)
+              </p>
             </div>
 
             <div style={{ marginBottom: '12px' }}>
@@ -304,9 +307,12 @@ export default function TierSimulationPage() {
                   style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
                 <span style={{ fontSize: '13px', fontWeight: '600' }}>
-                  매일 연속 발주 (연속성 보너스 적용)
+                  영업일 기준 매일 발주 (월~금, 연속성 보너스)
                 </span>
               </label>
+              <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px', marginLeft: '24px' }}>
+                주말 제외, 영업일 기준으로 연속 발주할 경우 체크
+              </p>
             </div>
 
             <button
@@ -597,7 +603,7 @@ export default function TierSimulationPage() {
                   연속성 보너스
                 </h3>
                 <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px' }}>
-                  (매일 연속 발주 필요)
+                  (영업일 기준 매일 발주 필요, 주말 제외)
                 </p>
                 {consecutiveBonuses.map((bonus, index) => (
                   <div key={index} style={{ marginBottom: '8px', display: 'flex', gap: '6px', alignItems: 'center' }}>
