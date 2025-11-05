@@ -358,7 +358,7 @@ async function getLastBusinessDayOfMonth(date: string): Promise<string> {
 
 /**
  * 주간/월간 연속 발주 보너스 계산 및 업데이트
- * 주간: 일요일~금요일 6일 연속 발주 시, 금요일에 보너스 가산
+ * 주간: 일요일~금요일 6일 연속 발주 시, 토요일에 보너스 가산
  * 월간: 해당 월 영업일에 모두 발주 시, 월의 마지막 영업일에 보너스 가산
  */
 export async function trackConsecutiveOrder(sellerId: string) {
@@ -378,14 +378,14 @@ export async function trackConsecutiveOrder(sellerId: string) {
 
     const todayDate = new Date(today);
 
-    // 주간 보너스 체크 (일요일~금요일 6일 연속 발주 시, 금요일에 가산)
+    // 주간 보너스 체크 (일요일~금요일 6일 연속 발주 시, 토요일에 가산)
     let weeklyBonusPoints = 0;
     const dayOfWeek = todayDate.getDay();
 
-    if (dayOfWeek === 5) {
-      // 오늘이 금요일인 경우, 일요일~금요일 6일 연속발주 체크
+    if (dayOfWeek === 6) {
+      // 오늘이 토요일인 경우, 일요일~금요일 6일 연속발주 체크
       const weekStart = new Date(todayDate);
-      weekStart.setDate(weekStart.getDate() - 5); // 이번 주 일요일
+      weekStart.setDate(weekStart.getDate() - 6); // 이번 주 일요일
       const weekStartStr = weekStart.toISOString().split('T')[0];
 
       // 일요일~금요일 6일 목록 생성
@@ -397,13 +397,17 @@ export async function trackConsecutiveOrder(sellerId: string) {
         daysThisWeek.push(dateStr);
       }
 
-      // 이번 주 6일 발주 기록 조회
+      // 이번 주 6일 발주 기록 조회 (일요일~금요일)
+      const fridayDate = new Date(todayDate);
+      fridayDate.setDate(todayDate.getDate() - 1); // 어제(금요일)
+      const fridayStr = fridayDate.toISOString().split('T')[0];
+
       const { data: weekOrders } = await supabase
         .from('seller_performance_daily')
         .select('date, order_count')
         .eq('seller_id', sellerId)
         .gte('date', weekStartStr)
-        .lte('date', today);
+        .lte('date', fridayStr);
 
       // 6일 모두 발주가 있는지 확인
       const ordersMap = new Map(weekOrders?.map(o => [o.date, o.order_count || 0]) || []);

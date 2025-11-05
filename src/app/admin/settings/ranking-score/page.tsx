@@ -216,7 +216,7 @@ export default function RankingScoreSettingsPage() {
                 min="0"
               />
               <span className="text-sm text-gray-600">점</span>
-              <span className="text-xs text-gray-500 ml-2">(일요일~금요일 6일 연속 발주 시, 금요일에 가산)</span>
+              <span className="text-xs text-gray-500 ml-2">(일요일~금요일 6일 연속 발주 시, 토요일에 가산)</span>
             </div>
 
             <div className="flex items-center gap-2">
