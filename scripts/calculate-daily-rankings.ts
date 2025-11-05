@@ -74,6 +74,22 @@ async function calculateDailyScores() {
 
   const yesterday = getYesterdayKST();
 
+  // 랭킹 점수 설정 조회
+  const { data: settings, error: settingsError } = await supabase
+    .from('ranking_score_settings')
+    .select('sales_per_point, orders_per_point')
+    .eq('id', '00000000-0000-0000-0000-000000000001')
+    .single();
+
+  if (settingsError) {
+    console.error('❌ 랭킹 점수 설정 조회 실패:', settingsError);
+    return { success: false };
+  }
+
+  const salesPerPoint = settings?.sales_per_point || 10000;
+  const ordersPerPoint = settings?.orders_per_point || 10;
+  console.log(`   - 설정: ${salesPerPoint}원당 1점, 1건당 ${ordersPerPoint}점`);
+
   // 어제 날짜의 모든 성과 데이터 가져오기
   const { data: performances, error } = await supabase
     .from('seller_performance_daily')
@@ -92,8 +108,8 @@ async function calculateDailyScores() {
 
   console.log(`   - 발견된 셀러: ${performances.length}명`);
 
-  // 점수 계산
-  const scores = calculateRankings(performances as SellerPerformanceData[]);
+  // 점수 계산 (설정값 전달)
+  const scores = calculateRankings(performances as SellerPerformanceData[], salesPerPoint, ordersPerPoint);
 
   // 점수 업데이트
   for (const score of scores) {
@@ -114,13 +130,18 @@ async function calculateDailyScores() {
   }
 
   console.log(`   ✅ ${scores.length}명의 점수 계산 완료`);
-  return { success: true, count: scores.length, scores };
+  return { success: true, count: scores.length, scores, salesPerPoint, ordersPerPoint };
 }
 
 /**
  * 2단계: 기간별 랭킹 생성 (일간/주간/월간)
  */
-async function generateRankings(periodType: 'daily' | 'weekly' | 'monthly', scores: SellerScore[]) {
+async function generateRankings(
+  periodType: 'daily' | 'weekly' | 'monthly',
+  scores: SellerScore[],
+  salesPerPoint: number,
+  ordersPerPoint: number
+) {
   console.log(`\n📈 랭킹 생성 중 (${periodType})...`);
 
   const today = getTodayKST();
@@ -174,8 +195,8 @@ async function generateRankings(periodType: 'daily' | 'weekly' | 'monthly', scor
     seller.activity_score = (seller.activity_score || 0) + (p.activity_score || 0);
   });
 
-  // 점수 계산 및 순위 부여
-  const rankingScores = calculateRankings(Array.from(sellerMap.values()));
+  // 점수 계산 및 순위 부여 (설정값 전달)
+  const rankingScores = calculateRankings(Array.from(sellerMap.values()), salesPerPoint, ordersPerPoint);
 
   // seller_rankings에 저장
   for (const score of rankingScores) {
@@ -308,16 +329,16 @@ async function main() {
 
   try {
     // 1. 일일 점수 계산
-    const { success: step1Success, scores } = await calculateDailyScores();
+    const { success: step1Success, scores, salesPerPoint, ordersPerPoint } = await calculateDailyScores();
     if (!step1Success) {
       throw new Error('일일 점수 계산 실패');
     }
 
     // 2. 랭킹 생성 (일간/주간/월간)
     if (scores && scores.length > 0) {
-      await generateRankings('daily', scores);
-      await generateRankings('weekly', scores);
-      await generateRankings('monthly', scores);
+      await generateRankings('daily', scores, salesPerPoint || 10000, ordersPerPoint || 10);
+      await generateRankings('weekly', scores, salesPerPoint || 10000, ordersPerPoint || 10);
+      await generateRankings('monthly', scores, salesPerPoint || 10000, ordersPerPoint || 10);
     }
 
     // 3. 배지 부여
