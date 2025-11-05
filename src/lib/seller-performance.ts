@@ -359,7 +359,7 @@ async function getLastBusinessDayOfMonth(date: string): Promise<string> {
 /**
  * 주간/월간 연속 발주 보너스 계산 및 업데이트
  * 주간: 일요일~금요일 6일 연속 발주 시, 토요일에 보너스 가산
- * 월간: 해당 월 영업일에 모두 발주 시, 월의 마지막 영업일에 보너스 가산
+ * 월간: 1일~마지막일까지 토요일 제외한 모든 날에 발주 시, 다음달 1일에 보너스 가산
  */
 export async function trackConsecutiveOrder(sellerId: string) {
   try {
@@ -418,41 +418,43 @@ export async function trackConsecutiveOrder(sellerId: string) {
       }
     }
 
-    // 월간 보너스 체크
+    // 월간 보너스 체크 (토요일 제외한 모든 날 발주 시, 다음달 1일에 가산)
     let monthlyBonusPoints = 0;
-    const lastBusinessDayOfMonth = await getLastBusinessDayOfMonth(today);
 
-    if (today === lastBusinessDayOfMonth) {
-      // 오늘이 해당 월의 마지막 영업일인 경우, 월간 연속발주 체크
-      const monthStart = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
-      const monthStartStr = monthStart.toISOString().split('T')[0];
+    if (todayDate.getDate() === 1) {
+      // 오늘이 1일인 경우, 지난 달 토요일을 제외한 모든 날 연속발주 체크
+      const lastMonth = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1);
+      const lastMonthStart = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
+      const lastMonthEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
 
-      // 이번 달 영업일 목록 생성
-      const businessDaysThisMonth: string[] = [];
-      const monthEnd = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
+      const lastMonthStartStr = lastMonthStart.toISOString().split('T')[0];
+      const lastMonthEndStr = lastMonthEnd.toISOString().split('T')[0];
 
-      for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+      // 지난 달 토요일 제외한 모든 날 목록 생성
+      const daysLastMonth: string[] = [];
+      for (let d = new Date(lastMonthStart); d <= lastMonthEnd; d.setDate(d.getDate() + 1)) {
         const dateStr = d.toISOString().split('T')[0];
+        const dayOfWeek = d.getDay();
 
-        if (dateStr > today) break;
-        if (await isBusinessDay(dateStr)) {
-          businessDaysThisMonth.push(dateStr);
+        // 토요일(6) 제외
+        if (dayOfWeek !== 6) {
+          daysLastMonth.push(dateStr);
         }
       }
 
-      // 이번 달 영업일 발주 기록 조회
+      // 지난 달 발주 기록 조회
       const { data: monthOrders } = await supabase
         .from('seller_performance_daily')
         .select('date, order_count')
         .eq('seller_id', sellerId)
-        .gte('date', monthStartStr)
-        .lte('date', today);
+        .gte('date', lastMonthStartStr)
+        .lte('date', lastMonthEndStr);
 
-      // 모든 영업일에 발주가 있는지 확인
+      // 토요일 제외한 모든 날에 발주가 있는지 확인
       const ordersMap = new Map(monthOrders?.map(o => [o.date, o.order_count || 0]) || []);
-      const allDaysHaveOrders = businessDaysThisMonth.every(day => (ordersMap.get(day) || 0) > 0);
+      const allDaysHaveOrders = daysLastMonth.every(day => (ordersMap.get(day) || 0) > 0);
 
-      if (allDaysHaveOrders && businessDaysThisMonth.length > 0) {
+      if (allDaysHaveOrders && daysLastMonth.length > 0) {
         monthlyBonusPoints = monthlyBonus;
       }
     }

@@ -230,7 +230,7 @@ export default function RankingScoreSettingsPage() {
                 min="0"
               />
               <span className="text-sm text-gray-600">점</span>
-              <span className="text-xs text-gray-500 ml-2">(매월 영업일 빠짐없이 발주 시, 월의 마지막 영업일에 가산)</span>
+              <span className="text-xs text-gray-500 ml-2">(1일~마지막일 토요일 제외한 모든 날 발주 시, 다음달 1일에 가산)</span>
             </div>
           </div>
         </div>

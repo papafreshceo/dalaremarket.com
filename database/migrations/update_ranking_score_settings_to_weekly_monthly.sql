@@ -13,7 +13,7 @@ ADD COLUMN IF NOT EXISTS monthly_consecutive_bonus INTEGER NOT NULL DEFAULT 500;
 
 -- 코멘트 업데이트
 COMMENT ON COLUMN ranking_score_settings.weekly_consecutive_bonus IS '주간 연속발주 보너스 (일요일~금요일 6일 연속 발주 시, 토요일 가산)';
-COMMENT ON COLUMN ranking_score_settings.monthly_consecutive_bonus IS '월간 연속발주 보너스 (영업일 빠짐없이 발주 시, 월말 가산)';
+COMMENT ON COLUMN ranking_score_settings.monthly_consecutive_bonus IS '월간 연속발주 보너스 (1일~마지막일 토요일 제외한 모든 날 발주 시, 다음달 1일 가산)';
 
 -- 기존 데이터 초기화
 UPDATE ranking_score_settings
