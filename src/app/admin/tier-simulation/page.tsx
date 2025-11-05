@@ -104,7 +104,7 @@ export default function TierSimulationPage() {
   const [results, setResults] = useState<SimulationResult[]>([]);
   const [showDetailedSettings, setShowDetailedSettings] = useState(false);
 
-  const calculateAccumulatedPoints = (totalDays: number, totalMonths: number, daysPerMonth: number, hasConsecutive: boolean, daysPerWeek: number): { total: number; breakdown: { base: number; milestones: number; consecutive: number; monthly: number } } => {
+  const calculateAccumulatedPoints = (totalDays: number, totalMonths: number, daysPerMonth: number, hasConsecutive: boolean): { total: number; breakdown: { base: number; milestones: number; consecutive: number; monthly: number } } => {
     let basePoints = totalDays * pointsPerDay;
     let milestonePoints = 0;
     let consecutivePoints = 0;
@@ -116,7 +116,7 @@ export default function TierSimulationPage() {
       }
     });
 
-    if (hasConsecutive && daysPerWeek === 5) {
+    if (hasConsecutive) {
       consecutiveBonuses.forEach(bonus => {
         if (bonus.enabled && totalDays >= bonus.days) {
           consecutivePoints += bonus.bonus;
@@ -172,7 +172,7 @@ export default function TierSimulationPage() {
 
     for (let month = 1; month <= 120; month++) {
       const accumulatedDays = Math.round(daysPerMonth * month);
-      const pointsData = calculateAccumulatedPoints(accumulatedDays, month, daysPerMonth, hasConsecutiveStreak, daysPerWeek);
+      const pointsData = calculateAccumulatedPoints(accumulatedDays, month, daysPerMonth, hasConsecutiveStreak);
 
       const tierByExisting = checkTierByExisting(monthlyOrders, monthlySales);
       const tierByPoints = checkTierByPoints(pointsData.total);
@@ -377,7 +377,7 @@ export default function TierSimulationPage() {
                 연속성 보너스
               </h3>
               <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
-                (주5일만 적용)
+                (연속 발주 시 적용)
               </p>
               {consecutiveBonuses.map((bonus, index) => (
                 <div key={index} style={{ marginBottom: '6px', display: 'flex', gap: '4px', alignItems: 'center' }}>
@@ -479,14 +479,7 @@ export default function TierSimulationPage() {
               <input
                 type="number"
                 value={simulationInput.daysPerWeek}
-                onChange={(e) => {
-                  const newDays = parseInt(e.target.value) || 0;
-                  setSimulationInput({
-                    ...simulationInput,
-                    daysPerWeek: newDays,
-                    hasConsecutiveStreak: newDays === 5 ? simulationInput.hasConsecutiveStreak : false
-                  });
-                }}
+                onChange={(e) => setSimulationInput({ ...simulationInput, daysPerWeek: parseInt(e.target.value) || 0 })}
                 style={{ width: '100%', padding: '6px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px' }}
               />
               <p style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}>
@@ -519,22 +512,19 @@ export default function TierSimulationPage() {
             </div>
 
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: simulationInput.daysPerWeek === 5 ? 'pointer' : 'not-allowed', opacity: simulationInput.daysPerWeek === 5 ? 1 : 0.5 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
-                  checked={simulationInput.hasConsecutiveStreak && simulationInput.daysPerWeek === 5}
-                  disabled={simulationInput.daysPerWeek !== 5}
+                  checked={simulationInput.hasConsecutiveStreak}
                   onChange={(e) => setSimulationInput({ ...simulationInput, hasConsecutiveStreak: e.target.checked })}
-                  style={{ width: '14px', height: '14px', cursor: simulationInput.daysPerWeek === 5 ? 'pointer' : 'not-allowed' }}
+                  style={{ width: '14px', height: '14px', cursor: 'pointer' }}
                 />
                 <span style={{ fontSize: '12px', fontWeight: '600' }}>
                   연속성 보너스 적용
                 </span>
               </label>
-              <p style={{ fontSize: '10px', color: simulationInput.daysPerWeek === 5 ? '#6b7280' : '#ef4444', marginTop: '2px', marginLeft: '20px' }}>
-                {simulationInput.daysPerWeek === 5
-                  ? '주5일 연속 발주'
-                  : '⚠️ 주5일만 가능'}
+              <p style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px', marginLeft: '20px' }}>
+                설정한 발주일수만큼 연속 발주 시 보너스 적용
               </p>
             </div>
 
