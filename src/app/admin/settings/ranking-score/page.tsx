@@ -29,6 +29,11 @@ interface UISettings {
   login_points: number;
 }
 
+interface RewardSetting {
+  rank: number;
+  reward_cash: number;
+}
+
 export default function RankingScoreSettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -48,8 +53,30 @@ export default function RankingScoreSettingsPage() {
     login_points: 3
   });
 
+  const [weeklyRewards, setWeeklyRewards] = useState<RewardSetting[]>([
+    { rank: 1, reward_cash: 100000 },
+    { rank: 2, reward_cash: 50000 },
+    { rank: 3, reward_cash: 30000 },
+    { rank: 4, reward_cash: 20000 },
+    { rank: 5, reward_cash: 10000 }
+  ]);
+
+  const [monthlyRewards, setMonthlyRewards] = useState<RewardSetting[]>([
+    { rank: 1, reward_cash: 500000 },
+    { rank: 2, reward_cash: 300000 },
+    { rank: 3, reward_cash: 200000 },
+    { rank: 4, reward_cash: 150000 },
+    { rank: 5, reward_cash: 100000 },
+    { rank: 6, reward_cash: 80000 },
+    { rank: 7, reward_cash: 60000 },
+    { rank: 8, reward_cash: 50000 },
+    { rank: 9, reward_cash: 40000 },
+    { rank: 10, reward_cash: 30000 }
+  ]);
+
   useEffect(() => {
     fetchSettings();
+    fetchRewards();
   }, []);
 
   const fetchSettings = async () => {
@@ -82,6 +109,29 @@ export default function RankingScoreSettingsPage() {
       toast.error('설정 조회 중 오류 발생');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRewards = async () => {
+    try {
+      const response = await fetch('/api/admin/ranking-rewards');
+      const result = await response.json();
+
+      if (result.success && result.rewards) {
+        const weekly = result.rewards.filter((r: any) => r.period_type === 'weekly')
+          .sort((a: any, b: any) => a.rank - b.rank);
+        const monthly = result.rewards.filter((r: any) => r.period_type === 'monthly')
+          .sort((a: any, b: any) => a.rank - b.rank);
+
+        if (weekly.length > 0) {
+          setWeeklyRewards(weekly.map((r: any) => ({ rank: r.rank, reward_cash: r.reward_cash })));
+        }
+        if (monthly.length > 0) {
+          setMonthlyRewards(monthly.map((r: any) => ({ rank: r.rank, reward_cash: r.reward_cash })));
+        }
+      }
+    } catch (error) {
+      console.error('보상 설정 조회 오류:', error);
     }
   };
 
@@ -138,6 +188,66 @@ export default function RankingScoreSettingsPage() {
 
   const formatNumber = (value: number) => {
     return value.toLocaleString();
+  };
+
+  const handleRewardChange = (type: 'weekly' | 'monthly', rank: number, value: string) => {
+    const numValue = parseInt(value.replace(/,/g, '')) || 0;
+    if (type === 'weekly') {
+      setWeeklyRewards(prev =>
+        prev.map(r => r.rank === rank ? { ...r, reward_cash: numValue } : r)
+      );
+    } else {
+      setMonthlyRewards(prev =>
+        prev.map(r => r.rank === rank ? { ...r, reward_cash: numValue } : r)
+      );
+    }
+  };
+
+  const addRewardRank = (type: 'weekly' | 'monthly') => {
+    if (type === 'weekly') {
+      const maxRank = Math.max(...weeklyRewards.map(r => r.rank), 0);
+      setWeeklyRewards([...weeklyRewards, { rank: maxRank + 1, reward_cash: 0 }]);
+    } else {
+      const maxRank = Math.max(...monthlyRewards.map(r => r.rank), 0);
+      setMonthlyRewards([...monthlyRewards, { rank: maxRank + 1, reward_cash: 0 }]);
+    }
+  };
+
+  const removeRewardRank = (type: 'weekly' | 'monthly', rank: number) => {
+    if (type === 'weekly') {
+      setWeeklyRewards(prev => prev.filter(r => r.rank !== rank));
+    } else {
+      setMonthlyRewards(prev => prev.filter(r => r.rank !== rank));
+    }
+  };
+
+  const handleSaveRewards = async () => {
+    setSaving(true);
+    try {
+      const allRewards = [
+        ...weeklyRewards.map(r => ({ period_type: 'weekly', rank: r.rank, reward_cash: r.reward_cash })),
+        ...monthlyRewards.map(r => ({ period_type: 'monthly', rank: r.rank, reward_cash: r.reward_cash }))
+      ];
+
+      const response = await fetch('/api/admin/ranking-rewards', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rewards: allRewards })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success('보상 설정이 저장되었습니다');
+      } else {
+        toast.error(result.error || '보상 설정 저장 실패');
+      }
+    } catch (error) {
+      console.error('보상 설정 저장 오류:', error);
+      toast.error('보상 설정 저장 중 오류 발생');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -318,14 +428,139 @@ export default function RankingScoreSettingsPage() {
           </div>
         </div>
 
+        {/* 랭킹 보상 설정 */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-bold mb-4">랭킹 보상 캐시 설정</h2>
+          <p className="text-sm text-gray-600 mb-6">
+            주간 랭킹은 토요일에, 월간 랭킹은 다음달 1일에 확정 및 보상 지급됩니다.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* 주간 랭킹 보상 */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">주간 랭킹 (토요일 확정)</h3>
+                <button
+                  onClick={() => addRewardRank('weekly')}
+                  className="text-sm px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                >
+                  + 순위 추가
+                </button>
+              </div>
+              <table className="w-full border">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border px-3 py-2 text-sm">순위</th>
+                    <th className="border px-3 py-2 text-sm">보상 금액</th>
+                    <th className="border px-3 py-2 text-sm w-16">삭제</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {weeklyRewards.map((reward) => (
+                    <tr key={reward.rank}>
+                      <td className="border px-3 py-2 text-center font-medium">{reward.rank}위</td>
+                      <td className="border px-3 py-2">
+                        <input
+                          type="text"
+                          value={formatNumber(reward.reward_cash)}
+                          onChange={(e) => handleRewardChange('weekly', reward.rank, e.target.value)}
+                          className="w-full px-2 py-1 border rounded text-right"
+                        />
+                      </td>
+                      <td className="border px-3 py-2 text-center">
+                        <button
+                          onClick={() => removeRewardRank('weekly', reward.rank)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-gray-50">
+                  <tr>
+                    <td className="border px-3 py-2 font-bold">합계</td>
+                    <td className="border px-3 py-2 text-right font-bold">
+                      {formatNumber(weeklyRewards.reduce((sum, r) => sum + r.reward_cash, 0))}원
+                    </td>
+                    <td className="border"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* 월간 랭킹 보상 */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">월간 랭킹 (다음달 1일 확정)</h3>
+                <button
+                  onClick={() => addRewardRank('monthly')}
+                  className="text-sm px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                >
+                  + 순위 추가
+                </button>
+              </div>
+              <table className="w-full border">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border px-3 py-2 text-sm">순위</th>
+                    <th className="border px-3 py-2 text-sm">보상 금액</th>
+                    <th className="border px-3 py-2 text-sm w-16">삭제</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyRewards.map((reward) => (
+                    <tr key={reward.rank}>
+                      <td className="border px-3 py-2 text-center font-medium">{reward.rank}위</td>
+                      <td className="border px-3 py-2">
+                        <input
+                          type="text"
+                          value={formatNumber(reward.reward_cash)}
+                          onChange={(e) => handleRewardChange('monthly', reward.rank, e.target.value)}
+                          className="w-full px-2 py-1 border rounded text-right"
+                        />
+                      </td>
+                      <td className="border px-3 py-2 text-center">
+                        <button
+                          onClick={() => removeRewardRank('monthly', reward.rank)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-gray-50">
+                  <tr>
+                    <td className="border px-3 py-2 font-bold">합계</td>
+                    <td className="border px-3 py-2 text-right font-bold">
+                      {formatNumber(monthlyRewards.reduce((sum, r) => sum + r.reward_cash, 0))}원
+                    </td>
+                    <td className="border"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
         {/* 저장 버튼 */}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3">
           <button
             onClick={handleSave}
             disabled={saving}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
           >
-            {saving ? '저장 중...' : '설정 저장'}
+            {saving ? '저장 중...' : '점수 설정 저장'}
+          </button>
+          <button
+            onClick={handleSaveRewards}
+            disabled={saving}
+            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
+          >
+            {saving ? '저장 중...' : '보상 설정 저장'}
           </button>
         </div>
       </div>
