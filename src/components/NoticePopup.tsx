@@ -25,11 +25,11 @@ export function NoticePopup() {
 
   const loadPopupNotices = async () => {
     try {
-      // 팝업으로 설정되고 공개된 공지사항만 조회
+      // 고정되고 공개된 공지사항만 조회 (platform_notices 테이블 사용)
       const { data, error } = await supabase
-        .from('notices')
+        .from('platform_notices')
         .select('id, title, content, category, created_at')
-        .eq('is_popup', true)
+        .eq('is_pinned', true)  // is_popup 대신 is_pinned 사용
         .eq('published', true)
         .order('created_at', { ascending: false });
 
