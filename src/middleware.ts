@@ -32,6 +32,15 @@ export async function middleware(request: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession()
   const pathname = request.nextUrl.pathname
 
+  // 디버깅: 관리자 페이지 접근 시 세션 확인
+  if (pathname.startsWith('/admin')) {
+    console.log('[Middleware] Admin page access:', {
+      pathname,
+      hasSession: !!session,
+      userId: session?.user?.id
+    })
+  }
+
   // 공개 페이지 (로그인 없이 접근 가능)
   const publicPaths = [
     '/',
@@ -74,11 +83,21 @@ export async function middleware(request: NextRequest) {
   }
 
   // 세션이 있으면 사용자 정보 확인
-  const { data: userData } = await supabase
+  const { data: userData, error: userError } = await supabase
     .from('users')
     .select('role, approved')
     .eq('id', session.user.id)
     .single()
+
+  // 디버깅: 사용자 데이터 확인
+  if (pathname.startsWith('/admin')) {
+    console.log('[Middleware] User data:', {
+      userData,
+      userError,
+      role: userData?.role,
+      approved: userData?.approved
+    })
+  }
 
   // 승인되지 않은 사용자
   if (!userData?.approved) {
