@@ -146,7 +146,8 @@
       "Bash(npm run build:*)",
       "Bash(rm:*)",
       "Bash(npm audit:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(npx knip:*)"
     ],
     "deny": [],
     "ask": []
