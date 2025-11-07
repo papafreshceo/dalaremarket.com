@@ -6,7 +6,7 @@ import { HeadingPlugin } from '@udecode/plate-heading/react';
 import { BlockquotePlugin } from '@udecode/plate-block-quote/react';
 import { BulletedListPlugin, NumberedListPlugin, ListItemPlugin } from '@udecode/plate-list/react';
 import { LinkPlugin } from '@udecode/plate-link/react';
-import { ParagraphPlugin } from '@udecode/plate-common';
+import { ParagraphPlugin } from '@udecode/plate-common/react';
 import { useCallback, useState } from 'react';
 
 interface PlateEditorProps {
