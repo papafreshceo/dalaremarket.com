@@ -27,7 +27,7 @@ export function NoticePopup() {
     try {
       // 팝업으로 설정되고 공개된 공지사항만 조회
       const { data, error } = await supabase
-        .from('platform_notices')
+        .from('notices')
         .select('id, title, content, category, created_at')
         .eq('is_popup', true)
         .eq('published', true)
