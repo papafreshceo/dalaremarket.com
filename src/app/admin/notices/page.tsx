@@ -89,10 +89,16 @@ export default function AdminNoticesPage() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}.${month}.${day}`;
+    // 한국 시간대로 명시적 변환
+    return date.toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).replace(/\. /g, '.').replace(/\.$/, '');
   };
 
   return (
@@ -203,7 +209,7 @@ export default function AdminNoticesPage() {
                     fontSize: '14px',
                     fontWeight: '600',
                     color: '#374151',
-                    width: '120px'
+                    width: '160px'
                   }}>작성일</th>
                   <th style={{
                     padding: '12px',
