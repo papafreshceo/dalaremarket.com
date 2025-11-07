@@ -63,32 +63,26 @@ export default function AdminLayout({
     const originalBackground = document.body.style.background;
     document.body.style.background = 'var(--color-background)';
 
-    // 파비콘 변경 (한 번만, 안전하게)
-    try {
-      const existingFavicons = Array.from(document.querySelectorAll("link[rel*='icon']"));
-      existingFavicons.forEach(el => {
-        try {
-          if (el && el.parentNode) {
-            el.parentNode.removeChild(el);
-          }
-        } catch (e) {
-          // 이미 제거된 경우 무시
-        }
-      });
+    // 파비콘 변경 (href만 변경, DOM 조작 최소화)
+    let faviconLink = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
 
-      const link = document.createElement('link');
-      link.rel = 'icon';
-      link.type = 'image/png';
-      link.href = `/admin-favicon.png?v=${Date.now()}`;
-      document.head.appendChild(link);
-    } catch (error) {
-      console.error('Favicon update error:', error);
+    if (!faviconLink) {
+      faviconLink = document.createElement('link');
+      faviconLink.rel = 'icon';
+      faviconLink.type = 'image/png';
+      document.head.appendChild(faviconLink);
     }
 
+    const originalFavicon = faviconLink.href;
+    faviconLink.href = `/admin-favicon.png?v=${Date.now()}`;
+
     return () => {
-      // 페이지 떠날 때 원래 배경으로 복원
+      // 페이지 떠날 때 원래 배경과 파비콘 복원
       if (document.body) {
         document.body.style.background = originalBackground;
+      }
+      if (faviconLink && originalFavicon) {
+        faviconLink.href = originalFavicon;
       }
     };
   }, []);
