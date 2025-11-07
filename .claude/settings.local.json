@@ -147,7 +147,8 @@
       "Bash(rm:*)",
       "Bash(npm audit:*)",
       "Bash(test:*)",
-      "Bash(npx knip:*)"
+      "Bash(npx knip:*)",
+      "Bash(if exist check-notices-table.js del /f check-notices-table.js)"
     ],
     "deny": [],
     "ask": []

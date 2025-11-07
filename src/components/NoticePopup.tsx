@@ -25,12 +25,12 @@ export function NoticePopup() {
 
   const loadPopupNotices = async () => {
     try {
-      // 중요하고 공개된 공지사항만 조회 (notices 테이블 사용)
+      // 팝업으로 설정되고 공개된 공지사항만 조회
       const { data, error } = await supabase
         .from('notices')
         .select('id, title, content, category, created_at')
-        .eq('is_important', true)  // 중요 공지를 팝업으로 표시
-        .eq('is_public', true)      // 공개된 공지만
+        .eq('is_popup', true)
+        .eq('published', true)
         .order('created_at', { ascending: false });
 
       if (error) {
