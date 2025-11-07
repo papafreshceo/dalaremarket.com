@@ -78,11 +78,18 @@ export default function AdminLayout({
 
     return () => {
       // 페이지 떠날 때 원래 배경과 파비콘 복원
-      if (document.body) {
-        document.body.style.background = originalBackground;
-      }
-      if (faviconLink && originalFavicon) {
-        faviconLink.href = originalFavicon;
+      // DOM이 아직 존재하는지 확인 후 복원
+      try {
+        if (document.body) {
+          document.body.style.background = originalBackground;
+        }
+        // faviconLink가 여전히 DOM에 연결되어 있는지 확인
+        if (faviconLink && originalFavicon && document.head.contains(faviconLink)) {
+          faviconLink.href = originalFavicon;
+        }
+      } catch (error) {
+        // DOM이 이미 정리된 경우 무시
+        console.log('Favicon cleanup skipped: DOM already unmounted');
       }
     };
   }, []);
