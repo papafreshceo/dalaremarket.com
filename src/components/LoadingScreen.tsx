@@ -30,7 +30,8 @@ export default function LoadingScreen({ isLoading }: LoadingScreenProps) {
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 248, 255, 0.98) 100%)',
+        backdropFilter: 'blur(20px)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -40,57 +41,72 @@ export default function LoadingScreen({ isLoading }: LoadingScreenProps) {
         transition: 'opacity 0.5s ease-out',
       }}
     >
-      {/* 로고 */}
+      {/* 유리 효과 카드 */}
       <div
-        className="animate-pulse"
         style={{
-          animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          background: 'rgba(255, 255, 255, 0.7)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '24px',
+          padding: '48px 64px',
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+          border: '1px solid rgba(255, 255, 255, 0.18)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
         }}
       >
-        <Image
-          src="/logo.png"
-          alt="달래마켓"
-          width={200}
-          height={60}
-          priority
+        {/* 로고 */}
+        <div
+          className="animate-pulse"
           style={{
-            filter: 'brightness(0) invert(1)', // 흰색으로 변환
+            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
           }}
-        />
-      </div>
+        >
+          <Image
+            src="/DalraeMarket_loge_trans.png"
+            alt="달래마켓"
+            width={240}
+            height={80}
+            priority
+            style={{
+              objectFit: 'contain',
+            }}
+          />
+        </div>
 
-      {/* 로딩 텍스트 */}
-      <div
-        style={{
-          marginTop: '32px',
-          color: '#ffffff',
-          fontSize: '18px',
-          fontWeight: '600',
-          letterSpacing: '0.05em',
-        }}
-      >
-        데이터를 불러오는 중...
-      </div>
-
-      {/* 로딩 바 */}
-      <div
-        style={{
-          marginTop: '24px',
-          width: '300px',
-          height: '4px',
-          background: 'rgba(255, 255, 255, 0.2)',
-          borderRadius: '2px',
-          overflow: 'hidden',
-        }}
-      >
+        {/* 로딩 텍스트 */}
         <div
           style={{
-            width: '100%',
-            height: '100%',
-            background: 'linear-gradient(90deg, transparent, #ffffff, transparent)',
-            animation: 'shimmer 1.5s infinite',
+            marginTop: '32px',
+            color: '#1a202c',
+            fontSize: '18px',
+            fontWeight: '600',
+            letterSpacing: '0.05em',
           }}
-        />
+        >
+          데이터를 불러오는 중...
+        </div>
+
+        {/* 로딩 바 */}
+        <div
+          style={{
+            marginTop: '24px',
+            width: '300px',
+            height: '4px',
+            background: 'rgba(66, 153, 225, 0.2)',
+            borderRadius: '2px',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(90deg, transparent, #4299e1, transparent)',
+              animation: 'shimmer 1.5s infinite',
+            }}
+          />
+        </div>
       </div>
 
       {/* 애니메이션 키프레임 */}

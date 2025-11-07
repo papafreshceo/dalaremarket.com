@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-// import ToolModal from '@/legacy/dalraemarket/src/components/tools/ToolModal';
+import ToolModal from '@/components/tools/ToolModal';
 
 interface Category {
   id: string;
@@ -789,13 +789,13 @@ export default function ToolsPage() {
         </div>
       </div>
 
-      {/* 도구 모달 - Legacy 제거로 임시 비활성화 */}
-      {/* <ToolModal
+      {/* 도구 모달 */}
+      <ToolModal
         isOpen={modalOpen}
         onClose={handleCloseModal}
         toolId={selectedTool?.id}
         toolName={selectedTool?.name}
-      /> */}
+      />
     </>
   );
 }
