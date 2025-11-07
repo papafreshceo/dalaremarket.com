@@ -16,7 +16,7 @@ import {
   createListPlugin,
   createTodoListPlugin,
 } from '@udecode/plate-list';
-import { createImagePlugin } from '@udecode/plate-image';
+import { createImagePlugin } from '@udecode/plate-media';
 import { createTablePlugin } from '@udecode/plate-table';
 import { createHorizontalRulePlugin } from '@udecode/plate-horizontal-rule';
 import { createAlignPlugin } from '@udecode/plate-alignment';

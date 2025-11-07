@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AnnouncementEditor } from '@/components/editor/AnnouncementEditor';
+// import { AnnouncementEditor } from '@/components/editor/AnnouncementEditor'; // Temporarily disabled
 
 export default function CreateAnnouncementPage() {
   const router = useRouter();
@@ -58,12 +58,8 @@ export default function CreateAnnouncementPage() {
   const renderPreview = () => {
     if (!formData.content) return <p style={{ color: '#9ca3af' }}>내용을 입력하면 미리보기가 표시됩니다.</p>;
 
-    try {
-      const content = JSON.parse(formData.content);
-      return <div dangerouslySetInnerHTML={{ __html: convertToHTML(content) }} />;
-    } catch {
-      return <p>미리보기를 생성할 수 없습니다.</p>;
-    }
+    // Simple text preview (not HTML)
+    return <div style={{ whiteSpace: 'pre-wrap' }}>{formData.content}</div>;
   };
 
   return (
@@ -221,10 +217,23 @@ export default function CreateAnnouncementPage() {
               내용 <span style={{ color: '#ef4444' }}>*</span>
             </label>
             {!showPreview ? (
-              <AnnouncementEditor
+              <textarea
                 value={formData.content}
-                onChange={(value) => setFormData({ ...formData, content: value })}
+                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                 placeholder="공지사항 내용을 입력하세요..."
+                style={{
+                  width: '100%',
+                  minHeight: '400px',
+                  padding: '16px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  resize: 'vertical'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
               />
             ) : (
               <div style={{
@@ -334,45 +343,4 @@ export default function CreateAnnouncementPage() {
       </form>
     </div>
   );
-}
-
-// Helper function to convert Plate JSON to HTML
-function convertToHTML(nodes: any[]): string {
-  return nodes.map((node) => {
-    if (node.text !== undefined) {
-      let text = node.text;
-      if (node.bold) text = `<strong>${text}</strong>`;
-      if (node.italic) text = `<em>${text}</em>`;
-      if (node.underline) text = `<u>${text}</u>`;
-      if (node.strikethrough) text = `<s>${text}</s>`;
-      if (node.code) text = `<code>${text}</code>`;
-      return text;
-    }
-
-    const children = node.children?.map((child: any) => convertToHTML([child])).join('') || '';
-
-    switch (node.type) {
-      case 'h1':
-        return `<h1>${children}</h1>`;
-      case 'h2':
-        return `<h2>${children}</h2>`;
-      case 'h3':
-        return `<h3>${children}</h3>`;
-      case 'ul':
-        return `<ul>${children}</ul>`;
-      case 'ol':
-        return `<ol>${children}</ol>`;
-      case 'li':
-        return `<li>${children}</li>`;
-      case 'img':
-        return `<img src="${node.url}" alt="" style="max-width: 100%; height: auto;" />`;
-      case 'a':
-        return `<a href="${node.url}" target="_blank" rel="noopener noreferrer">${children}</a>`;
-      case 'hr':
-        return `<hr style="border: 0; border-top: 2px solid #e5e7eb; margin: 24px 0;" />`;
-      case 'p':
-      default:
-        return `<p>${children || '<br>'}</p>`;
-    }
-  }).join('');
 }

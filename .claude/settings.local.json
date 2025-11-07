@@ -142,7 +142,9 @@
       "Bash(npm view:*)",
       "Bash(npx shadcn@latest init)",
       "Bash(if exist apply-announcements-migration.js del /f apply-announcements-migration.js)",
-      "Bash(if exist apply-popup-migration.js del /f apply-popup-migration.js)"
+      "Bash(if exist apply-popup-migration.js del /f apply-popup-migration.js)",
+      "Bash(npm run build:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []
