@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback, memo, startTransition } from 'react'
 import { Button } from '@/components/ui'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import { createClient } from '@/lib/supabase/client'
 
 interface Column<T = any> {
@@ -1297,7 +1297,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     })
   }, [gridData, globalSearchTerm, columns])
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     // ID 컬럼이 있는지 확인
     const hasIdInColumns = columns.some(col => col.key === 'id')
     const hasIdInData = gridData.length > 0 && 'id' in gridData[0]
@@ -1313,32 +1313,49 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       exportColumns.map(col => row[col.key] ?? '')
     )
 
-    // 워크시트 생성
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...data])
+    // 워크북 생성
+    const wb = new ExcelJS.Workbook()
+    const ws = wb.addWorksheet('Sheet1')
+
+    // 헤더 추가
+    ws.addRow(headers)
+
+    // 데이터 추가
+    data.forEach(row => ws.addRow(row))
 
     // 컬럼 너비 자동 조정
-    const colWidths = exportColumns.map(col => ({
-      wch: Math.max(col.title.length * 2, 10)
-    }))
-    ws['!cols'] = colWidths
-
-    // 워크북 생성
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1')
+    exportColumns.forEach((col, index) => {
+      const column = ws.getColumn(index + 1)
+      column.width = Math.max(col.title.length * 2, 10)
+    })
 
     // 파일 다운로드
     const dateStr = new Date().toISOString().split('T')[0]
-    XLSX.writeFile(wb, `${exportFilePrefix}_${dateStr}.xlsx`)
+    const buffer = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${exportFilePrefix}_${dateStr}.xlsx`
+    a.click()
+    window.URL.revokeObjectURL(url)
   }
 
   const importFromExcel = async (file: File, mode: 'replace' | 'merge' = 'replace') => {
     const reader = new FileReader()
     reader.onload = async (e) => {
       const data = e.target?.result
-      const workbook = XLSX.read(data, { type: 'binary', WTF: true })
-      const sheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[sheetName]
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
+      const workbook = new ExcelJS.Workbook()
+      await workbook.xlsx.load(data as ArrayBuffer)
+      const worksheet = workbook.worksheets[0]
+      const jsonData: any[][] = []
+      worksheet.eachRow((row) => {
+        const rowValues: any[] = []
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          rowValues.push(cell.value)
+        })
+        jsonData.push(rowValues)
+      })
 
       if (jsonData.length < 2) {
         alert('데이터가 없습니다.')

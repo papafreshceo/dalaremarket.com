@@ -1,5 +1,6 @@
 'use client';
 
+import DOMPurify from 'isomorphic-dompurify';
 import { usePlateEditor, Plate, PlateContent, ParagraphPlugin } from 'platejs/react';
 import {
   BoldPlugin,
@@ -693,7 +694,7 @@ export function NoticeEditor({ value, onChange, placeholder = '내용을 입력�
           lineHeight: '1.6',
         }}>
           {value ? (
-            <div dangerouslySetInnerHTML={{ __html: value }} />
+            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(value) }} />
           ) : (
             <p style={{ color: '#9ca3af' }}>내용을 입력하면 미리보기가 표시됩니다.</p>
           )}

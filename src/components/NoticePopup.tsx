@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import DOMPurify from 'isomorphic-dompurify';
 
 interface Notice {
   id: number;
@@ -195,7 +196,7 @@ export function NoticePopup() {
           }}
         >
           <div
-            dangerouslySetInnerHTML={{ __html: currentNotice.content }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentNotice.content) }}
             style={{
               fontSize: '14px',
               lineHeight: '1.6',

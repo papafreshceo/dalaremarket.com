@@ -6,7 +6,7 @@ import { Card, Button, Modal } from '@/components/ui'
 import { useToast } from '@/components/ui/Toast'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 
 interface CategorySetting {
   id: string
@@ -373,7 +373,7 @@ export default function CategorySettingsPage() {
         <div className="flex gap-2">
           {/* 엑셀 다운로드 버튼 */}
           <button
-            onClick={() => {
+            onClick={async () => {
               // 데이터를 엑셀 형식으로 변환
               const excelData = categories.map(cat => ({
                 'ID': cat.id,
@@ -385,10 +385,28 @@ export default function CategorySettingsPage() {
                 '비고': cat.notes || ''
               }))
 
-              const worksheet = XLSX.utils.json_to_sheet(excelData)
-              const workbook = XLSX.utils.book_new()
-              XLSX.utils.book_append_sheet(workbook, worksheet, '카테고리설정')
-              XLSX.writeFile(workbook, `카테고리설정_${new Date().toISOString().split('T')[0]}.xlsx`)
+              const workbook = new ExcelJS.Workbook()
+              const worksheet = workbook.addWorksheet('카테고리설정')
+
+              // Add headers
+              const headers = Object.keys(excelData[0] || {})
+              worksheet.addRow(headers)
+
+              // Add data
+              excelData.forEach(row => {
+                worksheet.addRow(Object.values(row))
+              })
+
+              // Download file
+              const buffer = await workbook.xlsx.writeBuffer()
+              const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+              const url = window.URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `카테고리설정_${new Date().toISOString().split('T')[0]}.xlsx`
+              a.click()
+              window.URL.revokeObjectURL(url)
+
               showToast('엑셀 다운로드 완료', 'success')
             }}
             className="p-2 text-sm border border-blue-500 text-blue-600 rounded hover:bg-blue-50 transition-colors"
@@ -412,10 +430,25 @@ export default function CategorySettingsPage() {
                 const reader = new FileReader()
                 reader.onload = async (e) => {
                   const data = e.target?.result
-                  const workbook = XLSX.read(data, { type: 'binary', cellDates: true, WTF: true })
-                  const sheetName = workbook.SheetNames[0]
-                  const worksheet = workbook.Sheets[sheetName]
-                  const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: null })
+                  const workbook = new ExcelJS.Workbook()
+                  await workbook.xlsx.load(data as ArrayBuffer)
+                  const worksheet = workbook.worksheets[0]
+                  const jsonData: any[] = []
+
+                  worksheet.eachRow((row, rowNumber) => {
+                    if (rowNumber === 1) return // Skip header row
+                    const rowData: any = {}
+                    const headers = worksheet.getRow(1).values as any[]
+                    row.eachCell((cell, colNumber) => {
+                      const header = headers[colNumber]
+                      if (header) {
+                        rowData[header] = cell.value === null ? null : cell.value
+                      }
+                    })
+                    if (Object.keys(rowData).length > 0) {
+                      jsonData.push(rowData)
+                    }
+                  })
 
                   // 한글 헤더를 영문으로 매핑
                   const reverseFieldMapping: Record<string, string> = {
@@ -454,7 +487,7 @@ export default function CategorySettingsPage() {
                   // 모달 열기 (교체/병합 선택)
                   setExcelUploadModal({ data: cleanData, mode: null })
                 }
-                reader.readAsBinaryString(file)
+                reader.readAsArrayBuffer(file)
               }
               input.click()
             }}

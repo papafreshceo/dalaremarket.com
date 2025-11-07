@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileSpreadsheet, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import toast from 'react-hot-toast';
 import { getCurrentTimeUTC } from '@/lib/date';
 import { showStatusToast, showErrorToast } from '../utils/statusToast';
@@ -156,15 +156,18 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
           const data = await file.arrayBuffer();
 
           // 파일 읽기 (복호화된 파일이므로 비밀번호 불필요)
-          const workbook = XLSX.read(data, {
-            type: 'array'
-          });
+          const workbook = new ExcelJS.Workbook();
+          await workbook.xlsx.load(data);
 
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const firstSheet = workbook.worksheets[0];
 
           // 헤더 행 감지
-          const allData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
-          const firstDataRow = allData[0] || [];
+          const firstDataRow: any[] = [];
+          const headerRow = firstSheet.getRow(1);
+          headerRow.eachCell((cell, colNumber) => {
+            firstDataRow[colNumber - 1] = cell.value;
+          });
+
           const headerObj: any = {};
           firstDataRow.forEach((header: any, index: number) => {
             headerObj[header] = index;
@@ -175,12 +178,13 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
           const marketName = template?.market_name || '알 수 없음';
 
           // 주문 건수 계산
-          const headerRowIndex = (template?.header_row || 1) - 1;
-          const dataRows = XLSX.utils.sheet_to_json(firstSheet, {
-            range: headerRowIndex,
-            defval: null
+          const headerRowIndex = (template?.header_row || 1);
+          let orderCount = 0;
+          firstSheet.eachRow((row, rowNumber) => {
+            if (rowNumber > headerRowIndex) {
+              orderCount++;
+            }
           });
-          const orderCount = dataRows.length;
 
           // 파일이 오늘 수정되었는지 확인
           const today = new Date();
@@ -352,10 +356,9 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       for (const filePreview of uploadedFiles) {
         const arrayBuffer = await filePreview.file.arrayBuffer();
 
-        const workbook = XLSX.read(arrayBuffer, {
-          type: 'array'
-        });
-        const sheetName = workbook.SheetNames[0];
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(arrayBuffer);
+        const sheetName = workbook.worksheets[0].name;
 
         const orders = await processSheetAndReturnOrders(workbook, sheetName, filePreview.file.name);
         allOrders.push(...orders);
@@ -477,8 +480,8 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
   };
 
   // 시트 처리하고 주문 데이터 반환
-  const processSheetAndReturnOrders = async (workbook: XLSX.WorkBook, sheetName: string, fileName: string = 'unknown'): Promise<SellerUploadedOrder[]> => {
-    const worksheet = workbook.Sheets[sheetName];
+  const processSheetAndReturnOrders = async (workbook: ExcelJS.Workbook, sheetName: string, fileName: string = 'unknown'): Promise<SellerUploadedOrder[]> => {
+    const worksheet = workbook.worksheets[0];
 
     // 마켓 템플릿과 필드 매핑 병렬 로드
     const [templates, mappings] = await Promise.all([
@@ -489,8 +492,12 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
     console.log('📋 Loaded mappings:', mappings.size);
 
     // 첫 번째 행을 헤더로 읽기 (마켓 감지용)
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-    const firstDataRow = rawData[0] || [];
+    const firstDataRow: any[] = [];
+    const headerRow = worksheet.getRow(1);
+    headerRow.eachCell((cell, colNumber) => {
+      firstDataRow[colNumber - 1] = cell.value;
+    });
+
     const headerObj: any = {};
     firstDataRow.forEach((header: any, index: number) => {
       headerObj[header] = index;
@@ -517,12 +524,23 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
 
     console.log('✓ 마켓 매핑:', marketMapping);
 
-    // 헤더 행 기준으로 데이터 읽기 (header_row는 1-based, sheet_to_json range는 0-based)
-    const headerRowIndex = (detected.header_row || 1) - 1;
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-      range: headerRowIndex,
-      defval: null
-    }) as any[];
+    // 헤더 행 기준으로 데이터 읽기
+    const headerRowIndex = (detected.header_row || 1);
+    const jsonData: any[] = [];
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber <= headerRowIndex) return; // Skip header row
+      const rowData: any = {};
+      row.eachCell((cell, colNumber) => {
+        const header = worksheet.getRow(headerRowIndex).getCell(colNumber).value;
+        if (header) {
+          rowData[String(header)] = cell.value;
+        }
+      });
+      if (Object.keys(rowData).length > 0) {
+        jsonData.push(rowData);
+      }
+    });
 
     console.log(`📊 읽은 데이터 행 수: ${jsonData.length}`);
 

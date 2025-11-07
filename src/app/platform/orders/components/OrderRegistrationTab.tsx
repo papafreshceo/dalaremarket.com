@@ -6,7 +6,6 @@ import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import DatePicker from '@/components/ui/DatePicker';
 import { Modal } from '@/components/ui/Modal';
 import { Download, Upload, RefreshCw } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC, formatDateTimeForDisplay } from '@/lib/date';

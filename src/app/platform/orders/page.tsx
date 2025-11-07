@@ -19,7 +19,7 @@ import MappingResultModal from './modals/MappingResultModal';
 import { LocalThemeToggle } from './components/LocalThemeToggle';
 import PWAInstallBanner from './components/PWAInstallBanner';
 import TierBadge from '@/components/TierBadge';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { validateRequiredColumns } from './utils/validation';
 import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC } from '@/lib/date';
@@ -608,10 +608,25 @@ function OrdersPageContent() {
     reader.onload = async (e) => {
       try {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary', WTF: true });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(data as ArrayBuffer);
+        const worksheet = workbook.worksheets[0];
+        const jsonData: any[] = [];
+
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return; // Skip header row
+          const rowData: any = {};
+          const headers = worksheet.getRow(1).values as any[];
+          row.eachCell((cell, colNumber) => {
+            const header = headers[colNumber];
+            if (header) {
+              rowData[header] = cell.value;
+            }
+          });
+          if (Object.keys(rowData).length > 0) {
+            jsonData.push(rowData);
+          }
+        });
 
 
         // 필수 칼럼 검증
@@ -743,7 +758,7 @@ function OrdersPageContent() {
         });
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const handleSaveValidatedOrders = async (validatedOrders: any[]) => {

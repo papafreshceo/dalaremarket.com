@@ -3,10 +3,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileSpreadsheet, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC } from '@/lib/date';
 import PasswordModal from './PasswordModal';
+import DOMPurify from 'isomorphic-dompurify';
 
 interface UploadedOrder {
   id?: number;
@@ -748,14 +749,22 @@ export default function ExcelTab() {
           };
 
           const data = await file.arrayBuffer();
-          const workbook = XLSX.read(data, { type: 'array', cellDates: true, WTF: true });
+          const workbook = new ExcelJS.Workbook();
+          await workbook.xlsx.load(data);
 
           // console.error 복원
           console.error = originalError;
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const firstSheet = workbook.worksheets[0];
 
           // 헤더 행 감지를 위해 먼저 읽기
-          const allData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
+          const allData: any[][] = [];
+          firstSheet.eachRow((row) => {
+            const rowValues: any[] = [];
+            row.eachCell({ includeEmpty: true }, (cell) => {
+              rowValues.push(cell.value);
+            });
+            allData.push(rowValues);
+          });
 
           // 첫 번째 데이터 행으로 템플릿 감지
           const firstDataRow = allData[0] || [];
@@ -775,12 +784,8 @@ export default function ExcelTab() {
           }
 
           // 주문 건수 계산 (실제 데이터 행 개수 - 헤더와 동일한 방식으로)
-          const headerRowIndex = (template?.header_row || 1) - 1;
-          const dataRows = XLSX.utils.sheet_to_json(firstSheet, {
-            range: headerRowIndex,
-            defval: null
-          });
-          const orderCount = dataRows.length;
+          const headerRowIndex = (template?.header_row || 1);
+          const orderCount = firstSheet.rowCount - headerRowIndex;
 
           // 파일이 오늘 수정되었는지 확인
           const today = new Date();
@@ -957,21 +962,32 @@ export default function ExcelTab() {
         };
 
         const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true, WTF: true });
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(data);
 
         // console.error 복원
         console.error = originalError;
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const firstSheet = workbook.worksheets[0];
 
         let jsonData: any[];
 
         if (template) {
           // 템플릿이 있으면 헤더 행 고려
-          const headerRowIndex = (template.header_row || 1) - 1;
-          jsonData = XLSX.utils.sheet_to_json(firstSheet, {
-            range: headerRowIndex,
-            defval: null
-          }) as any[];
+          const headerRowIndex = template.header_row || 1;
+          jsonData = [];
+          const headers: any[] = [];
+          firstSheet.getRow(headerRowIndex).eachCell((cell) => {
+            headers.push(cell.value);
+          });
+          firstSheet.eachRow((row, rowNumber) => {
+            if (rowNumber <= headerRowIndex) return;
+            const rowData: any = {};
+            row.eachCell((cell, colNumber) => {
+              const header = headers[colNumber - 1];
+              if (header) rowData[header] = cell.value;
+            });
+            jsonData.push(rowData);
+          });
 
           // 마켓별 필드 매핑 정보 가져오기
           const marketMapping = marketFieldMappings.get(template.market_name.toLowerCase());
@@ -1016,7 +1032,20 @@ export default function ExcelTab() {
 
         } else {
           // 템플릿이 없으면 기존 방식 (fallback)
-          jsonData = XLSX.utils.sheet_to_json(firstSheet) as any[];
+          jsonData = [];
+          const headers: any[] = [];
+          firstSheet.getRow(1).eachCell((cell) => {
+            headers.push(cell.value);
+          });
+          firstSheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const rowData: any = {};
+            row.eachCell((cell, colNumber) => {
+              const header = headers[colNumber - 1];
+              if (header) rowData[header] = cell.value;
+            });
+            jsonData.push(rowData);
+          });
 
           const marketName = filePreview.marketName;
 
@@ -2022,7 +2051,7 @@ export default function ExcelTab() {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">{resultMessage.title}</h3>
             <div
               className="text-gray-700 mb-6"
-              dangerouslySetInnerHTML={{ __html: resultMessage.content }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(resultMessage.content) }}
             />
             <button
               onClick={() => setShowResultModal(false)}

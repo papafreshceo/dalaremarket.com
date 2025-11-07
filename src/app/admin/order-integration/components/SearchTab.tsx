@@ -5,7 +5,6 @@ import { Download, RefreshCw } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import { Modal } from '@/components/ui/Modal';
 import ModelessWindow from '@/components/ModelessWindow';
-import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { formatDateTimeForDisplay } from '@/lib/date';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -910,7 +909,7 @@ export default function SearchTab() {
   };
 
   // 엑셀 다운로드
-  const handleExcelDownload = () => {
+  const handleExcelDownload = async () => {
     if (orders.length === 0) {
       alert('다운로드할 데이터가 없습니다.');
       return;
@@ -938,12 +937,23 @@ export default function SearchTab() {
       메모: order.memo || '',
     }));
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '주문조회');
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('주문조회');
+
+    if (exportData.length > 0) {
+      ws.addRow(Object.keys(exportData[0]));
+      exportData.forEach(row => ws.addRow(Object.values(row)));
+    }
 
     const fileName = `주문조회_${filters.startDate}_${filters.endDate}.xlsx`;
-    XLSX.writeFile(wb, fileName);
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   // 데이터 저장 핸들러
@@ -2124,12 +2134,23 @@ export default function SearchTab() {
         발송일: order.shipped_date || '',
       }));
 
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, sellerId);
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet(sellerId);
+
+      if (exportData.length > 0) {
+        ws.addRow(Object.keys(exportData[0]));
+        exportData.forEach(row => ws.addRow(Object.values(row)));
+      }
 
       const fileName = `${sellerId}_발송목록_${new Date().toISOString().split('T')[0]}.xlsx`;
-      XLSX.writeFile(wb, fileName);
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('셀러 엑셀 다운로드 실패:', error);
       alert('셀러 엑셀 다운로드 중 오류가 발생했습니다.');
@@ -2158,10 +2179,23 @@ export default function SearchTab() {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary', cellDates: true, WTF: true });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(data as ArrayBuffer);
+        const worksheet = workbook.worksheets[0];
+        const jsonData: any[] = [];
+        const headers: any[] = [];
+        worksheet.getRow(1).eachCell((cell) => {
+          headers.push(cell.value);
+        });
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const rowData: any = {};
+          row.eachCell((cell, colNumber) => {
+            const header = headers[colNumber - 1];
+            if (header) rowData[header] = cell.value;
+          });
+          jsonData.push(rowData);
+        });
 
         console.log('📊 엑셀에서 읽은 전체 행 수:', jsonData.length);
         console.log('📋 첫 번째 행 데이터:', jsonData[0]);
@@ -2352,10 +2386,23 @@ export default function SearchTab() {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary', cellDates: true, WTF: true });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(data as ArrayBuffer);
+        const worksheet = workbook.worksheets[0];
+        const jsonData: any[] = [];
+        const headers: any[] = [];
+        worksheet.getRow(1).eachCell((cell) => {
+          headers.push(cell.value);
+        });
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const rowData: any = {};
+          row.eachCell((cell, colNumber) => {
+            const header = headers[colNumber - 1];
+            if (header) rowData[header] = cell.value;
+          });
+          jsonData.push(rowData);
+        });
 
         console.log('📊 엑셀에서 읽은 전체 행 수:', jsonData.length);
         console.log('📋 첫 번째 행 데이터:', jsonData[0]);

@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button, Modal } from '@/components/ui'
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 import { useToast } from '@/components/ui/Toast'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { inheritRawMaterialToOptionProducts } from '@/lib/inheritance-utils'
 
@@ -460,7 +460,7 @@ export default function RawMaterialsManagementPage() {
   }
 
   // 엑셀 다운로드
-  const handleExcelDownload = () => {
+  const handleExcelDownload = async () => {
     // 현재 필터링된 데이터 사용
     const exportData = filteredMaterials.map(m => ({
       '원물코드': m.material_code,
@@ -484,12 +484,23 @@ export default function RawMaterialsManagementPage() {
       '컬러코드': m.color_code || ''
     }))
 
-    const ws = XLSX.utils.json_to_sheet(exportData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '원물관리')
+    const wb = new ExcelJS.Workbook()
+    const ws = wb.addWorksheet('원물관리')
+
+    if (exportData.length > 0) {
+      ws.addRow(Object.keys(exportData[0]))
+      exportData.forEach(row => ws.addRow(Object.values(row)))
+    }
 
     const fileName = `원물관리_${new Date().toISOString().split('T')[0]}.xlsx`
-    XLSX.writeFile(wb, fileName)
+    const buffer = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    a.click()
+    window.URL.revokeObjectURL(url)
   }
 
   // 엑셀 업로드 (1단계: 분석 및 프리뷰)
@@ -500,11 +511,24 @@ export default function RawMaterialsManagementPage() {
     const reader = new FileReader()
     reader.onload = async (evt) => {
       try {
-        const data = new Uint8Array(evt.target?.result as ArrayBuffer)
-        const workbook = XLSX.read(data, { type: 'array', WTF: true })
-        const sheetName = workbook.SheetNames[0]
-        const worksheet = workbook.Sheets[sheetName]
-        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[]
+        const data = evt.target?.result as ArrayBuffer
+        const workbook = new ExcelJS.Workbook()
+        await workbook.xlsx.load(data)
+        const worksheet = workbook.worksheets[0]
+        const jsonData: any[] = []
+        const headers: any[] = []
+        worksheet.getRow(1).eachCell((cell) => {
+          headers.push(cell.value)
+        })
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return
+          const rowData: any = {}
+          row.eachCell((cell, colNumber) => {
+            const header = headers[colNumber - 1]
+            if (header) rowData[header] = cell.value
+          })
+          jsonData.push(rowData)
+        })
 
         // 기존 DB 원물코드 세트
         const existingCodes = new Set(materials.map(m => m.material_code))
@@ -1391,7 +1415,7 @@ export default function RawMaterialsManagementPage() {
         {/* 메뉴 버튼들 - 아웃라인 */}
         <div className="flex gap-2">
           <button
-            onClick={() => {
+            onClick={async () => {
               // 필드명을 한글로 매핑
               const fieldMapping: Record<string, string> = {
                 'id': 'ID',
@@ -1433,11 +1457,23 @@ export default function RawMaterialsManagementPage() {
                 return koreanData
               })
 
-              const ws = XLSX.utils.json_to_sheet(exportData)
-              const wb = XLSX.utils.book_new()
-              XLSX.utils.book_append_sheet(wb, ws, '원물관리')
+              const wb = new ExcelJS.Workbook()
+              const ws = wb.addWorksheet('원물관리')
+
+              if (exportData.length > 0) {
+                ws.addRow(Object.keys(exportData[0]))
+                exportData.forEach(row => ws.addRow(Object.values(row)))
+              }
+
               const dateStr = new Date().toISOString().split('T')[0]
-              XLSX.writeFile(wb, `원물관리_${dateStr}.xlsx`)
+              const buffer = await wb.xlsx.writeBuffer()
+              const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+              const url = window.URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `원물관리_${dateStr}.xlsx`
+              a.click()
+              window.URL.revokeObjectURL(url)
             }}
             className="p-2 text-sm border border-blue-500 text-blue-600 rounded hover:bg-blue-50 transition-colors"
             title="엑셀 다운로드"
@@ -1458,15 +1494,27 @@ export default function RawMaterialsManagementPage() {
                 const reader = new FileReader()
                 reader.onload = async (e) => {
                   const data = e.target?.result
-                  const workbook = XLSX.read(data, { type: 'binary', cellDates: true, WTF: true })
-                  const sheetName = workbook.SheetNames[0]
-                  const worksheet = workbook.Sheets[sheetName]
+                  const workbook = new ExcelJS.Workbook()
+                  await workbook.xlsx.load(data as ArrayBuffer)
+                  const worksheet = workbook.worksheets[0]
 
                   // 엑셀 시트의 범위 확인
-                  const range = worksheet['!ref']
-                  console.log('📄 엑셀 시트 범위:', range)
+                  console.log('📄 엑셀 시트 범위:', worksheet.rowCount, 'x', worksheet.columnCount)
 
-                  const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: null })
+                  const jsonData: any[] = []
+                  const headers: any[] = []
+                  worksheet.getRow(1).eachCell((cell) => {
+                    headers.push(cell.value)
+                  })
+                  worksheet.eachRow((row, rowNumber) => {
+                    if (rowNumber === 1) return
+                    const rowData: any = {}
+                    row.eachCell((cell, colNumber) => {
+                      const header = headers[colNumber - 1]
+                      if (header) rowData[header] = cell.value
+                    })
+                    jsonData.push(rowData)
+                  })
 
                   console.log('📊 엑셀 원본 데이터 개수:', jsonData.length)
 
@@ -1627,7 +1675,7 @@ export default function RawMaterialsManagementPage() {
                   // 모달 열기 (교체/병합 선택)
                   setExcelUploadModal({ data: cleanData, mode: null })
                 }
-                reader.readAsBinaryString(file)
+                reader.readAsArrayBuffer(file)
               }
               input.click()
             }}

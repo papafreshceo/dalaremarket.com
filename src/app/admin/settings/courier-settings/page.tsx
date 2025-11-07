@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Save, Copy, ArrowUp, ArrowDown, Upload } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 interface ColumnMapping {
   order: number;
@@ -511,10 +511,25 @@ export default function CourierSettingsPage() {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(data as ArrayBuffer);
+        const worksheet = workbook.worksheets[0];
+        const jsonData: any[] = [];
+
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return; // Skip header row
+          const rowData: any = {};
+          const headers = worksheet.getRow(1).values as any[];
+          row.eachCell((cell, colNumber) => {
+            const header = headers[colNumber];
+            if (header) {
+              rowData[header] = cell.value;
+            }
+          });
+          if (Object.keys(rowData).length > 0) {
+            jsonData.push(rowData);
+          }
+        });
 
         if (jsonData.length === 0) {
           alert('엑셀 파일에 데이터가 없습니다.');
@@ -539,7 +554,7 @@ export default function CourierSettingsPage() {
         await processInvoiceData(jsonData);
       };
 
-      reader.readAsBinaryString(uploadFile);
+      reader.readAsArrayBuffer(uploadFile);
     } catch (error) {
       console.error('파일 처리 오류:', error);
       alert('파일 처리 중 오류가 발생했습니다.');
@@ -642,15 +657,30 @@ export default function CourierSettingsPage() {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(data as ArrayBuffer);
+        const worksheet = workbook.worksheets[0];
+        const jsonData: any[] = [];
+
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return; // Skip header row
+          const rowData: any = {};
+          const headers = worksheet.getRow(1).values as any[];
+          row.eachCell((cell, colNumber) => {
+            const header = headers[colNumber];
+            if (header) {
+              rowData[header] = cell.value;
+            }
+          });
+          if (Object.keys(rowData).length > 0) {
+            jsonData.push(rowData);
+          }
+        });
 
         await processInvoiceData(jsonData);
       };
 
-      reader.readAsBinaryString(uploadFile);
+      reader.readAsArrayBuffer(uploadFile);
     } catch (error) {
       console.error('파일 처리 오류:', error);
       alert('파일 처리 중 오류가 발생했습니다.');

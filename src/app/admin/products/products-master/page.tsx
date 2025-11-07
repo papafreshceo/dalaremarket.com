@@ -6,7 +6,7 @@ import { Card, Button, Modal } from '@/components/ui'
 import { useToast } from '@/components/ui/Toast'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 
 interface ProductMaster {
   id: string
@@ -543,7 +543,7 @@ export default function ProductsMasterPage() {
     }
   ]
 
-  const handleExcelDownload = () => {
+  const handleExcelDownload = async () => {
     const excelData = products.map(prod => ({
       'ID': prod.id,
       '대분류': prod.category_1 || '',
@@ -564,10 +564,28 @@ export default function ProductsMasterPage() {
       '활성화': prod.is_active ? 'Y' : 'N'
     }))
 
-    const worksheet = XLSX.utils.json_to_sheet(excelData)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, '품목마스터')
-    XLSX.writeFile(workbook, `품목마스터_${new Date().toISOString().split('T')[0]}.xlsx`)
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet('품목마스터')
+
+    // Add headers
+    const headers = Object.keys(excelData[0] || {})
+    worksheet.addRow(headers)
+
+    // Add data
+    excelData.forEach(row => {
+      worksheet.addRow(Object.values(row))
+    })
+
+    // Download file
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `품목마스터_${new Date().toISOString().split('T')[0]}.xlsx`
+    a.click()
+    window.URL.revokeObjectURL(url)
+
     showToast('엑셀 다운로드 완료', 'success')
   }
 

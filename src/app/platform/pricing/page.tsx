@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import DOMPurify from 'isomorphic-dompurify';
 
 interface PlanLimits {
   [featureId: string]: string;
@@ -443,7 +444,7 @@ export default function PricingPage() {
                     {feature.circle3 && <circle cx={feature.circle3.split(',')[0]} cy={feature.circle3.split(',')[1]} r={feature.circle3.split(',')[2]}/>}
                     {feature.circle4 && <circle cx={feature.circle4.split(',')[0]} cy={feature.circle4.split(',')[1]} r={feature.circle4.split(',')[2]}/>}
                   </svg>
-                  <span dangerouslySetInnerHTML={{ __html: feature.text + (planLimits.starter[feature.id] ? ' ' + planLimits.starter[feature.id] : '') }} />
+                  <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(feature.text + (planLimits.starter[feature.id] ? ' ' + planLimits.starter[feature.id] : '')) }} />
                 </li>
               ))}
             </ul>
@@ -561,9 +562,9 @@ export default function PricingPage() {
                     {feature.circle4 && <circle cx={feature.circle4.split(',')[0]} cy={feature.circle4.split(',')[1]} r={feature.circle4.split(',')[2]}/>}
                   </svg>
                   <span dangerouslySetInnerHTML={{
-                    __html: feature.id === 'discount'
+                    __html: DOMPurify.sanitize(feature.id === 'discount'
                       ? `공급가 ${planLimits.pro[feature.id]}`
-                      : feature.text + (planLimits.pro[feature.id] ? ' ' + planLimits.pro[feature.id] : '')
+                      : feature.text + (planLimits.pro[feature.id] ? ' ' + planLimits.pro[feature.id] : ''))
                   }} />
                 </li>
               ))}
@@ -684,7 +685,7 @@ export default function PricingPage() {
                       {feature.circle3 && <circle cx={feature.circle3.split(',')[0]} cy={feature.circle3.split(',')[1]} r={feature.circle3.split(',')[2]}/>}
                       {feature.circle4 && <circle cx={feature.circle4.split(',')[0]} cy={feature.circle4.split(',')[1]} r={feature.circle4.split(',')[2]}/>}
                     </svg>
-                    <span dangerouslySetInnerHTML={{ __html: displayText }} />
+                    <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(displayText) }} />
                   </li>
                 );
               })}

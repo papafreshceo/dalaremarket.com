@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button, Modal } from '@/components/ui'
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid'
 import { useToast } from '@/components/ui/Toast'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 
 // ===== 타입 =====
 interface OptionProduct {
@@ -1312,7 +1312,7 @@ export default function OptionProductsManagementPage() {
         {/* 엑셀 버튼 */}
         <div className="flex gap-2">
           <button
-            onClick={() => {
+            onClick={async () => {
               // 가상 필드 제거 (프론트엔드에서 추가한 필드들)
               const virtualFields = [
                 'vendor_name', 'used_material_1', 'used_material_2', 'used_material_3',
@@ -1377,11 +1377,23 @@ export default function OptionProductsManagementPage() {
                 alert(`엑셀 헤더 (총 ${headers.length}개):\n${headers.slice(0, 10).join('\n')}\n...`)
               }
 
-              const ws = XLSX.utils.json_to_sheet(exportData)
-              const wb = XLSX.utils.book_new()
-              XLSX.utils.book_append_sheet(wb, ws, '옵션상품관리')
+              const wb = new ExcelJS.Workbook()
+              const ws = wb.addWorksheet('옵션상품관리')
+
+              if (exportData.length > 0) {
+                ws.addRow(Object.keys(exportData[0]))
+                exportData.forEach(row => ws.addRow(Object.values(row)))
+              }
+
               const dateStr = new Date().toISOString().split('T')[0]
-              XLSX.writeFile(wb, `옵션상품관리_${dateStr}.xlsx`)
+              const buffer = await wb.xlsx.writeBuffer()
+              const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+              const url = window.URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `옵션상품관리_${dateStr}.xlsx`
+              a.click()
+              window.URL.revokeObjectURL(url)
             }}
             className="p-2 text-sm border border-blue-500 text-blue-600 rounded hover:bg-blue-50 transition-colors"
             title="엑셀 다운로드"
@@ -1402,15 +1414,27 @@ export default function OptionProductsManagementPage() {
                 const reader = new FileReader()
                 reader.onload = async (e) => {
                   const data = e.target?.result
-                  const workbook = XLSX.read(data, { type: 'binary', cellDates: true, WTF: true })
-                  const sheetName = workbook.SheetNames[0]
-                  const worksheet = workbook.Sheets[sheetName]
+                  const workbook = new ExcelJS.Workbook()
+                  await workbook.xlsx.load(data as ArrayBuffer)
+                  const worksheet = workbook.worksheets[0]
 
                   // 엑셀 시트의 범위 확인
-                  const range = worksheet['!ref']
-                  console.log('📄 엑셀 시트 범위:', range)
+                  console.log('📄 엑셀 시트 범위:', worksheet.rowCount, 'x', worksheet.columnCount)
 
-                  const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: null })
+                  const jsonData: any[] = []
+                  const headers: any[] = []
+                  worksheet.getRow(1).eachCell((cell) => {
+                    headers.push(cell.value)
+                  })
+                  worksheet.eachRow((row, rowNumber) => {
+                    if (rowNumber === 1) return
+                    const rowData: any = {}
+                    row.eachCell((cell, colNumber) => {
+                      const header = headers[colNumber - 1]
+                      if (header) rowData[header] = cell.value
+                    })
+                    jsonData.push(rowData)
+                  })
 
                   console.log('📊 엑셀 원본 데이터 개수:', jsonData.length)
 
@@ -1540,7 +1564,7 @@ export default function OptionProductsManagementPage() {
                   // 모달 열기 (교체/병합 선택)
                   setExcelUploadModal({ data: cleanData, mode: null })
                 }
-                reader.readAsBinaryString(file)
+                reader.readAsArrayBuffer(file)
               }
               input.click()
             }}
