@@ -818,7 +818,7 @@ export default function UserHeader() {
                 </div>
                 {(userRole === 'admin' || userRole === 'employee' || userRole === 'super_admin') && (
                   <button
-                    onClick={() => window.open('/admin/dashboard', '_blank')}
+                    onClick={() => router.push('/admin/dashboard')}
                     style={{
                       padding: '6px 12px',
                       background: '#10b981',
@@ -1067,7 +1067,7 @@ export default function UserHeader() {
                   </div>
                   {(userRole === 'admin' || userRole === 'employee' || userRole === 'super_admin') && (
                     <div
-                      onClick={() => { window.open('/admin/dashboard', '_blank'); setMobileMenuOpen(false); }}
+                      onClick={() => { router.push('/admin/dashboard'); setMobileMenuOpen(false); }}
                       style={{
                         padding: '8px 0',
                         fontSize: '15px',
