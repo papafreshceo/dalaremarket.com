@@ -87,8 +87,8 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // 로그인 성공
-      return NextResponse.redirect(new URL('/platform/dashboard', request.url))
+      // 로그인 성공 - 랜딩페이지로
+      return NextResponse.redirect(new URL('/', request.url))
     } else {
       // 신규 사용자 - 회원가입
       const { data: authData, error: signUpError } = await supabase.auth.signUp({

@@ -58,11 +58,11 @@ export async function middleware(request: NextRequest) {
         .eq('id', session.user.id)
         .single()
 
-      // 관리자/직원은 admin으로, 일반 사용자는 platform으로
+      // 관리자/직원은 admin으로, 일반 사용자는 랜딩페이지로
       if (userData?.role === 'admin' || userData?.role === 'super_admin' || userData?.role === 'employee') {
         return NextResponse.redirect(new URL('/admin/dashboard', request.url))
       } else {
-        return NextResponse.redirect(new URL('/platform/dashboard', request.url))
+        return NextResponse.redirect(new URL('/', request.url))
       }
     }
     return response
@@ -89,13 +89,13 @@ export async function middleware(request: NextRequest) {
 
   // 관리자 페이지 접근 제어
   if (pathname.startsWith('/admin')) {
-    const isAdminOrEmployee = userData.role === 'admin' || 
-                              userData.role === 'super_admin' || 
+    const isAdminOrEmployee = userData.role === 'admin' ||
+                              userData.role === 'super_admin' ||
                               userData.role === 'employee'
-    
+
     if (!isAdminOrEmployee) {
-      // 관리자가 아니면 platform으로
-      return NextResponse.redirect(new URL('/platform/dashboard', request.url))
+      // 관리자가 아니면 랜딩페이지로
+      return NextResponse.redirect(new URL('/', request.url))
     }
   }
 

@@ -43,7 +43,7 @@ export default function MobileBottomNav() {
       label: '공지사항'
     },
     {
-      path: '/platform/dashboard',
+      path: '/platform/mypage',
       label: '나의정보'
     }
   ];
