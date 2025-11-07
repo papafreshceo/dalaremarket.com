@@ -1,11 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/api-security';
 
 /**
  * POST /api/integrated-orders/soft-delete
  * 주문 소프트 삭제 (is_deleted = true)
  */
 export async function POST(request: NextRequest) {
+  // 🔒 보안: 관리자만 접근 가능
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const supabase = await createClient();
     const { ids } = await request.json();
@@ -17,18 +22,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 현재 사용자 정보 가져오기
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     // 소프트 삭제 업데이트
     const { data, error } = await supabase
       .from('integrated_orders')
       .update({
         is_deleted: true,
         deleted_at: new Date().toISOString(),
-        deleted_by: user?.id || null,
+        deleted_by: auth.user?.id || null,
       })
       .in('id', ids)
       .eq('is_deleted', false) // 이미 삭제된 건은 제외

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/api-security';
 
 export async function POST(request: NextRequest) {
+  // 🔒 보안: 인증된 사용자만 접근 가능
+  const auth = await requireAuth(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const { businessNumber } = await request.json();
 

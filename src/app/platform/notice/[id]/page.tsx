@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import DOMPurify from 'isomorphic-dompurify';
 
 interface Notice {
   id: number;
@@ -310,7 +311,7 @@ export default function NoticeDetailPage() {
             {/* 본문 */}
             <div
               className="notice-content"
-              dangerouslySetInnerHTML={{ __html: notice.content }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(notice.content) }}
             />
           </div>
 

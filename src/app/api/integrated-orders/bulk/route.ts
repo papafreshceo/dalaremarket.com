@@ -1,12 +1,17 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
+import { requireAdmin } from '@/lib/api-security';
 
 /**
  * POST /api/integrated-orders/bulk
  * 대량 주문 생성/업데이트 (UPSERT)
  */
 export async function POST(request: NextRequest) {
+  // 🔒 보안: 관리자만 접근 가능
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const supabase = await createClient();
     const { orders, overwriteDuplicates = false, skipDuplicateCheck = false } = await request.json();
@@ -258,6 +263,10 @@ export async function POST(request: NextRequest) {
  * 대량 주문 수정
  */
 export async function PUT(request: NextRequest) {
+  // 🔒 보안: 관리자만 접근 가능
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const supabase = await createClient();
     const { orders } = await request.json();
@@ -346,6 +355,10 @@ export async function PUT(request: NextRequest) {
  * 대량 주문 삭제
  */
 export async function DELETE(request: NextRequest) {
+  // 🔒 보안: 관리자만 접근 가능
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const supabase = await createClient();
     const { ids } = await request.json();

@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import cloudinary from '@/lib/cloudinary/config';
 import { createClient } from '@/lib/supabase/server';
 import crypto from 'crypto';
+import { requireAuth } from '@/lib/api-security';
 
 /**
  * POST /api/cloudinary/upload
  * Cloudinary에 이미지 업로드 후 DB에 메타데이터 저장
  */
 export async function POST(request: NextRequest) {
+  // 🔒 보안: 인증된 사용자만 파일 업로드 가능
+  const auth = await requireAuth(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -31,6 +36,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: '파일이 필요합니다.' },
         { status: 400 }
+      );
+    }
+
+    // 🔒 보안: 파일 타입 검증
+    const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return NextResponse.json(
+        { success: false, error: '허용되지 않는 파일 형식입니다. (jpg, png, webp, gif만 가능)' },
+        { status: 400 }
+      );
+    }
+
+    // 🔒 보안: 파일 크기 제한 (10MB)
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      return NextResponse.json(
+        { success: false, error: '파일 크기는 10MB 이하여야 합니다.' },
+        { status: 413 }
       );
     }
 

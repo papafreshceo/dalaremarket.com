@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/api-security';
 
 // 테마 목록 조회
 export async function GET(request: NextRequest) {
+  // 🔒 보안: 관리자만 접근 가능
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const supabase = await createClient();
 
@@ -34,6 +39,10 @@ export async function GET(request: NextRequest) {
 
 // 테마 생성
 export async function POST(request: NextRequest) {
+  // 🔒 보안: 관리자만 접근 가능
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const supabase = await createClient();
     const body = await request.json();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/api-security';
 
 /**
  * GET /api/cash/settings
@@ -43,21 +44,12 @@ export async function GET(request: NextRequest) {
  * 캐시 설정 수정 (관리자만)
  */
 export async function PUT(request: NextRequest) {
+  // 🔒 보안: 관리자만 접근 가능
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const supabase = await createClient();
-
-    // 현재 로그인한 사용자 확인
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: '인증이 필요합니다.' },
-        { status: 401 }
-      );
-    }
-
-    // TODO: 관리자 권한 확인 로직 추가
-    // 현재는 모든 로그인 사용자가 수정 가능 (나중에 관리자 체크 추가 필요)
 
     // 요청 본문 파싱
     const body = await request.json();
@@ -90,7 +82,7 @@ export async function PUT(request: NextRequest) {
           login_reward,
           activity_reward_per_minute,
           daily_activity_limit,
-          updated_by: user.id
+          updated_by: auth.user?.id
         })
         .eq('id', existingSettings.id);
 
@@ -109,7 +101,7 @@ export async function PUT(request: NextRequest) {
           login_reward,
           activity_reward_per_minute,
           daily_activity_limit,
-          updated_by: user.id
+          updated_by: auth.user?.id
         });
 
       if (insertError) {

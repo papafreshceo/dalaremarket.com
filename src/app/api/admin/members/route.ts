@@ -1,7 +1,12 @@
 import { createClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/api-security';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // 🔒 보안: 관리자만 회원 목록 조회 가능
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const supabase = await createClient();
 
@@ -70,7 +75,11 @@ export async function GET() {
   }
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
+  // 🔒 보안: 관리자만 회원 상태 변경 가능
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const supabase = await createClient();
     const body = await request.json();

@@ -144,7 +144,9 @@
       "Bash(if exist apply-announcements-migration.js del /f apply-announcements-migration.js)",
       "Bash(if exist apply-popup-migration.js del /f apply-popup-migration.js)",
       "Bash(npm run build:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npm audit:*)",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []

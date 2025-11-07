@@ -1,11 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/api-security';
 
 /**
  * GET /api/admin/promotional-images
  * 홍보 이미지 목록 조회 (Cloudinary 이미지 포함)
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // 🔒 보안: 관리자만 접근 가능
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const supabase = await createClient();
 
@@ -49,6 +54,10 @@ export async function GET() {
  * 홍보 이미지 생성
  */
 export async function POST(request: NextRequest) {
+  // 🔒 보안: 관리자만 접근 가능
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const supabase = await createClient();
     const body = await request.json();
@@ -91,6 +100,10 @@ export async function POST(request: NextRequest) {
  * 홍보 이미지 수정
  */
 export async function PUT(request: NextRequest) {
+  // 🔒 보안: 관리자만 접근 가능
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const supabase = await createClient();
     const body = await request.json();
@@ -136,6 +149,10 @@ export async function PUT(request: NextRequest) {
  * 홍보 이미지 삭제
  */
 export async function DELETE(request: NextRequest) {
+  // 🔒 보안: 관리자만 접근 가능
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
+
   try {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
