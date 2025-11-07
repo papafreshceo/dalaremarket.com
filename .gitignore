@@ -53,3 +53,14 @@ nul
 
 # Claude Code
 .claude/settings.local.json
+
+# Migration and test scripts (contain sensitive keys)
+apply-*.js
+check-*.js
+insert-*.js
+update-*.js
+create-*.js
+test-*.js
+find-*.js
+set-*.js
+database/migrations/*.js
