@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import DashboardTab from './components/DashboardTab';
 import { Order, StatusConfig } from './types';
@@ -33,7 +33,7 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = createClientComponentClient();
+      const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
@@ -67,7 +67,7 @@ export default function AdminDashboardPage() {
    */
   const fetchOrders = async () => {
     try {
-      const supabase = createClientComponentClient();
+      const supabase = createClient();
 
       // 모든 주문 조회 (seller_id 필터링 없음)
       const { data, error } = await supabase
