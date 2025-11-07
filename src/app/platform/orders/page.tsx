@@ -19,6 +19,7 @@ import MappingResultModal from './modals/MappingResultModal';
 import { LocalThemeToggle } from './components/LocalThemeToggle';
 import PWAInstallBanner from './components/PWAInstallBanner';
 import TierBadge from '@/components/TierBadge';
+import LoadingScreen from '@/components/LoadingScreen';
 import ExcelJS from 'exceljs';
 import { validateRequiredColumns } from './utils/validation';
 import toast, { Toaster } from 'react-hot-toast';
@@ -83,6 +84,9 @@ function OrdersPageContent() {
 
   // 샘플 모드 상태
   const [isSampleMode, setIsSampleMode] = useState(false);
+
+  // 초기 로딩 상태 (전체 화면 로딩 스크린용)
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   // 사용자별 테마 불러오기
   useEffect(() => {
@@ -483,8 +487,13 @@ function OrdersPageContent() {
     }));
 
     setOrders(convertedOrders);
+
+    // 초기 로딩 완료
+    setIsInitialLoading(false);
     } catch (error) {
       console.error('주문 조회 중 오류:', error);
+      // 에러가 발생해도 로딩 화면은 닫기
+      setIsInitialLoading(false);
     }
   };
 
@@ -898,13 +907,17 @@ function OrdersPageContent() {
     : null;
 
   return (
-    <div className="platform-orders-page" style={{
-      minHeight: '100vh',
-      width: '100%',
-      background: 'var(--color-background)'
-    }}>
-      {/* PWA 설치 안내 배너 */}
-      <PWAInstallBanner />
+    <>
+      {/* 전체 화면 로딩 스크린 */}
+      <LoadingScreen isLoading={isInitialLoading} />
+
+      <div className="platform-orders-page" style={{
+        minHeight: '100vh',
+        width: '100%',
+        background: 'var(--color-background)'
+      }}>
+        {/* PWA 설치 안내 배너 */}
+        <PWAInstallBanner />
 
       {/* 관리자 회원 전환 배너 */}
       {impersonateUser && (
@@ -1795,6 +1808,7 @@ function OrdersPageContent() {
         />
       </div>
     </div>
+  </>
   );
 }
 
