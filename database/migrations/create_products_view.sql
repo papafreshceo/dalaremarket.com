@@ -11,7 +11,6 @@ SELECT
   op.option_name,
   op.option_code,
   op.seller_supply_price,
-  op.market_price,
   op.shipping_entity,
   op.invoice_entity,
   op.shipping_vendor_id,
