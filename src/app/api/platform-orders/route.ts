@@ -14,6 +14,11 @@ import { generateSampleOrders, convertSampleOrdersToDBFormat } from '@/lib/sampl
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const { searchParams } = new URL(request.url);
+
+    // 날짜 필터 파라미터
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
 
     // impersonate 헤더 확인
     const impersonateUserId = request.headers.get('X-Impersonate-User-Id');
@@ -106,14 +111,33 @@ export async function GET(request: NextRequest) {
     console.log('[GET platform-orders] 주문 조회 시작:', {
       effectiveUserId,
       isImpersonate: !!impersonateUserId,
-      usingServiceRole: !!impersonateUserId
+      usingServiceRole: !!impersonateUserId,
+      startDate,
+      endDate
     });
 
-    const { data: orders, error: ordersError } = await dbClient
+    // 쿼리 빌더
+    let query = dbClient
       .from('integrated_orders')
       .select('*')
       .eq('seller_id', effectiveUserId)
-      .order('created_at', { ascending: false });
+      .eq('is_deleted', false);
+
+    // 날짜 필터 적용
+    if (startDate) {
+      query = query.gte('created_at', startDate);
+    }
+    if (endDate) {
+      // endDate는 해당 날짜의 23:59:59까지 포함
+      const endDateTime = new Date(endDate);
+      endDateTime.setHours(23, 59, 59, 999);
+      query = query.lte('created_at', endDateTime.toISOString());
+    }
+
+    // 정렬
+    query = query.order('created_at', { ascending: false });
+
+    const { data: orders, error: ordersError } = await query;
 
     if (ordersError) {
       console.error('[GET platform-orders] 주문 조회 오류:', ordersError);

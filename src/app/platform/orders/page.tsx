@@ -276,6 +276,14 @@ function OrdersPageContent() {
     init();
   }, []);
 
+  // 날짜 필터 변경 시 주문 다시 조회
+  useEffect(() => {
+    // 최초 로딩이 아닐 때만 실행 (userId가 설정된 후)
+    if (userId) {
+      fetchOrders();
+    }
+  }, [startDate, endDate, userId]);
+
   // 캐시 & 크레딧 잔액 조회 함수
   const fetchBalances = async (showRefillToast: boolean = true) => {
     // impersonate 사용자 정보 확인
@@ -385,8 +393,19 @@ function OrdersPageContent() {
       }
 
 
+      // API URL에 날짜 파라미터 추가
+      const params = new URLSearchParams();
+      if (startDate) {
+        params.append('startDate', startDate.toISOString());
+      }
+      if (endDate) {
+        params.append('endDate', endDate.toISOString());
+      }
+
+      const url = `/api/platform-orders${params.toString() ? `?${params.toString()}` : ''}`;
+
       // API를 통해 주문 조회 (샘플 모드 자동 처리)
-      const response = await fetch('/api/platform-orders', {
+      const response = await fetch(url, {
         cache: 'no-store',
         headers
       });
