@@ -48,163 +48,37 @@ export default function AllProductsPage() {
 
   useEffect(() => {
     fetchProducts();
-    fetchSupplyStatuses();
   }, []);
-
-  const fetchSupplyStatuses = async () => {
-    const { data, error } = await supabase
-      .from('supply_status_settings')
-      .select('code, name, color, display_order')
-      .eq('status_type', 'product') // 품목 마스터 상태 표시
-      .eq('is_active', true)
-      .order('display_order');
-
-
-    if (data) {
-      setSupplyStatuses(data);
-    }
-  };
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
 
-      // 1. option_products 조회
-      const { data: optionProducts, error: opError } = await supabase
-        .from('option_products')
-        .select('*')
-        .order('option_name', { ascending: true });
+      // API를 통해 한 번에 조회 (View 사용)
+      const response = await fetch('/api/products/all');
+      const { success, products: fetchedProducts, supplyStatuses: fetchedStatuses, error } = await response.json();
 
-      if (opError) {
-        console.error('상품 조회 오류:', opError);
+      if (!success) {
+        console.error('상품 조회 오류:', error);
         return;
       }
 
-      // 2. products_master 조회 (품목 정보 + 공급상태 + 셀러공급여부 + 배지정보 + 발송기한 + 시즌)
-      const { data: productsMaster, error: masterError } = await supabase
-        .from('products_master')
-        .select('id, category_1, category_2, category_3, category_4, supply_status, seller_supply, is_best, is_recommended, has_image, has_detail_page, shipping_deadline, season_start_date, season_end_date')
-        .eq('is_active', true)
-        .eq('seller_supply', true) // 셀러공급 품목만 조회
-        .not('category_4', 'is', null); // category_4(품목)가 있는 것만
-
-      if (masterError) {
-        console.error('품목 마스터 조회 오류:', masterError);
-      }
-
-      // 품목 마스터 ID -> 품목정보 맵핑 (product_master_id로 매칭)
-      const categoryMap = new Map(
-        (productsMaster || []).map(pm => [pm.id, {
-          id: pm.id,
-          category_1: pm.category_1,
-          category_2: pm.category_2,
-          category_3: pm.category_3,
-          category_4: pm.category_4,
-          supply_status: pm.supply_status,
-          is_best: pm.is_best,
-          is_recommended: pm.is_recommended,
-          has_image: pm.has_image,
-          has_detail_page: pm.has_detail_page,
-          shipping_deadline: pm.shipping_deadline,
-          season_start_date: pm.season_start_date,
-          season_end_date: pm.season_end_date
-        }])
-      );
-
-      // 품목 마스터 ID -> 품목명 맵핑 (대표이미지 매핑용)
-      const categoryIdToNameMap = new Map(
-        (productsMaster || []).map(pm => [pm.id, pm.category_4])
-      );
-
-      // 3. 대표이미지 조회 (옵션상품 기준 + 품목 기준)
-      const { data: representativeImages, error: imgError } = await supabase
-        .from('cloudinary_images')
-        .select('option_product_id, category_4_id, secure_url, is_representative')
-        .eq('is_representative', true);
-
-      if (imgError) {
-        console.error('대표이미지 조회 오류:', imgError);
-      }
-
-
-      // 4. 옵션상품별 대표이미지 맵핑 (option_product_id 기준)
-      const optionImageMap = new Map(
-        (representativeImages || [])
-          .filter(img => img.option_product_id)
-          .map(img => [img.option_product_id, img.secure_url])
-      );
-
-
-      // 5. 품목별 대표이미지 맵핑 (category_4_id -> category_4 이름으로 변환)
+      // 품목별 대표이미지 맵핑 (카드보기용)
       const newCategoryImageMap = new Map(
-        (representativeImages || [])
-          .filter(img => img.category_4_id)
-          .map(img => {
-            const categoryName = categoryIdToNameMap.get(img.category_4_id);
-            return [categoryName, img.secure_url];
-          })
-          .filter(([categoryName]) => categoryName) // 품목명이 있는 것만
+        (fetchedProducts || [])
+          .filter((p: any) => p.category_4 && p.category_thumbnail_url)
+          .map((p: any) => [p.category_4, p.category_thumbnail_url])
       );
 
-
-      // 상태로 저장 (카드보기에서 품목 썸네일 표시용)
       setCategoryImageMap(newCategoryImageMap);
+      setProducts(fetchedProducts || []);
+      setSupplyStatuses(fetchedStatuses || []);
 
-      // 6. 대표이미지 URL을 thumbnail_url로 매핑 및 셀러공급 필터링
-      // 우선순위: 1) 옵션상품 대표이미지 2) 품목 대표이미지
-      // 필터링 조건: 품목의 seller_supply=true AND 옵션상품의 seller_supply=true
-      const productsWithThumbnail = (optionProducts || [])
-        .map(product => {
-          // 옵션상품의 product_master_id로 품목 마스터 정보 찾기
-          const categoryInfo = categoryMap.get(product.product_master_id);
-          const category4Name = categoryInfo?.category_4;
-
-          // 썸네일 우선순위: 옵션상품 대표이미지 > 품목 대표이미지
-          const thumbnailUrl = optionImageMap.get(product.id) ||
-            (category4Name ? newCategoryImageMap.get(category4Name) : null) || null;
-
-          return {
-            ...product,
-            thumbnail_url: thumbnailUrl,
-            // 품목의 공급상태 및 소분류 추가
-            category_supply_status: categoryInfo?.supply_status || null,
-            category_2: categoryInfo?.category_2 || null,
-            category_3: categoryInfo?.category_3 || null,
-            category_4: categoryInfo?.category_4 || null,
-            category_seller_supply: !!categoryInfo, // 품목의 셀러공급 여부
-            category_4_id: categoryInfo?.id, // 품목 마스터 ID 추가
-            // 배지 정보 추가
-            is_best: categoryInfo?.is_best || false,
-            is_recommended: categoryInfo?.is_recommended || false,
-            has_image: categoryInfo?.has_image || false,
-            has_detail_page: categoryInfo?.has_detail_page || false,
-            // 발송기한 추가 (임시: 데이터 없으면 3일로 설정)
-            shipping_deadline: categoryInfo?.shipping_deadline || 3,
-            // 시즌 날짜 추가
-            season_start_date: categoryInfo?.season_start_date || null,
-            season_end_date: categoryInfo?.season_end_date || null
-          };
-        })
-        .filter(product => {
-          // 품목의 seller_supply=true AND 옵션상품의 is_seller_supply=true 인 경우만 표시
-          const categorySupply = product.category_seller_supply;
-          const optionSupply = product.is_seller_supply !== false; // is_seller_supply가 명시적으로 false가 아닌 경우
-          return categorySupply && optionSupply;
-        });
-
-      console.log('🎯 시즌 날짜 샘플:', {
-        season_start: productsWithThumbnail[0]?.season_start_date,
-        season_end: productsWithThumbnail[0]?.season_end_date
-      });
-      console.log('샘플 상품:', {
-        option_name: productsWithThumbnail[0]?.option_name,
-        category_4: productsWithThumbnail[0]?.category_4,
-        product_master_id: productsWithThumbnail[0]?.product_master_id,
-        thumbnail_url: productsWithThumbnail[0]?.thumbnail_url,
-        shipping_deadline: productsWithThumbnail[0]?.shipping_deadline
+      console.log('🎯 상품 로딩 완료:', {
+        count: fetchedProducts?.length || 0,
+        sample: fetchedProducts?.[0]
       });
 
-      setProducts(productsWithThumbnail);
     } catch (error) {
       console.error('상품 fetch 오류:', error);
     } finally {
@@ -417,11 +291,37 @@ export default function AllProductsPage() {
       {/* 컨텐츠 */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">상품을 불러오는 중...</p>
-            </div>
+          <div className="space-y-4">
+            {/* 스켈레톤 카드 */}
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div
+                key={i}
+                className="animate-pulse bg-white rounded-lg border border-gray-200 p-4"
+              >
+                <div className="flex items-center gap-4">
+                  {/* 썸네일 스켈레톤 */}
+                  <div className="w-16 h-16 bg-gray-200 rounded"></div>
+
+                  {/* 정보 스켈레톤 */}
+                  <div className="flex-1 space-y-2">
+                    <div className="h-5 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                  </div>
+
+                  {/* 가격 스켈레톤 */}
+                  <div className="space-y-2">
+                    <div className="h-6 bg-gray-200 rounded w-24"></div>
+                    <div className="h-4 bg-gray-200 rounded w-20"></div>
+                  </div>
+
+                  {/* 버튼 스켈레톤 */}
+                  <div className="flex gap-2">
+                    <div className="w-8 h-8 bg-gray-200 rounded"></div>
+                    <div className="w-8 h-8 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="text-center py-12">
