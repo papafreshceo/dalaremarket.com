@@ -3,17 +3,17 @@
 import { useEffect } from 'react';
 import MarginCalculator from './MarginCalculator';
 import PriceSimulator from './PriceSimulator';
-import DiscountCalculator from './DiscountCalculator';
-import BarcodeGenerator from './BarcodeGenerator';
+import OptionPricing from './OptionPricing';
 
 interface ToolModalProps {
   isOpen: boolean;
   onClose: () => void;
   toolId?: string;
   toolName?: string;
+  onOpenSimulator?: () => void;
 }
 
-export default function ToolModal({ isOpen, onClose, toolId, toolName }: ToolModalProps) {
+export default function ToolModal({ isOpen, onClose, toolId, toolName, onOpenSimulator }: ToolModalProps) {
   // ESC 키로 닫기
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -52,15 +52,14 @@ export default function ToolModal({ isOpen, onClose, toolId, toolName }: ToolMod
         zIndex: 10000,
         padding: '20px'
       }}
-      onClick={onClose}
     >
       <div
         style={{
           background: '#ffffff',
           borderRadius: '16px',
-          maxWidth: '600px',
+          maxWidth: '1410px',
           width: '100%',
-          maxHeight: '80vh',
+          maxHeight: '90vh',
           overflow: 'auto',
           position: 'relative',
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
@@ -73,7 +72,8 @@ export default function ToolModal({ isOpen, onClose, toolId, toolName }: ToolMod
           borderBottom: '1px solid #dee2e6',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          gap: '16px'
         }}>
           <h2 style={{
             fontSize: '24px',
@@ -82,6 +82,7 @@ export default function ToolModal({ isOpen, onClose, toolId, toolName }: ToolMod
           }}>
             {toolName || '업무도구'}
           </h2>
+
           <button
             onClick={onClose}
             style={{
@@ -114,39 +115,7 @@ export default function ToolModal({ isOpen, onClose, toolId, toolName }: ToolMod
           padding: '24px'
         }}>
           {/* 도구별 콘텐츠 */}
-          {renderToolContent(toolId)}
-        </div>
-
-        {/* 푸터 */}
-        <div style={{
-          padding: '24px',
-          borderTop: '1px solid #dee2e6',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '12px'
-        }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '10px 20px',
-              background: '#f8f9fa',
-              color: '#495057',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#e9ecef';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#f8f9fa';
-            }}
-          >
-            닫기
-          </button>
+          {renderToolContent(toolId, onOpenSimulator)}
         </div>
       </div>
     </div>
@@ -154,7 +123,7 @@ export default function ToolModal({ isOpen, onClose, toolId, toolName }: ToolMod
 }
 
 // 도구별 콘텐츠 렌더링
-function renderToolContent(toolId?: string) {
+function renderToolContent(toolId?: string, onOpenSimulator?: () => void) {
   if (!toolId) {
     return (
       <div style={{
@@ -169,10 +138,9 @@ function renderToolContent(toolId?: string) {
 
   // 각 도구별 컴포넌트
   const toolContents: Record<string, JSX.Element> = {
-    'margin-calculator': <MarginCalculator />,
+    'margin-calculator': <MarginCalculator onOpenSimulator={onOpenSimulator} />,
     'price-simulator': <PriceSimulator />,
-    'discount-calculator': <DiscountCalculator />,
-    'barcode-generator': <BarcodeGenerator />,
+    'option-pricing': <OptionPricing />,
   };
 
   return toolContents[toolId] || (

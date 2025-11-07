@@ -45,10 +45,10 @@ export default function ToolsPage() {
 
   // 도구 카테고리
   const categories: Category[] = [
-    { id: 'all', name: '전체', count: 16 },
-    { id: 'essential', name: '핵심 도구', count: 5 },
-    { id: 'data', name: '데이터 관리', count: 3 },
-    { id: 'pricing', name: '가격 설정', count: 4 },
+    { id: 'all', name: '전체', count: 12 },
+    { id: 'essential', name: '핵심 도구', count: 4 },
+    { id: 'data', name: '데이터 관리', count: 2 },
+    { id: 'pricing', name: '가격 설정', count: 2 },
     { id: 'analytics', name: '분석 도구', count: 5 },
     { id: 'communication', name: '커뮤니케이션', count: 1 }
   ];
@@ -80,17 +80,6 @@ export default function ToolsPage() {
         <path d="M19.07 17.66L12.41 11L11 12.41L17.66 19.07L16.24 20.49L21.49 21.9L20.08 16.65L19.07 17.66Z" fill="white"/>
       </svg>
     ),
-    'inventory-tracker': (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="white"/>
-        <path d="M2 17L12 22L22 17M2 12L12 17L22 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    ),
-    'discount-calculator': (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12.5 6.9C11.77 6.33 10.86 6 9.85 6C7.09 6 4.85 8.24 4.85 11C4.85 13.76 7.09 16 9.85 16C10.86 16 11.77 15.67 12.5 15.1C13.23 15.67 14.14 16 15.15 16C17.91 16 20.15 13.76 20.15 11C20.15 8.24 17.91 6 15.15 6C14.14 6 13.23 6.33 12.5 6.9ZM9.85 14C8.2 14 6.85 12.65 6.85 11C6.85 9.35 8.2 8 9.85 8C10.51 8 11.1 8.22 11.59 8.59C11.12 9.3 10.85 10.13 10.85 11C10.85 11.87 11.12 12.7 11.59 13.41C11.1 13.78 10.51 14 9.85 14ZM15.15 14C14.49 14 13.9 13.78 13.41 13.41C13.88 12.7 14.15 11.87 14.15 11C14.15 10.13 13.88 9.3 13.41 8.59C13.9 8.22 14.49 8 15.15 8C16.8 8 18.15 9.35 18.15 11C18.15 12.65 16.8 14 15.15 14Z" fill="white"/>
-      </svg>
-    ),
     'sales-analytics': (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M5 9.2H8V19H5V9.2ZM10.6 5H13.4V19H10.6V5ZM16.2 13H19V19H16.2V13Z" fill="white"/>
@@ -100,11 +89,6 @@ export default function ToolsPage() {
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2ZM20 16H6L4 18V4H20V16Z" fill="white"/>
         <path d="M7 9H17V11H7V9ZM7 6H17V8H7V6ZM7 12H14V14H7V12Z" fill="white"/>
-      </svg>
-    ),
-    'barcode-generator': (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M2 6H4V18H2V6ZM5 6H6V18H5V6ZM7 6H10V18H7V6ZM11 6H12V18H11V6ZM14 6H16V18H14V6ZM17 6H18V18H17V6ZM19 6H22V18H19V6Z" fill="white"/>
       </svg>
     ),
     'transaction-statement': (
@@ -133,11 +117,6 @@ export default function ToolsPage() {
     'review-analyzer': (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M11.99 2C6.47 2 2 6.48 2 12C2 17.52 6.47 22 11.99 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 11.99 2ZM8.5 8C9.33 8 10 8.67 10 9.5C10 10.33 9.33 11 8.5 11C7.67 11 7 10.33 7 9.5C7 8.67 7.67 8 8.5 8ZM12 18C9.5 18 7.3 16.7 6.05 14.75C6.2 14.3 6.85 13.8 8.5 13C8.75 13.15 9.25 13.5 10 13.5C10.75 13.5 11.25 13.15 11.5 13C13.15 13.8 13.8 14.3 13.95 14.75C12.7 16.7 10.5 18 12 18ZM15.5 11C14.67 11 14 10.33 14 9.5C14 8.67 14.67 8 15.5 8C16.33 8 17 8.67 17 9.5C17 10.33 16.33 11 15.5 11Z" fill="white"/>
-      </svg>
-    ),
-    'price-recommender': (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13.41 18.09V20H10.74V18.07C9.03 17.71 7.58 16.61 7.47 14.67H9.43C9.53 15.82 10.39 16.7 12.08 16.7C13.98 16.7 14.54 15.64 14.54 14.93C14.54 14.04 14.08 13.37 12.31 12.95L10.46 12.52C8.55 12.08 7.51 10.87 7.51 9.14C7.51 7.17 8.96 5.94 10.74 5.58V4H13.41V5.6C15.27 6.04 16.27 7.38 16.37 9H14.41C14.35 7.96 13.65 7.22 12.08 7.22C10.58 7.22 9.75 7.91 9.75 8.88C9.75 9.73 10.29 10.29 11.89 10.67L13.48 11.05C15.69 11.55 16.78 12.62 16.78 14.65C16.77 16.79 15.35 17.72 13.41 18.09Z" fill="white"/>
       </svg>
     ),
     'category-rank-checker': (
@@ -205,26 +184,6 @@ export default function ToolsPage() {
       isPremium: false
     },
     {
-      id: 'inventory-tracker',
-      category: 'data',
-      name: '재고 추적기',
-      description: '실시간 재고 현황을 모니터링하고 알림 설정',
-      bgGradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-      usageCount: '1,456회/월',
-      isNew: false,
-      isPremium: false
-    },
-    {
-      id: 'discount-calculator',
-      category: 'pricing',
-      name: '할인율 계산기',
-      description: '목표 마진을 유지하면서 최대 할인율 계산',
-      bgGradient: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
-      usageCount: '672회/월',
-      isNew: false,
-      isPremium: false
-    },
-    {
       id: 'sales-analytics',
       category: 'analytics',
       name: '매출 분석',
@@ -242,16 +201,6 @@ export default function ToolsPage() {
       bgGradient: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
       usageCount: '445회/월',
       isNew: false,
-      isPremium: false
-    },
-    {
-      id: 'barcode-generator',
-      category: 'essential',
-      name: '바코드 생성기',
-      description: '상품 바코드를 대량으로 생성 및 인쇄',
-      bgGradient: 'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)',
-      usageCount: '567회/월',
-      isNew: true,
       isPremium: false
     },
     {
@@ -305,16 +254,6 @@ export default function ToolsPage() {
       isPremium: false
     },
     {
-      id: 'price-recommender',
-      category: 'pricing',
-      name: '판매가/할인가 추천기',
-      description: '원가와 마진율을 고려한 최적의 판매 가격 추천',
-      bgGradient: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
-      usageCount: '1,567회/월',
-      isNew: false,
-      isPremium: false
-    },
-    {
       id: 'category-rank-checker',
       category: 'analytics',
       name: '카테고리 순위 확인',
@@ -355,6 +294,14 @@ export default function ToolsPage() {
     console.log('Modal closing'); // 디버깅용
     setModalOpen(false);
     setSelectedTool(null);
+  };
+
+  // 시뮬레이터로 전환 핸들러
+  const handleOpenSimulator = () => {
+    const simulatorTool = tools.find(t => t.id === 'price-simulator');
+    if (simulatorTool) {
+      setSelectedTool(simulatorTool);
+    }
   };
 
   // 즐겨찾기된 도구와 일반 도구 분리
@@ -795,6 +742,7 @@ export default function ToolsPage() {
         onClose={handleCloseModal}
         toolId={selectedTool?.id}
         toolName={selectedTool?.name}
+        onOpenSimulator={handleOpenSimulator}
       />
     </>
   );
