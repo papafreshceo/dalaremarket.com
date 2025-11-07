@@ -183,13 +183,11 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       if (data !== prevDataRef.current) {
         // 내부 업데이트로 인한 변경인 경우 무시
         if (isInternalUpdate.current) {
-          console.log('[EditableAdminGrid] Internal update detected, skipping reset')
           isInternalUpdate.current = false
           prevDataRef.current = data
           return
         }
 
-        console.log('[EditableAdminGrid] External data change detected, resetting modified state')
         const prevLength = prevDataRef.current.length
         const newLength = data.length
 
@@ -318,7 +316,6 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
           return
         } else if (e.key === 'Backspace' || e.key === 'Delete') {
           // Backspace나 Delete 키를 누르면 셀 값을 바로 삭제 (편집 모드로 전환하지 않음)
-          console.log('[Global Delete] Delete key pressed')
           e.preventDefault()
 
           const newData = [...gridData]
@@ -327,7 +324,6 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
           // 다중 셀 선택이 있는 경우
           if (selectedCells.size > 0) {
-            console.log('[Global Delete] Multiple cells selected:', selectedCells.size)
             selectedCells.forEach(cellKey => {
               const [rowStr, colKey] = cellKey.split('-')
               const rowIndex = parseInt(rowStr)
@@ -362,7 +358,6 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
             const column = columns.find(c => c.key === selectedCell.col)
             const row = gridData[selectedCell.row]
             if (column && !isReadOnly(column, row)) {
-              console.log('[Global Delete] Single cell, column found, not readonly')
               newData[selectedCell.row] = {
                 ...newData[selectedCell.row],
                 [selectedCell.col]: column.type === 'number' ? null : ''
@@ -391,7 +386,6 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
           if (hasChanges) {
             // 내부 업데이트 플래그 먼저 설정
-            console.log('[Global Delete] Setting isInternalUpdate to true, modifiedCells size:', newModifiedCells.size)
             isInternalUpdate.current = true
 
             // React 18의 자동 배칭을 활용하여 상태 업데이트
@@ -401,7 +395,6 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
             // 다음 틱에 콜백 실행 (상태 업데이트 완료 후)
             setTimeout(() => {
-              console.log('[Global Delete] Calling onDataChange in setTimeout')
               onDataChange?.(newData)
             }, 0)
           }
@@ -1490,7 +1483,6 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
               const key = mergeKeyGetter ? mergeKeyGetter(row) : JSON.stringify(row)
 
               if (insertedKeys.has(key)) {
-                console.log('저장 중 중복 스킵:', row)
                 continue
               }
 
@@ -1521,7 +1513,6 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
               // 이번 저장에서 이미 삽입했는지 체크
               if (insertedKeys.has(key)) {
-                console.log('저장 중 중복 스킵:', row)
                 continue
               }
 
@@ -1543,7 +1534,6 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                 const { data: existing } = await query.limit(1)
 
                 if (existing && existing.length > 0) {
-                  console.log('DB 중복 스킵:', row)
                   continue
                 }
               }

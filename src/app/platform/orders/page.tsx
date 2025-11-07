@@ -264,7 +264,6 @@ function OrdersPageContent() {
         setUserId('guest');
         setUserEmail('');
         setUserTier('light');
-        console.log('[orders] 비회원 사용자 - 샘플 데이터 모드');
       }
     };
 
@@ -374,7 +373,6 @@ function OrdersPageContent() {
         ? JSON.parse(sessionStorage.getItem('impersonate_user') || 'null')
         : null;
 
-      console.log('[fetchOrders] Impersonate 정보:', impersonateUser);
 
       const headers: Record<string, string> = {
         'Cache-Control': 'no-cache',
@@ -384,10 +382,8 @@ function OrdersPageContent() {
       // impersonate 모드인 경우 헤더에 사용자 ID 추가
       if (impersonateUser) {
         headers['X-Impersonate-User-Id'] = impersonateUser.userId;
-        console.log('[fetchOrders] X-Impersonate-User-Id 헤더 설정:', impersonateUser.userId);
       }
 
-      console.log('[fetchOrders] 요청 헤더:', headers);
 
       // API를 통해 주문 조회 (샘플 모드 자동 처리)
       const response = await fetch('/api/platform-orders', {
@@ -405,7 +401,6 @@ function OrdersPageContent() {
 
       // 샘플 데이터인 경우 콘솔에 표시
       if (result.isSample) {
-        console.log('📊 샘플 데이터 표시 중 (' + data.length + '건)');
         setIsSampleMode(true);
       } else {
         setIsSampleMode(false);

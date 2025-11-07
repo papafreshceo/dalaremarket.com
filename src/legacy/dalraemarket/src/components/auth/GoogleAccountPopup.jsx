@@ -22,7 +22,6 @@ function GoogleAccountPopup({ isOpen, onClose, onSelectAccount, isMobile, isHome
 
   const handleAccountSelect = (account) => {
     setSelectedAccount(account);
-    console.log('구글 로그인:', account);
     if (onSelectAccount) {
       onSelectAccount(account);
     }

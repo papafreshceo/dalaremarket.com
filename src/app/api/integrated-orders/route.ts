@@ -78,8 +78,6 @@ export async function GET(request: NextRequest) {
 
     if (data) {
       const marketNames = [...new Set(data.map((o: any) => o.market_name))];
-      console.log('📊 DB에서 가져온 마켓명:', marketNames);
-      console.log('📊 전체 주문 수:', data.length);
     }
 
     if (error) {
@@ -127,7 +125,6 @@ export async function GET(request: NextRequest) {
         // company_name이 없으면 name, 그것도 없으면 email 사용
         const displayName = seller.company_name || seller.name || seller.email || '미지정';
         sellersMap.set(seller.id, displayName);
-        console.log(`Seller mapping: ${seller.id} => ${displayName}`);
       });
     }
 

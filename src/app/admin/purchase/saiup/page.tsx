@@ -175,7 +175,6 @@ export default function SaiupManagementPage() {
         taste: row.taste || '',
         notes: row.notes || ''
       }))
-      console.log('로드된 데이터:', mapped)
       setRecords(mapped)
     }
     setLoading(false)

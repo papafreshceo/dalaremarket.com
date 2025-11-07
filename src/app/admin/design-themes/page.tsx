@@ -170,7 +170,6 @@ export default function DesignThemesPage() {
       });
 
       const result = await response.json();
-      console.log('Response:', result);
 
       if (result.success) {
         toast.success(editingTheme ? '✅ 테마가 수정되었습니다!' : '✅ 테마가 생성되었습니다!');

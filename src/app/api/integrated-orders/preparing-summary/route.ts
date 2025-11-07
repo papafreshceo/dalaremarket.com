@@ -81,7 +81,6 @@ export async function GET(request: NextRequest) {
 
     // 옵션명 목록 추출
     const optionNames = [...new Set(orders.map(o => o.option_name).filter(Boolean))];
-    console.log('📦 옵션명 목록:', optionNames);
 
     // 옵션상품 및 원물 정보 조회
     const { data: optionProductsData, error: optionError } = await supabase
@@ -93,11 +92,9 @@ export async function GET(request: NextRequest) {
       console.error('옵션상품 조회 오류:', optionError);
     }
 
-    console.log('📦 조회된 옵션상품:', optionProductsData?.length || 0, '개');
 
     // 옵션상품 ID 목록
     const optionProductIds = optionProductsData?.map(op => op.id) || [];
-    console.log('📦 옵션상품 ID 목록:', optionProductIds);
 
     // 옵션명으로 매핑
     const optionNameToId = new Map(
@@ -114,8 +111,6 @@ export async function GET(request: NextRequest) {
       console.error('원물 링크 조회 오류:', materialsLinksError);
     }
 
-    console.log('📦 조회된 원물 링크:', materialsLinksData?.length || 0, '개');
-    console.log('📦 원물 링크 데이터:', materialsLinksData);
 
     // 원물 ID 목록 추출
     const rawMaterialIds = [
@@ -125,7 +120,6 @@ export async function GET(request: NextRequest) {
           .filter(Boolean) || []
       )
     ];
-    console.log('📦 원물 ID 목록:', rawMaterialIds);
 
     // 원물 정보 조회
     const { data: rawMaterialsData, error: rawMaterialsError } = await supabase
@@ -137,7 +131,6 @@ export async function GET(request: NextRequest) {
       console.error('원물 정보 조회 오류:', rawMaterialsError);
     }
 
-    console.log('📦 조회된 원물 정보:', rawMaterialsData?.length || 0, '개');
     console.log('📦 원물 데이터:', rawMaterialsData?.map(rm => ({
       name: rm.material_name,
       standard_quantity: rm.standard_quantity

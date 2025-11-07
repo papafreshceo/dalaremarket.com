@@ -177,7 +177,6 @@ export default function ItemMasterPage() {
           indices.forEach(index => handleDelete(index))
         }}
         onCopy={(indices) => {
-          console.log('복사할 행:', indices)
         }}
         height="600px"
         globalSearchPlaceholder="대분류, 중분류, 소분류, 품목, 품종, 비고 검색"

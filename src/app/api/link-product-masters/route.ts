@@ -77,7 +77,6 @@ export async function POST() {
       }
 
       if (optionProducts && optionProducts.length > 0) {
-        console.log(`품목 ${pm.category_4}: 매칭할 옵션상품 ${optionProducts.length}개 발견`)
         for (const option of optionProducts) {
           const { error: optionError } = await supabase
             .from('option_products')
@@ -98,7 +97,6 @@ export async function POST() {
       if (alreadyOptionCount) alreadyLinkedOptionProducts += alreadyOptionCount
     }
 
-    console.log(`✅ 전체 매칭 완료: ${productMasters.length}개 품목, 원물 신규 ${newRawMaterials}개/기존 ${alreadyLinkedRawMaterials}개, 옵션상품 신규 ${newOptionProducts}개/기존 ${alreadyLinkedOptionProducts}개`)
 
     return NextResponse.json({
       success: true,

@@ -173,7 +173,6 @@ export default function OrderRegistrationTab({
       // 모든 옵션명 수집 (중복 제거)
       const uniqueOptionNames = [...new Set(filteredOrders.map(order => order.products).filter(Boolean))];
 
-      console.log('🔍 공급가 갱신 - 옵션명:', uniqueOptionNames);
 
       // option_products에서 최신 공급단가 조회
       const { data: optionProducts, error: optionError } = await supabase
@@ -188,7 +187,6 @@ export default function OrderRegistrationTab({
         return;
       }
 
-      console.log('✅ 조회된 옵션 상품:', optionProducts);
 
       // 옵션명 -> 공급단가 맵 생성
       const priceMap = new Map<string, number>();
@@ -210,7 +208,6 @@ export default function OrderRegistrationTab({
         const newUnitPrice = priceMap.get(key);
 
         if (newUnitPrice === undefined) {
-          console.warn(`⚠️ 공급단가를 찾을 수 없음: ${optionName}`);
           notFoundCount++;
           continue;
         }
@@ -291,7 +288,6 @@ export default function OrderRegistrationTab({
         depositorName = extraData?.depositor_name || '';
       } catch (e) {
         // depositor_name 칼럼이 없으면 무시
-        console.log('depositor_name 칼럼이 없습니다 (마이그레이션 필요)');
       }
 
       // 필수 정보 확인
@@ -324,7 +320,6 @@ export default function OrderRegistrationTab({
       // 모든 옵션명 수집 (중복 제거)
       const uniqueOptionNames = [...new Set(filteredOrders.map(order => order.products).filter(Boolean))];
 
-      console.log('🔍 옵션명 검증 시작:', uniqueOptionNames);
 
       // option_products에서 공급단가 조회
       const { data: optionProducts, error: optionError} = await supabase
@@ -335,10 +330,8 @@ export default function OrderRegistrationTab({
       if (optionError) {
         console.error('❌ 옵션명 조회 오류:', optionError);
       } else {
-        console.log('✅ 옵션명으로 조회된 데이터:', optionProducts);
       }
 
-      console.log('💰 최종 조회된 옵션상품:', optionProducts);
 
       // 옵션상품 Map 저장 (옵션명 소문자 키로 저장)
       const productMap = new Map<string, any>();
@@ -387,7 +380,6 @@ export default function OrderRegistrationTab({
         }
       }));
 
-      console.log('📋 검증 모달에 전달할 주문 데이터:', ordersForValidation);
 
       setValidatedOrders(ordersForValidation);
       setShowOptionValidationModal(true);

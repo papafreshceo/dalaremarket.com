@@ -21,7 +21,6 @@ export async function PUT(request: NextRequest) {
   const body = await request.json();
   const { market_name, updates } = body;
 
-  console.log('API 받은 데이터:', { market_name, updates });
 
   try {
     const { data, error} = await supabase
@@ -30,7 +29,6 @@ export async function PUT(request: NextRequest) {
       .eq('market_name', market_name)
       .select();
 
-    console.log('Supabase 응답:', { data, error });
 
     if (error) throw error;
 

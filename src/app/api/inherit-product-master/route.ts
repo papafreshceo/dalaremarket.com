@@ -87,7 +87,6 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log(`✅ 상속 완료: 원물 ${rawCount || 0}개, 옵션상품 ${optionCount || 0}개`)
 
     return NextResponse.json({
       success: true,

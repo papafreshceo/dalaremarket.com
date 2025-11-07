@@ -13,7 +13,6 @@ function LoginForm({ onClose, onModeChange }) {
       return;
     }
 
-    console.log('로그인 시도:', { email: formData.email });
     alert('로그인 되었습니다!');
     onClose();
   };

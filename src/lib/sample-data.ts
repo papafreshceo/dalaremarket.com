@@ -129,7 +129,6 @@ export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrd
 
   // 옵션 상품이 없으면 빈 배열 반환
   if (optionProducts.length === 0) {
-    console.warn('[generateSampleOrders] 옵션 상품이 없습니다.');
     return [];
   }
 

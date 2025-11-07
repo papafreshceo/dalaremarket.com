@@ -93,9 +93,7 @@ export function auditLog(
   const logMessage = `[${timestamp}] [${action}] ${userData.name}(${userData.role})`
 
   if (details) {
-    console.log(logMessage, details)
   } else {
-    console.log(logMessage)
   }
 
   // TODO: 나중에 데이터베이스에 감사 로그 저장하기

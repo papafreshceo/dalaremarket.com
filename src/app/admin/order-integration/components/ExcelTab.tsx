@@ -203,7 +203,6 @@ export default function ExcelTab() {
         });
 
         setColumns(updatedColumns);
-        console.log('✓ 마켓 렌더러 추가 완료, marketTemplates 크기:', marketTemplates.size);
       }
     }
   }, [marketTemplates, columns]);
@@ -214,13 +213,11 @@ export default function ExcelTab() {
       const response = await fetch('/api/mapping-settings/fields');
       const result = await response.json();
 
-      console.log('API 응답:', result);
 
       if (result.success && result.data) {
         // 표준필드 행 찾기
         const standardRow = result.data.find((row: any) => row.market_name === '표준필드');
 
-        console.log('표준필드 행:', standardRow);
 
         if (standardRow) {
           // field_1 ~ field_50까지 있는 필드들을 컬럼으로 변환
@@ -292,10 +289,6 @@ export default function ExcelTab() {
             }
           }
 
-          console.log('생성된 컬럼 수:', dynamicColumns.length);
-          console.log('컬럼 샘플:', dynamicColumns.slice(0, 5).map(c => ({ key: c.key, title: c.title, width: c.width, hasRenderer: !!c.renderer })));
-          console.log('marketTemplates 크기:', marketTemplates.size);
-          console.log('marketTemplates 샘플:', Array.from(marketTemplates.entries()).slice(0, 3));
 
           // 컬럼 검증 - renderer가 함수인지 확인
           dynamicColumns.forEach((col, idx) => {
@@ -310,7 +303,6 @@ export default function ExcelTab() {
           setColumns(dynamicColumns);
           setStandardFields(standardRow); // 표준필드 정보 저장
         } else {
-          console.log('표준필드 행을 찾을 수 없습니다.');
         }
 
         // 마켓별 필드 매핑 정보 저장
@@ -321,7 +313,6 @@ export default function ExcelTab() {
           }
         });
         setMarketFieldMappings(mappings);
-        console.log('마켓별 필드 매핑:', mappings);
       }
     } catch (error) {
       console.error('표준 필드 로드 실패:', error);
@@ -354,7 +345,6 @@ export default function ExcelTab() {
           productMap.set(product.option_name.toLowerCase(), product);
         });
         setOptionProducts(productMap);
-        console.log('옵션상품 로드 완료:', productMap.size, '개');
       }
     } catch (error) {
       console.error('옵션상품 로드 실패:', error);
@@ -403,11 +393,6 @@ export default function ExcelTab() {
 
     const mappedOrder = { ...order };
 
-    console.log('📦 옵션상품 매핑 시작:', product.option_name);
-    console.log('  - shipping_entity:', product.shipping_entity);
-    console.log('  - invoice_entity:', product.invoice_entity);
-    console.log('  - shipping_vendor_id:', product.shipping_vendor_id);
-    console.log('  - shipping_vendor name:', product.shipping_vendor?.name);
 
     // 표준필드(field_1~50)를 순회하면서 매칭
     for (let i = 1; i <= 50; i++) {
@@ -431,12 +416,10 @@ export default function ExcelTab() {
         if (value !== undefined && value !== null) {
           // 기존 값이 없을 때만 매핑 (엑셀 데이터 우선)
           if (!mappedOrder[fieldKey]) {
-            console.log(`  ✓ 매핑: ${standardFieldName} (${fieldKey}) = ${value} (from ${optionProductColumn})`);
             mappedOrder[fieldKey] = value;
           }
         } else {
           if (standardFieldName === '출고' || standardFieldName === '송장' || standardFieldName === '벤더사') {
-            console.log(`  ✗ 값 없음: ${standardFieldName} (${fieldKey}) - optionProductColumn: ${optionProductColumn}, value: ${value}`);
           }
         }
       }
@@ -483,8 +466,6 @@ export default function ExcelTab() {
     const lowerFileName = fileName.toLowerCase();
     const rowText = Object.keys(firstRow).join(',').toLowerCase();
 
-    console.log('마켓 감지 시작 - 파일명:', fileName);
-    console.log('헤더:', rowText);
 
     // 각 템플릿별 매칭 점수 계산
     const candidates: Array<{ template: MarketTemplate; score: number; reason: string }> = [];
@@ -519,13 +500,11 @@ export default function ExcelTab() {
           score,
           reason: reasons.join(' + ')
         });
-        console.log(`${template.market_name} - 점수: ${score}, 이유: ${reasons.join(' + ')}`);
       }
     }
 
     // 점수가 가장 높은 것 선택
     if (candidates.length === 0) {
-      console.log('✗ 매칭되는 마켓을 찾을 수 없음');
       return null;
     }
 
@@ -533,11 +512,9 @@ export default function ExcelTab() {
     candidates.sort((a, b) => b.score - a.score);
 
     const winner = candidates[0];
-    console.log(`✓ ${winner.template.market_name}로 감지됨 (점수: ${winner.score}, 이유: ${winner.reason})`);
 
     // 동점자가 있는지 확인 (같은 마켓이 아닌 경우만)
     if (candidates.length > 1 && candidates[1].score === winner.score && candidates[1].template.market_name !== winner.template.market_name) {
-      console.warn(`⚠ 경고: ${candidates[1].template.market_name}도 같은 점수(${winner.score})입니다`);
     }
 
     return winner.template;
@@ -576,7 +553,6 @@ export default function ExcelTab() {
   const calculateSettlement = (row: any, formula: string, marketFieldMappings: any): number | null => {
     if (!formula || !standardFields) return null;
 
-    console.log('정산 계산 - formula:', formula);
 
     // formula 예: "정산예정금액*1", "상품금액*0.9415", "최종결제금액*0.88", "최종결제금액"
     // 곱하기가 없으면 그 필드 값을 그대로 사용
@@ -592,7 +568,6 @@ export default function ExcelTab() {
       multiplier = 1;
     }
 
-    console.log('필드명:', fieldName, '배율:', multiplier);
 
     // 표준필드명 -> field 번호 매핑 (예: "정산예정금액" -> field_26)
     let targetFieldNumber: number | null = null;
@@ -600,13 +575,11 @@ export default function ExcelTab() {
       const fieldKey = `field_${i}`;
       if (standardFields[fieldKey] === fieldName) {
         targetFieldNumber = i;
-        console.log(`표준필드에서 ${fieldName}은 field_${i}`);
         break;
       }
     }
 
     if (!targetFieldNumber) {
-      console.log('표준필드에서 해당 필드를 찾을 수 없음:', fieldName);
       return null;
     }
 
@@ -615,29 +588,23 @@ export default function ExcelTab() {
     const excelColumnName = marketFieldMappings[targetFieldKey];
 
     if (!excelColumnName) {
-      console.log(`${targetFieldKey}에 대한 매핑이 없음`);
       return null;
     }
 
-    console.log(`${targetFieldKey}의 엑셀 컬럼명:`, excelColumnName);
 
     // 엑셀에서 해당 컬럼의 값 가져오기
     const fieldValue = row[excelColumnName];
-    console.log('엑셀에서 값 가져옴:', fieldValue);
 
     if (fieldValue === null || fieldValue === undefined) {
-      console.log('필드 값을 찾을 수 없음');
       return null;
     }
 
     const numValue = parseFloat(String(fieldValue).replace(/,/g, ''));
     if (isNaN(numValue)) {
-      console.log('숫자 변환 실패:', fieldValue);
       return null;
     }
 
     const result = Math.round(numValue * multiplier);
-    console.log('정산 계산 결과:', result);
     return result;
   };
 
@@ -728,8 +695,6 @@ export default function ExcelTab() {
 
     setLoading(true);
     try {
-      console.log('marketTemplates 크기:', marketTemplates.size);
-      console.log('optionProducts 크기:', optionProducts.size);
 
       const filePreviews: FilePreview[] = [];
 
@@ -804,7 +769,6 @@ export default function ExcelTab() {
           });
         } catch (error: any) {
           // 암호화된 파일 감지
-          console.log('파일 읽기 에러:', error.message, error);
 
           // CFB (Compound File Binary) 형식의 암호화된 파일 감지
           if (
@@ -816,7 +780,6 @@ export default function ExcelTab() {
               error.message.toLowerCase().includes('encryption')
             )
           ) {
-            console.log('암호화된 파일 감지:', file.name);
             // 이미 처리된 파일들을 저장
             setProcessedPreviews(filePreviews);
             // 원본 FileList 저장
@@ -992,11 +955,8 @@ export default function ExcelTab() {
           // 마켓별 필드 매핑 정보 가져오기
           const marketMapping = marketFieldMappings.get(template.market_name.toLowerCase());
 
-          console.log(`${template.market_name} - 읽은 데이터 행 수:`, jsonData.length);
-          console.log('마켓 매핑:', marketMapping);
 
           if (!marketMapping) {
-            console.warn(`${template.market_name}의 필드 매핑 정보가 없습니다.`);
             continue;
           }
 
@@ -1021,13 +981,10 @@ export default function ExcelTab() {
             }
 
             if (index === 0) {
-              console.log('첫 번째 행 원본:', row);
-              console.log('첫 번째 행 매핑 결과:', mapped);
             }
             return mapped;
           });
 
-          console.log(`${template.market_name} - 매핑된 주문 수:`, mappedOrders.length);
           allOrders = [...allOrders, ...mappedOrders];
 
         } else {
@@ -1079,13 +1036,10 @@ export default function ExcelTab() {
         }
       }
 
-      console.log('전체 통합된 주문 수:', allOrders.length);
-      console.log('전체 주문 데이터:', allOrders);
 
       // 옵션명 기준으로 자동 매칭
       const ordersWithMapping = applyProductMapping(allOrders);
 
-      console.log('옵션명 매칭 완료');
 
       // 주문통합 완료 - 로컬에만 저장 (DB 저장 안 함)
       setOrders(ordersWithMapping);
@@ -1142,7 +1096,6 @@ export default function ExcelTab() {
 
     setLoading(true);
     try {
-      console.log('검증 시작 - 주문 수:', orders.length, '옵션상품 수:', optionProducts.size);
 
       // field_11이 옵션명
       const ordersWithMapping = orders.map((order) => {
@@ -1372,9 +1325,6 @@ export default function ExcelTab() {
       });
 
       // 중복 제거를 서버에서 처리하도록 모든 주문 전송
-      console.log('총 저장할 주문 수:', ordersToSave.length);
-      console.log('첫 번째 주문 데이터:', ordersToSave[0]);
-      console.log('첫 번째 주문의 모든 키:', Object.keys(ordersToSave[0]));
 
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'POST',
@@ -1664,7 +1614,6 @@ export default function ExcelTab() {
       return;
     }
 
-    console.log('🔄 일괄수정 시작, batchEditData:', batchEditData);
 
     let modifiedCount = 0;
 
@@ -1675,7 +1624,6 @@ export default function ExcelTab() {
       if (currentOption && batchEditData[currentOption] && batchEditData[currentOption].trim() !== '') {
         const newOptionName = batchEditData[currentOption].trim();
 
-        console.log(`✏️ [${index}] 수정: "${currentOption}" → "${newOptionName}"`);
 
         // 새 옵션명이 DB에 있는지 확인
         const product = optionProducts.get(newOptionName.toLowerCase());
@@ -1700,7 +1648,6 @@ export default function ExcelTab() {
             _optionNameVerified: false,
             match_status: 'matched' as const
           };
-          console.log(`✓ [${index}] 매핑 완료:`, finalOrder.field_11);
           return finalOrder;
         } else {
           const finalOrder = {
@@ -1708,7 +1655,6 @@ export default function ExcelTab() {
             _optionNameInDB: false,
             match_status: 'unmatched' as const
           };
-          console.log(`⚠ [${index}] 매핑 실패 (DB에 없음):`, finalOrder.field_11);
           return finalOrder;
         }
       }
@@ -1717,8 +1663,6 @@ export default function ExcelTab() {
       return { ...order };
     });
 
-    console.log('✅ 일괄수정 완료, 수정된 주문 수:', modifiedCount);
-    console.log('📊 updatedOrders 샘플 (처음 3개):', updatedOrders.slice(0, 3).map(o => o.field_11));
 
     setOrders(updatedOrders);
 

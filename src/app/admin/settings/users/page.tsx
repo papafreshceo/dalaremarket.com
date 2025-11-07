@@ -81,7 +81,6 @@ export default function UsersPage() {
 
     if (!confirmed) return
 
-    console.log('Approving user:', userId, userName)
 
     const { data, error } = await supabase
       .from('users')
@@ -89,7 +88,6 @@ export default function UsersPage() {
       .eq('id', userId)
       .select()
 
-    console.log('Update result:', { data, error })
 
     if (error) {
       showToast(`승인 처리에 실패했습니다: ${error.message}`, 'error')

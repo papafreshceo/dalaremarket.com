@@ -40,7 +40,6 @@ export async function enrichOrdersWithOptionInfo<T extends { option_name: string
   }
 
   // option_products 테이블에서 옵션 정보 일괄 조회 (shipping_vendor와 JOIN)
-  console.log('[enrichOrdersWithOptionInfo] 조회할 옵션명:', uniqueOptionNames);
 
   const { data: optionProducts, error } = await supabase
     .from('option_products')
@@ -62,7 +61,6 @@ export async function enrichOrdersWithOptionInfo<T extends { option_name: string
     console.error('[enrichOrdersWithOptionInfo] 옵션 상품 조회 실패:', error);
   }
 
-  console.log('[enrichOrdersWithOptionInfo] 조회된 옵션 상품:', optionProducts);
 
   // 옵션명별 정보 맵 생성 (빠른 조회를 위해)
   const optionInfoMap = new Map<string, OptionProductInfo>();
@@ -86,7 +84,6 @@ export async function enrichOrdersWithOptionInfo<T extends { option_name: string
   // 각 주문에 옵션 정보 매핑 및 정산금액 계산
   return ordersData.map(order => {
     const optionInfo = optionInfoMap.get(order.option_name) || {};
-    console.log(`[enrichOrdersWithOptionInfo] 옵션명 "${order.option_name}" → optionInfo:`, optionInfo);
     const orderAny = order as any;
 
     // 정산금액 = 공급단가 × 수량
@@ -127,7 +124,6 @@ export async function enrichOrdersWithOptionInfo<T extends { option_name: string
     }
     // 기존에 settlement_amount가 있으면 유지 (관리자가 계산한 값 보존)
 
-    console.log(`[enrichOrdersWithOptionInfo] 최종 결과:`, result);
     return result;
   });
 }

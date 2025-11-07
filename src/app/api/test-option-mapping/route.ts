@@ -29,12 +29,10 @@ export async function GET() {
     }
   ];
 
-  console.log('테스트 주문 (enrichment 전):', testOrders);
 
   // 3. enrichOrdersWithOptionInfo 실행
   const enrichedOrders = await enrichOrdersWithOptionInfo(testOrders);
 
-  console.log('테스트 주문 (enrichment 후):', enrichedOrders);
 
   return NextResponse.json({
     message: '테스트 성공',

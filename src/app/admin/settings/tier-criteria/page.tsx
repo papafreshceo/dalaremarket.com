@@ -180,13 +180,11 @@ export default function TierCriteriaPage() {
 
   const loadPointSettings = async () => {
     try {
-      console.log('📥 누적점수 설정 불러오는 중...');
       const response = await fetch('/api/admin/tier-point-settings');
       const data = await response.json();
 
       if (data.success && data.settings) {
         const { settings } = data;
-        console.log('📥 받은 데이터:', settings);
 
         if (settings.login_points_per_day !== undefined) setLoginPointsPerDay(settings.login_points_per_day);
         if (settings.points_per_day) setPointsPerDay(settings.points_per_day);
@@ -196,10 +194,6 @@ export default function TierCriteriaPage() {
         if (settings.no_login_penalties) setNoLoginPenalties(settings.no_login_penalties);
         if (settings.accumulated_point_criteria) setAccumulatedPointCriteria(settings.accumulated_point_criteria);
 
-        console.log('✅ 누적점수 설정 불러오기 완료');
-        console.log('- 로그인 점수:', settings.login_points_per_day);
-        console.log('- 발주 점수:', settings.points_per_day);
-        console.log('- 등급별 필요 점수:', settings.accumulated_point_criteria);
       } else {
         console.error('❌ 누적점수 설정 불러오기 실패:', data);
         toast.error('누적점수 설정을 불러올 수 없습니다.');
@@ -224,7 +218,6 @@ export default function TierCriteriaPage() {
         accumulatedPointCriteria,
       };
 
-      console.log('💾 누적점수 설정 저장 중...', payload);
 
       const response = await fetch('/api/admin/tier-point-settings', {
         method: 'PUT',
@@ -233,7 +226,6 @@ export default function TierCriteriaPage() {
       });
 
       const data = await response.json();
-      console.log('💾 서버 응답:', data);
 
       if (data.success) {
         toast.success('✅ 누적점수 설정이 저장되었습니다.', {
@@ -241,7 +233,6 @@ export default function TierCriteriaPage() {
         });
         // 저장 후 다시 불러와서 확인
         await loadPointSettings();
-        console.log('✅ 누적점수 설정 저장 완료 및 재확인 완료');
       } else {
         toast.error(data.error || '❌ 설정 저장에 실패했습니다.');
         console.error('❌ 저장 실패:', data);
@@ -381,13 +372,8 @@ export default function TierCriteriaPage() {
     const monthlyOrders = Math.round(daysPerMonth * ordersPerDay);
     const monthlySales = monthlyOrders * pricePerOrder;
 
-    console.log('=== 시뮬레이션 시작 ===');
-    console.log('📊 입력값:', { daysPerWeek, ordersPerDay, pricePerOrder });
-    console.log('📊 계산값:', { daysPerMonth: daysPerMonth.toFixed(2), monthlyOrders, monthlySales });
-    console.log('📊 시뮬레이션 기준:', simulationCriteria);
 
     const lightCriteria = simulationCriteria.find(c => c.tier === 'LIGHT');
-    console.log('🎯 LIGHT 기준:', lightCriteria);
 
     // LIGHT 즉시 승급 일수 계산
     let lightUpgradeDays = 0;
@@ -396,11 +382,7 @@ export default function TierCriteriaPage() {
       const daysForSales = Math.ceil(lightCriteria.minTotalSales / (ordersPerDay * pricePerOrder));
       lightUpgradeDays = Math.max(daysForOrders, daysForSales);
 
-      console.log(`✅ LIGHT 즉시 승급 조건: ${lightCriteria.minOrderCount}건 이상 + ${lightCriteria.minTotalSales.toLocaleString()}원 이상`);
-      console.log(`📈 하루 발주: ${ordersPerDay}건 + ${(ordersPerDay * pricePerOrder).toLocaleString()}원`);
-      console.log(`🎯 LIGHT 승급까지 필요 일수: ${lightUpgradeDays}일`);
     } else {
-      console.log('❌ LIGHT 기준을 찾을 수 없습니다!');
     }
 
     const simulationResults: SimulationResult[] = [];
@@ -451,7 +433,6 @@ export default function TierCriteriaPage() {
             pointsBreakdown: pointsData.breakdown,
           });
 
-          console.log(`\n🎉 [${day}일차] ✅ LIGHT 즉시 승급! (실적방식 - 누적 ${currentTotalOrders}건 / ${currentTotalSales.toLocaleString()}원)`);
           break;
         }
       }
@@ -507,8 +488,6 @@ export default function TierCriteriaPage() {
         }
 
         // 3개월 실적 로그 (매월 1일마다)
-        console.log(`\n📅 [${currentDate.toISOString().split('T')[0]}] 매월 1일 실적 체크`);
-        console.log(`  3개월 실적: ${threeMonthOrders}건 / ${threeMonthSales.toLocaleString()}원`);
       }
 
       // 등급 변경 시에만 결과 추가
@@ -531,10 +510,6 @@ export default function TierCriteriaPage() {
         const oneMonthOrders = Math.round((oneMonthCalendarDays / 7) * daysPerWeek * ordersPerDay);
         const oneMonthSales = oneMonthOrders * pricePerOrder;
 
-        console.log(`\n🎉 [${dateString}] ${currentTier} → ${newTier} 승급! (${upgradedBy === 'existing' ? '실적방식' : '활동점수방식'})`);
-        console.log(`  누적 점수: ${pointsData.total}점`);
-        console.log(`  월간 실적: ${oneMonthOrders}건 / ${oneMonthSales.toLocaleString()}원`);
-        console.log(`  3개월 실적: ${threeMonthOrders}건 / ${threeMonthSales.toLocaleString()}원`);
 
         currentTier = newTier;
 

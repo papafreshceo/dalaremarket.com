@@ -57,7 +57,6 @@ export async function POST(request: NextRequest) {
     // Gemini API 호출 - 무료 모델 (gemini-2.0-flash-lite)
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
 
-    console.log('🔍 API 호출 시도:', apiUrl.replace(GEMINI_API_KEY, 'KEY_HIDDEN'));
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -124,8 +123,6 @@ ${productList}
     }
 
     const data = await response.json();
-    console.log('✅ Gemini API 응답 성공');
-    console.log('📦 응답 데이터:', JSON.stringify(data, null, 2));
 
     // 응답 구조 확인 및 안전하게 추출
     let aiResponse = '';

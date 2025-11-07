@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('📥 POST /api/platform-seller-orders 호출됨');
 
     const supabase = await createClient();
 
@@ -14,11 +13,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
     }
 
-    console.log('✅ 인증된 사용자:', user.id);
 
     const { orders } = await request.json();
 
-    console.log('📦 받은 주문 개수:', orders?.length);
 
     if (!orders || !Array.isArray(orders) || orders.length === 0) {
       console.error('❌ 유효하지 않은 주문 데이터');
@@ -31,7 +28,6 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('seller_id', user.id);
 
-    console.log('🔄 옵션명 매핑 개수:', mappings?.length || 0);
 
     const mappingMap = new Map(
       (mappings || []).map(m => [m.user_option_name, m.site_option_name])
@@ -62,8 +58,6 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    console.log('💾 데이터베이스에 삽입 시도:', insertData.length, '건');
-    console.log('📋 첫 번째 주문 샘플:', insertData[0]);
 
     // 데이터베이스에 삽입
     const { data, error } = await supabase

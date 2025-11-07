@@ -172,7 +172,6 @@ export default function MediaManagementPage() {
 
   const fetchRawMaterials = async () => {
     try {
-      console.log('원물 목록 조회 시작...');
       const { data, error } = await supabase
         .from('raw_materials')
         .select('id, material_code, material_name')
@@ -182,7 +181,6 @@ export default function MediaManagementPage() {
         console.error('원물 조회 에러:', error);
         throw error;
       }
-      console.log('원물 목록 조회 완료:', data?.length, '개');
       setRawMaterials(data || []);
     } catch (error) {
       console.error('원물 조회 오류:', error);
@@ -191,7 +189,6 @@ export default function MediaManagementPage() {
 
   const fetchOptionProducts = async () => {
     try {
-      console.log('옵션상품 목록 조회 시작...');
       const { data, error } = await supabase
         .from('option_products')
         .select('id, option_code, option_name')
@@ -201,7 +198,6 @@ export default function MediaManagementPage() {
         console.error('옵션상품 조회 에러:', error);
         throw error;
       }
-      console.log('옵션상품 목록 조회 완료:', data?.length, '개');
       setOptionProducts(data || []);
     } catch (error) {
       console.error('옵션상품 조회 오류:', error);
@@ -210,7 +206,6 @@ export default function MediaManagementPage() {
 
   const fetchProductCategories = async () => {
     try {
-      console.log('품목 마스터 조회 시작...');
       const { data, error } = await supabase
         .from('products_master')
         .select('id, category_1, category_2, category_3, category_4, category_4_code')
@@ -223,7 +218,6 @@ export default function MediaManagementPage() {
         throw error;
       }
 
-      console.log('품목 마스터 조회 완료:', data?.length, '개');
       setProductCategories(data || []);
     } catch (error) {
       console.error('품목 마스터 조회 오류:', error);
@@ -272,14 +266,12 @@ export default function MediaManagementPage() {
       const uploadedUrls: string[] = [];
 
       // 이미지 파일 압축 (10MB 초과 시 자동 압축)
-      console.log('이미지 압축 시작...');
       const compressedFiles = await compressImages(uploadForm.files, {
         maxWidth: 1920,
         maxHeight: 1920,
         quality: 0.85,
         maxSizeMB: 10,
       });
-      console.log('이미지 압축 완료');
 
       // 여러 파일을 순차적으로 업로드
       for (let i = 0; i < compressedFiles.length; i++) {
@@ -325,7 +317,6 @@ export default function MediaManagementPage() {
           throw new Error(`서버 오류가 발생했습니다. (상태 코드: ${response.status})`);
         }
 
-        console.log('업로드 응답:', response.status, result);
 
         if (result.success) {
           uploadedUrls.push(result.data.secure_url);
@@ -392,8 +383,6 @@ export default function MediaManagementPage() {
   const handleUpdate = async () => {
     if (!editingImage) return;
 
-    console.log('=== 프론트엔드: 이미지 수정 시작 ===');
-    console.log('수정할 이미지:', editingImage);
     console.log('외래 키:', {
       category_4_id: (editingImage as any).category_4_id,
       raw_material_id: (editingImage as any).raw_material_id,
@@ -408,7 +397,6 @@ export default function MediaManagementPage() {
       });
 
       const result = await response.json();
-      console.log('API 응답:', result);
 
       if (result.success) {
         alert('수정 완료!');

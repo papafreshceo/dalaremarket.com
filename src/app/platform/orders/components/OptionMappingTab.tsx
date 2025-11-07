@@ -70,7 +70,6 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
       if (error) {
         // 테이블이 존재하지 않는 경우
         if (error.code === '42P01') {
-          console.warn('option_name_mappings 테이블이 아직 생성되지 않았습니다.');
           setTableNotExists(true);
           setMappings([]);
           setLoading(false);

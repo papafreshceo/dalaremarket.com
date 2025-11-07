@@ -83,16 +83,13 @@ export default function AgriChatbot() {
         if (error) {
           // 테이블이 없거나 권한 문제 - 조용히 무시
           if (error.code === 'PGRST116' || error.code === '42P01' || error.code === 'PGRST301') {
-            console.log('챗봇 설정 테이블이 없습니다. 챗봇을 비활성화합니다.');
           } else {
-            console.warn('설정 로드 실패:', error.message);
           }
           return;
         }
 
         if (data && data.length > 0) {
           setSettings(data[0]);
-          console.log('✅ 챗봇 설정 로드 완료');
         }
       } catch (error) {
         console.error('❌ 챗봇 설정 로드 실패:', error);
@@ -154,7 +151,6 @@ export default function AgriChatbot() {
     // FAQ 키워드 매칭
     for (const faq of settings.faqs) {
       if (faq.keywords.some(keyword => msg.includes(keyword))) {
-        console.log('🎯 키워드 매칭 성공:', faq.question);
         const newUsage = { ...apiUsage, keywordMatches: apiUsage.keywordMatches + 1 };
         setApiUsage(newUsage);
         localStorage.setItem('apiUsage', JSON.stringify(newUsage));
@@ -188,7 +184,6 @@ export default function AgriChatbot() {
     }
 
     if (apiUsage.today >= settings.daily_ai_limit) {
-      console.warn('⚠️ AI API 일일 한도 초과');
       return `죄송합니다. 오늘 AI 상담 한도를 초과했습니다.\n기본 문의는 ${settings.company_phone}로 전화주세요.`;
     }
 
@@ -220,11 +215,9 @@ export default function AgriChatbot() {
 
   // 메시지 처리
   const processMessage = async (message: string): Promise<string> => {
-    console.log('📨 메시지 처리 시작:', message);
 
     // 캐시 확인
     if (messageCache.current.has(message)) {
-      console.log('💾 캐시 히트!');
       const newUsage = { ...apiUsage, cacheHits: apiUsage.cacheHits + 1 };
       setApiUsage(newUsage);
       localStorage.setItem('apiUsage', JSON.stringify(newUsage));

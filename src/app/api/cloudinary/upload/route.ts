@@ -91,7 +91,6 @@ export async function POST(request: NextRequest) {
 
     // 덮어쓰기 모드: 해시 중복 파일 삭제
     if (hashDuplicate && overwrite) {
-      console.log('덮어쓰기 모드: 해시 중복 파일 삭제', hashDuplicate.cloudinary_id);
       await cloudinary.uploader.destroy(hashDuplicate.cloudinary_id);
       await supabase.from('cloudinary_images').delete().eq('id', hashDuplicate.id);
     }
@@ -172,7 +171,6 @@ export async function POST(request: NextRequest) {
 
     // 덮어쓰기 모드: 파일명 중복 파일 삭제
     if (filenameDuplicate && overwrite) {
-      console.log('덮어쓰기 모드: 파일명 중복 파일 삭제', filenameDuplicate.cloudinary_id);
       await cloudinary.uploader.destroy(filenameDuplicate.cloudinary_id);
       await supabase.from('cloudinary_images').delete().eq('id', filenameDuplicate.id);
     }
@@ -225,16 +223,12 @@ export async function POST(request: NextRequest) {
       image_type: imageType, // 이미지 타입 추가
     };
 
-    console.log('=== 이미지 업로드 - 대표이미지 설정 ===');
-    console.log('uploadType:', uploadType);
-    console.log('외래 키:', { rawMaterialId, optionProductId, category4Id });
 
     // 업로드 타입에 따라 관련 ID 추가 및 기존 대표이미지 해제
     // ⚠️ 중요: 외래 키가 실제로 존재할 때만 대표이미지로 설정
     if (uploadType === 'raw_material' && rawMaterialId) {
       insertData.raw_material_id = rawMaterialId;
       insertData.is_representative = true; // 자동으로 대표이미지로 설정
-      console.log('원물 대표이미지로 설정:', rawMaterialId);
 
       // 기존 대표이미지 해제
       await supabase
@@ -245,7 +239,6 @@ export async function POST(request: NextRequest) {
     } else if (uploadType === 'option_product' && optionProductId) {
       insertData.option_product_id = optionProductId;
       insertData.is_representative = true; // 자동으로 대표이미지로 설정
-      console.log('옵션상품 대표이미지로 설정:', optionProductId);
 
       // 기존 대표이미지 해제
       await supabase
@@ -256,7 +249,6 @@ export async function POST(request: NextRequest) {
     } else if (uploadType === 'category_4' && category4Id) {
       insertData.category_4_id = category4Id;
       insertData.is_representative = true; // 자동으로 대표이미지로 설정
-      console.log('품목 대표이미지로 설정:', category4Id);
 
       // 기존 대표이미지 해제
       await supabase
@@ -266,7 +258,6 @@ export async function POST(request: NextRequest) {
     } else {
       // 외래 키가 없으면 대표이미지로 설정하지 않음
       insertData.is_representative = false;
-      console.log('외래 키 없음 - 대표이미지 아님');
     }
 
     const { data, error } = await supabase

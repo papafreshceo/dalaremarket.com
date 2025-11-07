@@ -225,7 +225,6 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
             .update({ depositor_name: sellerInfo.depositor_name })
             .eq('id', userId);
         } catch (e) {
-          console.log('depositor_name 업데이트 건너뜀 (칼럼 없음, 마이그레이션 필요)');
         }
       }
 

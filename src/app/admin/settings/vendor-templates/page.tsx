@@ -64,13 +64,9 @@ export default function VendorTemplatesPage() {
 
   const fetchStandardFields = async () => {
     try {
-      console.log('표준필드 API 호출 시작');
       const response = await fetch('/api/standard-fields');
-      console.log('표준필드 API 응답 상태:', response.status);
       const result = await response.json();
-      console.log('표준필드 API 응답 데이터:', result);
       if (result.success) {
-        console.log('표준필드 설정:', result.data);
         setStandardFields(result.data);
       } else {
         console.error('표준필드 조회 실패:', result.error);

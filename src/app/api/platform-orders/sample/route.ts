@@ -34,7 +34,6 @@ export async function DELETE() {
       );
     }
 
-    console.log('[DELETE platform-orders/sample] 샘플 모드 비활성화 완료');
 
     return NextResponse.json({
       success: true,

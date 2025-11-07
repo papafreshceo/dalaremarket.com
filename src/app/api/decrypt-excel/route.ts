@@ -47,19 +47,13 @@ export async function POST(request: NextRequest) {
     // Python 스크립트 경로
     const scriptPath = path.join(process.cwd(), 'scripts', 'decrypt_excel.py');
 
-    console.log('=== 복호화 시작 ===');
-    console.log('스크립트 경로:', scriptPath);
-    console.log('입력 파일:', inputFilePath);
-    console.log('출력 파일:', outputFilePath);
 
     // Python 스크립트 실행
     try {
       const command = `python "${scriptPath}" "${inputFilePath}" "${outputFilePath}" "${password}"`;
-      console.log('실행 명령:', command);
 
       const { stdout, stderr } = await execAsync(command);
 
-      console.log('Python stdout:', stdout);
       if (stderr) {
         console.error('Python stderr:', stderr);
       }
@@ -78,7 +72,6 @@ export async function POST(request: NextRequest) {
       await fs.unlink(inputFilePath).catch(() => {});
       await fs.unlink(outputFilePath).catch(() => {});
 
-      console.log('복호화 성공! 파일 크기:', decryptedBuffer.length, 'bytes');
 
       // 파일명을 URL 인코딩 (한글 파일명 처리)
       const encodedFileName = encodeURIComponent(file.name);

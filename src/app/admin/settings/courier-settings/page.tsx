@@ -546,7 +546,6 @@ export default function CourierSettingsPage() {
 
         // 택배사 칼럼이 없으면 여기서 멈추고 사용자에게 선택 요청
         if (!hasCourier) {
-          console.log('택배사 칼럼이 없습니다. 사용자 선택 대기 중...');
           return;
         }
 

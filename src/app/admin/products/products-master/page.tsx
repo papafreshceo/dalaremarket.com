@@ -160,10 +160,6 @@ export default function ProductsMasterPage() {
 
   const handleSave = async () => {
     try {
-      console.log('[Save Debug] originalData 샘플:', originalData[0])
-      console.log('[Save Debug] tableData 샘플:', tableData[0])
-      console.log('[Save Debug] originalData 길이:', originalData.length)
-      console.log('[Save Debug] tableData 길이:', tableData.length)
 
       const { changed, newRows, total } = getChangedRows()
 
@@ -190,7 +186,6 @@ export default function ProductsMasterPage() {
 
         // 최소한 category_4(품목)는 있어야 함
         if (!row.category_4) {
-          console.log('⚠️ category_4가 없어서 건너뜀:', row);
           skippedRows.push(`${row.category_1 || ''} > ${row.category_2 || ''} > ${row.category_3 || ''} (품목명 없음)`)
           continue
         }
@@ -208,7 +203,6 @@ export default function ProductsMasterPage() {
         if (!checkError && existingData && existingData.length > 0) {
           const duplicatePath = `${row.category_1 || ''} > ${row.category_2 || ''} > ${row.category_3 || ''} > ${row.category_4}`
           duplicateRows.push(duplicatePath)
-          console.log('⚠️ 중복된 품목:', duplicatePath)
           continue
         }
 
@@ -249,7 +243,6 @@ export default function ProductsMasterPage() {
           if (error.code === '23505' || error.message.includes('duplicate') || error.message.includes('unique')) {
             const duplicatePath = `${row.category_1 || ''} > ${row.category_2 || ''} > ${row.category_3 || ''} > ${row.category_4}`
             duplicateRows.push(duplicatePath)
-            console.log('⚠️ 등록 중 중복 발견:', duplicatePath)
             continue
           }
           showToast(`품목 등록 실패: ${error.message}`, 'error')

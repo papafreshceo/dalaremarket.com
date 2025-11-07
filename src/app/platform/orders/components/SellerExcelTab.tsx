@@ -105,7 +105,6 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
           }
         });
         setMarketFieldMappings(mappings);
-        console.log('✓ 마켓별 필드 매핑 로드 완료:', mappings.size, '개');
         return mappings;
       }
       return new Map();
@@ -121,7 +120,6 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       const response = await fetch('/api/market-templates');
       if (!response.ok) throw new Error('마켓 템플릿을 불러오는데 실패했습니다.');
       const data = await response.json();
-      console.log('🔧 API Response:', data);
 
       // API 응답이 배열인지 확인하고, 아니면 data 속성에서 추출
       if (Array.isArray(data)) {
@@ -203,7 +201,6 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
           });
         } catch (error: any) {
           // 암호화된 파일 감지
-          console.log('파일 읽기 에러:', error.message, error);
 
           // CFB (Compound File Binary) 형식의 암호화된 파일 감지
           if (
@@ -215,7 +212,6 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
               error.message.toLowerCase().includes('encryption')
             )
           ) {
-            console.log('암호화된 파일 감지:', file.name);
             // 이미 처리된 파일들을 저장
             setProcessedPreviews(filePreviews);
             // 원본 FileList 저장
@@ -365,7 +361,6 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       }
 
       // 1. 옵션명 매핑 먼저 적용
-      console.log('🔄 옵션명 매핑 적용 시작...');
       const { orders: mappedOrders, mappingResults, totalOrders, mappedOrders: mappedCount } =
         await applyOptionMapping(allOrders, userId);
 
@@ -396,18 +391,15 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       }
 
       const hasUnmatched = unmatchedOrders.length > 0;
-      console.log('매칭 안된 옵션명:', hasUnmatched ? unmatchedOrders.length + '건' : '없음');
 
       // 6. 매칭 안된 옵션명 정보 저장
       setHasUnmatchedOptions(hasUnmatched);
 
       // 7. 매핑 결과가 있으면 먼저 매핑 결과 모달 표시
       if (mappingResults.length > 0) {
-        console.log('📋 옵션명 매핑 변환 내역 표시');
         setShowMappingResultModal(true);
       } else if (hasUnmatched) {
         // 매핑 결과는 없지만 매칭 안된 옵션명이 있으면 바로 검증 모달 표시
-        console.log('❌ 매칭되지 않은 옵션명 발견:', unmatchedOrders.length, '건');
         setShowOptionValidationModal(true);
       } else {
         // 매핑 결과도 없고 모든 옵션명이 매칭되었으면 바로 통합 완료
@@ -426,8 +418,6 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
     const lowerFileName = fileName.toLowerCase();
     const rowText = Object.keys(firstRow).join(',').toLowerCase();
 
-    console.log('마켓 감지 시작 - 파일명:', fileName);
-    console.log('헤더:', rowText);
 
     // 각 템플릿별 매칭 점수 계산
     const candidates: Array<{ template: MarketTemplate; score: number; reason: string }> = [];
@@ -462,19 +452,16 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
           score,
           reason: reasons.join(' + ')
         });
-        console.log(`${template.market_name} - 점수: ${score}, 이유: ${reasons.join(' + ')}`);
       }
     }
 
     // 점수가 가장 높은 것 선택
     if (candidates.length === 0) {
-      console.log('✗ 매칭되는 마켓을 찾을 수 없음');
       return null;
     }
 
     candidates.sort((a, b) => b.score - a.score);
     const winner = candidates[0];
-    console.log(`✓ 선택된 마켓: ${winner.template.market_name} (${winner.score}점)`);
 
     return winner.template;
   };
@@ -488,8 +475,6 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       fetchMarketTemplates(),
       fetchMarketFieldMappings()
     ]);
-    console.log('📋 Loaded templates:', templates.length);
-    console.log('📋 Loaded mappings:', mappings.size);
 
     // 첫 번째 행을 헤더로 읽기 (마켓 감지용)
     const firstDataRow: any[] = [];
@@ -508,21 +493,16 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
     setDetectedMarket(detected);
 
     if (!detected) {
-      console.warn(`${fileName}: 마켓을 자동 감지하지 못했습니다.`);
       return [];
     }
 
-    console.log('✓ 감지된 마켓:', detected.market_name);
-    console.log('✓ 헤더 행:', detected.header_row);
 
     // 해당 마켓의 필드 매핑 가져오기
     const marketMapping = mappings.get(detected.market_name.toLowerCase());
     if (!marketMapping) {
-      console.warn(`${detected.market_name}의 필드 매핑 정보가 없습니다.`);
       return [];
     }
 
-    console.log('✓ 마켓 매핑:', marketMapping);
 
     // 헤더 행 기준으로 데이터 읽기
     const headerRowIndex = (detected.header_row || 1);
@@ -542,10 +522,8 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       }
     });
 
-    console.log(`📊 읽은 데이터 행 수: ${jsonData.length}`);
 
     if (jsonData.length === 0) {
-      console.warn(`${fileName}: 데이터가 없습니다.`);
       return [];
     }
 
@@ -610,8 +588,6 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
         };
       });
 
-      console.log('📤 전송할 데이터:', ordersToInsert);
-      console.log('📊 주문 개수:', ordersToInsert.length);
 
       const response = await fetch('/api/platform-orders', {
         method: 'POST',
@@ -619,7 +595,6 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
         body: JSON.stringify({ orders: ordersToInsert })
       });
 
-      console.log('응답 상태:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -954,7 +929,6 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
           setShowOptionValidationModal(false);
 
           // 바로 DB에 저장 (매칭 실패가 0건이므로)
-          console.log('✅ 옵션명 검증 완료. 발주서 등록 시작...');
           setIsSaving(true);
 
           try {
@@ -1035,7 +1009,6 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
 
           // 매칭 안된 옵션명이 있으면 옵션명 검증 모달 표시
           if (hasUnmatchedOptions) {
-            console.log('✋ 매핑 결과 확인 완료. 옵션명 검증 모달로 이동');
             setShowOptionValidationModal(true);
           } else {
             // 모든 옵션명이 매칭되었으면 통합 완료

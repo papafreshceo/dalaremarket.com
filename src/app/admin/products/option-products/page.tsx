@@ -530,13 +530,11 @@ export default function OptionProductsManagementPage() {
 
 
   const fetchProducts = async () => {
-    console.log('🔵 fetchProducts 시작')
     const { data, error } = await supabase
       .from('option_products')
       .select('*')
       .order('created_at', { ascending: false })
 
-    console.log('🔵 option_products 데이터:', data?.length, '개')
 
     if (error) {
       console.error('Fetch error:', error)
@@ -554,7 +552,6 @@ export default function OptionProductsManagementPage() {
             .eq('option_product_id', product.id)
 
           if (materialsError) {
-            console.warn('Materials fetch error for product', product.id, materialsError.message)
             // 에러 발생 시 빈 배열로 계속 진행
           }
 
@@ -570,7 +567,6 @@ export default function OptionProductsManagementPage() {
                   .single()
 
                 if (rawMaterialError || !rawMaterial) {
-                  console.warn('Raw material not found or error:', m.raw_material_id, rawMaterialError?.message || 'Material deleted or not accessible')
                   // 원물을 찾을 수 없으면 null 반환 (나중에 filter로 제거)
                   return null
                 }
@@ -651,11 +647,9 @@ export default function OptionProductsManagementPage() {
         return codeA.localeCompare(codeB)
       })
 
-      console.log('🔵 최종 productsWithCalculations:', sortedProducts.length, '개')
       setProducts(sortedProducts)
       setFilteredProducts(sortedProducts)
     } else {
-      console.log('🔴 data가 없음')
     }
   }
 
@@ -666,7 +660,6 @@ export default function OptionProductsManagementPage() {
       .eq('status_type', 'option_products')
       .eq('is_active', true)
       .order('display_order')
-    console.log('Supply Statuses:', data)
     if (error) console.error('Supply Status Error:', error)
     if (data) setSupplyStatuses(data)
   }
@@ -993,8 +986,6 @@ export default function OptionProductsManagementPage() {
          p.coupang_price_mode === '자동' || p.coupang_price_mode === 'auto')
       )
 
-      console.log('🔄 자동 모드 옵션상품:', autoModeProducts.length, '개')
-      console.log('🔄 첫 번째 옵션:', autoModeProducts[0])
 
       if (autoModeProducts.length === 0) {
         showToast('자동 모드인 옵션상품이 없습니다.', 'warning')
@@ -1029,7 +1020,6 @@ export default function OptionProductsManagementPage() {
           coupang_free_shipping_price: p.coupang_free_shipping_price != null ? Number(p.coupang_free_shipping_price) : null
         }
 
-        console.log(`🔧 [${p.option_name}] 1단계: 모드를 수동으로 변경`)
 
         // 1단계: 모드를 '수동'으로 변경 (트리거 비활성화)
         await supabase
@@ -1041,7 +1031,6 @@ export default function OptionProductsManagementPage() {
           })
           .eq('id', p.id)
 
-        console.log(`💰 [${p.option_name}] 2단계: 가격 업데이트`, priceData)
 
         // 2단계: 가격 업데이트
         await supabase
@@ -1049,7 +1038,6 @@ export default function OptionProductsManagementPage() {
           .update(priceData)
           .eq('id', p.id)
 
-        console.log(`🔄 [${p.option_name}] 3단계: 모드를 자동으로 복원`)
 
         // 3단계: 모드를 원래대로 복원 (자동)
         return supabase
@@ -1066,7 +1054,6 @@ export default function OptionProductsManagementPage() {
       // 모든 UPDATE 쿼리를 병렬로 실행
       const results = await Promise.all(rows)
 
-      console.log('✅ UPDATE 결과:', results.length, '개')
 
       // 에러 체크
       const errors = results.filter(r => r.error)
@@ -1087,7 +1074,6 @@ export default function OptionProductsManagementPage() {
         }
       })
 
-      console.log('✅ 모든 UPDATE 성공')
 
       // 데이터 다시 불러오기
       await fetchProducts()
@@ -1343,8 +1329,6 @@ export default function OptionProductsManagementPage() {
               }
 
               // 디버깅: FIELD_LABELS와 매핑 확인
-              console.log('=== 엑셀 다운로드 디버깅 ===')
-              console.log('FIELD_LABELS:', FIELD_LABELS)
 
               const exportData = products.map((product) => {
                 const koreanData: Record<string, any> = {}
@@ -1370,8 +1354,6 @@ export default function OptionProductsManagementPage() {
               // 첫 번째 행의 헤더 확인
               if (exportData.length > 0) {
                 const headers = Object.keys(exportData[0])
-                console.log('엑셀 헤더:', headers)
-                console.log('헤더 개수:', headers.length)
 
                 // 처음 10개 헤더만 alert로 표시
                 alert(`엑셀 헤더 (총 ${headers.length}개):\n${headers.slice(0, 10).join('\n')}\n...`)
@@ -1419,7 +1401,6 @@ export default function OptionProductsManagementPage() {
                   const worksheet = workbook.worksheets[0]
 
                   // 엑셀 시트의 범위 확인
-                  console.log('📄 엑셀 시트 범위:', worksheet.rowCount, 'x', worksheet.columnCount)
 
                   const jsonData: any[] = []
                   const headers: any[] = []
@@ -1436,14 +1417,12 @@ export default function OptionProductsManagementPage() {
                     jsonData.push(rowData)
                   })
 
-                  console.log('📊 엑셀 원본 데이터 개수:', jsonData.length)
 
                   // 빈 행이나 모든 셀이 비어있는 행 확인
                   const emptyRows = jsonData.filter((row: any) => {
                     const values = Object.values(row)
                     return values.every(v => v === null || v === undefined || v === '')
                   })
-                  console.log('⚠️ 완전히 빈 행 개수:', emptyRows.length)
 
                   // 추가 필드 역매핑 (FIELD_LABELS에 없는 필드들)
                   const additionalReverseMapping: Record<string, string> = {
@@ -1501,7 +1480,6 @@ export default function OptionProductsManagementPage() {
                   // (다운로드 시 이미 가상 필드를 제거했으므로 추가 필터링 불필요)
                   const dbFields = Object.keys(convertedData[0] || {})
 
-                  console.log('🔄 한글→영문 변환 후 데이터 개수:', convertedData.length)
 
                   // vendor_name 필드 제거 및 데이터 정제
                   const cleanData = convertedData.map((row: any) => {
@@ -1559,7 +1537,6 @@ export default function OptionProductsManagementPage() {
                     return normalizedRow
                   })
 
-                  console.log('✅ 최종 cleanData 개수:', cleanData.length)
 
                   // 모달 열기 (교체/병합 선택)
                   setExcelUploadModal({ data: cleanData, mode: null })
@@ -2285,7 +2262,6 @@ export default function OptionProductsManagementPage() {
                       }
 
                       if (hasChanges) {
-                        console.log(`변경감지: ${row.option_name}`, changedFields)
                         updated.push(`${row.option_name} (${row.option_code})`)
                       }
                     } else {
@@ -2299,17 +2275,12 @@ export default function OptionProductsManagementPage() {
                   const existingMap = new Map(existingProducts?.map(p => [String(p.option_code).trim(), p.id]) || [])
                   const existingIdSet = new Set(existingProducts?.map(p => p.id) || [])  // 기존 id 목록
 
-                  console.log('기존 데이터 수:', existingProducts?.length)
-                  console.log('업로드할 데이터 수:', excelUploadModal.data.length)
-                  console.log('기존 option_code 샘플:', Array.from(existingMap.keys()).slice(0, 5))
-                  console.log('기존 id 개수:', existingIdSet.size)
 
                   // 벤더사 이름을 ID로 변환
                   const dataToUpsert = excelUploadModal.data
                     .filter((row: any) => {
                       // option_code가 없는 행은 제외
                       if (!row.option_code || String(row.option_code).trim() === '') {
-                        console.warn('option_code가 없는 행 제외:', row.option_name)
                         return false
                       }
                       return true
@@ -2338,22 +2309,18 @@ export default function OptionProductsManagementPage() {
                       // 1. 엑셀의 id가 유효하면 사용
                       if (excelId && String(excelId).trim() !== '' && excelId !== 'null' && excelId !== 'undefined') {
                         result.id = excelId
-                        console.log(`✅ 엑셀 id 사용: ${optionCode} → id:${excelId}`)
                       }
                       // 2. 엑셀 id가 없으면 DB에서 option_code로 찾기
                       else if (existingMap.has(optionCode)) {
                         result.id = existingMap.get(optionCode)
-                        console.log(`🔄 DB 매핑: ${optionCode} → id:${result.id} (엑셀id: ${excelId})`)
                       }
                       // 3. 둘 다 없으면 신규
                       else {
-                        console.log(`🆕 신규 데이터: ${optionCode} (엑셀id: ${excelId})`)
                       }
 
                       return result
                     })
 
-                  console.log('처리할 데이터 수:', dataToUpsert.length)
 
                   if (dataToUpsert.length === 0) {
                     showToast('업로드할 유효한 데이터가 없습니다. option_code를 확인하세요.', 'error')
@@ -2380,9 +2347,6 @@ export default function OptionProductsManagementPage() {
                   const dataWithIds = dataToUpsert.filter((item: any) => item.id)
                   const dataWithoutIds = dataToUpsert.filter((item: any) => !item.id)
 
-                  console.log('✅ 기존 데이터:', dataWithIds.length, '신규 데이터:', dataWithoutIds.length)
-                  console.log('샘플 - 기존:', dataWithIds.slice(0, 3).map(d => ({ name: d.option_name, code: d.option_code, id: d.id })))
-                  console.log('샘플 - 신규:', dataWithoutIds.slice(0, 3).map(d => ({ name: d.option_name, code: d.option_code })))
 
                   // option_code 중복 검사 (중복이 있으면 업로드 중단)
                   const optionCodeCount = new Map<string, { count: number, items: any[] }>()
@@ -2419,7 +2383,6 @@ export default function OptionProductsManagementPage() {
                     return
                   }
 
-                  console.log(`📤 전체 ${dataToUpsert.length}개 데이터를 업로드...`)
 
                   // id가 DB에 실제로 존재하는지 확인하여 분리
                   const dataWithId = dataToUpsert
@@ -2436,14 +2399,10 @@ export default function OptionProductsManagementPage() {
                       return itemWithoutId
                     })
 
-                  console.log('📦 DB에 존재하는 id (업데이트):', dataWithId.length)
-                  console.log('📦 DB에 없는 데이터 (신규 추가):', dataWithoutId.length)
 
                   // 새로운 id가 포함된 항목 로그
                   const newIdsInExcel = dataToUpsert.filter((item: any) => item.id && !existingIdSet.has(item.id))
                   if (newIdsInExcel.length > 0) {
-                    console.log(`ℹ️ 엑셀에 있지만 DB에 없는 id: ${newIdsInExcel.length}개 (신규 추가로 처리)`)
-                    console.log('샘플:', newIdsInExcel.slice(0, 3).map(d => ({ name: d.option_name, code: d.option_code, id: d.id })))
                   }
 
                   // 1. id 있는 데이터 업데이트 (id 기준으로 upsert)
@@ -2464,7 +2423,6 @@ export default function OptionProductsManagementPage() {
                       return
                     }
                     updateCount = dataWithId.length
-                    console.log(`✅ ${dataWithId.length}개 업데이트 완료`)
                   }
 
                   // 2. id 없는 데이터 신규 추가 (insert)
@@ -2479,7 +2437,6 @@ export default function OptionProductsManagementPage() {
                       return
                     }
                     addCount = dataWithoutId.length
-                    console.log(`✅ ${dataWithoutId.length}개 신규 추가 완료`)
                   }
 
 
@@ -2487,7 +2444,6 @@ export default function OptionProductsManagementPage() {
                   const uploadedCodes = new Set(dataToUpsert.map(d => d.option_code))
                   const deletedProducts = existingProducts?.filter(p => !uploadedCodes.has(p.option_code)) || []
 
-                  console.log(`🗑️ 삭제 대상: ${deletedProducts.length}개`)
 
                   const { error: deleteError } = await supabase
                     .from('option_products')
@@ -2495,7 +2451,6 @@ export default function OptionProductsManagementPage() {
                     .not('option_code', 'in', `(${uploadCodes.map(c => `"${c}"`).join(',')})`)
 
                   if (deleteError && deleteError.code !== '23503') {
-                    console.warn(deleteError)
                   }
 
                   await fetchProducts()
@@ -2604,15 +2559,12 @@ export default function OptionProductsManagementPage() {
                   // 기존 데이터에서 id 매핑
                   const existingMap2 = new Map(existingData?.map(d => [d.option_code, d.id]) || [])
 
-                  console.log('기존 데이터 수:', existingData?.length)
-                  console.log('업로드할 데이터 수:', excelUploadModal.data.length)
 
                   // 벤더사 이름을 ID로 변환
                   const dataToUpsert = excelUploadModal.data
                     .filter((row: any) => {
                       // option_code가 없는 행은 제외
                       if (!row.option_code || String(row.option_code).trim() === '') {
-                        console.warn('option_code가 없는 행 제외:', row.option_name)
                         return false
                       }
                       return true
@@ -2645,7 +2597,6 @@ export default function OptionProductsManagementPage() {
                       return result
                     })
 
-                  console.log('처리할 데이터 수:', dataToUpsert.length)
 
                   if (dataToUpsert.length === 0) {
                     showToast('업로드할 유효한 데이터가 없습니다. option_code를 확인하세요.', 'error')

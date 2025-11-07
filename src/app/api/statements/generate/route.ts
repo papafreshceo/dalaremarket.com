@@ -92,9 +92,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      console.log(`[statements/generate] ✅ 문서 생성 성공! ID: ${docId}, 문서번호: ${docNumber}`);
     } else {
-      console.log(`[statements/generate] 📄 비회원 샘플 PDF 생성 (DB 저장 안 함)`);
     }
 
     // 4. QR코드 생성

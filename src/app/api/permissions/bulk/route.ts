@@ -69,7 +69,6 @@ export async function POST(request: NextRequest) {
       if (insertError) throw insertError
 
       // 감사 로그
-      console.log(`[권한 변경] ${authResult.userData.name}(${authResult.userData.role})이 ${role} 역할의 권한을 변경했습니다.`)
 
       return NextResponse.json({ success: true, data })
     }

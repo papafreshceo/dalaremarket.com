@@ -132,7 +132,6 @@ export default function OrderPlatformPage() {
 
       if (result.success) {
         const sellerOrders = result.data || [];
-        console.log('📊 셀러 주문:', sellerOrders.length);
 
         // 셀러 ID 수집
         const sellerIds = [...new Set(sellerOrders.map((o: Order) => o.seller_id).filter(Boolean))];
@@ -152,7 +151,6 @@ export default function OrderPlatformPage() {
             users.forEach((user: any) => {
               const displayName = user.company_name || user.name || user.id;
               nameMap.set(user.id, displayName);
-              console.log(`Seller mapping: ${user.id} => ${displayName}`);
             });
             setSellerNames(nameMap);
           }

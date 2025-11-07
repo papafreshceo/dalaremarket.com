@@ -45,7 +45,6 @@ export async function inheritProductMasterToRawMaterials(productMasterId: string
     return { success: false, error: updateError }
   }
 
-  console.log(`✅ 품목 마스터 → 원물: ${count || 0}개 업데이트`)
   return { success: true, updatedCount: count || 0 }
 }
 
@@ -87,7 +86,6 @@ export async function inheritRawMaterialToOptionProducts(rawMaterialId: string) 
     has_detail_page: rawMaterial.has_detail_page
   }
 
-  console.log('Updating option products with data:', updateData)
 
   const { error: updateError, count } = await supabase
     .from('option_products')
@@ -100,7 +98,6 @@ export async function inheritRawMaterialToOptionProducts(rawMaterialId: string) 
     return { success: false, error: updateError }
   }
 
-  console.log(`✅ 원물 → 옵션상품: ${count || 0}개 업데이트`)
   return { success: true, updatedCount: count || 0 }
 }
 
@@ -112,7 +109,6 @@ export async function inheritRawMaterialToOptionProducts(rawMaterialId: string) 
 export async function inheritProductMasterToAllDescendants(productMasterId: string) {
   const supabase = createClient()
 
-  console.log(`🔄 품목 마스터 상속 시작: ${productMasterId}`)
 
   // 1. 품목 마스터 정보 조회
   const { data: productMaster, error: masterError } = await supabase
@@ -155,7 +151,6 @@ export async function inheritProductMasterToAllDescendants(productMasterId: stri
     return { success: false, error: optionUpdateError }
   }
 
-  console.log(`✅ 전체 상속 완료: 원물 ${result1.updatedCount}개, 옵션상품 ${optionCount || 0}개`)
 
   return {
     success: true,
@@ -168,11 +163,9 @@ export async function inheritProductMasterToAllDescendants(productMasterId: stri
  * 원물 업데이트 시 옵션상품으로 상속
  */
 export async function inheritRawMaterialToAllOptionProducts(rawMaterialId: string) {
-  console.log(`🔄 원물 상속 시작: ${rawMaterialId}`)
   const result = await inheritRawMaterialToOptionProducts(rawMaterialId)
 
   if (result.success) {
-    console.log(`✅ 원물 상속 완료: 옵션상품 ${result.updatedCount}개`)
   }
 
   return result
@@ -233,7 +226,6 @@ export async function linkRawMaterialsToProductMaster(productMasterId: string) {
     else console.warn(`옵션상품 ${option.id} 매칭 실패:`, error.message)
   }
 
-  console.log(`✅ 매칭 완료: 원물 ${rawCount}개, 옵션상품 ${optionCount}개`)
   return {
     success: true,
     rawMaterialsLinked: rawCount,
@@ -270,7 +262,6 @@ export async function linkAllProductMasters() {
     }
   }
 
-  console.log(`✅ 전체 매칭 완료: ${productMasters.length}개 품목, 원물 ${totalRawMaterials}개, 옵션상품 ${totalOptionProducts}개`)
   return {
     success: true,
     productMastersCount: productMasters.length,

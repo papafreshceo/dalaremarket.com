@@ -43,8 +43,6 @@ export async function GET() {
     .select('*')
     .limit(10);
 
-  console.log('category_settings error:', catError);
-  console.log('category_settings raw:', rawCategorySettings);
 
   // 3. 옵션상품 샘플
   const { data: optionProducts } = await supabase

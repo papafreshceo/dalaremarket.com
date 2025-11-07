@@ -611,9 +611,6 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       return true;
     });
 
-    console.log(`[filteredOrders] 선택된 상태: ${selectedStatus}`);
-    console.log(`[filteredOrders] 날짜 필터 후: ${dateFilteredOrders.length}개`);
-    console.log(`[filteredOrders] 상태 필터 후: ${filtered.length}개`);
     if (filtered.length > 0) {
       console.log(`[filteredOrders] 첫 주문 샘플:`, {
         status: filtered[0].status,
@@ -1140,14 +1137,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     // startDate와 endDate 사이의 모든 기간 생성
     const allPeriods = getAllPeriods(startDate, endDate, productTimeUnit);
 
-    console.log(`[품목그래프-${productTimeUnit}] 전체 기간 개수:`, allPeriods.length);
-    console.log(`[품목그래프-${productTimeUnit}] dateItemMarketMap 크기:`, dateItemMarketMap.size);
 
     // 첫 번째 기간의 데이터 확인
     if (allPeriods.length > 0) {
       const firstPeriod = allPeriods[0];
       const firstData = dateItemMarketMap.get(firstPeriod);
-      console.log(`[품목그래프-${productTimeUnit}] 첫 번째 기간 (${firstPeriod}) 데이터:`, firstData);
     }
 
     // 15개 초과 시 15개로 샘플링
@@ -1343,14 +1337,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     // startDate와 endDate 사이의 모든 기간 생성
     const allPeriods = getAllPeriods(startDate, endDate, optionTimeUnit);
 
-    console.log(`[옵션그래프-${optionTimeUnit}] 전체 기간 개수:`, allPeriods.length);
-    console.log(`[옵션그래프-${optionTimeUnit}] dateItemMarketMap 크기:`, dateItemMarketMap.size);
 
     // 첫 번째 기간의 데이터 확인
     if (allPeriods.length > 0) {
       const firstPeriod = allPeriods[0];
       const firstData = dateItemMarketMap.get(firstPeriod);
-      console.log(`[옵션그래프-${optionTimeUnit}] 첫 번째 기간 (${firstPeriod}) 데이터:`, firstData);
     }
 
     // 15개 초과 시 15개로 샘플링

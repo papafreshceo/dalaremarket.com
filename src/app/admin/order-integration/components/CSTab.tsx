@@ -167,8 +167,6 @@ export default function CSTab() {
       const recordsResult = await recordsResponse.json();
       const statsResult = await statsResponse.json();
 
-      console.log('CS 기록 로드 결과:', recordsResult);
-      console.log('데이터 개수:', recordsResult.data?.length);
 
       if (recordsResult.success) {
         setRecords(recordsResult.data || []);

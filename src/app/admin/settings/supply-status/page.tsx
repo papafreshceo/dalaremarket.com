@@ -266,7 +266,6 @@ export default function SupplyStatusSettingsPage() {
         status_type: activeTab
       }
 
-      console.log('💾 저장 시도:', dataToSave);
 
       let result;
       if (editingStatus) {
@@ -280,7 +279,6 @@ export default function SupplyStatusSettingsPage() {
           .insert([dataToSave])
       }
 
-      console.log('💾 저장 결과:', result);
 
       if (result.error) {
         console.error('❌ 저장 오류:', result.error);

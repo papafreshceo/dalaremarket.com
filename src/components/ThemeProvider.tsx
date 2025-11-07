@@ -24,7 +24,6 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
             document.body.style.backgroundColor = css_variables['--color-background'];
           }
 
-          console.log('✅ Design theme applied:', result.data.name);
         }
       } catch (error) {
         console.error('Failed to load design theme:', error);

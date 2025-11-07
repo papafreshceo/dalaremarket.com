@@ -70,7 +70,6 @@ export default function SecurityPage() {
 
   const handleSave = () => {
     toast.success('보안 설정이 저장되었습니다.');
-    console.log('Saved settings:', settings);
   };
 
   const ToggleSwitch = ({ value, onChange }: any) => (

@@ -86,7 +86,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         .eq('id', userId)
 
       if (error) {
-        console.warn('Failed to save theme to DB:', error)
       }
     }
   }

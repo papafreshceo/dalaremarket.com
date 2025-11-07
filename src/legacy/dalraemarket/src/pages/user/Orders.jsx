@@ -88,7 +88,6 @@ function Orders() {
   };
 
   const handleFiles = (files) => {
-    console.log('Files:', files);
     alert('엑셀 파일이 업로드되었습니다.');
     setShowUploadModal(false);
   };

@@ -39,7 +39,6 @@ export async function POST(request: NextRequest) {
     );
 
     const data = await response.json();
-    console.log('API Response from server:', data);
 
     return NextResponse.json(data);
   } catch (error) {

@@ -59,11 +59,9 @@ export default function AllProductsPage() {
       .eq('is_active', true)
       .order('display_order');
 
-    console.log('🔍 Supply Status Settings 조회:', { data, error });
 
     if (data) {
       setSupplyStatuses(data);
-      console.log('✅ Supply Statuses 설정됨:', data);
     }
   };
 
@@ -128,8 +126,6 @@ export default function AllProductsPage() {
         console.error('대표이미지 조회 오류:', imgError);
       }
 
-      console.log('대표이미지 조회 결과:', representativeImages?.length, '개');
-      console.log('샘플 대표이미지:', representativeImages?.[0]);
 
       // 4. 옵션상품별 대표이미지 맵핑 (option_product_id 기준)
       const optionImageMap = new Map(
@@ -138,7 +134,6 @@ export default function AllProductsPage() {
           .map(img => [img.option_product_id, img.secure_url])
       );
 
-      console.log('옵션상품 이미지 맵:', optionImageMap.size, '개');
 
       // 5. 품목별 대표이미지 맵핑 (category_4_id -> category_4 이름으로 변환)
       const newCategoryImageMap = new Map(
@@ -146,13 +141,11 @@ export default function AllProductsPage() {
           .filter(img => img.category_4_id)
           .map(img => {
             const categoryName = categoryIdToNameMap.get(img.category_4_id);
-            console.log('품목 이미지 매핑:', img.category_4_id, '->', categoryName);
             return [categoryName, img.secure_url];
           })
           .filter(([categoryName]) => categoryName) // 품목명이 있는 것만
       );
 
-      console.log('품목 이미지 맵:', newCategoryImageMap.size, '개');
 
       // 상태로 저장 (카드보기에서 품목 썸네일 표시용)
       setCategoryImageMap(newCategoryImageMap);
@@ -199,9 +192,6 @@ export default function AllProductsPage() {
           return categorySupply && optionSupply;
         });
 
-      console.log('조회된 상품 수:', productsWithThumbnail.length);
-      console.log('옵션상품 대표이미지 수:', optionImageMap.size);
-      console.log('품목 대표이미지 수:', newCategoryImageMap.size);
       console.log('🎯 시즌 날짜 샘플:', {
         season_start: productsWithThumbnail[0]?.season_start_date,
         season_end: productsWithThumbnail[0]?.season_end_date

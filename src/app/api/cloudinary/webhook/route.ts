@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
 
     // JSON 파싱
     const data = JSON.parse(body);
-    console.log('Cloudinary Webhook 수신:', data);
 
     const { notification_type, public_id } = data;
 
@@ -73,7 +72,6 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        console.log(`✅ DB에서 이미지 삭제 완료: ${image.filename} (${public_id})`);
         return NextResponse.json({
           success: true,
           message: 'Image deleted from database',
@@ -84,7 +82,6 @@ export async function POST(request: NextRequest) {
           }
         });
       } else {
-        console.log(`⚠️  DB에 해당 이미지 없음: ${public_id}`);
         return NextResponse.json({
           success: true,
           message: 'Image not found in database (already deleted or never stored)',
@@ -94,7 +91,6 @@ export async function POST(request: NextRequest) {
     }
 
     // 기타 이벤트는 로그만 남김
-    console.log(`기타 이벤트 수신: ${notification_type}`);
     return NextResponse.json({
       success: true,
       message: 'Event received but not processed',

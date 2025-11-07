@@ -63,7 +63,6 @@ export default function SellerInfoValidationModal({
         depositorName = extraData?.depositor_name || '';
       } catch (e) {
         // depositor_name 칼럼이 없으면 빈 값으로 처리
-        console.log('depositor_name 칼럼이 없습니다 (마이그레이션 필요)');
       }
 
       const loadedInfo = {
@@ -193,7 +192,6 @@ export default function SellerInfoValidationModal({
             .update({ depositor_name: userInfo.depositor_name })
             .eq('id', userId);
         } catch (e) {
-          console.log('depositor_name 업데이트 건너뜀 (칼럼 없음)');
         }
       }
 

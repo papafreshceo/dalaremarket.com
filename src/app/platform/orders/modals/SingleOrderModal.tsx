@@ -192,16 +192,11 @@ export default function SingleOrderModal({
     const selectedRecipient = recipients.find(r => r.id === selectedRecipientId);
     if (!selectedRecipient) return;
 
-    console.log('선택된 배지 ID:', selectedRecipient.selectedBadgeId);
-    console.log('옵션명:', option.option_name);
-    console.log('현재 배지들:', selectedRecipient.badges.map(b => b.optionName));
 
     // 선택된 배지가 없고, 중복 체크 필요한 경우
     if (selectedRecipient.selectedBadgeId === null) {
       const isDuplicate = selectedRecipient.badges.some(badge => badge.optionName === option.option_name);
-      console.log('중복 체크 결과:', isDuplicate);
       if (isDuplicate) {
-        console.log('토스트 호출!');
         showErrorToast('이미 추가된 상품입니다');
         return;
       }
@@ -342,7 +337,6 @@ export default function SingleOrderModal({
         return;
       }
 
-      console.log('품목 조회 결과:', data);
       setProductMasters(data || []);
     } catch (error) {
       console.error('품목 조회 실패:', error);
@@ -351,20 +345,15 @@ export default function SingleOrderModal({
 
   // 품목 선택 시 옵션상품 로드
   useEffect(() => {
-    console.log('selectedProductMaster changed:', selectedProductMaster);
     if (selectedProductMaster) {
-      console.log('Fetching options for product:', selectedProductMaster.id);
       fetchOptionProducts(selectedProductMaster.id);
     } else {
-      console.log('No product selected, clearing options');
       setOptionProducts([]);
     }
   }, [selectedProductMaster]);
 
   const fetchOptionProducts = async (productMasterId: string) => {
-    console.log('fetchOptionProducts called with id:', productMasterId);
     if (!productMasterId) {
-      console.log('No productMasterId provided, returning');
       return;
     }
 
@@ -372,7 +361,6 @@ export default function SingleOrderModal({
     const supabase = createClient();
 
     try {
-      console.log('Querying option_products for product_master_id:', productMasterId);
       const { data, error } = await supabase
         .from('option_products')
         .select('id, option_name, option_code, seller_supply_price')
@@ -386,16 +374,12 @@ export default function SingleOrderModal({
         return;
       }
 
-      console.log('Options loaded:', data);
-      console.log('Number of options:', data?.length || 0);
       setOptionProducts(data || []);
 
       // 첫 번째 옵션을 기본 선택
       if (data && data.length > 0) {
-        console.log('Setting first option as default:', data[0]);
         setSelectedOption(data[0]);
       } else {
-        console.log('No options found for this product');
         setSelectedOption(null);
       }
     } catch (error) {
@@ -404,7 +388,6 @@ export default function SingleOrderModal({
       setSelectedOption(null);
     } finally {
       setLoadingOptions(false);
-      console.log('Loading options complete');
     }
   };
 
@@ -599,28 +582,20 @@ export default function SingleOrderModal({
   };
 
   const validateForm = () => {
-    console.log('🔍 검증 시작');
-    console.log('주문자:', formData.orderer);
-    console.log('주문자 연락처:', formData.ordererPhone);
-    console.log('수령인 목록:', recipients);
 
     // 주문자 정보 검증
     if (!formData.orderer || !formData.orderer.trim()) {
-      console.log('❌ 주문자명 없음');
       toast.error('주문자명을 입력하세요');
       return false;
     }
     if (!formData.ordererPhone || !formData.ordererPhone.trim()) {
-      console.log('❌ 주문자 연락처 없음');
       toast.error('주문자 연락처를 입력하세요');
       return false;
     }
 
     // 전체 옵션 상품 개수 확인
     const totalBadges = recipients.reduce((sum, recipient) => sum + recipient.badges.length, 0);
-    console.log('총 옵션 상품 개수:', totalBadges);
     if (totalBadges === 0) {
-      console.log('❌ 옵션 상품 없음');
       toast.error('옵션 상품을 선택해주세요');
       return false;
     }
@@ -628,31 +603,25 @@ export default function SingleOrderModal({
     // 수령인별 검증
     for (let i = 0; i < recipients.length; i++) {
       const recipient = recipients[i];
-      console.log(`수령인 ${i + 1} 검증:`, recipient);
 
       if (!recipient.recipient || !recipient.recipient.trim()) {
-        console.log(`❌ 수령인 ${i + 1} 이름 없음`);
         toast.error(`수령인 정보를 입력하세요`);
         return false;
       }
       if (!recipient.recipientPhone || !recipient.recipientPhone.trim()) {
-        console.log(`❌ 수령인 ${i + 1} 연락처 없음`);
         toast.error(`수령인 연락처를 입력하세요`);
         return false;
       }
       if (!recipient.address || !recipient.address.trim()) {
-        console.log(`❌ 수령인 ${i + 1} 배송지 없음`);
         toast.error(`배송지를 입력하세요`);
         return false;
       }
       if (recipient.badges.length === 0) {
-        console.log(`❌ 수령인 ${i + 1} 상품 없음`);
         toast.error(`수령인에게 상품을 추가하세요`);
         return false;
       }
     }
 
-    console.log('✅ 검증 성공');
     return true;
   };
 
@@ -927,11 +896,8 @@ export default function SingleOrderModal({
               <select
                 value={selectedProductMaster?.id || ''}
                 onChange={(e) => {
-                  console.log('Dropdown changed, selected value:', e.target.value);
                   const productId = e.target.value;
-                  console.log('Product ID (string):', productId);
                   const product = productMasters.find(p => p.id === productId);
-                  console.log('Found product:', product);
                   setSelectedProductMaster(product || null);
                 }}
                 style={{

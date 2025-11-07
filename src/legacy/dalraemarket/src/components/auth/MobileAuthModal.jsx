@@ -158,7 +158,6 @@ function MobileAuthModal({ isOpen, onClose, initialMode = 'login' }) {
       return;
     }
     
-    console.log('모바일 로그인:', formData);
     alert('로그인되었습니다!');
     handleClose();
   };

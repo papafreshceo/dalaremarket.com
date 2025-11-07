@@ -32,7 +32,6 @@ export async function POST(request: NextRequest) {
     }
 
     const channelData = await channelResponse.json();
-    console.log('채널 데이터:', channelData);
     if (!channelData.items || channelData.items.length === 0) {
       return NextResponse.json(
         { success: false, error: '채널을 찾을 수 없습니다.' },

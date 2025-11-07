@@ -55,7 +55,6 @@ export async function POST(request: NextRequest) {
         EXECUTE FUNCTION update_ranking_participation_updated_at();
     `;
 
-    console.log('📝 테이블 생성 중...');
     const { error: tableError } = await supabase.rpc('exec_sql' as any, {
       sql: createTableSQL
     } as any);
@@ -65,17 +64,14 @@ export async function POST(request: NextRequest) {
       // 테이블이 이미 존재하는 경우 무시하고 계속 진행
     }
 
-    console.log('📝 인덱스 생성 중...');
     const { error: indexError } = await supabase.rpc('exec_sql' as any, {
       sql: createIndexesSQL
     } as any);
 
-    console.log('📝 트리거 함수 생성 중...');
     const { error: functionError } = await supabase.rpc('exec_sql' as any, {
       sql: createTriggerFunctionSQL
     } as any);
 
-    console.log('📝 트리거 생성 중...');
     const { error: triggerError } = await supabase.rpc('exec_sql' as any, {
       sql: createTriggerSQL
     } as any);

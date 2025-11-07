@@ -173,16 +173,12 @@ export default function OptionValidationModal({
           product = data;
           // Map에도 추가
           optionProducts.set(trimmedOption, product);
-          console.log(`🔍 [DB 조회 성공] "${optionName}" → 공급단가: ${product.seller_supply_price}원`);
         } else {
-          console.log(`🔍 [DB 조회 실패] "${optionName}" - 옵션상품이 DB에 없습니다`);
         }
       } catch (error) {
-        console.log(`🔍 [DB 조회 오류] "${optionName}"`, error);
       }
     }
 
-    console.log(`🔍 [수정 후 검증] "${optionName}" → "${trimmedOption}"`, product ? '✅ 매칭 성공' : '❌ 매칭 실패');
 
     if (product) {
       // 매칭 성공

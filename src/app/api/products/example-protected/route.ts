@@ -42,7 +42,6 @@ export const POST = withPermission(
     const body = await request.json()
 
     // 권한 체크 통과! 안전하게 데이터 생성
-    console.log(`${userData.name}(${userData.role})이 상품을 생성합니다.`)
 
     // 실제 비즈니스 로직
     const newProduct = {
@@ -73,7 +72,6 @@ export const DELETE = withPermission(
     const productId = searchParams.get('id')
 
     // 권한 체크 통과! 안전하게 데이터 삭제
-    console.log(`${userData.name}(${userData.role})이 상품 ${productId}를 삭제합니다.`)
 
     // 실제 비즈니스 로직
     // await supabase.from('products').delete().eq('id', productId)

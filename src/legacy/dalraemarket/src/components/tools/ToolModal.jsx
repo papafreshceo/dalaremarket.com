@@ -27,9 +27,6 @@ function ToolModal({ isOpen, onClose, toolId, toolName }) {
   // 선택된 도구 컴포넌트 가져오기
   const ToolComponent = toolComponents[toolId];
   
-  console.log('ToolModal - toolId:', toolId);
-  console.log('ToolModal - toolComponents:', toolComponents);
-  console.log('ToolModal - ToolComponent found:', !!ToolComponent);
 
   return (
     <div 

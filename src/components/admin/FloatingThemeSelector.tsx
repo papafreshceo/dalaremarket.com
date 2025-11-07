@@ -87,7 +87,6 @@ export function FloatingThemeSelector({ onClose }: FloatingThemeSelectorProps) {
       }
     });
 
-    console.log('✅ 테마 미리보기 적용:', theme.name);
   };
 
   const handlePreview = (theme: DesignTheme) => {

@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 export async function POST() {
   const supabase = await createClient();
 
-  console.log('=== 대표이미지 초기화 시작 ===');
 
   // 외래 키가 모두 null인데 is_representative가 true인 이미지들을 찾아서 false로 변경
   const { data: fixed, error } = await supabase
@@ -21,8 +20,6 @@ export async function POST() {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 
-  console.log('초기화된 이미지 수:', fixed?.length || 0);
-  console.log('초기화된 이미지 ID:', fixed?.map(img => img.id));
 
   return NextResponse.json({
     success: true,

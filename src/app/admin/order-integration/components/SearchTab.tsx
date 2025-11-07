@@ -413,16 +413,12 @@ export default function SearchTab() {
       const response = await fetch('/api/market-templates');
       const result = await response.json();
 
-      console.log('🎯 마켓 템플릿 API 응답:', result);
 
       if (result.success) {
         const templateMap = new Map<string, any>();
         result.data.forEach((template: any) => {
           templateMap.set(template.market_name.toLowerCase(), template);
         });
-        console.log('✅ 마켓 템플릿 로드 완료:', templateMap.size, '개');
-        console.log('📋 저장된 마켓 목록:', Array.from(templateMap.keys()));
-        console.log('템플릿 샘플:', Array.from(templateMap.entries()).slice(0, 3));
         setMarketTemplates(templateMap);
         return templateMap;
       }
@@ -674,7 +670,6 @@ export default function SearchTab() {
       else if (filters.shippingStatus) params.append('shippingStatus', filters.shippingStatus);
       if (filters.vendorName) params.append('vendorName', filters.vendorName);
 
-      console.log('📊 [React Query] 통계 조회 시작:', Object.fromEntries(params));
 
       const response = await fetch(`/api/integrated-orders/stats?${params}`);
       const result = await response.json();
@@ -683,7 +678,6 @@ export default function SearchTab() {
         throw new Error(result.error || '통계 조회 실패');
       }
 
-      console.log('✅ [React Query] 통계 조회 성공:', result.data.stats);
       return result.data;
     },
     enabled: false, // 수동 트리거 (fetchOrders에서 호출)
@@ -705,7 +699,6 @@ export default function SearchTab() {
       if (filters.vendorName) params.append('vendorName', filters.vendorName);
       params.append('limit', '10000');
 
-      console.log('🔍 [React Query] 주문 조회 시작:', Object.fromEntries(params));
 
       const response = await fetch(`/api/integrated-orders?${params}`);
       const result = await response.json();
@@ -714,7 +707,6 @@ export default function SearchTab() {
         throw new Error(result.error || '주문 조회 실패');
       }
 
-      console.log('✅ [React Query] 주문 조회 성공:', result.data?.length);
       return result.data || [];
     },
     enabled: false, // 수동 트리거
@@ -750,7 +742,6 @@ export default function SearchTab() {
       params.append('limit', itemsPerPage.toString());
       params.append('offset', offset.toString());
 
-      console.log(`🔍 ${logPrefix} 주문 조회 시작 (page: ${page}, offset: ${offset}):`, Object.fromEntries(params));
       const response = await fetch(`/api/integrated-orders?${params}`);
       const result = await response.json();
       if (!result.success) throw new Error(result.error || '주문 조회 실패');
@@ -780,7 +771,6 @@ export default function SearchTab() {
       // if (targetFilters.shippingStatus) params.append('shippingStatus', targetFilters.shippingStatus); // 제거!
       if (targetFilters.vendorName) params.append('vendorName', targetFilters.vendorName);
 
-      console.log(`📊 ${logPrefix} 통계 조회 시작:`, Object.fromEntries(params));
       const response = await fetch(`/api/integrated-orders/stats?${params}`);
       const result = await response.json();
       if (!result.success) throw new Error(result.error || '통계 조회 실패');
@@ -795,14 +785,12 @@ export default function SearchTab() {
 
       // 주문 데이터 처리
       setOrders(ordersData);
-      console.log(`✅ ${logPrefix} Orders updated:`, ordersData.length, `(page ${page})`);
 
       // 통계 데이터 처리
       setStats(statsData.stats);
       setVendorStats(statsData.vendorStats);
       setSellerStats(statsData.sellerStats);
       setOptionStats(statsData.optionStats);
-      console.log(`✅ ${logPrefix} Stats updated`);
     } finally {
       setIsLoading(false);
     }
@@ -1372,7 +1360,6 @@ export default function SearchTab() {
         return;
       }
 
-      console.log('💰 입금확인 시작:', ordersToConfirm.length, '건');
 
       const ordersToSave = ordersToConfirm.map((order: Order) => ({
         id: order.id,
@@ -1521,7 +1508,6 @@ export default function SearchTab() {
         shipping_status: '발송완료', // 상태를 발송완료로 변경
       }));
 
-      console.log('🔄 송장수정 시작:', ordersToSave.length, '건');
 
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'PUT',
@@ -1559,14 +1545,10 @@ export default function SearchTab() {
     }
 
     try {
-      console.log('📋 selectedOrders:', selectedOrders);
-      console.log('📋 filteredOrders 개수:', filteredOrders.length);
-      console.log('📋 filteredOrders 샘플 ID:', filteredOrders.slice(0, 3).map(o => o.id));
 
       // 선택된 주문만 필터링 (filteredOrders 사용)
       const selectedOrderList = filteredOrders.filter(order => selectedOrders.includes(order.id));
 
-      console.log('✅ 필터링된 주문 개수:', selectedOrderList.length);
 
       if (selectedOrderList.length === 0) {
         alert('선택된 주문을 찾을 수 없습니다.');
@@ -1582,7 +1564,6 @@ export default function SearchTab() {
         shipping_status: '상품준비중',
       }));
 
-      console.log('🔙 송장회수 시작:', ordersToSave.length, '건');
 
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'PUT',
@@ -1800,7 +1781,6 @@ export default function SearchTab() {
 
   // 마켓별 송장파일 다운로드
   const handleMarketInvoiceDownload = async (marketName: string) => {
-    console.log('📦 [송장다운로드] 시작:', marketName);
 
     try {
       // 서버에서 현재 필터 조건으로 전체 주문 가져오기 (페이지네이션 없이)
@@ -1823,15 +1803,12 @@ export default function SearchTab() {
         return;
       }
 
-      console.log('📦 [송장다운로드] 서버에서 받은 전체 주문 수:', (data.data || []).length);
-      console.log('📦 [송장다운로드] 마켓명:', marketName);
 
       // 필터된 전체 주문에서 발송완료 + 해당 마켓만
       const marketOrders = (data.data || []).filter(
         (o: Order) => o.shipping_status === '발송완료' && (o.market_name || '미지정') === marketName
       );
 
-      console.log('📦 [송장다운로드] 발송완료 상태의', marketName, '마켓 주문 수:', marketOrders.length);
 
       if (marketOrders.length === 0) {
         alert('다운로드할 주문이 없습니다.');
@@ -1840,19 +1817,16 @@ export default function SearchTab() {
 
       // 마켓 송장 템플릿 가져오기
       const apiUrl = `/api/market-invoice-templates/${encodeURIComponent(marketName)}`;
-      console.log('📦 [송장다운로드] API 호출:', apiUrl);
 
       const response = await fetch(apiUrl);
       const result = await response.json();
 
-      console.log('📦 [송장다운로드] API 응답:', result);
 
       let exportData;
 
       if (result.success && result.data && result.data.columns.length > 0) {
         // 템플릿이 있는 경우: 템플릿에 맞게 데이터 변환
         const template = result.data;
-        console.log('✅ [송장다운로드] 템플릿 발견:', template.template_name, '컬럼 수:', template.columns.length);
 
         // order 필드로 컬럼 정렬
         const sortedColumns = [...template.columns].sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -1877,10 +1851,8 @@ export default function SearchTab() {
           return row;
         });
 
-        console.log('✅ [송장다운로드] 템플릿 적용 완료, 헤더:', Object.keys(exportData[0] || {}));
       } else {
         // 템플릿이 없는 경우: 기본 양식 사용
-        console.log('⚠️ [송장다운로드] 템플릿 없음 - 기본 양식 사용');
         exportData = marketOrders.map((order) => ({
           주문번호: order.order_number,
           수취인: order.recipient_name,
@@ -1900,7 +1872,6 @@ export default function SearchTab() {
         : marketName;
 
       const worksheet = workbook.addWorksheet(sheetName);
-      console.log('📄 [송장다운로드] 시트명:', sheetName);
 
       if (exportData.length > 0) {
         // 헤더 추가 (템플릿이 있으면 width와 headerColor 사용)
@@ -2174,7 +2145,6 @@ export default function SearchTab() {
     }
 
     try {
-      console.log('📄 선택된 파일:', bulkInvoiceFile.name, '크기:', bulkInvoiceFile.size, 'bytes');
 
       const reader = new FileReader();
       reader.onload = async (e) => {
@@ -2197,9 +2167,6 @@ export default function SearchTab() {
           jsonData.push(rowData);
         });
 
-        console.log('📊 엑셀에서 읽은 전체 행 수:', jsonData.length);
-        console.log('📋 첫 번째 행 데이터:', jsonData[0]);
-        console.log('📋 엑셀 컬럼명:', Object.keys(jsonData[0] || {}));
 
         if (jsonData.length === 0) {
           alert('엑셀 파일에 데이터가 없습니다.');
@@ -2232,7 +2199,6 @@ export default function SearchTab() {
             }
 
             if (idx < 3) {
-              console.log(`엑셀 ${idx + 1}행:`, {원본: orderNumber, 타입: typeof orderNumber, 변환후: key});
             }
 
             invoiceMap.set(key, {
@@ -2247,8 +2213,6 @@ export default function SearchTab() {
           return;
         }
 
-        console.log('📦 엑셀에서 읽은 송장 정보:', invoiceMap.size, '건');
-        console.log('📦 엑셀 주문번호 샘플 (처음 5개):', Array.from(invoiceMap.keys()).slice(0, 5));
 
         // 서버에서 현재 필터 조건으로 전체 주문 가져오기
         const params = new URLSearchParams();
@@ -2278,9 +2242,6 @@ export default function SearchTab() {
 
         const targetOrders = allOrders.filter((order: Order) => order.shipping_status === '상품준비중');
 
-        console.log('📋 전체 주문 수:', allOrders.length, '건');
-        console.log('📋 상품준비중 주문 수:', targetOrders.length, '건');
-        console.log('📋 주문번호 샘플 (처음 5개):', targetOrders.slice(0, 5).map((o: Order) => o.order_number));
 
         let matchCount = 0;
         let notMatchCount = 0;
@@ -2314,20 +2275,16 @@ export default function SearchTab() {
               });
               matchCount++;
               if (matchCount <= 3) {
-                console.log(`✅ 매칭 성공 ${matchCount}:`, key);
               }
             } else {
               notMatchCount++;
               if (notMatchCount <= 3) {
-                console.log(`❌ 매칭 실패 ${notMatchCount}:`, key, '(엑셀에 없음)');
               }
             }
           }
         });
 
-        console.log(`📊 매칭 결과: 성공 ${matchCount}건, 실패 ${notMatchCount}건`);
 
-        console.log('✅ 매칭된 주문:', updates.length, '건');
 
         if (updates.length === 0) {
           alert('매칭되는 주문이 없습니다.');
@@ -2381,7 +2338,6 @@ export default function SearchTab() {
     }
 
     try {
-      console.log('📄 선택된 파일:', bulkInvoiceUpdateFile.name, '크기:', bulkInvoiceUpdateFile.size, 'bytes');
 
       const reader = new FileReader();
       reader.onload = async (e) => {
@@ -2404,9 +2360,6 @@ export default function SearchTab() {
           jsonData.push(rowData);
         });
 
-        console.log('📊 엑셀에서 읽은 전체 행 수:', jsonData.length);
-        console.log('📋 첫 번째 행 데이터:', jsonData[0]);
-        console.log('📋 엑셀 컬럼명:', Object.keys(jsonData[0] || {}));
 
         if (jsonData.length === 0) {
           alert('엑셀 파일에 데이터가 없습니다.');
@@ -2439,7 +2392,6 @@ export default function SearchTab() {
             }
 
             if (idx < 3) {
-              console.log(`엑셀 ${idx + 1}행:`, {원본: orderNumber, 타입: typeof orderNumber, 변환후: key});
             }
 
             invoiceMap.set(key, {
@@ -2454,8 +2406,6 @@ export default function SearchTab() {
           return;
         }
 
-        console.log('📦 엑셀에서 읽은 송장 정보:', invoiceMap.size, '건');
-        console.log('📦 엑셀 주문번호 샘플 (처음 5개):', Array.from(invoiceMap.keys()).slice(0, 5));
 
         // 서버에서 현재 필터 조건으로 전체 주문 가져오기
         const params = new URLSearchParams();
@@ -2485,9 +2435,6 @@ export default function SearchTab() {
 
         const targetOrders = allOrders.filter((order: Order) => order.shipping_status === '발송완료');
 
-        console.log('📋 전체 주문 수:', allOrders.length, '건');
-        console.log('📋 발송완료 주문 수:', targetOrders.length, '건');
-        console.log('📋 주문번호 샘플 (처음 5개):', targetOrders.slice(0, 5).map((o: Order) => o.order_number));
 
         let matchCount = 0;
         let notMatchCount = 0;
@@ -2521,20 +2468,16 @@ export default function SearchTab() {
               });
               matchCount++;
               if (matchCount <= 3) {
-                console.log(`✅ 매칭 성공 ${matchCount}:`, key);
               }
             } else {
               notMatchCount++;
               if (notMatchCount <= 3) {
-                console.log(`❌ 매칭 실패 ${notMatchCount}:`, key, '(엑셀에 없음)');
               }
             }
           }
         });
 
-        console.log(`📊 매칭 결과: 성공 ${matchCount}건, 실패 ${notMatchCount}건`);
 
-        console.log('✅ 매칭된 주문:', updates.length, '건');
 
         if (updates.length === 0) {
           alert('매칭되는 주문이 없습니다.');
@@ -2736,7 +2679,6 @@ export default function SearchTab() {
 
     try {
       // 0. CS 기록 중복 검증
-      console.log('🔍 CS 중복 검증 시작:', selectedOrder.order_number);
       const duplicateCheckResponse = await fetch(
         `/api/cs-records?orderNumber=${encodeURIComponent(selectedOrder.order_number)}`
       );
@@ -2752,12 +2694,9 @@ export default function SearchTab() {
           `그래도 중복 등록하시겠습니까?`;
 
         if (!confirm(confirmMessage)) {
-          console.log('❌ 사용자가 중복 등록을 취소했습니다.');
           return;
         }
-        console.log('✅ 사용자가 중복 등록을 승인했습니다.');
       } else {
-        console.log('✅ 중복된 CS 기록 없음');
       }
 
       // 1. CS 기록 저장
@@ -2792,7 +2731,6 @@ export default function SearchTab() {
         account_number: csFormData.solution === 'partial_refund' ? csFormData.accountNumber : null,
       };
 
-      console.log('📤 CS 기록 저장 요청 데이터:', csRecordData);
 
       const csResponse = await fetch('/api/cs-records', {
         method: 'POST',
@@ -2800,11 +2738,9 @@ export default function SearchTab() {
         body: JSON.stringify(csRecordData),
       });
 
-      console.log('📡 CS API 응답 상태:', csResponse.status);
 
       const csResult = await csResponse.json();
 
-      console.log('📥 CS 기록 저장 응답:', csResult);
 
       if (!csResult.success) {
         console.error('❌ CS 기록 저장 실패 상세:', csResult);
@@ -2853,7 +2789,6 @@ export default function SearchTab() {
           cs_type: csFormData.solution || null,
         };
 
-        console.log('📤 재발송 주문 생성 요청 데이터:', newOrderData);
 
         // 주문 생성 API 호출
         const createOrderResponse = await fetch('/api/integrated-orders', {
@@ -2862,18 +2797,15 @@ export default function SearchTab() {
           body: JSON.stringify(newOrderData),
         });
 
-        console.log('📡 재발송 주문 생성 응답 상태:', createOrderResponse.status);
 
         const createOrderResult = await createOrderResponse.json();
 
-        console.log('📥 재발송 주문 생성 응답:', createOrderResult);
 
         if (!createOrderResult.success) {
           alert('재발송 주문 생성 실패: ' + createOrderResult.error);
           return;
         }
 
-        console.log('✅ 재발송 주문 생성 완료:', csOrderNumber, '/ ID:', createOrderResult.data?.id);
       }
 
       // 3. 원주문의 cs_status 업데이트

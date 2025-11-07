@@ -317,7 +317,6 @@ export default function MappingSettingsPage() {
       const promises = dataToSave.map(async (row) => {
         const { market_name, id, created_at, updated_at, ...updates } = row
 
-        console.log('저장할 데이터:', { market_name, updates })
 
         const response = await fetch('/api/mapping-settings/fields', {
           method: 'PUT',
@@ -326,7 +325,6 @@ export default function MappingSettingsPage() {
         })
 
         const result = await response.json()
-        console.log('저장 결과:', result)
         return result
       })
 

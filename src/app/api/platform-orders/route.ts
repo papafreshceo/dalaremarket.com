@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
 
     // 비로그인 사용자이고 impersonate도 아닌 경우 샘플 데이터 반환
     if (!effectiveUserId) {
-      console.log('[GET platform-orders] 비로그인 사용자 - 샘플 데이터 제공');
 
       // 실제 option_products 조회 (service role 사용으로 RLS 우회)
       const { createClient: createServiceClient } = await import('@supabase/supabase-js');
@@ -48,7 +47,6 @@ export async function GET(request: NextRequest) {
         .eq('is_active', true);
 
       if (opError || !optionProducts || optionProducts.length === 0) {
-        console.warn('[GET platform-orders] 옵션 상품이 없습니다. 빈 샘플 데이터 반환');
         return NextResponse.json({
           success: true,
           data: [],
@@ -70,7 +68,6 @@ export async function GET(request: NextRequest) {
       // DB 포맷으로 변환
       const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, 'guest');
 
-      console.log(`[GET platform-orders] 비회원용 샘플 데이터 생성: ${sampleOrders.length}건 (오늘 기준 1년치)`);
 
       return NextResponse.json({
         success: true,
@@ -135,7 +132,6 @@ export async function GET(request: NextRequest) {
 
     // 샘플 데이터 반환 조건: show_sample_data가 true이고 실제 주문이 없을 때
     if (showSampleData && (!orders || orders.length === 0)) {
-      console.log('[GET platform-orders] 샘플 데이터 모드 활성화');
 
       // 실제 option_products 조회 (service role 사용으로 RLS 우회)
       const { createClient: createServiceClient } = await import('@supabase/supabase-js');
@@ -158,7 +154,6 @@ export async function GET(request: NextRequest) {
       }
 
       if (!optionProducts || optionProducts.length === 0) {
-        console.warn('[GET platform-orders] 옵션 상품이 없습니다. 빈 샘플 데이터 반환');
         return NextResponse.json({
           success: true,
           data: [],
@@ -179,7 +174,6 @@ export async function GET(request: NextRequest) {
       // DB 포맷으로 변환
       const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, effectiveUserId);
 
-      console.log(`[GET platform-orders] 회원용 샘플 데이터 생성: ${sampleOrders.length}건 (오늘 기준 1년치)`);
 
       return NextResponse.json({
         success: true,
@@ -250,7 +244,6 @@ export async function POST(request: NextRequest) {
       // 2단계: 옵션 상품 정보 자동 매핑 (공급단가, 발송정보 등)
       const ordersWithInfo = await enrichOrdersWithOptionInfo(orders);
 
-      console.log('[platform-orders] DB에 저장할 데이터 (첫 번째 주문):', JSON.stringify(ordersWithInfo[0], null, 2));
 
       // DB에 일괄 저장
       const { data, error } = await supabase
@@ -272,7 +265,6 @@ export async function POST(request: NextRequest) {
         .update({ show_sample_data: false })
         .eq('id', user.id);
 
-      console.log('[platform-orders] 샘플 모드 비활성화 (첫 주문 업로드)');
 
       return NextResponse.json({
         success: true,
@@ -322,7 +314,6 @@ export async function POST(request: NextRequest) {
         .update({ show_sample_data: false })
         .eq('id', user.id);
 
-      console.log('[platform-orders] 샘플 모드 비활성화 (첫 주문 업로드)');
 
       return NextResponse.json({
         success: true,

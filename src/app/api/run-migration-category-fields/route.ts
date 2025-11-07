@@ -8,7 +8,6 @@ const supabase = createClient(
 
 export async function POST() {
   try {
-    console.log('=== category_settings 테이블에 필드 추가 시작 ===');
 
     // SQL 실행을 위한 raw query
     const { data: result1, error: error1 } = await supabase

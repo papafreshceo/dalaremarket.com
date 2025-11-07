@@ -11,7 +11,6 @@ interface SeasonBandProps {
 export default function SeasonBand({ seasonStart, seasonEnd, className = '' }: SeasonBandProps) {
   const [showTooltip, setShowTooltip] = useState(false);
 
-  console.log('🎯 SeasonBand received:', { seasonStart, seasonEnd });
 
   // 시즌 날짜가 없으면 플레이스홀더 표시 (디버그용)
   if (!seasonStart || !seasonEnd) {

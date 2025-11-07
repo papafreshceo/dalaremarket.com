@@ -97,9 +97,7 @@ export default function Page() {
     }
 
     if (data) {
-      console.log('partner_types 데이터:', data)
       setPartnerTypes(data)
-      console.log('type_name 목록:', data.map(t => t.type_name))
     }
   }
 

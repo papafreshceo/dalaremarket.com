@@ -150,7 +150,6 @@ export default function CategorySettingsPage() {
           const key = `${row.expense_type || ''}|${row.category_1 || ''}|${row.category_2 || ''}|${row.category_3 || ''}|${row.category_4 || ''}`
 
           if (insertedKeys.has(key)) {
-            console.log('저장 중 중복 스킵:', row)
             continue
           }
 
@@ -181,7 +180,6 @@ export default function CategorySettingsPage() {
           if (!row.id || String(row.id).startsWith('temp_')) {
             // 이번 저장에서 이미 삽입했는지 체크
             if (insertedKeys.has(key)) {
-              console.log('저장 중 중복 스킵:', row)
               continue
             }
 
@@ -197,7 +195,6 @@ export default function CategorySettingsPage() {
               .limit(1)
 
             if (existing && existing.length > 0) {
-              console.log('DB 중복 스킵:', row)
               continue
             }
 
@@ -547,7 +544,6 @@ export default function CategorySettingsPage() {
         onDataReload={fetchCategories}
         excludeEmptyColumns={['category_1', 'category_2', 'category_3', 'category_4']}
         onCopy={(indices) => {
-          console.log('복사할 행:', indices)
         }}
         height="600px"
         globalSearchPlaceholder="대분류, 중분류, 소분류, 품목, 품종, 비고 검색"

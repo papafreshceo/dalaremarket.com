@@ -38,7 +38,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(`${users.length}명의 샘플 회원 발견:`, users.map(u => u.email));
 
     // 2. 각 샘플 회원의 ranking_participation 업데이트
     const results = [];
@@ -67,7 +66,6 @@ export async function POST(request: NextRequest) {
           error: updateError.message
         });
       } else {
-        console.log(`${user.email} 업데이트 완료`);
         successCount++;
         results.push({
           email: user.email,

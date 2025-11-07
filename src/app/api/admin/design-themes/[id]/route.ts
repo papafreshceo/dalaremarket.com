@@ -54,7 +54,6 @@ export async function PATCH(
     if (description !== undefined) updateData.description = description;
     if (css_variables !== undefined) updateData.css_variables = css_variables;
 
-    console.log('Updating theme:', id, 'with data:', updateData);
 
     const { data: theme, error } = await supabase
       .from('design_themes')

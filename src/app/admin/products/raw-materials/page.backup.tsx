@@ -1060,7 +1060,6 @@ export default function RawMaterialsManagementPage() {
       return
     }
 
-    console.log('저장할 데이터:', recordsToInsert)
 
     // 변경사항 안내
     const summary = recordsToInsert.map((record, idx) => {
@@ -1083,7 +1082,6 @@ export default function RawMaterialsManagementPage() {
       return
     }
 
-    console.log('저장 성공:', data)
     alert(`${recordsToInsert.length}개 원물의 시세가 기록되었습니다.`)
     closeModal()
   }

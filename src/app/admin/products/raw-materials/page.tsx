@@ -296,7 +296,6 @@ export default function RawMaterialsManagementPage() {
             (productMasters || []).map(pm => [pm.category_4, pm.supply_status])
           )
         } catch (err) {
-          console.warn('Failed to fetch products_master:', err)
         }
 
         // supplier name을 supplier_name 필드로 매핑하고 supplier 객체는 제거
@@ -350,7 +349,6 @@ export default function RawMaterialsManagementPage() {
     }
 
     if (data) {
-      console.log('Products master loaded:', data.length)
       setProductMasters(data)
     }
   }
@@ -824,7 +822,6 @@ export default function RawMaterialsManagementPage() {
 
   // EditableAdminGrid의 데이터 변경을 처리하는 핸들러
   const handleGridDataChange = (newData: RawMaterial[]) => {
-    console.log('[RawMaterials] handleGridDataChange called')
 
     // supplier_name 처리: 드롭다운에서 supplier name이 변경되면 supplier_id를 찾아서 업데이트
     let hasChanges = false
@@ -845,7 +842,6 @@ export default function RawMaterialsManagementPage() {
 
     // 실제 변경이 있을 때만 새 배열 설정, 없으면 원본 유지
     const finalData = hasChanges ? processedData : newData
-    console.log('[RawMaterials] hasChanges:', hasChanges, 'same reference:', finalData === newData)
     setGridData(finalData)
 
     // gridData의 변경사항을 materials에 반영 (새로 추가된 행도 포함)
@@ -953,7 +949,6 @@ export default function RawMaterialsManagementPage() {
         season_end_date: m.season_end_date || null,
         color_code: m.color_code || null,
       }))
-      console.log('Saving rows:', rows)
       const { error: upErr } = await supabase.from('raw_materials').upsert(rows, { onConflict: 'id' })
       if (upErr) throw upErr
 
@@ -1353,7 +1348,6 @@ export default function RawMaterialsManagementPage() {
       return
     }
 
-    console.log('저장할 데이터:', recordsToInsert)
 
     // 변경사항 안내
     const summary = recordsToInsert.map((record, idx) => {
@@ -1379,7 +1373,6 @@ export default function RawMaterialsManagementPage() {
       return
     }
 
-    console.log('저장 성공:', data)
     showToast(`${records.length}개 원물의 시세가 기록되었습니다.`, 'success')
     setPriceRecordConfirm(null)
     closeModal()
@@ -1499,7 +1492,6 @@ export default function RawMaterialsManagementPage() {
                   const worksheet = workbook.worksheets[0]
 
                   // 엑셀 시트의 범위 확인
-                  console.log('📄 엑셀 시트 범위:', worksheet.rowCount, 'x', worksheet.columnCount)
 
                   const jsonData: any[] = []
                   const headers: any[] = []
@@ -1516,14 +1508,12 @@ export default function RawMaterialsManagementPage() {
                     jsonData.push(rowData)
                   })
 
-                  console.log('📊 엑셀 원본 데이터 개수:', jsonData.length)
 
                   // 빈 행이나 모든 셀이 비어있는 행 확인
                   const emptyRows = jsonData.filter((row: any) => {
                     const values = Object.values(row)
                     return values.every(v => v === null || v === undefined || v === '')
                   })
-                  console.log('⚠️ 완전히 빈 행 개수:', emptyRows.length)
 
                   // 한글 헤더를 영문으로 매핑
                   const reverseFieldMapping: Record<string, string> = {
@@ -1662,15 +1652,12 @@ export default function RawMaterialsManagementPage() {
                   })
 
                   // 디버깅: 업로드 데이터 확인
-                  console.log('업로드할 데이터 샘플:', JSON.stringify(cleanData[0], null, 2))
                   const category5Check = cleanData.map(d => ({
                     material_code: d.material_code,
                     category_5: d.category_5,
                     category_5_type: typeof d.category_5,
                     has_category_5: 'category_5' in d
                   })).slice(0, 5)
-                  console.log('category_5 필드 확인:', JSON.stringify(category5Check, null, 2))
-                  console.log('전체 데이터 개수:', cleanData.length)
 
                   // 모달 열기 (교체/병합 선택)
                   setExcelUploadModal({ data: cleanData, mode: null })
@@ -3000,10 +2987,6 @@ export default function RawMaterialsManagementPage() {
                   const existingMap = new Map(existingProducts?.map(p => [String(p.material_code).trim(), p.id]) || [])
                   const existingIdSet = new Set(existingProducts?.map(p => p.id) || [])  // 기존 id 목록
 
-                  console.log('기존 데이터 수:', existingProducts?.length)
-                  console.log('업로드할 데이터 수:', excelUploadModal.data.length)
-                  console.log('기존 material_code 샘플:', Array.from(existingMap.keys()).slice(0, 5))
-                  console.log('기존 id 개수:', existingIdSet.size)
 
                   const dataToUpsert = excelUploadModal.data
 
@@ -3048,14 +3031,10 @@ export default function RawMaterialsManagementPage() {
                       return itemWithoutId
                     })
 
-                  console.log('📦 DB에 존재하는 id (업데이트):', dataWithId.length)
-                  console.log('📦 DB에 없는 데이터 (신규 추가):', dataWithoutId.length)
 
                   // 새로운 id가 포함된 항목 로그
                   const newIdsInExcel = dataToUpsert.filter((item: any) => item.id && !existingIdSet.has(item.id))
                   if (newIdsInExcel.length > 0) {
-                    console.log(`ℹ️ 엑셀에 있지만 DB에 없는 id: ${newIdsInExcel.length}개 (신규 추가로 처리)`)
-                    console.log('샘플:', newIdsInExcel.slice(0, 3).map(d => ({ name: d.material_name, code: d.material_code, id: d.id })))
                   }
 
                   // 추가/수정 분류
@@ -3081,12 +3060,10 @@ export default function RawMaterialsManagementPage() {
                       showToast('업로드 중 오류가 발생했습니다.', 'error')
                       return
                     }
-                    console.log('✅ 기존 데이터 업데이트 완료:', dataWithId.length)
                   }
 
                   // 2. id가 없는 데이터 신규 추가
                   if (dataWithoutId.length > 0) {
-                    console.log('📦 삽입할 데이터 샘플:', JSON.stringify(dataWithoutId[0], null, 2))
                     const { error: insertError } = await supabase
                       .from('raw_materials')
                       .insert(dataWithoutId)
@@ -3101,14 +3078,12 @@ export default function RawMaterialsManagementPage() {
                       showToast(`업로드 중 오류가 발생했습니다.\n${insertError?.message || '알 수 없는 오류'}`, 'error')
                       return
                     }
-                    console.log('✅ 신규 데이터 추가 완료:', dataWithoutId.length)
                   }
 
                   // 3. 엑셀에 없는 데이터 확인 및 삭제
                   const uploadedCodes = new Set(dataToUpsert.map(d => d.material_code))
                   const deletedProducts = existingProducts?.filter(p => !uploadedCodes.has(p.material_code)) || []
 
-                  console.log(`🗑️ 삭제 대상: ${deletedProducts.length}개`)
 
                   const { error: deleteError } = await supabase
                     .from('raw_materials')
@@ -3116,7 +3091,6 @@ export default function RawMaterialsManagementPage() {
                     .not('material_code', 'in', `(${uploadCodes.map(c => `"${c}"`).join(',')})`)
 
                   if (deleteError && deleteError.code !== '23503') {
-                    console.warn(deleteError)
                   }
 
                   showToast('교체 완료!', 'success')
@@ -3153,8 +3127,6 @@ export default function RawMaterialsManagementPage() {
                   const existingIdSet = new Set(existingData?.map(p => p.id) || [])  // 기존 id 목록
                   const existingDataMap = new Map(existingData?.map(d => [d.material_code, d]) || [])
 
-                  console.log('기존 데이터 수:', existingData?.length)
-                  console.log('업로드할 데이터 수:', excelUploadModal.data.length)
 
                   const dataToUpsert = excelUploadModal.data
 
@@ -3196,8 +3168,6 @@ export default function RawMaterialsManagementPage() {
                       return itemWithoutId
                     })
 
-                  console.log('📦 DB에 존재하는 id (업데이트):', dataWithId.length)
-                  console.log('📦 DB에 없는 데이터 (신규 추가):', dataWithoutId.length)
 
                   // 추가/수정/변경없음 분류
                   const added: string[] = []
@@ -3250,7 +3220,6 @@ export default function RawMaterialsManagementPage() {
 
                   // 2. id가 없는 데이터 신규 추가
                   if (dataWithoutId.length > 0) {
-                    console.log('📦 삽입할 데이터 샘플:', JSON.stringify(dataWithoutId[0], null, 2))
                     const { error: insertError } = await supabase
                       .from('raw_materials')
                       .insert(dataWithoutId)
@@ -3265,7 +3234,6 @@ export default function RawMaterialsManagementPage() {
                       showToast(`업로드 중 오류가 발생했습니다.\n${insertError?.message || '알 수 없는 오류'}`, 'error')
                       return
                     }
-                    console.log('✅ 신규 데이터 추가 완료:', dataWithoutId.length)
                   }
 
                   showToast('병합 완료!', 'success')

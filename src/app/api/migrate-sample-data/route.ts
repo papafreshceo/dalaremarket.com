@@ -42,7 +42,6 @@ export async function POST() {
       );
     }
 
-    console.log('[migrate-sample-data] 마이그레이션 완료');
 
     return NextResponse.json({
       success: true,

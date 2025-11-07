@@ -39,7 +39,6 @@ export default function ImageGalleryModal({ isOpen, onClose, category4, category
     try {
       setLoading(true);
 
-      console.log('이미지 조회 시작 - category4Id:', category4Id);
 
       const { data, error } = await supabase
         .from('cloudinary_images')
@@ -52,8 +51,6 @@ export default function ImageGalleryModal({ isOpen, onClose, category4, category
         return;
       }
 
-      console.log('조회된 이미지 개수:', data?.length);
-      console.log('조회된 이미지 데이터:', data);
       if (data && data.length > 0) {
         console.log('첫 번째 이미지 상세:', {
           secure_url: data[0].secure_url,
@@ -162,7 +159,6 @@ export default function ImageGalleryModal({ isOpen, onClose, category4, category
                       alt={image.filename || image.cloudinary_id}
                       className="w-full h-full object-cover"
                       onLoad={(e) => {
-                        console.log('✅ 이미지 로드 성공:', image.secure_url);
                       }}
                       onError={(e) => {
                         console.error('❌ 이미지 로드 실패:', {

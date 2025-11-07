@@ -92,11 +92,6 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .map(num => String(num).trim());
 
-    console.log('🔍 중복 체크 시작');
-    console.log('  - 업로드할 주문 개수:', processedOrders.length);
-    console.log('  - 업로드할 주문번호 개수:', uploadOrderNumbers.length);
-    console.log('  - overwriteDuplicates:', overwriteDuplicates);
-    console.log('  - skipDuplicateCheck:', skipDuplicateCheck);
 
     // 업로드하려는 주문번호 중에서 이미 DB에 있는 것만 조회 (IN 절 사용)
     const { data: existingOrders, error: fetchError } = await supabase
@@ -116,7 +111,6 @@ export async function POST(request: NextRequest) {
         .filter(Boolean)
     );
 
-    console.log('  - DB에서 발견된 기존 주문:', existingOrderNumbers.size);
 
     let duplicateCount = 0;
     let newCount = 0;
@@ -125,18 +119,14 @@ export async function POST(request: NextRequest) {
       const orderNumber = order.order_number ? String(order.order_number).trim() : null;
       if (orderNumber && existingOrderNumbers.has(orderNumber)) {
         duplicateCount++;
-        console.log('  ⚠️ 중복 발견:', orderNumber);
       } else {
         newCount++;
       }
     });
 
-    console.log('  - 중복 개수:', duplicateCount);
-    console.log('  - 신규 개수:', newCount);
 
     // 중복이 있고 덮어쓰기가 아니며 중복 체크를 건너뛰지 않는 경우 → 확인 모달 표시
     if (duplicateCount > 0 && !overwriteDuplicates && !skipDuplicateCheck) {
-      console.log('✅ 중복 모달 표시 조건 충족');
       // 마켓별 회차 정보 생성
       const marketBatchDetails = Object.entries(marketBatchInfo)
         .map(([marketName, info]) => `${marketName}: ${info.currentBatch}회차`)
@@ -199,11 +189,9 @@ export async function POST(request: NextRequest) {
     // INSERT 또는 UPSERT 수행
     let data, error;
 
-    console.log('💾 저장 시작 - 저장할 주문 수:', ordersWithSequence.length);
 
     if (overwriteDuplicates) {
       // 덮어쓰기 모드: UPSERT 사용 (중복 시 덮어쓰기)
-      console.log('  모드: 덮어쓰기 (UPSERT)');
       const result = await supabase
         .from('integrated_orders')
         .upsert(ordersWithSequence, {
@@ -215,7 +203,6 @@ export async function POST(request: NextRequest) {
       error = result.error;
     } else {
       // 중복 제외 모드: INSERT 사용 (이미 필터링됨)
-      console.log('  모드: 중복 제외 (INSERT)');
       const result = await supabase
         .from('integrated_orders')
         .insert(ordersWithSequence)
@@ -224,7 +211,6 @@ export async function POST(request: NextRequest) {
       error = result.error;
     }
 
-    console.log('💾 저장 완료 - 저장된 주문 수:', data?.length || 0);
 
     if (error) {
       console.error('대량 주문 생성 실패:', error);

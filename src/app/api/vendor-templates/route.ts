@@ -25,7 +25,6 @@ export async function GET(request: NextRequest) {
     });
 
     if (createError) {
-      console.log('Table might already exist:', createError);
     }
 
     const { data, error } = await supabase
