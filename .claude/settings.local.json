@@ -148,7 +148,8 @@
       "Bash(npm audit:*)",
       "Bash(test:*)",
       "Bash(npx knip:*)",
-      "Bash(if exist check-notices-table.js del /f check-notices-table.js)"
+      "Bash(if exist check-notices-table.js del /f check-notices-table.js)",
+      "Bash(\"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\.env.local\")"
     ],
     "deny": [],
     "ask": []

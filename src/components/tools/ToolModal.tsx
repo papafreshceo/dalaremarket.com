@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import MarginCalculator from './MarginCalculator';
 import PriceSimulator from './PriceSimulator';
 import OptionPricing from './OptionPricing';
+import TrendAnalysis from './TrendAnalysis';
 
 interface ToolModalProps {
   isOpen: boolean;
@@ -141,6 +142,7 @@ function renderToolContent(toolId?: string, onOpenSimulator?: () => void) {
     'margin-calculator': <MarginCalculator onOpenSimulator={onOpenSimulator} />,
     'price-simulator': <PriceSimulator />,
     'option-pricing': <OptionPricing />,
+    'trend-analysis': <TrendAnalysis />,
   };
 
   return toolContents[toolId] || (
