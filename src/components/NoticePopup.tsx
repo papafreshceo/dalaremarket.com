@@ -27,13 +27,16 @@ export function NoticePopup() {
     try {
       // 팝업으로 설정되고 공개된 공지사항만 조회
       const { data, error } = await supabase
-        .from('announcements')
+        .from('platform_notices')
         .select('id, title, content, category, created_at')
         .eq('is_popup', true)
         .eq('published', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw error;
+      }
 
       if (data && data.length > 0) {
         // 오늘 하루 보지 않기로 설정한 공지사항 필터링
