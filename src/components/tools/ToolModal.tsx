@@ -5,6 +5,7 @@ import MarginCalculator from './MarginCalculator';
 import PriceSimulator from './PriceSimulator';
 import OptionPricing from './OptionPricing';
 import TrendAnalysis from './TrendAnalysis';
+import CompetitorMonitor from './CompetitorMonitor';
 
 interface ToolModalProps {
   isOpen: boolean;
@@ -143,6 +144,7 @@ function renderToolContent(toolId?: string, onOpenSimulator?: () => void) {
     'price-simulator': <PriceSimulator />,
     'option-pricing': <OptionPricing />,
     'trend-analysis': <TrendAnalysis />,
+    'competitor-monitor': <CompetitorMonitor />,
   };
 
   return toolContents[toolId] || (
