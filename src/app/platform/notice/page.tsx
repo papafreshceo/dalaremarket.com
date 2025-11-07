@@ -243,14 +243,55 @@ export default function NoticePage() {
         }}>
           {loading ? (
             <div style={{
-              background: '#ffffff',
-              border: '1px solid #bfdbfe',
-              borderRadius: '22px',
-              padding: '60px',
-              textAlign: 'center',
-              color: '#64748b'
+              display: 'grid',
+              gap: '16px'
             }}>
-              로딩 중...
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="animate-pulse"
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '22px',
+                    padding: '22px'
+                  }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    marginBottom: '12px'
+                  }}>
+                    <div style={{
+                      width: '80px',
+                      height: '28px',
+                      background: '#e0e7ff',
+                      borderRadius: '8px'
+                    }} />
+                    <div style={{
+                      width: '60px',
+                      height: '28px',
+                      background: '#e0e7ff',
+                      borderRadius: '8px',
+                      marginLeft: 'auto'
+                    }} />
+                  </div>
+                  <div style={{
+                    width: '70%',
+                    height: '24px',
+                    background: '#e0e7ff',
+                    borderRadius: '8px',
+                    marginBottom: '8px'
+                  }} />
+                  <div style={{
+                    width: '40px',
+                    height: '18px',
+                    background: '#e0e7ff',
+                    borderRadius: '8px'
+                  }} />
+                </div>
+              ))}
             </div>
           ) : filteredNotices.length === 0 ? (
             <div style={{

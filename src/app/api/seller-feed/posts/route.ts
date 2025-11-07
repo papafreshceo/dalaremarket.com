@@ -10,6 +10,9 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
 
+    // 현재 사용자 정보를 한 번만 조회
+    const { data: { user } } = await supabase.auth.getUser();
+
     let query = supabase
       .from('seller_feed_posts')
       .select(`
@@ -61,46 +64,64 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 각 게시글에 대한 좋아요 수, 댓글 수 조회
-    const postsWithStats = await Promise.all(
-      (posts || []).map(async (post) => {
-        // 좋아요 수
-        const { count: likesCount } = await supabase
-          .from('seller_feed_post_likes')
-          .select('*', { count: 'exact', head: true })
-          .eq('post_id', post.id);
+    if (!posts || posts.length === 0) {
+      return NextResponse.json({
+        success: true,
+        posts: [],
+      });
+    }
 
-        // 댓글 수
-        const { count: commentsCount } = await supabase
-          .from('seller_feed_comments')
-          .select('*', { count: 'exact', head: true })
-          .eq('post_id', post.id)
-          .eq('is_deleted', false);
+    // 모든 게시글 ID 수집
+    const postIds = posts.map(p => p.id);
 
-        // 현재 사용자의 좋아요 여부 확인
-        const { data: { user } } = await supabase.auth.getUser();
-        let isLiked = false;
-        if (user) {
-          const { data: likeData } = await supabase
-            .from('seller_feed_post_likes')
-            .select('id')
-            .eq('post_id', post.id)
-            .eq('user_id', user.id)
-            .single();
-          isLiked = !!likeData;
-        }
+    // 병렬로 모든 통계 데이터 한 번에 조회
+    const [likesData, commentsData, userLikesData] = await Promise.all([
+      // 모든 게시글의 좋아요 수 한 번에 조회
+      supabase
+        .from('seller_feed_post_likes')
+        .select('post_id')
+        .in('post_id', postIds),
 
-        return {
-          ...post,
-          likes: likesCount || 0,
-          commentsCount: commentsCount || 0,
-          isLiked,
-          tags: post.seller_feed_tags?.map((t: any) => t.tag) || [],
-          author: post.display_nickname || post.users?.profile_name || post.users?.email?.split('@')[0] || '익명',
-          display_nickname: post.display_nickname || null,
-        };
-      })
-    );
+      // 모든 게시글의 댓글 수 한 번에 조회
+      supabase
+        .from('seller_feed_comments')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('is_deleted', false),
+
+      // 현재 사용자가 좋아요한 게시글 한 번에 조회 (로그인한 경우만)
+      user ? supabase
+        .from('seller_feed_post_likes')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('user_id', user.id) : Promise.resolve({ data: [] })
+    ]);
+
+    // 좋아요 수를 post_id별로 그룹화
+    const likesCountMap = new Map<number, number>();
+    (likesData.data || []).forEach(like => {
+      likesCountMap.set(like.post_id, (likesCountMap.get(like.post_id) || 0) + 1);
+    });
+
+    // 댓글 수를 post_id별로 그룹화
+    const commentsCountMap = new Map<number, number>();
+    (commentsData.data || []).forEach(comment => {
+      commentsCountMap.set(comment.post_id, (commentsCountMap.get(comment.post_id) || 0) + 1);
+    });
+
+    // 사용자가 좋아요한 게시글 Set으로 변환
+    const userLikedPostIds = new Set((userLikesData.data || []).map(like => like.post_id));
+
+    // 통계 데이터를 각 게시글에 매핑
+    const postsWithStats = posts.map(post => ({
+      ...post,
+      likes: likesCountMap.get(post.id) || 0,
+      commentsCount: commentsCountMap.get(post.id) || 0,
+      isLiked: userLikedPostIds.has(post.id),
+      tags: post.seller_feed_tags?.map((t: any) => t.tag) || [],
+      author: post.display_nickname || post.users?.profile_name || post.users?.email?.split('@')[0] || '익명',
+      display_nickname: post.display_nickname || null,
+    }));
 
     return NextResponse.json({
       success: true,
