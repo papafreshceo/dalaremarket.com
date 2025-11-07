@@ -564,13 +564,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
       return true;
     });
 
-    if (filtered.length > 0) {
-      console.log(`[filteredOrders] 첫 주문 샘플:`, {
-        status: filtered[0].status,
-        date: filtered[0].registeredAt,
-        amount: filtered[0].supplyPrice
-      });
-    }
+    // 필터링된 주문 확인 완료
 
     return filtered;
   }, [dateFilteredOrders, selectedStatus]);
