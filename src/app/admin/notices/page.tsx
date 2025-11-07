@@ -102,7 +102,8 @@ export default function AdminNoticesPage() {
   };
 
   return (
-    <div style={{ width: '100%', height: '100%' }}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: '1440px', padding: '0 24px' }}>
         {/* 헤더 */}
         <div style={{
           display: 'flex',
@@ -345,6 +346,7 @@ export default function AdminNoticesPage() {
             </table>
           )}
         </div>
+      </div>
     </div>
   );
 }
