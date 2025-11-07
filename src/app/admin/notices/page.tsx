@@ -23,34 +23,9 @@ export default function AdminNoticesPage() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
 
-  // 페이지 마운트 확인
-  console.log('🔥 [AdminNoticesPage] Component mounted!');
-
   useEffect(() => {
-    console.log('🔥 [AdminNoticesPage] useEffect running');
-    checkAuth();
     fetchNotices();
   }, []);
-
-  const checkAuth = async () => {
-    const supabase = createClientComponentClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      router.push('/auth/login');
-      return;
-    }
-
-    const { data: userData } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!userData || !['admin', 'super_admin', 'employee'].includes(userData.role)) {
-      router.push('/');
-    }
-  };
 
   const fetchNotices = async () => {
     try {
@@ -121,7 +96,7 @@ export default function AdminNoticesPage() {
   };
 
   return (
-    <div style={{ maxWidth: '1440px', margin: '0 auto' }}>
+    <div style={{ width: '100%', height: '100%' }}>
         {/* 헤더 */}
         <div style={{
           display: 'flex',

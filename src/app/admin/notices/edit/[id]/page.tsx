@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
+import { TiptapEditor } from '@/components/admin/TiptapEditor';
 
 interface Notice {
   id: number;
@@ -31,31 +32,10 @@ export default function EditNoticePage() {
   });
 
   useEffect(() => {
-    checkAuth();
     if (params.id) {
       fetchNotice(params.id as string);
     }
   }, [params.id]);
-
-  const checkAuth = async () => {
-    const supabase = createClientComponentClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      router.push('/auth/login');
-      return;
-    }
-
-    const { data: userData } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!userData || !['admin', 'super_admin', 'employee'].includes(userData.role)) {
-      router.push('/');
-    }
-  };
 
   const fetchNotice = async (id: string) => {
     try {
@@ -138,7 +118,7 @@ export default function EditNoticePage() {
   }
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+    <div style={{ width: '100%', height: '100%' }}>
         {/* 헤더 */}
         <div style={{
           display: 'flex',
@@ -255,25 +235,10 @@ export default function EditNoticePage() {
               }}>
                 내용 <span style={{ color: '#ef4444' }}>*</span>
               </label>
-              <textarea
+              <TiptapEditor
                 value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                placeholder="공지사항 내용을 입력하세요"
-                rows={15}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  outline: 'none',
-                  resize: 'vertical',
-                  fontFamily: 'inherit',
-                  lineHeight: '1.6',
-                  transition: 'border-color 0.2s'
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                onChange={(value) => setFormData({ ...formData, content: value })}
+                placeholder="공지사항 내용을 입력하세요..."
               />
             </div>
 
