@@ -49,9 +49,21 @@ export async function middleware(request: NextRequest) {
 
   // 공개 페이지는 통과
   if (publicPaths.some(path => pathname === path || pathname.startsWith(path))) {
-    // 로그인한 상태에서 로그인 페이지 접근 시 리다이렉트
+    // 로그인한 상태에서 로그인 페이지 접근 시 역할에 따라 리다이렉트
     if (session && (pathname === '/auth/login' || pathname === '/auth/register')) {
-      return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+      // 사용자 역할 확인
+      const { data: userData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', session.user.id)
+        .single()
+
+      // 관리자/직원은 admin으로, 일반 사용자는 platform으로
+      if (userData?.role === 'admin' || userData?.role === 'super_admin' || userData?.role === 'employee') {
+        return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+      } else {
+        return NextResponse.redirect(new URL('/platform/dashboard', request.url))
+      }
     }
     return response
   }
