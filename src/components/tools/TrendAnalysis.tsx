@@ -71,6 +71,13 @@ export default function TrendAnalysis() {
       }
 
       const data = await response.json();
+
+      // 데이터 검증
+      if (!data.results || data.results.length === 0) {
+        setError('키워드에 대한 검색 데이터가 충분하지 않습니다. 더 일반적인 키워드를 사용해보세요.');
+        return;
+      }
+
       setTrendData(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : '오류가 발생했습니다.');
