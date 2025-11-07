@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { NoticeEditor } from '@/components/editor/NoticeEditor';
 
@@ -39,7 +39,7 @@ export default function EditNoticePage() {
 
   const fetchNotice = async (id: string) => {
     try {
-      const supabase = createClientComponentClient();
+      const supabase = createClient();
       const { data, error } = await supabase
         .from('platform_notices')
         .select('*')

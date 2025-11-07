@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 
 interface Announcement {
   id: number;
@@ -17,7 +17,7 @@ interface Announcement {
 export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
 
   useEffect(() => {
     fetchAnnouncements();
