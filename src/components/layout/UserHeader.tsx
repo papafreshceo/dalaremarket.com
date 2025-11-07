@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { useToast } from '@/components/ui/Toast';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
+import TierBadge from '@/components/TierBadge';
 
 interface NavItem {
   path: string;
@@ -24,6 +25,7 @@ export default function UserHeader() {
   const [showSubmenu, setShowSubmenu] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [userTier, setUserTier] = useState<'light' | 'standard' | 'advance' | 'elite' | 'legend'>('light');
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
   const [isMobile, setIsMobile] = useState<boolean>(false);
@@ -167,13 +169,19 @@ export default function UserHeader() {
       if (user) {
         const { data: userData } = await supabase
           .from('users')
-          .select('role')
+          .select('role, tier')
           .eq('id', user.id)
           .single();
 
         setUserRole(userData?.role || null);
+
+        // tier 유효성 검사
+        const validTiers = ['light', 'standard', 'advance', 'elite', 'legend'];
+        const tier = userData?.tier;
+        setUserTier(validTiers.includes(tier) ? tier : 'light');
       } else {
         setUserRole(null);
+        setUserTier('light');
       }
     };
 
@@ -185,6 +193,7 @@ export default function UserHeader() {
       } else {
         setUser(null);
         setUserRole(null);
+        setUserTier('light');
       }
     });
 
@@ -274,7 +283,6 @@ export default function UserHeader() {
         { path: '/gallery', text: '이미지다운로드' }
       ]
     },
-    { path: '/platform/orders', text: '발주관리', special: true },
     {
       path: '/platform/tools',
       text: '업무도구',
@@ -443,26 +451,6 @@ export default function UserHeader() {
                   onMouseEnter={() => item.hasSubmenu && setShowSubmenu(item.path)}
                   onMouseLeave={() => setShowSubmenu(null)}
                 >
-                  {item.text === '발주관리' ? (
-                    <button
-                      onClick={() => openOrders()}
-                      style={{
-                        fontSize: '14px',
-                        color: '#212529',
-                        fontWeight: '500',
-                        textDecoration: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: 0
-                      }}
-                    >
-                      {item.text}
-                    </button>
-                  ) : (
                   <Link
                     href={item.path}
                     style={{
@@ -505,7 +493,6 @@ export default function UserHeader() {
                       </>
                     )}
                   </Link>
-                  )}
 
                   {/* Submenu dropdown */}
                   {item.hasSubmenu && showSubmenu === item.path && (
@@ -786,7 +773,7 @@ export default function UserHeader() {
                       zIndex: 10000
                     }}>
                       <div style={{ fontWeight: '600', marginBottom: '4px' }}>크레딧</div>
-                      <div style={{ fontSize: '11px', opacity: 0.9 }}>업무도구 사용 포인트 (매일 100 리필)</div>
+                      <div style={{ fontSize: '11px', opacity: 0.9 }}>업무도구 사용 포인트 (매일 1,000 리필)</div>
                       <div style={{
                         position: 'absolute',
                         bottom: '100%',
@@ -802,6 +789,7 @@ export default function UserHeader() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <TierBadge tier={userTier} iconOnly glow={0} />
                   <span style={{ fontSize: '14px', color: '#495057' }}>
                     {user.email}
                   </span>
@@ -823,8 +811,8 @@ export default function UserHeader() {
                     title="회원정보"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#495057" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="3"></circle>
-                      <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.25M15.54 15.54l4.24 4.25M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"></path>
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="12" cy="7" r="4"></circle>
                     </svg>
                   </button>
                 </div>
@@ -921,10 +909,6 @@ export default function UserHeader() {
                     if (item.hasSubmenu) {
                       e.preventDefault();
                       setExpandedSubmenu(expandedSubmenu === item.path ? null : item.path);
-                    } else if (item.text === '발주관리') {
-                      e.preventDefault();
-                      openOrders();
-                      setMobileMenuOpen(false);
                     } else {
                       setMobileMenuOpen(false);
                     }
@@ -958,8 +942,6 @@ export default function UserHeader() {
                         <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </>
-                  ) : item.text === '발주관리' ? (
-                    <span>{item.text}</span>
                   ) : (
                     <Link
                       href={item.path}
@@ -1075,11 +1057,12 @@ export default function UserHeader() {
                       </div>
                     </div>
                     <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '4px' }}>
-                      캐시: 활동보상 | 크레딧: 매일 100 리필
+                      캐시: 활동보상 | 크레딧: 매일 1,000 리필
                     </div>
                   </div>
 
-                  <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <TierBadge tier={userTier} iconOnly glow={0} />
                     {user.email}
                   </div>
                   {(userRole === 'admin' || userRole === 'employee' || userRole === 'super_admin') && (

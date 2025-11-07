@@ -38,13 +38,26 @@ export default function MyRankingWidget() {
     setLoading(true);
     try {
       const response = await fetch(`/api/seller-rankings/me?period=${periodType}`);
+
+      // JSON이 아닌 응답 처리
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('내 랭킹 조회 실패: JSON이 아닌 응답');
+        setRanking(null);
+        return;
+      }
+
       const result = await response.json();
 
       if (result.success) {
         setRanking(result.data);
+      } else {
+        console.error('내 랭킹 조회 실패:', result.error);
+        setRanking(null);
       }
     } catch (error) {
       console.error('내 랭킹 조회 실패:', error);
+      setRanking(null);
     } finally {
       setLoading(false);
     }
@@ -114,29 +127,6 @@ export default function MyRankingWidget() {
     );
   };
 
-  if (loading) {
-    return (
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-        <div className="flex items-center justify-center gap-2 text-gray-500">
-          <RefreshCw className="w-5 h-5 animate-spin" />
-          <span>로딩 중...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!ranking) {
-    return (
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-        <div className="text-center text-gray-500">
-          <div className="text-4xl mb-2">📊</div>
-          <p className="text-sm">아직 랭킹 데이터가 없습니다.</p>
-          <p className="text-xs mt-1">주문을 시작하면 랭킹이 집계됩니다.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
       {/* 헤더 */}
@@ -169,95 +159,121 @@ export default function MyRankingWidget() {
         </div>
       </div>
 
-      {/* 메인 순위 정보 */}
-      <div className={`bg-gradient-to-br ${getTierColor(ranking.tier)} p-6 text-white`}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="text-5xl">{getTierIcon(ranking.tier)}</div>
-            <div>
-              <div className="text-sm opacity-90">현재 등급</div>
-              <div className="text-2xl font-bold">{getTierName(ranking.tier)}</div>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm opacity-90">순위</div>
-            <div className="text-3xl font-bold">
-              {ranking.rank}<span className="text-lg font-normal opacity-90">위</span>
-            </div>
-            <div className="text-xs opacity-75 mt-1">(전체 {ranking.total_sellers}명)</div>
-          </div>
-        </div>
-
-        {/* 순위 변동 & 종합 점수 */}
-        <div className="flex items-center justify-between pt-4 border-t border-white/20">
-          <div>
-            <div className="text-xs opacity-75 mb-1">순위 변동</div>
-            <div className="bg-white/20 rounded-lg px-3 py-1.5 inline-block">
-              {getRankChangeDisplay()}
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-xs opacity-75 mb-1">종합 점수</div>
-            <div className="text-2xl font-bold">{ranking.total_score.toFixed(1)}점</div>
-          </div>
-        </div>
-      </div>
-
-      {/* 상세 지표 */}
-      <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">매출액</div>
-          <div className="text-sm font-semibold text-gray-900 dark:text-white">
-            {ranking.total_sales.toLocaleString()}원
-          </div>
-        </div>
-        <div className="text-center">
-          <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">주문건수</div>
-          <div className="text-sm font-semibold text-gray-900 dark:text-white">
-            {ranking.order_count.toLocaleString()}건
-          </div>
-        </div>
-        <div className="text-center">
-          <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">발주속도</div>
-          <div className="text-sm font-semibold text-gray-900 dark:text-white">
-            {ranking.avg_confirm_hours.toFixed(1)}시간
-          </div>
-        </div>
-        <div className="text-center">
-          <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">취소율</div>
-          <div className="text-sm font-semibold text-gray-900 dark:text-white">
-            {ranking.cancel_rate.toFixed(1)}%
-          </div>
-        </div>
-      </div>
-
-      {/* 획득 배지 */}
-      {ranking.badges && ranking.badges.length > 0 && (
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="text-xs text-gray-600 dark:text-gray-400 mb-2 font-medium">획득 배지</div>
-          <div className="flex flex-wrap gap-2">
-            {ranking.badges.map((badge) => (
-              <div
-                key={badge.badge_id}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-700 rounded-full"
-                title={badge.badge_definitions.description}
-              >
-                <span className="text-base">{badge.badge_definitions.icon}</span>
-                <span className="text-xs font-medium text-gray-900 dark:text-white">
-                  {badge.badge_definitions.name}
-                </span>
-              </div>
-            ))}
+      {/* 로딩 상태 */}
+      {loading && (
+        <div className="p-6">
+          <div className="flex items-center justify-center gap-2 text-gray-500">
+            <RefreshCw className="w-5 h-5 animate-spin" />
+            <span>로딩 중...</span>
           </div>
         </div>
       )}
 
-      {/* 안내 메시지 */}
-      <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-800">
-        <p className="text-xs text-blue-800 dark:text-blue-300">
-          💡 빠른 발주확정과 낮은 취소율로 더 높은 순위를 달성하세요!
-        </p>
-      </div>
+      {/* 데이터 없음 */}
+      {!loading && !ranking && (
+        <div className="p-6">
+          <div className="text-center text-gray-500">
+            <div className="text-4xl mb-2">📊</div>
+            <p className="text-sm">아직 랭킹 데이터가 없습니다.</p>
+            <p className="text-xs mt-1">주문을 시작하면 랭킹이 집계됩니다.</p>
+          </div>
+        </div>
+      )}
+
+      {/* 랭킹 데이터 */}
+      {!loading && ranking && (
+        <>
+          {/* 메인 순위 정보 */}
+          <div className={`bg-gradient-to-br ${getTierColor(ranking.tier)} p-6 text-white`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="text-5xl">{getTierIcon(ranking.tier)}</div>
+                <div>
+                  <div className="text-sm opacity-90">현재 등급</div>
+                  <div className="text-2xl font-bold">{getTierName(ranking.tier)}</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm opacity-90">순위</div>
+                <div className="text-3xl font-bold">
+                  {ranking.rank}<span className="text-lg font-normal opacity-90">위</span>
+                </div>
+                <div className="text-xs opacity-75 mt-1">(전체 {ranking.total_sellers}명)</div>
+              </div>
+            </div>
+
+            {/* 순위 변동 & 종합 점수 */}
+            <div className="flex items-center justify-between pt-4 border-t border-white/20">
+              <div>
+                <div className="text-xs opacity-75 mb-1">순위 변동</div>
+                <div className="bg-white/20 rounded-lg px-3 py-1.5 inline-block">
+                  {getRankChangeDisplay()}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs opacity-75 mb-1">종합 점수</div>
+                <div className="text-2xl font-bold">{ranking.total_score.toFixed(1)}점</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 상세 지표 */}
+          <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900">
+            <div className="text-center">
+              <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">매출액</div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                {ranking.total_sales.toLocaleString()}원
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">주문건수</div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                {ranking.order_count.toLocaleString()}건
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">발주속도</div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                {ranking.avg_confirm_hours.toFixed(1)}시간
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">취소율</div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                {ranking.cancel_rate.toFixed(1)}%
+              </div>
+            </div>
+          </div>
+
+          {/* 획득 배지 */}
+          {ranking.badges && ranking.badges.length > 0 && (
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="text-xs text-gray-600 dark:text-gray-400 mb-2 font-medium">획득 배지</div>
+              <div className="flex flex-wrap gap-2">
+                {ranking.badges.map((badge) => (
+                  <div
+                    key={badge.badge_id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-700 rounded-full"
+                    title={badge.badge_definitions.description}
+                  >
+                    <span className="text-base">{badge.badge_definitions.icon}</span>
+                    <span className="text-xs font-medium text-gray-900 dark:text-white">
+                      {badge.badge_definitions.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 안내 메시지 */}
+          <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-800">
+            <p className="text-xs text-blue-800 dark:text-blue-300">
+              💡 빠른 발주확정과 낮은 취소율로 더 높은 순위를 달성하세요!
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 }

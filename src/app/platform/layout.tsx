@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import UserHeader from '@/components/layout/UserHeader'
 import MobileBottomNav from '@/components/layout/MobileBottomNav'
+import PlatformFooter from '@/components/PlatformFooter'
 
 export default function PlatformLayout({
   children,
@@ -58,10 +59,11 @@ export default function PlatformLayout({
   const showHeaderAndNav = !isMounted || isInIframe === false
 
   return (
-    <>
+    <div className="flex flex-col min-h-screen">
       {showHeaderAndNav && <UserHeader />}
-      {children}
+      <main className="flex-1">{children}</main>
+      {showHeaderAndNav && <PlatformFooter />}
       {showHeaderAndNav && <MobileBottomNav />}
-    </>
+    </div>
   )
 }

@@ -3,8 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/credits/daily-refill
- * 일일 크레딧 리필 (최대 100, 저축 불가)
- * 날짜가 바뀌면 무조건 100으로 리셋
+ * 일일 크레딧 리필 (최대 1000, 저축 불가)
+ * 날짜가 바뀌면 무조건 1000으로 리셋
  */
 export async function POST(request: NextRequest) {
   try {
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     const kstDate = new Date(now.getTime() + kstOffset);
     const today = kstDate.toISOString().split('T')[0]; // YYYY-MM-DD
 
-    const DAILY_CREDIT_LIMIT = 100;
+    const DAILY_CREDIT_LIMIT = 1000;
 
     // 크레딧 계정 조회
     let { data: userCredit, error: creditError } = await dbClient

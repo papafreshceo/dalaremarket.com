@@ -4,16 +4,18 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
-import { PlateEditor } from '@/components/admin/PlateEditor';
+import { NoticeEditor } from '@/components/editor/NoticeEditor';
 
 export default function CreateNoticePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     content: '',
     category: 'general',
     is_pinned: false,
+    is_popup: false,
     published: true
   });
 
@@ -153,9 +155,9 @@ export default function CreateNoticePage() {
                 }}
               >
                 <option value="general">일반</option>
-                <option value="important">중요</option>
+                <option value="shipping">발송</option>
+                <option value="product">상품</option>
                 <option value="update">업데이트</option>
-                <option value="event">이벤트</option>
               </select>
             </div>
 
@@ -170,7 +172,7 @@ export default function CreateNoticePage() {
               }}>
                 내용 <span style={{ color: '#ef4444' }}>*</span>
               </label>
-              <PlateEditor
+              <NoticeEditor
                 value={formData.content}
                 onChange={(value) => setFormData({ ...formData, content: value })}
                 placeholder="공지사항 내용을 입력하세요..."
@@ -205,6 +207,26 @@ export default function CreateNoticePage() {
                   }}
                 />
                 상단 고정
+              </label>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                color: '#374151',
+                cursor: 'pointer'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={formData.is_popup}
+                  onChange={(e) => setFormData({ ...formData, is_popup: e.target.checked })}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    cursor: 'pointer'
+                  }}
+                />
+                팝업으로 표시
               </label>
               <label style={{
                 display: 'flex',

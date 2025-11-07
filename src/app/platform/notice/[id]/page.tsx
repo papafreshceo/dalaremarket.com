@@ -44,20 +44,20 @@ export default function NoticeDetailPage() {
 
   const getCategoryLabel = (category: string) => {
     const labels: { [key: string]: string } = {
-      important: '중요',
       general: '일반',
-      update: '업데이트',
-      event: '이벤트'
+      shipping: '발송',
+      product: '상품',
+      update: '업데이트'
     };
     return labels[category] || category;
   };
 
   const getCategoryColor = (category: string) => {
     const colors: { [key: string]: { bg: string; text: string } } = {
-      important: { bg: 'rgba(239, 68, 68, 0.1)', text: '#ef4444' },
       general: { bg: 'rgba(37, 99, 235, 0.1)', text: '#2563eb' },
-      update: { bg: 'rgba(16, 185, 129, 0.1)', text: '#10b981' },
-      event: { bg: 'rgba(139, 92, 246, 0.1)', text: '#8b5cf6' }
+      shipping: { bg: 'rgba(239, 68, 68, 0.1)', text: '#ef4444' },
+      product: { bg: 'rgba(139, 92, 246, 0.1)', text: '#8b5cf6' },
+      update: { bg: 'rgba(16, 185, 129, 0.1)', text: '#10b981' }
     };
     return colors[category] || { bg: 'rgba(107, 114, 128, 0.1)', text: '#6b7280' };
   };
@@ -80,73 +80,6 @@ export default function NoticeDetailPage() {
     return diffDays <= 7;
   };
 
-  // Markdown 스타일 텍스트 렌더링 (간단한 버전)
-  const renderContent = (content: string) => {
-    const lines = content.split('\n');
-    return lines.map((line, index) => {
-      // 제목 처리
-      if (line.startsWith('## ')) {
-        return (
-          <h2 key={index} style={{
-            fontSize: isMobile ? '20px' : '22px',
-            fontWeight: '600',
-            marginTop: '24px',
-            marginBottom: '12px',
-            color: '#212529'
-          }}>
-            {line.replace('## ', '')}
-          </h2>
-        );
-      }
-
-      // 굵은 텍스트 처리
-      if (line.startsWith('**') && line.endsWith('**')) {
-        return (
-          <p key={index} style={{
-            fontSize: '15px',
-            lineHeight: '1.8',
-            marginBottom: '12px',
-            fontWeight: '600',
-            color: '#212529'
-          }}>
-            {line.replace(/\*\*/g, '')}
-          </p>
-        );
-      }
-
-      // 리스트 처리
-      if (line.startsWith('- ')) {
-        return (
-          <li key={index} style={{
-            fontSize: '15px',
-            lineHeight: '1.8',
-            marginBottom: '8px',
-            color: '#495057',
-            marginLeft: '20px'
-          }}>
-            {line.replace('- ', '')}
-          </li>
-        );
-      }
-
-      // 빈 줄
-      if (line.trim() === '') {
-        return <div key={index} style={{ height: '12px' }} />;
-      }
-
-      // 일반 텍스트
-      return (
-        <p key={index} style={{
-          fontSize: '15px',
-          lineHeight: '1.8',
-          marginBottom: '12px',
-          color: '#495057'
-        }}>
-          {line}
-        </p>
-      );
-    });
-  };
 
   if (loading) {
     return (
@@ -375,13 +308,155 @@ export default function NoticeDetailPage() {
             </div>
 
             {/* 본문 */}
-            <div style={{
-              fontSize: '16px',
-              lineHeight: '1.8',
-              color: '#334155'
-            }}>
-              {renderContent(notice.content)}
-            </div>
+            <div
+              className="notice-content"
+              dangerouslySetInnerHTML={{ __html: notice.content }}
+            />
+            <style jsx>{`
+              .notice-content {
+                font-size: 16px;
+                line-height: 1.8;
+                color: #334155;
+              }
+              .notice-content :global(p) {
+                margin-bottom: 12px;
+                font-size: 15px;
+                line-height: 1.8;
+                color: #495057;
+              }
+              .notice-content :global(h1) {
+                font-size: 28px;
+                font-weight: 700;
+                margin-top: 32px;
+                margin-bottom: 16px;
+                color: #212529;
+              }
+              .notice-content :global(h2) {
+                font-size: 24px;
+                font-weight: 600;
+                margin-top: 28px;
+                margin-bottom: 14px;
+                color: #212529;
+              }
+              .notice-content :global(h3) {
+                font-size: 20px;
+                font-weight: 600;
+                margin-top: 24px;
+                margin-bottom: 12px;
+                color: #212529;
+              }
+              .notice-content :global(h4) {
+                font-size: 18px;
+                font-weight: 600;
+                margin-top: 20px;
+                margin-bottom: 10px;
+                color: #212529;
+              }
+              .notice-content :global(h5) {
+                font-size: 16px;
+                font-weight: 600;
+                margin-top: 18px;
+                margin-bottom: 8px;
+                color: #212529;
+              }
+              .notice-content :global(h6) {
+                font-size: 14px;
+                font-weight: 600;
+                margin-top: 16px;
+                margin-bottom: 8px;
+                color: #212529;
+              }
+              .notice-content :global(strong) {
+                font-weight: 700;
+                color: #212529;
+              }
+              .notice-content :global(em) {
+                font-style: italic;
+              }
+              .notice-content :global(u) {
+                text-decoration: underline;
+              }
+              .notice-content :global(s) {
+                text-decoration: line-through;
+              }
+              .notice-content :global(ul), .notice-content :global(ol) {
+                margin-bottom: 16px;
+                padding-left: 24px;
+              }
+              .notice-content :global(li) {
+                margin-bottom: 8px;
+                font-size: 15px;
+                line-height: 1.8;
+                color: #495057;
+              }
+              .notice-content :global(table) {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 20px 0;
+                border: 2px solid #374151;
+              }
+              .notice-content :global(th), .notice-content :global(td) {
+                border: 1px solid #9ca3af;
+                padding: 12px;
+                text-align: left;
+              }
+              .notice-content :global(th) {
+                background-color: #f3f4f6;
+                font-weight: 600;
+                color: #374151;
+              }
+              .notice-content :global(td) {
+                background-color: #ffffff;
+                color: #495057;
+              }
+              .notice-content :global(img) {
+                max-width: 100%;
+                height: auto;
+                display: block;
+                margin: 20px auto;
+                border-radius: 8px;
+              }
+              .notice-content :global(hr) {
+                border: none;
+                border-top: 2px solid #e5e7eb;
+                margin: 24px 0;
+              }
+              .notice-content :global(blockquote) {
+                border-left: 4px solid #2563eb;
+                padding-left: 16px;
+                margin: 16px 0;
+                color: #64748b;
+                font-style: italic;
+              }
+              .notice-content :global(code) {
+                background-color: #f3f4f6;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-family: monospace;
+                font-size: 14px;
+                color: #ef4444;
+              }
+              .notice-content :global(pre) {
+                background-color: #1f2937;
+                color: #f3f4f6;
+                padding: 16px;
+                border-radius: 8px;
+                overflow-x: auto;
+                margin: 16px 0;
+              }
+              .notice-content :global(pre code) {
+                background-color: transparent;
+                padding: 0;
+                color: #f3f4f6;
+              }
+              .notice-content :global(a) {
+                color: #2563eb;
+                text-decoration: underline;
+              }
+              .notice-content :global(a:hover) {
+                color: #1d4ed8;
+              }
+            `}</style>
           </div>
 
           {/* 목록 버튼 */}

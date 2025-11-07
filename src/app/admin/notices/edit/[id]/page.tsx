@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
-import { PlateEditor } from '@/components/admin/PlateEditor';
+import { NoticeEditor } from '@/components/editor/NoticeEditor';
 
 interface Notice {
   id: number;
@@ -235,7 +235,7 @@ export default function EditNoticePage() {
               }}>
                 내용 <span style={{ color: '#ef4444' }}>*</span>
               </label>
-              <PlateEditor
+              <NoticeEditor
                 value={formData.content}
                 onChange={(value) => setFormData({ ...formData, content: value })}
                 placeholder="공지사항 내용을 입력하세요..."

@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 
 interface Transaction {
   id: string;
-  type: 'login' | 'activity' | 'usage' | 'admin_adjustment';
+  type: 'login' | 'activity' | 'usage' | 'admin_adjustment' | 'daily_refill';
   amount: number;
   balance_after: number;
   description: string;
@@ -21,33 +21,46 @@ const transactionTypeConfig: Record<Transaction['type'], { label: string; color:
   login: { label: '로그인 보상', color: '#10b981', icon: '🎁' },
   activity: { label: '활동 보상', color: '#3b82f6', icon: '⏱️' },
   usage: { label: '사용', color: '#ef4444', icon: '💳' },
-  admin_adjustment: { label: '관리자 조정', color: '#8b5cf6', icon: '⚙️' }
+  admin_adjustment: { label: '관리자 조정', color: '#8b5cf6', icon: '⚙️' },
+  daily_refill: { label: '일일 리필', color: '#7c3aed', icon: '🔄' }
 };
 
 export default function CashHistoryTab({ userId }: CashHistoryTabProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [cashBalance, setCashBalance] = useState<number>(0);
+  const [creditBalance, setCreditBalance] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [total, setTotal] = useState<number>(0);
   const [limit] = useState<number>(50);
   const [offset, setOffset] = useState<number>(0);
+  const [selectedType, setSelectedType] = useState<'cash' | 'credit'>('cash');
 
-  // 캐시 잔액 조회
+  // 캐시 & 크레딧 잔액 조회
   useEffect(() => {
-    const fetchCashBalance = async () => {
+    const fetchBalances = async () => {
       try {
-        const response = await fetch('/api/cash');
-        const data = await response.json();
+        // 캐시 조회
+        const cashResponse = await fetch('/api/cash');
+        const cashData = await cashResponse.json();
+        if (cashData.success) {
+          setCashBalance(cashData.balance);
+        }
 
-        if (data.success) {
-          setCashBalance(data.balance);
+        // 크레딧 조회
+        const creditResponse = await fetch('/api/credits/daily-refill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const creditData = await creditResponse.json();
+        if (creditData.success) {
+          setCreditBalance(creditData.balance);
         }
       } catch (error) {
-        console.error('캐시 잔액 조회 실패:', error);
+        console.error('잔액 조회 실패:', error);
       }
     };
 
-    fetchCashBalance();
+    fetchBalances();
   }, []);
 
   // 거래 이력 조회
@@ -55,7 +68,11 @@ export default function CashHistoryTab({ userId }: CashHistoryTabProps) {
     const fetchTransactions = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/cash/transactions?limit=${limit}&offset=${offset}`);
+        const endpoint = selectedType === 'cash'
+          ? `/api/cash/transactions?limit=${limit}&offset=${offset}`
+          : `/api/credits/transactions?limit=${limit}&offset=${offset}`;
+
+        const response = await fetch(endpoint);
         const data = await response.json();
 
         if (data.success) {
@@ -73,7 +90,7 @@ export default function CashHistoryTab({ userId }: CashHistoryTabProps) {
     };
 
     fetchTransactions();
-  }, [offset, limit]);
+  }, [offset, limit, selectedType]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -92,34 +109,83 @@ export default function CashHistoryTab({ userId }: CashHistoryTabProps) {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      {/* 캐시 잔액 카드 */}
+      {/* 캐시 & 크레딧 통계 */}
+      <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&display=swap" rel="stylesheet" />
       <div style={{
-        padding: '24px',
-        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-        border: '2px solid #fbbf24',
-        borderRadius: '12px',
-        marginBottom: '24px',
-        boxShadow: '0 4px 12px rgba(251, 191, 36, 0.15)'
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '16px',
+        marginBottom: '24px'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h2 style={{ fontSize: '16px', fontWeight: '600', color: '#92400e', marginBottom: '8px' }}>
-              💰 보유 캐시
-            </h2>
-            <div style={{ fontSize: '32px', fontWeight: '700', color: '#78350f' }}>
-              {cashBalance.toLocaleString()} <span style={{ fontSize: '20px', fontWeight: '600' }}>캐시</span>
-            </div>
+        {/* 캐시 통계 */}
+        <div
+          onClick={() => {
+            setSelectedType('cash');
+            setOffset(0);
+          }}
+          style={{
+            padding: '24px',
+            background: selectedType === 'cash' ? 'rgba(16, 185, 129, 0.1)' : 'var(--color-surface)',
+            border: selectedType === 'cash' ? '2px solid #10b981' : '2px solid var(--color-border)',
+            borderRadius: '12px',
+            boxShadow: selectedType === 'cash' ? '0 4px 12px rgba(16, 185, 129, 0.2)' : '0 2px 8px rgba(16, 185, 129, 0.05)',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            transform: selectedType === 'cash' ? 'translateY(-2px)' : 'none'
+          }}
+        >
+          <div style={{
+            fontSize: '14px',
+            fontWeight: '600',
+            color: 'var(--color-text-secondary)',
+            marginBottom: '12px'
+          }}>
+            캐시
           </div>
           <div style={{
-            padding: '12px',
-            background: 'white',
-            borderRadius: '50%',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+            fontSize: '36px',
+            fontWeight: '700',
+            color: '#10b981',
+            fontFamily: 'Oxanium, monospace',
+            letterSpacing: '0.5px'
           }}>
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <text x="12" y="16" textAnchor="middle" fontSize="12" fill="#f59e0b" fontWeight="bold">₩</text>
-            </svg>
+            {cashBalance.toLocaleString()}
+          </div>
+        </div>
+
+        {/* 크레딧 통계 */}
+        <div
+          onClick={() => {
+            setSelectedType('credit');
+            setOffset(0);
+          }}
+          style={{
+            padding: '24px',
+            background: selectedType === 'credit' ? 'rgba(124, 58, 237, 0.1)' : 'var(--color-surface)',
+            border: selectedType === 'credit' ? '2px solid #7c3aed' : '2px solid var(--color-border)',
+            borderRadius: '12px',
+            boxShadow: selectedType === 'credit' ? '0 4px 12px rgba(124, 58, 237, 0.2)' : '0 2px 8px rgba(124, 58, 237, 0.05)',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            transform: selectedType === 'credit' ? 'translateY(-2px)' : 'none'
+          }}
+        >
+          <div style={{
+            fontSize: '14px',
+            fontWeight: '600',
+            color: 'var(--color-text-secondary)',
+            marginBottom: '12px'
+          }}>
+            크레딧
+          </div>
+          <div style={{
+            fontSize: '36px',
+            fontWeight: '700',
+            color: '#7c3aed',
+            fontFamily: 'Oxanium, monospace',
+            letterSpacing: '0.5px'
+          }}>
+            {creditBalance.toLocaleString()}
           </div>
         </div>
       </div>
@@ -137,11 +203,8 @@ export default function CashHistoryTab({ userId }: CashHistoryTabProps) {
           background: 'var(--color-background)'
         }}>
           <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-text)', margin: 0 }}>
-            거래 이력
+            {selectedType === 'cash' ? '캐시' : '크레딧'} 적립 사용
           </h3>
-          <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '4px', marginBottom: 0 }}>
-            총 {total.toLocaleString()}건의 거래
-          </p>
         </div>
 
         {loading ? (
@@ -175,39 +238,39 @@ export default function CashHistoryTab({ userId }: CashHistoryTabProps) {
                 <thead>
                   <tr style={{ background: 'var(--color-background)' }}>
                     <th style={{
-                      padding: '12px 16px',
-                      textAlign: 'left',
+                      padding: '10px 12px',
+                      textAlign: 'center',
                       fontSize: '12px',
                       fontWeight: '600',
                       color: 'var(--color-text-secondary)',
                       borderBottom: '1px solid var(--color-border)'
                     }}>일시</th>
                     <th style={{
-                      padding: '12px 16px',
-                      textAlign: 'left',
+                      padding: '10px 12px',
+                      textAlign: 'center',
                       fontSize: '12px',
                       fontWeight: '600',
                       color: 'var(--color-text-secondary)',
                       borderBottom: '1px solid var(--color-border)'
                     }}>구분</th>
                     <th style={{
-                      padding: '12px 16px',
-                      textAlign: 'left',
+                      padding: '10px 12px',
+                      textAlign: 'center',
                       fontSize: '12px',
                       fontWeight: '600',
                       color: 'var(--color-text-secondary)',
                       borderBottom: '1px solid var(--color-border)'
                     }}>내용</th>
                     <th style={{
-                      padding: '12px 16px',
-                      textAlign: 'right',
+                      padding: '10px 12px',
+                      textAlign: 'center',
                       fontSize: '12px',
                       fontWeight: '600',
                       color: 'var(--color-text-secondary)',
                       borderBottom: '1px solid var(--color-border)'
                     }}>금액</th>
                     <th style={{
-                      padding: '12px 16px',
+                      padding: '10px 12px',
                       textAlign: 'right',
                       fontSize: '12px',
                       fontWeight: '600',
@@ -231,10 +294,10 @@ export default function CashHistoryTab({ userId }: CashHistoryTabProps) {
                         onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-hover)'}
                         onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                       >
-                        <td style={{ padding: '16px', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                        <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
                           {formatDate(transaction.created_at)}
                         </td>
-                        <td style={{ padding: '16px' }}>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           <div style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -250,12 +313,12 @@ export default function CashHistoryTab({ userId }: CashHistoryTabProps) {
                             <span>{config.label}</span>
                           </div>
                         </td>
-                        <td style={{ padding: '16px', fontSize: '13px', color: 'var(--color-text)' }}>
+                        <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--color-text)', textAlign: 'center' }}>
                           {transaction.description}
                         </td>
                         <td style={{
-                          padding: '16px',
-                          textAlign: 'right',
+                          padding: '10px 12px',
+                          textAlign: 'center',
                           fontSize: '14px',
                           fontWeight: '700',
                           color: isPositive ? '#10b981' : '#ef4444'
@@ -263,7 +326,7 @@ export default function CashHistoryTab({ userId }: CashHistoryTabProps) {
                           {isPositive ? '+' : ''}{transaction.amount.toLocaleString()}
                         </td>
                         <td style={{
-                          padding: '16px',
+                          padding: '10px 12px',
                           textAlign: 'right',
                           fontSize: '13px',
                           fontWeight: '600',

@@ -1,0 +1,378 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { AnnouncementEditor } from '@/components/editor/AnnouncementEditor';
+
+export default function CreateAnnouncementPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    content: '',
+    category: 'general',
+    is_pinned: false,
+    published: true
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.title.trim()) {
+      alert('제목을 입력해주세요.');
+      return;
+    }
+
+    if (!formData.content.trim()) {
+      alert('내용을 입력해주세요.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/announcements', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create announcement');
+      }
+
+      alert('공지사항이 등록되었습니다.');
+      router.push('/admin/announcements');
+    } catch (error) {
+      console.error('Failed to create announcement:', error);
+      alert('등록에 실패했습니다: ' + (error as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderPreview = () => {
+    if (!formData.content) return <p style={{ color: '#9ca3af' }}>내용을 입력하면 미리보기가 표시됩니다.</p>;
+
+    try {
+      const content = JSON.parse(formData.content);
+      return <div dangerouslySetInnerHTML={{ __html: convertToHTML(content) }} />;
+    } catch {
+      return <p>미리보기를 생성할 수 없습니다.</p>;
+    }
+  };
+
+  return (
+    <div style={{ width: '100%', height: '100%' }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '24px'
+      }}>
+        <div>
+          <h1 style={{
+            fontSize: '28px',
+            fontWeight: '700',
+            marginBottom: '8px',
+            color: '#212529'
+          }}>공지사항 작성</h1>
+          <p style={{
+            fontSize: '14px',
+            color: '#6c757d'
+          }}>새로운 공지사항을 작성합니다</p>
+        </div>
+        <Link
+          href="/admin/announcements"
+          style={{
+            padding: '10px 20px',
+            background: '#ffffff',
+            color: '#374151',
+            border: '1px solid #d1d5db',
+            borderRadius: '8px',
+            textDecoration: 'none',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}
+        >
+          ← 목록으로
+        </Link>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit}>
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '12px',
+          padding: '32px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        }}>
+          {/* Title */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#374151',
+              marginBottom: '8px'
+            }}>
+              제목 <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder="공지사항 제목을 입력하세요"
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                fontSize: '14px',
+                outline: 'none',
+                transition: 'border-color 0.2s'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+            />
+          </div>
+
+          {/* Category */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#374151',
+              marginBottom: '8px'
+            }}>
+              카테고리 <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <select
+              value={formData.category}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                fontSize: '14px',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="general">일반</option>
+              <option value="important">중요</option>
+              <option value="event">이벤트</option>
+              <option value="update">업데이트</option>
+            </select>
+          </div>
+
+          {/* Preview Toggle */}
+          <div style={{ marginBottom: '16px', display: 'flex', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={() => setShowPreview(false)}
+              style={{
+                padding: '8px 16px',
+                background: !showPreview ? '#2563eb' : '#ffffff',
+                color: !showPreview ? '#ffffff' : '#374151',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              편집
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowPreview(true)}
+              style={{
+                padding: '8px 16px',
+                background: showPreview ? '#2563eb' : '#ffffff',
+                color: showPreview ? '#ffffff' : '#374151',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              미리보기
+            </button>
+          </div>
+
+          {/* Content */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#374151',
+              marginBottom: '8px'
+            }}>
+              내용 <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            {!showPreview ? (
+              <AnnouncementEditor
+                value={formData.content}
+                onChange={(value) => setFormData({ ...formData, content: value })}
+                placeholder="공지사항 내용을 입력하세요..."
+              />
+            ) : (
+              <div style={{
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                padding: '16px',
+                minHeight: '400px',
+                background: '#fff'
+              }}>
+                {renderPreview()}
+              </div>
+            )}
+          </div>
+
+          {/* Options */}
+          <div style={{
+            display: 'flex',
+            gap: '24px',
+            marginBottom: '32px',
+            padding: '16px',
+            background: '#f9fafb',
+            borderRadius: '8px'
+          }}>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '14px',
+              color: '#374151',
+              cursor: 'pointer'
+            }}>
+              <input
+                type="checkbox"
+                checked={formData.is_pinned}
+                onChange={(e) => setFormData({ ...formData, is_pinned: e.target.checked })}
+                style={{
+                  width: '18px',
+                  height: '18px',
+                  cursor: 'pointer'
+                }}
+              />
+              상단 고정
+            </label>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '14px',
+              color: '#374151',
+              cursor: 'pointer'
+            }}>
+              <input
+                type="checkbox"
+                checked={formData.published}
+                onChange={(e) => setFormData({ ...formData, published: e.target.checked })}
+                style={{
+                  width: '18px',
+                  height: '18px',
+                  cursor: 'pointer'
+                }}
+              />
+              공개
+            </label>
+          </div>
+
+          {/* Buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'flex-end'
+          }}>
+            <Link
+              href="/admin/announcements"
+              style={{
+                padding: '12px 24px',
+                background: '#ffffff',
+                color: '#374151',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                textDecoration: 'none',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'background 0.2s'
+              }}
+            >
+              취소
+            </Link>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                padding: '12px 24px',
+                background: loading ? '#9ca3af' : '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'background 0.2s'
+              }}
+            >
+              {loading ? '등록 중...' : '등록하기'}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// Helper function to convert Plate JSON to HTML
+function convertToHTML(nodes: any[]): string {
+  return nodes.map((node) => {
+    if (node.text !== undefined) {
+      let text = node.text;
+      if (node.bold) text = `<strong>${text}</strong>`;
+      if (node.italic) text = `<em>${text}</em>`;
+      if (node.underline) text = `<u>${text}</u>`;
+      if (node.strikethrough) text = `<s>${text}</s>`;
+      if (node.code) text = `<code>${text}</code>`;
+      return text;
+    }
+
+    const children = node.children?.map((child: any) => convertToHTML([child])).join('') || '';
+
+    switch (node.type) {
+      case 'h1':
+        return `<h1>${children}</h1>`;
+      case 'h2':
+        return `<h2>${children}</h2>`;
+      case 'h3':
+        return `<h3>${children}</h3>`;
+      case 'ul':
+        return `<ul>${children}</ul>`;
+      case 'ol':
+        return `<ol>${children}</ol>`;
+      case 'li':
+        return `<li>${children}</li>`;
+      case 'img':
+        return `<img src="${node.url}" alt="" style="max-width: 100%; height: auto;" />`;
+      case 'a':
+        return `<a href="${node.url}" target="_blank" rel="noopener noreferrer">${children}</a>`;
+      case 'hr':
+        return `<hr style="border: 0; border-top: 2px solid #e5e7eb; margin: 24px 0;" />`;
+      case 'p':
+      default:
+        return `<p>${children || '<br>'}</p>`;
+    }
+  }).join('');
+}

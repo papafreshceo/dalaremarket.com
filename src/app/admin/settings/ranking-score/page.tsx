@@ -76,7 +76,7 @@ export default function RankingScoreSettingsPage() {
 
   useEffect(() => {
     fetchSettings();
-    fetchRewards();
+    // fetchRewards(); // TODO: Supabase schema cache 갱신 후 활성화
   }, []);
 
   const fetchSettings = async () => {

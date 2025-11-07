@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import UserHeader from '@/components/layout/UserHeader'
 import MobileBottomNav from '@/components/layout/MobileBottomNav'
+import PlatformFooter from '@/components/PlatformFooter'
+import { NoticePopup } from '@/components/NoticePopup'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -102,19 +104,20 @@ export default function PlatformHome() {
   }, [])
 
   return (
-    <>
+    <div className="flex flex-col min-h-screen">
       <UserHeader />
-      <MobileBottomNav />
-      <div style={{
-        position: 'relative',
-        width: '100%',
-        paddingTop: '70px',
-        paddingLeft: isMobile ? '20px' : '40px',
-        paddingRight: isMobile ? '20px' : '40px',
-        paddingBottom: isMobile ? '80px' : '40px',
-        minHeight: '100vh',
-        overflow: 'hidden'
-      }}>
+      <NoticePopup />
+      <main className="flex-1">
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          paddingTop: '70px',
+          paddingLeft: isMobile ? '20px' : '40px',
+          paddingRight: isMobile ? '20px' : '40px',
+          paddingBottom: isMobile ? '80px' : '40px',
+          minHeight: '100vh',
+          overflow: 'hidden'
+        }}>
         {/* 메인 파란색 그라데이션 */}
         <div style={{
           position: 'absolute',
@@ -752,6 +755,9 @@ export default function PlatformHome() {
           </div>
         </div>
       </div>
-    </>
+      </main>
+      <PlatformFooter />
+      <MobileBottomNav />
+    </div>
   )
 }

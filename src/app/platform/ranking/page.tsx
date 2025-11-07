@@ -579,7 +579,7 @@ export default function RankingPage() {
           gap: '16px',
           marginBottom: '32px'
         }}>
-          {(['LEGEND', 'ELITE', 'ADVANCE', 'STANDARD', 'LIGHT'] as const).map((tier) => {
+          {(['LIGHT', 'STANDARD', 'ADVANCE', 'ELITE', 'LEGEND'] as const).map((tier) => {
             const color = getTierColor(tier);
             return (
               <div
@@ -587,23 +587,23 @@ export default function RankingPage() {
                 style={{
                   background: color.bg,
                   border: `2px solid ${color.border}`,
-                  padding: '24px',
+                  padding: '16px',
                   textAlign: 'center',
                   boxShadow: `0 0 12px ${color.border}55, 4px 4px 0px 0px rgba(0, 0, 0, 0.3)`
                 }}
               >
                 <div style={{
-                  fontSize: '12px',
+                  fontSize: '11px',
                   fontWeight: '700',
                   color: color.text,
-                  marginBottom: '8px',
+                  marginBottom: '4px',
                   letterSpacing: '0.1em',
                   textShadow: `0 0 8px ${color.text}88`
                 }}>
                   {getTierName(tier)}
                 </div>
                 <div style={{
-                  fontSize: '48px',
+                  fontSize: '32px',
                   fontWeight: '900',
                   color: color.text,
                   fontFamily: 'var(--font-mono)',

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui'
 import { useToast } from '@/components/ui/Toast'
 
 interface SiteSettings {
+  id?: string
   site_name: string
   site_logo_url: string
   site_description: string
@@ -14,6 +15,13 @@ interface SiteSettings {
   contact_phone: string
   business_hours: string
   footer_text: string
+  company_name: string
+  ceo_name: string
+  business_number: string
+  e_commerce_license_number: string
+  address: string
+  privacy_officer_name: string
+  privacy_officer_email: string
 }
 
 export default function SiteSettingsPage() {
@@ -28,8 +36,49 @@ export default function SiteSettingsPage() {
     contact_email: 'contact@dalreamarket.com',
     contact_phone: '1588-0000',
     business_hours: '평일 09:00 - 18:00',
-    footer_text: '© 2025 달래마켓. All rights reserved.'
+    footer_text: '© 2025 달래마켓. All rights reserved.',
+    company_name: '(주)달래마켓',
+    ceo_name: '홍길동',
+    business_number: '123-45-67890',
+    e_commerce_license_number: '2024-서울강남-12345',
+    address: '서울특별시 강남구 테헤란로 123',
+    privacy_officer_name: '김개인',
+    privacy_officer_email: 'privacy@dalreamarket.com'
   })
+
+  // DB에서 설정 불러오기
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('*')
+        .single()
+
+      if (data) {
+        // undefined 값을 빈 문자열로 처리
+        setSettings({
+          id: data.id,
+          site_name: data.site_name || '',
+          site_logo_url: data.site_logo_url || '',
+          site_description: data.site_description || '',
+          site_keywords: data.site_keywords || '',
+          contact_email: data.contact_email || '',
+          contact_phone: data.contact_phone || '',
+          business_hours: data.business_hours || '',
+          footer_text: data.footer_text || '',
+          company_name: data.company_name || '',
+          ceo_name: data.ceo_name || '',
+          business_number: data.business_number || '',
+          e_commerce_license_number: data.e_commerce_license_number || '',
+          address: data.address || '',
+          privacy_officer_name: data.privacy_officer_name || '',
+          privacy_officer_email: data.privacy_officer_email || ''
+        })
+      }
+    }
+
+    fetchSettings()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (field: keyof SiteSettings, value: string) => {
     setSettings(prev => ({ ...prev, [field]: value }))
@@ -38,11 +87,26 @@ export default function SiteSettingsPage() {
   const handleSave = async () => {
     setLoading(true)
     try {
-      // 실제로는 Supabase에 저장
-      // await supabase.from('site_settings').upsert(settings)
+      if (settings.id) {
+        // ID가 있으면 UPDATE
+        const { error } = await supabase
+          .from('site_settings')
+          .update(settings)
+          .eq('id', settings.id)
+
+        if (error) throw error
+      } else {
+        // ID가 없으면 INSERT
+        const { error } = await supabase
+          .from('site_settings')
+          .insert(settings)
+
+        if (error) throw error
+      }
 
       showToast('사이트 정보가 저장되었습니다.', 'success')
     } catch (error) {
+      console.error('저장 오류:', error)
       showToast('저장 중 오류가 발생했습니다.', 'error')
     } finally {
       setLoading(false)
@@ -172,6 +236,111 @@ export default function SiteSettingsPage() {
           <p className="mt-1 text-xs text-text-tertiary">
             쉼표(,)로 구분하여 입력하세요.
           </p>
+        </div>
+      </div>
+
+      {/* 사업자 정보 */}
+      <div className="bg-surface border border-border rounded-lg p-6 space-y-6">
+        <h2 className="text-lg font-semibold text-text">사업자 정보</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">
+              상호명
+            </label>
+            <input
+              type="text"
+              value={settings.company_name}
+              onChange={(e) => handleChange('company_name', e.target.value)}
+              className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-text"
+              placeholder="(주)회사명"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">
+              대표자명
+            </label>
+            <input
+              type="text"
+              value={settings.ceo_name}
+              onChange={(e) => handleChange('ceo_name', e.target.value)}
+              className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-text"
+              placeholder="홍길동"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">
+              사업자등록번호
+            </label>
+            <input
+              type="text"
+              value={settings.business_number}
+              onChange={(e) => handleChange('business_number', e.target.value)}
+              className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-text"
+              placeholder="123-45-67890"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">
+              통신판매업신고번호
+            </label>
+            <input
+              type="text"
+              value={settings.e_commerce_license_number}
+              onChange={(e) => handleChange('e_commerce_license_number', e.target.value)}
+              className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-text"
+              placeholder="2024-서울강남-12345"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-text mb-2">
+            사업장 주소
+          </label>
+          <input
+            type="text"
+            value={settings.address}
+            onChange={(e) => handleChange('address', e.target.value)}
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-text"
+            placeholder="서울특별시 강남구 테헤란로 123"
+          />
+        </div>
+      </div>
+
+      {/* 개인정보처리책임자 */}
+      <div className="bg-surface border border-border rounded-lg p-6 space-y-6">
+        <h2 className="text-lg font-semibold text-text">개인정보처리책임자</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">
+              책임자명
+            </label>
+            <input
+              type="text"
+              value={settings.privacy_officer_name}
+              onChange={(e) => handleChange('privacy_officer_name', e.target.value)}
+              className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-text"
+              placeholder="김개인"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">
+              책임자 이메일
+            </label>
+            <input
+              type="email"
+              value={settings.privacy_officer_email}
+              onChange={(e) => handleChange('privacy_officer_email', e.target.value)}
+              className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-text"
+              placeholder="privacy@example.com"
+            />
+          </div>
         </div>
       </div>
 

@@ -18,6 +18,7 @@ import OptionValidationModal from './modals/OptionValidationModal';
 import MappingResultModal from './modals/MappingResultModal';
 import { LocalThemeToggle } from './components/LocalThemeToggle';
 import PWAInstallBanner from './components/PWAInstallBanner';
+import TierBadge from '@/components/TierBadge';
 import * as XLSX from 'xlsx';
 import { validateRequiredColumns } from './utils/validation';
 import toast, { Toaster } from 'react-hot-toast';
@@ -34,6 +35,7 @@ function OrdersPageContent() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
+  const [userTier, setUserTier] = useState<'light' | 'standard' | 'advance' | 'elite' | 'legend'>('light');
   const [orders, setOrders] = useState<Order[]>([]);
   const [cashBalance, setCashBalance] = useState<number>(0);
   const [creditBalance, setCreditBalance] = useState<number>(0);
@@ -246,10 +248,22 @@ function OrdersPageContent() {
         if (user.email) {
           setUserEmail(user.email);
         }
+
+        // tier 정보 가져오기
+        const { data: userData } = await supabase
+          .from('users')
+          .select('tier')
+          .eq('id', user.id)
+          .single();
+
+        const validTiers = ['light', 'standard', 'advance', 'elite', 'legend'];
+        const tier = userData?.tier;
+        setUserTier(validTiers.includes(tier) ? tier : 'light');
       } else {
         // 비회원 사용자
         setUserId('guest');
         setUserEmail('');
+        setUserTier('light');
         console.log('[orders] 비회원 사용자 - 샘플 데이터 모드');
       }
     };
@@ -471,7 +485,7 @@ function OrdersPageContent() {
       return;
     }
 
-    if (tabParam && ['대시보드', '발주서등록', '건별등록', '정산관리', '옵션명매핑', '판매자정보', '인벤토리'].includes(tabParam)) {
+    if (tabParam && ['대시보드', '발주서등록', '건별등록', '정산관리', '옵션명매핑', '판매자정보', '지갑'].includes(tabParam)) {
       setActiveTab(tabParam as Tab);
       localStorage.setItem('ordersActiveTab', tabParam);
     } else {
@@ -988,7 +1002,7 @@ function OrdersPageContent() {
         height: '70px',
         background: 'var(--color-background-secondary)',
         borderBottom: '1px solid var(--color-border)',
-        zIndex: 1100,
+        zIndex: 1200,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -1079,14 +1093,21 @@ function OrdersPageContent() {
             )}
           </button>
 
-          {/* 로그인 정보 */}
+          {/* 티어 배지 & 로그인 정보 */}
           {!isMobile && (
             <div style={{
-              fontSize: '14px',
-              color: 'var(--color-text)',
-              fontWeight: '500'
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}>
-              {userEmail || '로그인 정보 없음'}
+              <TierBadge tier={userTier} iconOnly glow={0} />
+              <div style={{
+                fontSize: '14px',
+                color: 'var(--color-text)',
+                fontWeight: '500'
+              }}>
+                {userEmail || '로그인 정보 없음'}
+              </div>
             </div>
           )}
 
@@ -1202,7 +1223,7 @@ function OrdersPageContent() {
                     zIndex: 10000
                   }}>
                     <div style={{ fontWeight: '600', marginBottom: '4px' }}>크레딧</div>
-                    <div style={{ fontSize: '11px', opacity: 0.9 }}>업무도구 사용 포인트 (매일 100 리필)</div>
+                    <div style={{ fontSize: '11px', opacity: 0.9 }}>업무도구 사용 포인트 (매일 1,000 리필)</div>
                     <div style={{
                       position: 'absolute',
                       bottom: '100%',
@@ -1550,9 +1571,9 @@ function OrdersPageContent() {
             판매자정보
           </button>
 
-          {/* 인벤토리 탭 */}
+          {/* 지갑 탭 */}
           <button
-            onClick={() => handleTabChange('인벤토리')}
+            onClick={() => handleTabChange('지갑')}
             style={{
               width: '100%',
               display: 'flex',
@@ -1560,32 +1581,33 @@ function OrdersPageContent() {
               gap: '12px',
               padding: isMobile ? '10px 8px' : '10px 16px',
               margin: isMobile ? '4px 6px' : '2px 8px',
-              background: activeTab === '인벤토리' ? 'var(--color-surface-hover)' : 'transparent',
+              background: activeTab === '지갑' ? 'var(--color-surface-hover)' : 'transparent',
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
               fontSize: isMobile ? '12px' : '14px',
-              fontWeight: activeTab === '인벤토리' ? '600' : '400',
+              fontWeight: activeTab === '지갑' ? '600' : '400',
               color: 'var(--color-text)',
               textAlign: 'left',
               transition: 'background 0.2s'
             }}
             onMouseEnter={(e) => {
-              if (activeTab !== '인벤토리') {
+              if (activeTab !== '지갑') {
                 e.currentTarget.style.background = 'var(--color-surface-hover)';
               }
             }}
             onMouseLeave={(e) => {
-              if (activeTab !== '인벤토리') {
+              if (activeTab !== '지갑') {
                 e.currentTarget.style.background = 'transparent';
               }
             }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <text x="12" y="16" textAnchor="middle" fontSize="12" fill="currentColor" fontWeight="bold">₩</text>
+              <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"></path>
+              <path d="M4 6v12c0 1.1.9 2 2 2h14v-4"></path>
+              <path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"></path>
             </svg>
-            인벤토리
+            지갑
           </button>
         </div>
       </div>
@@ -1678,7 +1700,7 @@ function OrdersPageContent() {
         {activeTab === '판매자정보' && (
           <SellerInfoTab userId={userId} />
         )}
-        {activeTab === '인벤토리' && (
+        {activeTab === '지갑' && (
           <CashHistoryTab userId={userId} />
         )}
 

@@ -42,20 +42,20 @@ export default function NoticePage() {
 
   const getCategoryLabel = (category: string) => {
     const labels: { [key: string]: string } = {
-      important: '중요',
       general: '일반',
-      update: '업데이트',
-      event: '이벤트'
+      shipping: '발송',
+      product: '상품',
+      update: '업데이트'
     };
     return labels[category] || category;
   };
 
   const getCategoryColor = (category: string) => {
     const colors: { [key: string]: { bg: string; text: string } } = {
-      important: { bg: 'rgba(239, 68, 68, 0.1)', text: '#ef4444' },
       general: { bg: 'rgba(37, 99, 235, 0.1)', text: '#2563eb' },
-      update: { bg: 'rgba(16, 185, 129, 0.1)', text: '#10b981' },
-      event: { bg: 'rgba(139, 92, 246, 0.1)', text: '#8b5cf6' }
+      shipping: { bg: 'rgba(239, 68, 68, 0.1)', text: '#ef4444' },
+      product: { bg: 'rgba(139, 92, 246, 0.1)', text: '#8b5cf6' },
+      update: { bg: 'rgba(16, 185, 129, 0.1)', text: '#10b981' }
     };
     return colors[category] || { bg: 'rgba(107, 114, 128, 0.1)', text: '#6b7280' };
   };
@@ -169,22 +169,6 @@ export default function NoticePage() {
               전체
             </button>
             <button
-              onClick={() => setSelectedCategory('important')}
-              style={{
-                border: 0,
-                background: selectedCategory === 'important' ? '#ef4444' : 'transparent',
-                padding: '10px 16px',
-                borderRadius: '14px',
-                fontWeight: '800',
-                color: selectedCategory === 'important' ? '#ffffff' : '#1d4ed8',
-                cursor: 'pointer',
-                boxShadow: selectedCategory === 'important' ? '0 10px 20px rgba(239,68,68,0.25)' : 'none',
-                transition: 'all 0.2s'
-              }}
-            >
-              중요
-            </button>
-            <button
               onClick={() => setSelectedCategory('general')}
               style={{
                 border: 0,
@@ -201,6 +185,38 @@ export default function NoticePage() {
               일반
             </button>
             <button
+              onClick={() => setSelectedCategory('shipping')}
+              style={{
+                border: 0,
+                background: selectedCategory === 'shipping' ? '#ef4444' : 'transparent',
+                padding: '10px 16px',
+                borderRadius: '14px',
+                fontWeight: '800',
+                color: selectedCategory === 'shipping' ? '#ffffff' : '#1d4ed8',
+                cursor: 'pointer',
+                boxShadow: selectedCategory === 'shipping' ? '0 10px 20px rgba(239,68,68,0.25)' : 'none',
+                transition: 'all 0.2s'
+              }}
+            >
+              발송
+            </button>
+            <button
+              onClick={() => setSelectedCategory('product')}
+              style={{
+                border: 0,
+                background: selectedCategory === 'product' ? '#8b5cf6' : 'transparent',
+                padding: '10px 16px',
+                borderRadius: '14px',
+                fontWeight: '800',
+                color: selectedCategory === 'product' ? '#ffffff' : '#1d4ed8',
+                cursor: 'pointer',
+                boxShadow: selectedCategory === 'product' ? '0 10px 20px rgba(139,92,246,0.25)' : 'none',
+                transition: 'all 0.2s'
+              }}
+            >
+              상품
+            </button>
+            <button
               onClick={() => setSelectedCategory('update')}
               style={{
                 border: 0,
@@ -215,22 +231,6 @@ export default function NoticePage() {
               }}
             >
               업데이트
-            </button>
-            <button
-              onClick={() => setSelectedCategory('event')}
-              style={{
-                border: 0,
-                background: selectedCategory === 'event' ? '#8b5cf6' : 'transparent',
-                padding: '10px 16px',
-                borderRadius: '14px',
-                fontWeight: '800',
-                color: selectedCategory === 'event' ? '#ffffff' : '#1d4ed8',
-                cursor: 'pointer',
-                boxShadow: selectedCategory === 'event' ? '0 10px 20px rgba(139,92,246,0.25)' : 'none',
-                transition: 'all 0.2s'
-              }}
-            >
-              이벤트
             </button>
           </div>
         </div>

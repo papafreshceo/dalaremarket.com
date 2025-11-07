@@ -1,17 +1,20 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { useState } from 'react';
 
 type Tier = 'light' | 'standard' | 'advance' | 'elite' | 'legend';
 
 const TIER_META: Record<Tier, {
   label: string;
   color: string;     // main neon color
+  discount: string;  // 할인율
   Icon: (props: React.SVGProps<SVGSVGElement>) => JSX.Element;
 }> = {
   light: {
     label: 'LIGHT',
     color: '#7BE9FF',
+    discount: '0.5%',
     Icon: (p) => (
       <svg viewBox="0 0 24 24" {...p}>
         {/* 물방울 외곽 */}
@@ -24,6 +27,7 @@ const TIER_META: Record<Tier, {
   standard: {
     label: 'STANDARD',
     color: '#4BB3FF',
+    discount: '1%',
     Icon: (p) => (
       <svg viewBox="0 0 24 24" {...p}>
         {/* 방패 외곽 */}
@@ -36,6 +40,7 @@ const TIER_META: Record<Tier, {
   advance: {
     label: 'ADVANCE',
     color: '#B05CFF',
+    discount: '1.5%',
     Icon: (p) => (
       <svg viewBox="0 0 24 24" {...p}>
         {/* 로켓 본체 */}
@@ -58,6 +63,7 @@ const TIER_META: Record<Tier, {
   elite: {
     label: 'ELITE',
     color: '#24E3A8',
+    discount: '2%',
     Icon: (p) => (
       <svg viewBox="0 0 24 24" {...p}>
         <path d="M12 2l2.5 5.5 6 .9-4.3 4.2 1 6-5.2-3-5.2 3 1-6-4.3-4.2 6-.9L12 2Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
@@ -67,6 +73,7 @@ const TIER_META: Record<Tier, {
   legend: {
     label: 'LEGEND',
     color: '#FFD447',
+    discount: '2.5%',
     Icon: (p) => (
       <svg viewBox="0 0 24 24" {...p}>
         {/* 왕관 베이스 */}
@@ -106,7 +113,8 @@ type Props = {
 export default function TierBadge({
   tier, compact = true, hideLabel = false, glow = 1, iconOnly = false, className = ''
 }: Props) {
-  const meta = TIER_META[tier];
+  const meta = TIER_META[tier] || TIER_META['light']; // 기본값 fallback
+  const [showTooltip, setShowTooltip] = useState(false);
   const pulse = glow === 0 ? {} : {
     animate: { boxShadow: [
       `0 0 18px 0 ${meta.color}55`,
@@ -120,22 +128,65 @@ export default function TierBadge({
   if (iconOnly) {
     return (
       <div
-        className={`relative flex items-center justify-center w-7 h-7 rounded-full ${className}`}
-        style={{
-          // @ts-ignore
-          '--tier': meta.color,
-          background: `${meta.color}15`,
-          border: `1.5px solid ${meta.color}`,
-          boxShadow: `0 0 6px ${meta.color}55`
-        }}
+        className={`relative ${className}`}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
       >
-        {/* Icon */}
-        <meta.Icon
-          width={16}
-          height={16}
-          className="relative z-10"
-          style={{ color: meta.color, filter: `drop-shadow(0 0 4px ${meta.color})` }}
-        />
+        <div
+          className="flex items-center justify-center w-7 h-7 rounded-full cursor-pointer"
+          style={{
+            // @ts-ignore
+            '--tier': meta.color,
+            background: '#0b1020',
+            border: `1.5px solid ${meta.color}`,
+            boxShadow: `0 0 6px ${meta.color}55`
+          }}
+        >
+          {/* Icon */}
+          <meta.Icon
+            width={16}
+            height={16}
+            className="relative z-10"
+            style={{ color: meta.color, filter: `drop-shadow(0 0 4px ${meta.color})` }}
+          />
+        </div>
+
+        {/* Tooltip */}
+        {showTooltip && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 8px)',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              padding: '8px 12px',
+              background: 'rgba(0, 0, 0, 0.9)',
+              color: 'white',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: '600',
+              whiteSpace: 'nowrap',
+              zIndex: 10000,
+              border: `1px solid ${meta.color}40`
+            }}
+          >
+            <div style={{ color: meta.color, marginBottom: '2px', fontSize: '11px', fontWeight: '700' }}>{meta.label}</div>
+            <div style={{ color: '#fff', fontSize: '13px' }}>{meta.discount} 할인</div>
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 0,
+                height: 0,
+                borderLeft: '5px solid transparent',
+                borderRight: '5px solid transparent',
+                borderBottom: '5px solid rgba(0, 0, 0, 0.9)'
+              }}
+            />
+          </div>
+        )}
       </div>
     );
   }

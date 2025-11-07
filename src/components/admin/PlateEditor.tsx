@@ -1,13 +1,18 @@
 'use client';
 
-import { usePlateEditor, Plate, PlateContent } from '@udecode/plate-common/react';
-import { BoldPlugin, ItalicPlugin, UnderlinePlugin, StrikethroughPlugin, CodePlugin } from '@udecode/plate-basic-marks/react';
-import { HeadingPlugin } from '@udecode/plate-heading/react';
-import { BlockquotePlugin } from '@udecode/plate-block-quote/react';
-import { BulletedListPlugin, NumberedListPlugin, ListItemPlugin } from '@udecode/plate-list/react';
-import { LinkPlugin } from '@udecode/plate-link/react';
-import { ParagraphPlugin } from '@udecode/plate-common/react';
-import { useCallback, useState } from 'react';
+import { usePlateEditor, Plate, PlateContent, ParagraphPlugin } from 'platejs/react';
+import {
+  BoldPlugin,
+  ItalicPlugin,
+  UnderlinePlugin,
+  StrikethroughPlugin,
+  CodePlugin,
+  H1Plugin,
+  H2Plugin,
+  H3Plugin,
+  BlockquotePlugin,
+} from '@platejs/basic-nodes/react';
+import { useCallback } from 'react';
 
 interface PlateEditorProps {
   value: string;
@@ -28,17 +33,15 @@ export function PlateEditor({ value, onChange, placeholder = '내용을 입력�
     value: initialValue,
     plugins: [
       ParagraphPlugin,
-      HeadingPlugin,
+      H1Plugin,
+      H2Plugin,
+      H3Plugin,
       BlockquotePlugin,
       BoldPlugin,
       ItalicPlugin,
       UnderlinePlugin,
       StrikethroughPlugin,
       CodePlugin,
-      BulletedListPlugin,
-      NumberedListPlugin,
-      ListItemPlugin,
-      LinkPlugin,
     ],
   });
 
@@ -116,31 +119,6 @@ export function PlateEditor({ value, onChange, placeholder = '내용을 입력�
         </ToolbarButton>
         <ToolbarButton onClick={() => setBlockType('p')} title="일반 텍스트">
           ¶ 문단
-        </ToolbarButton>
-
-        <div style={{ width: '1px', background: '#d1d5db', margin: '0 4px' }} />
-
-        {/* 리스트 */}
-        <ToolbarButton onClick={() => setBlockType('ul')} title="순서 없는 목록">
-          • 목록
-        </ToolbarButton>
-        <ToolbarButton onClick={() => setBlockType('ol')} title="순서 있는 목록">
-          1. 목록
-        </ToolbarButton>
-
-        <div style={{ width: '1px', background: '#d1d5db', margin: '0 4px' }} />
-
-        {/* 링크 */}
-        <ToolbarButton onClick={() => {
-          const url = prompt('링크 URL을 입력하세요:');
-          if (url && editor) {
-            editor.tf.toggle.mark({
-              key: 'a',
-              value: url,
-            });
-          }
-        }} title="링크 삽입">
-          🔗 링크
         </ToolbarButton>
       </div>
 
@@ -262,13 +240,6 @@ function plateValueToHtml(nodes: any[]): string {
           return `<h6>${children}</h6>`;
         case 'blockquote':
           return `<blockquote>${children}</blockquote>`;
-        case 'ul':
-          return `<ul>${children}</ul>`;
-        case 'ol':
-          return `<ol>${children}</ol>`;
-        case 'li':
-        case 'lic':
-          return `<li>${children}</li>`;
         case 'a':
           return `<a href="${node.url}">${children}</a>`;
         case 'p':
