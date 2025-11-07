@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
-import { TiptapEditor } from '@/components/admin/TiptapEditor';
+import { PlateEditor } from '@/components/admin/PlateEditor';
 
 export default function CreateNoticePage() {
   const router = useRouter();
@@ -170,7 +170,7 @@ export default function CreateNoticePage() {
               }}>
                 내용 <span style={{ color: '#ef4444' }}>*</span>
               </label>
-              <TiptapEditor
+              <PlateEditor
                 value={formData.content}
                 onChange={(value) => setFormData({ ...formData, content: value })}
                 placeholder="공지사항 내용을 입력하세요..."
