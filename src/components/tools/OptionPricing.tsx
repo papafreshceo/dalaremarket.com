@@ -144,9 +144,9 @@ export default function OptionPricing() {
   const [discountPrice, setDiscountPrice] = useState<string>('');
 
   // 옵션 헤더명
-  const [option1Header, setOption1Header] = useState<string>('옵션1');
-  const [option2Header, setOption2Header] = useState<string>('옵션2');
-  const [option3Header, setOption3Header] = useState<string>('옵션3');
+  const [option1Header, setOption1Header] = useState<string>('');
+  const [option2Header, setOption2Header] = useState<string>('');
+  const [option3Header, setOption3Header] = useState<string>('');
 
   // 옵션명 개수
   const [optionCount, setOptionCount] = useState<number>(2);
