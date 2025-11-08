@@ -739,46 +739,6 @@ export default function OptionPricing() {
         </div>
       )}
 
-      {/* 가이드 버튼 */}
-      <div style={{
-        marginBottom: '24px',
-        display: 'flex',
-        justifyContent: 'flex-end'
-      }}>
-        <button
-          onClick={() => setShowGuide(!showGuide)}
-          style={{
-            padding: '10px 20px',
-            background: showGuide ? '#dc3545' : '#10b981',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            transition: 'all 0.2s',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.2)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="white"/>
-          </svg>
-          {showGuide ? '가이드 해제' : '가이드 보기'}
-        </button>
-      </div>
-
       {/* 판매가 및 할인금액 입력 */}
       <div style={{
         background: '#ffffff',
@@ -789,7 +749,8 @@ export default function OptionPricing() {
         display: 'flex',
         alignItems: 'center',
         gap: '16px',
-        flexWrap: 'wrap'
+        flexWrap: 'wrap',
+        justifyContent: 'space-between'
       }}>
         {/* 판매가(정가) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -905,6 +866,41 @@ export default function OptionPricing() {
             })()}
           </span>
         </div>
+
+        {/* 가이드 버튼 */}
+        <button
+          onClick={() => setShowGuide(!showGuide)}
+          style={{
+            padding: '8px 16px',
+            background: showGuide ? '#dc3545' : '#10b981',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '13px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s',
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
+            marginLeft: 'auto'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="white"/>
+          </svg>
+          {showGuide ? '가이드 해제' : '가이드 보기'}
+        </button>
       </div>
 
       {/* 옵션 목록 */}
