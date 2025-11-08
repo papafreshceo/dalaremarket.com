@@ -1318,22 +1318,22 @@ export default function OptionPricing() {
                   borderBottom: '1px solid #f1f3f5'
                 }}>
                   {/* 선택 */}
-                  <td style={{ padding: '8px', textAlign: 'center' }}>
+                  <td style={{ padding: '4px', textAlign: 'center' }}>
                     <input
                       type="checkbox"
                       checked={selectedOptionIds.has(option.id)}
                       onChange={() => toggleSelection(option.id)}
-                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                     />
                   </td>
                   {/* 순서 */}
                   <td style={{ padding: '2px 4px', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', alignItems: 'center' }}>
                       <button
                         onClick={() => moveUp(index)}
                         disabled={index === 0}
                         style={{
-                          padding: '2px',
+                          padding: '1px',
                           background: 'transparent',
                           border: 'none',
                           cursor: index === 0 ? 'not-allowed' : 'pointer',
@@ -1342,7 +1342,7 @@ export default function OptionPricing() {
                           justifyContent: 'center'
                         }}
                       >
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M10 6L15 11L14 12L10 8L6 12L5 11L10 6Z" fill={index === 0 ? '#adb5bd' : '#495057'}/>
                         </svg>
                       </button>
@@ -1350,7 +1350,7 @@ export default function OptionPricing() {
                         onClick={() => moveDown(index)}
                         disabled={index === options.length - 1}
                         style={{
-                          padding: '2px',
+                          padding: '1px',
                           background: 'transparent',
                           border: 'none',
                           cursor: index === options.length - 1 ? 'not-allowed' : 'pointer',
@@ -1359,29 +1359,29 @@ export default function OptionPricing() {
                           justifyContent: 'center'
                         }}
                       >
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M10 14L5 9L6 8L10 12L14 8L15 9L10 14Z" fill={index === options.length - 1 ? '#adb5bd' : '#495057'}/>
                         </svg>
                       </button>
                     </div>
                   </td>
                   {/* 기준설정 */}
-                  <td style={{ padding: '8px', textAlign: 'center' }}>
+                  <td style={{ padding: '4px', textAlign: 'center' }}>
                     <input
                       type="radio"
                       name="baseOption"
                       checked={baseOptionId === option.id}
                       onChange={() => setBaseOptionId(option.id)}
                       style={{
-                        width: '18px',
-                        height: '18px',
+                        width: '16px',
+                        height: '16px',
                         cursor: 'pointer',
                         accentColor: '#dc3545'
                       }}
                     />
                   </td>
                   {/* 옵션상품 */}
-                  <td style={{ padding: '8px' }}>
+                  <td style={{ padding: '4px' }}>
                     <input
                       type="text"
                       value={option.name}
@@ -1389,7 +1389,7 @@ export default function OptionPricing() {
                       placeholder="옵션상품명"
                       style={{
                         width: '100%',
-                        padding: '6px 8px',
+                        padding: '4px 6px',
                         border: '1px solid #dee2e6',
                         borderRadius: '4px',
                         fontSize: '13px',
@@ -1398,7 +1398,7 @@ export default function OptionPricing() {
                     />
                   </td>
                   {/* 판매가(원) */}
-                  <td style={{ padding: '8px' }}>
+                  <td style={{ padding: '4px' }}>
                     <input
                       type="text"
                       value={option.price ? parseInt(option.price).toLocaleString() : ''}
@@ -1409,7 +1409,7 @@ export default function OptionPricing() {
                       placeholder="0"
                       style={{
                         width: '100%',
-                        padding: '6px 8px',
+                        padding: '4px 6px',
                         border: '1px solid #dee2e6',
                         borderRadius: '4px',
                         fontSize: '13px',
@@ -1419,7 +1419,7 @@ export default function OptionPricing() {
                   </td>
                   {/* 옵션1 */}
                   {optionCount >= 1 && (
-                    <td style={{ padding: '8px' }}>
+                    <td style={{ padding: '4px' }}>
                       <input
                         type="text"
                         value={option.option1}
@@ -1427,7 +1427,7 @@ export default function OptionPricing() {
                         placeholder="옵션1"
                         style={{
                           width: '100%',
-                          padding: '6px 8px',
+                          padding: '4px 6px',
                           border: '1px solid #dee2e6',
                           borderRadius: '4px',
                           fontSize: '13px',
@@ -1438,7 +1438,7 @@ export default function OptionPricing() {
                   )}
                   {/* 옵션2 */}
                   {optionCount >= 2 && (
-                    <td style={{ padding: '8px' }}>
+                    <td style={{ padding: '4px' }}>
                       <input
                         type="text"
                         value={option.option2}
@@ -1446,7 +1446,7 @@ export default function OptionPricing() {
                         placeholder="옵션2"
                         style={{
                           width: '100%',
-                          padding: '6px 8px',
+                          padding: '4px 6px',
                           border: '1px solid #dee2e6',
                           borderRadius: '4px',
                           fontSize: '13px',
@@ -1457,7 +1457,7 @@ export default function OptionPricing() {
                   )}
                   {/* 옵션3 */}
                   {optionCount >= 3 && (
-                    <td style={{ padding: '8px' }}>
+                    <td style={{ padding: '4px' }}>
                       <input
                         type="text"
                         value={option.option3}
@@ -1465,7 +1465,7 @@ export default function OptionPricing() {
                         placeholder="옵션3"
                         style={{
                           width: '100%',
-                          padding: '6px 8px',
+                          padding: '4px 6px',
                           border: '1px solid #dee2e6',
                           borderRadius: '4px',
                           fontSize: '13px',
@@ -1475,7 +1475,7 @@ export default function OptionPricing() {
                     </td>
                   )}
                   {/* 옵션가 */}
-                  <td style={{ padding: '8px' }}>
+                  <td style={{ padding: '4px' }}>
                     {(() => {
                       const isWarning = sellingPrice && option.optionPrice &&
                         Math.abs(parseInt(option.optionPrice)) > (parseInt(sellingPrice) * 0.5);
@@ -1490,7 +1490,7 @@ export default function OptionPricing() {
                             placeholder="0"
                             style={{
                               width: '100%',
-                              padding: '6px 8px',
+                              padding: '4px 6px',
                               border: isWarning ? '2px solid #dc3545' : '1px solid #dee2e6',
                               borderRadius: '4px',
                               fontSize: '13px',
@@ -1517,7 +1517,7 @@ export default function OptionPricing() {
                     })()}
                   </td>
                   {/* 재고수량 */}
-                  <td style={{ padding: '8px' }}>
+                  <td style={{ padding: '4px' }}>
                     <input
                       type="text"
                       value={option.stockQuantity ? parseInt(option.stockQuantity).toLocaleString() : ''}
@@ -1528,7 +1528,7 @@ export default function OptionPricing() {
                       placeholder="0"
                       style={{
                         width: '100%',
-                        padding: '6px 8px',
+                        padding: '4px 6px',
                         border: '1px solid #dee2e6',
                         borderRadius: '4px',
                         fontSize: '13px',
@@ -1537,7 +1537,7 @@ export default function OptionPricing() {
                     />
                   </td>
                   {/* 관리코드 */}
-                  <td style={{ padding: '8px' }}>
+                  <td style={{ padding: '4px' }}>
                     <input
                       type="text"
                       value={option.managementCode}
@@ -1545,7 +1545,7 @@ export default function OptionPricing() {
                       placeholder="코드"
                       style={{
                         width: '100%',
-                        padding: '6px 8px',
+                        padding: '4px 6px',
                         border: '1px solid #dee2e6',
                         borderRadius: '4px',
                         fontSize: '13px',
@@ -1554,12 +1554,12 @@ export default function OptionPricing() {
                     />
                   </td>
                   {/* 사용여부 */}
-                  <td style={{ padding: '8px', textAlign: 'center' }}>
+                  <td style={{ padding: '4px', textAlign: 'center' }}>
                     <input
                       type="checkbox"
                       checked={option.isActive}
                       onChange={(e) => updateOption(option.id, 'isActive', e.target.checked.toString())}
-                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                     />
                   </td>
                 </tr>
