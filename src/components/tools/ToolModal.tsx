@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import MarginCalculator from './MarginCalculator';
 import PriceSimulator from './PriceSimulator';
 import OptionPricing from './OptionPricing';
 import TrendAnalysis from './TrendAnalysis';
 import CompetitorMonitor from './CompetitorMonitor';
+import OrderIntegration from './OrderIntegration';
 
 interface ToolModalProps {
   isOpen: boolean;
@@ -13,28 +14,59 @@ interface ToolModalProps {
   toolId?: string;
   toolName?: string;
   onOpenSimulator?: () => void;
+  zIndex?: number;
 }
 
-export default function ToolModal({ isOpen, onClose, toolId, toolName, onOpenSimulator }: ToolModalProps) {
-  // ESC 키로 닫기
+export default function ToolModal({ isOpen, onClose, toolId, toolName, onOpenSimulator, zIndex = 10000 }: ToolModalProps) {
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // 초기 위치 설정 (모달마다 약간씩 다르게)
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
+    if (isOpen) {
+      const offset = (zIndex - 10000) * 30;
+      setPosition({ x: offset, y: offset });
+    }
+  }, [isOpen, zIndex]);
+
+  // 드래그 시작
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return; // 버튼 클릭은 드래그 안함
+
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+  };
+
+  // 드래그 중
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        setPosition({
+          x: e.clientX - dragStart.x,
+          y: e.clientY - dragStart.y
+        });
       }
     };
 
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      // 모달 열릴 때 스크롤 방지
-      document.body.style.overflow = 'hidden';
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
     }
 
     return () => {
-      window.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'unset';
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isOpen, onClose]);
+  }, [isDragging, dragStart]);
 
   if (!isOpen) return null;
 
@@ -46,37 +78,43 @@ export default function ToolModal({ isOpen, onClose, toolId, toolName, onOpenSim
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0, 0, 0, 0.5)',
-        backdropFilter: 'blur(4px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10000,
-        padding: '20px'
+        zIndex: zIndex,
+        pointerEvents: 'none'
       }}
     >
       <div
+        ref={modalRef}
         style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))`,
           background: '#ffffff',
           borderRadius: '16px',
           maxWidth: '1410px',
-          width: '100%',
+          width: 'calc(100vw - 100px)',
           maxHeight: '90vh',
-          overflow: 'auto',
-          position: 'relative',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+          overflow: 'visible',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          pointerEvents: 'auto',
+          cursor: isDragging ? 'grabbing' : 'default'
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 헤더 */}
-        <div style={{
-          padding: '24px',
-          borderBottom: '1px solid #dee2e6',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '16px'
-        }}>
+        {/* 헤더 (드래그 가능) */}
+        <div
+          onMouseDown={handleMouseDown}
+          style={{
+            padding: '24px',
+            borderBottom: '1px solid #dee2e6',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '16px',
+            cursor: isDragging ? 'grabbing' : 'grab',
+            userSelect: 'none'
+          }}
+        >
           <h2 style={{
             fontSize: '24px',
             fontWeight: '600',
@@ -114,7 +152,9 @@ export default function ToolModal({ isOpen, onClose, toolId, toolName, onOpenSim
 
         {/* 본문 */}
         <div style={{
-          padding: '24px'
+          maxHeight: 'calc(90vh - 120px)',
+          overflowY: 'auto',
+          paddingBottom: '40px'
         }}>
           {/* 도구별 콘텐츠 */}
           {renderToolContent(toolId, onOpenSimulator)}
@@ -143,6 +183,7 @@ function renderToolContent(toolId?: string, onOpenSimulator?: () => void) {
     'margin-calculator': <MarginCalculator onOpenSimulator={onOpenSimulator} />,
     'price-simulator': <PriceSimulator />,
     'option-pricing': <OptionPricing />,
+    'order-integration': <OrderIntegration />,
     'trend-analysis': <TrendAnalysis />,
     'competitor-monitor': <CompetitorMonitor />,
   };

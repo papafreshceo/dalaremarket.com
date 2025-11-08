@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 
 // 불러오기 전용 버튼 컴포넌트
 function LoadOnlyButton({
@@ -274,26 +275,46 @@ export default function OptionPricing() {
       return;
     }
 
-    // 기존 옵션에 새 옵션들을 추가
-    const currentMaxId = Math.max(...options.map(o => parseInt(o.id)), 0);
-    const newOptions = selectedCat.option_products.map((product, index) => ({
-      id: (currentMaxId + index + 1).toString(),
-      name: product.option_name,
-      price: product.seller_supply_price.toString(),
-      option1: '',
-      option2: '',
-      option3: '',
-      optionPrice: '',
-      stockQuantity: '',
-      managementCode: '',
-      isActive: true,
-      priceDiff: 0
-    }));
+    // 행이 1개이고 빈 행인지 확인 (옵션명이 비어있으면 빈 행으로 간주)
+    const isEmptyRow = options.length === 1 && !options[0].name.trim();
 
-    // 항상 기존 옵션에 추가
-    setOptions([...options, ...newOptions]);
+    let newOptions;
+    if (isEmptyRow) {
+      // 교체 방식: 기존 빈 행을 새 옵션들로 교체
+      newOptions = selectedCat.option_products.map((product, index) => ({
+        id: (index + 1).toString(),
+        name: product.option_name,
+        price: product.seller_supply_price.toString(),
+        option1: '',
+        option2: '',
+        option3: '',
+        optionPrice: '',
+        stockQuantity: '',
+        managementCode: '',
+        isActive: true,
+        priceDiff: 0
+      }));
+      setOptions(newOptions);
+    } else {
+      // 추가 방식: 기존 옵션에 새 옵션들을 추가
+      const currentMaxId = Math.max(...options.map(o => parseInt(o.id)), 0);
+      newOptions = selectedCat.option_products.map((product, index) => ({
+        id: (currentMaxId + index + 1).toString(),
+        name: product.option_name,
+        price: product.seller_supply_price.toString(),
+        option1: '',
+        option2: '',
+        option3: '',
+        optionPrice: '',
+        stockQuantity: '',
+        managementCode: '',
+        isActive: true,
+        priceDiff: 0
+      }));
+      setOptions([...options, ...newOptions]);
+    }
 
-    alert(`"${category}" 카테고리의 ${newOptions.length}개 옵션 상품을 추가했습니다.`);
+    alert(`"${category}" 카테고리의 ${newOptions.length}개 옵션 상품을 ${isEmptyRow ? '추가' : '추가'}했습니다.`);
     setSelectedCategory('');
   };
 
@@ -317,6 +338,19 @@ export default function OptionPricing() {
     } else {
       setSelectedOptionIds(new Set(options.map(opt => opt.id)));
     }
+  };
+
+  // 다운로드 가능 여부 체크 (옵션가 값이 있는지만 확인)
+  const isDownloadable = () => {
+    const activeOptions = options.filter(opt => opt.isActive);
+
+    if (activeOptions.length === 0) return false;
+
+    return activeOptions.every(option => {
+      // 옵션가만 체크
+      const hasOptionPrice = option.optionPrice || option.priceDiff;
+      return hasOptionPrice !== undefined && hasOptionPrice !== null && String(hasOptionPrice).trim() !== '';
+    });
   };
 
   // 순서 위로 이동
@@ -416,6 +450,101 @@ export default function OptionPricing() {
     }
   };
 
+  // 자동채우기: 헤더명을 기준으로 옵션상품명에서 유사한 텍스트 추출
+  const autoFillOption = (optionNumber: 1 | 2 | 3) => {
+    const headerName = optionNumber === 1 ? option1Header : optionNumber === 2 ? option2Header : option3Header;
+
+    if (!headerName || !headerName.trim()) {
+      alert('헤더명을 먼저 입력해주세요.');
+      return;
+    }
+
+    const fieldName = `option${optionNumber}` as 'option1' | 'option2' | 'option3';
+
+    setOptions(prevOptions => {
+      return prevOptions.map(opt => {
+        if (!opt.name || !opt.name.trim()) return opt;
+
+        // 옵션상품명을 분석하여 헤더명과 유사한 텍스트 추출
+        const extractedText = extractSimilarText(opt.name, headerName, optionNumber);
+
+        return {
+          ...opt,
+          [fieldName]: extractedText
+        };
+      });
+    });
+  };
+
+  // 텍스트 유사도 기반 추출 함수
+  const extractSimilarText = (productName: string, headerName: string, optionNumber: 1 | 2 | 3): string => {
+    if (!productName || !headerName) return '';
+
+    // 1. 정확히 일치하는 키워드 찾기 (헤더명이 상품명에 포함된 경우)
+    if (productName.includes(headerName)) {
+      // 헤더명 주변 텍스트 추출
+      const patterns = [
+        new RegExp(`([^\\s,/()]+)?${headerName}([^\\s,/()]+)?`, 'g'),
+        new RegExp(`${headerName}[:\\s]*([^,/()\\s]+)`, 'g'),
+      ];
+
+      for (const pattern of patterns) {
+        const match = productName.match(pattern);
+        if (match && match[0]) {
+          return match[0].trim();
+        }
+      }
+    }
+
+    // 2. 키워드 기반 패턴 매칭
+    const keywordPatterns: Record<string, RegExp[]> = {
+      '중량': [/\d+(?:\.\d+)?(?:kg|g|근|t|톤)/gi, /\d+(?:\.\d+)?[\s]*(?:키로|그램|킬로)/gi],
+      '무게': [/\d+(?:\.\d+)?(?:kg|g|근|t|톤)/gi, /\d+(?:\.\d+)?[\s]*(?:키로|그램|킬로)/gi],
+      '용량': [/\d+(?:\.\d+)?(?:ml|l|리터|cc)/gi, /\d+(?:\.\d+)?[\s]*(?:밀리|리터)/gi],
+      '수량': [/\d+(?:개|구|입|box|팩|묶음)/gi, /\d+[\s]*(?:개입|구성)/gi],
+      '개수': [/\d+(?:개|구|입|box|팩|묶음)/gi],
+      '크기': [/(?:대|중|소|특대|왕대)/gi, /\d+(?:호|cm|mm|인치)/gi],
+      '사이즈': [/(?:XS|S|M|L|XL|XXL|\d+호)/gi, /\d+(?:cm|mm|인치)/gi],
+      '색상': [/(?:빨강|파랑|노랑|초록|검정|흰색|회색|베이지|브라운|핑크|그린|블루|레드|옐로우|블랙|화이트|그레이|네이비)/gi],
+      '색': [/(?:빨강|파랑|노랑|초록|검정|흰색|회색|베이지|브라운|핑크|그린|블루|레드|옐로우|블랙|화이트|그레이|네이비)/gi],
+      '맛': [/(?:딸기|초코|바닐라|녹차|우유|커피|레몬|오렌지|포도|사과|복숭아|망고)/gi],
+      '품종': [/(?:[가-힣]+(?:품종|종|계|산|형))/gi],
+      '등급': [/(?:특|상|중|하|프리미엄|고급|일반)/gi],
+      '원산지': [/(?:국내산|수입산|[가-힣]+산)/gi, /(?:한국|중국|미국|일본|호주|뉴질랜드)/gi],
+    };
+
+    // 헤더명과 관련된 패턴 찾기
+    const headerLower = headerName.toLowerCase().trim();
+    for (const [keyword, patterns] of Object.entries(keywordPatterns)) {
+      if (headerLower.includes(keyword) || keyword.includes(headerLower)) {
+        for (const pattern of patterns) {
+          const match = productName.match(pattern);
+          if (match && match[0]) {
+            return match[0].trim();
+          }
+        }
+      }
+    }
+
+    // 3. 일반적인 구분자로 분리하여 첫 번째 또는 마지막 토큰 추출
+    const separators = /[,/()·\-\s]+/;
+    const tokens = productName.split(separators).filter(t => t.trim());
+
+    // 토큰이 3개 이상이면 옵션 번호에 따라 다른 토큰 선택
+    if (tokens.length >= 3) {
+      if (optionNumber === 1) return tokens[0];
+      if (optionNumber === 2) return tokens[1];
+      if (optionNumber === 3) return tokens[2] || tokens[tokens.length - 1];
+    } else if (tokens.length === 2) {
+      if (optionNumber === 1) return tokens[0];
+      if (optionNumber === 2 || optionNumber === 3) return tokens[1];
+    } else if (tokens.length === 1) {
+      return tokens[0];
+    }
+
+    return '';
+  };
+
 
   // 마진계산기에서 불러오기
   const loadFromMarginCalculator = (name: string) => {
@@ -485,6 +614,205 @@ export default function OptionPricing() {
       }
     } else {
       alert('해당 이름의 마진계산기 설정을 찾을 수 없습니다.');
+    }
+  };
+
+  // 네이버 엑셀 다운로드 함수
+  const downloadNaverExcel = async () => {
+    if (options.length === 0) {
+      alert('다운로드할 옵션 데이터가 없습니다.');
+      return;
+    }
+
+    // 사용 중인 옵션만 필터링
+    const activeOptions = options.filter(opt => opt.isActive);
+
+    if (activeOptions.length === 0) {
+      alert('사용 중인 옵션이 없습니다.');
+      return;
+    }
+
+    try {
+      // 템플릿 파일 로드
+      const response = await fetch('/OptionCombinationNaver.xls');
+      const arrayBuffer = await response.arrayBuffer();
+      const templateWorkbook = XLSX.read(arrayBuffer, { type: 'array', cellStyles: true, bookVBA: true });
+
+      // 템플릿의 첫 번째 시트를 복사
+      const templateSheetName = templateWorkbook.SheetNames[0];
+      const templateSheet = templateWorkbook.Sheets[templateSheetName];
+
+      // 템플릿 시트를 그대로 복사
+      const newSheet = XLSX.utils.decode_range(templateSheet['!ref'] || 'A1');
+
+      // 헤더 행 - optionCount에 따라 동적으로 생성
+      const headers = [];
+      if (optionCount >= 1) headers.push(option1Header || '선택1');
+      if (optionCount >= 2) headers.push(option2Header || '선택2');
+      if (optionCount >= 3) headers.push(option3Header || '선택3');
+      headers.push('옵션가', '재고수량', '관리코드', '사용여부');
+
+      // 데이터 행 생성
+      const dataRows = activeOptions.map(option => {
+        const row = [];
+        if (optionCount >= 1) row.push(option.option1 || '');
+        if (optionCount >= 2) row.push(option.option2 || '');
+        if (optionCount >= 3) row.push(option.option3 || '');
+        row.push(
+          option.optionPrice || option.priceDiff || 0,
+          option.stockQuantity || 0,
+          option.managementCode || '',
+          option.isActive ? 'Y' : 'N'
+        );
+        return row;
+      });
+
+      // 전체 데이터
+      const wsData = [headers, ...dataRows];
+
+      // 새 워크시트 생성 (데이터만)
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      // 자동 열 너비 계산 (기본 12, 텍스트에 따라 자동 조절)
+      const calculateColWidth = (data: any[][], colIdx: number): number => {
+        let maxWidth = 12; // 기본 너비
+        data.forEach(row => {
+          if (row[colIdx]) {
+            const cellValue = String(row[colIdx]);
+            const cellWidth = cellValue.length + 2; // 여백 추가
+            if (cellWidth > maxWidth) {
+              maxWidth = cellWidth;
+            }
+          }
+        });
+        return Math.min(maxWidth, 50); // 최대 50
+      };
+
+      const colWidths = headers.map((_, colIdx) => ({
+        wch: calculateColWidth(wsData, colIdx)
+      }));
+      ws['!cols'] = colWidths;
+
+      // 행 높이 설정
+      ws['!rows'] = [
+        { hpt: 22 }, // 헤더 행
+      ];
+
+      // 헤더 행 스타일 적용 (개나리색 배경)
+      headers.forEach((headerValue, colIdx) => {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: colIdx });
+
+        if (!ws[cellAddress]) {
+          ws[cellAddress] = { t: 's', v: headerValue };
+        }
+
+        // 스타일 적용
+        ws[cellAddress].s = {
+          fill: {
+            fgColor: { rgb: 'FFF9C4' }
+          },
+          font: {
+            name: '맑은 고딕',
+            sz: 11,
+            bold: true,
+            color: { rgb: '000000' }
+          },
+          alignment: {
+            horizontal: 'center',
+            vertical: 'center',
+            wrapText: false
+          },
+          border: {
+            top: { style: 'thin', color: { auto: 1 } },
+            bottom: { style: 'thin', color: { auto: 1 } },
+            left: { style: 'thin', color: { auto: 1 } },
+            right: { style: 'thin', color: { auto: 1 } }
+          }
+        };
+      });
+
+      // 데이터 행 스타일 적용
+      dataRows.forEach((row, rowIdx) => {
+        row.forEach((cellValue, colIdx) => {
+          const cellAddress = XLSX.utils.encode_cell({ r: rowIdx + 1, c: colIdx });
+
+          if (ws[cellAddress]) {
+            ws[cellAddress].s = {
+              font: {
+                name: '맑은 고딕',
+                sz: 10
+              },
+              alignment: {
+                horizontal: 'center',
+                vertical: 'center',
+                wrapText: false
+              },
+              border: {
+                top: { style: 'thin', color: { auto: 1 } },
+                bottom: { style: 'thin', color: { auto: 1 } },
+                left: { style: 'thin', color: { auto: 1 } },
+                right: { style: 'thin', color: { auto: 1 } }
+              }
+            };
+          }
+        });
+      });
+
+      // 새 워크북 생성
+      const wb = XLSX.utils.book_new();
+
+      // 템플릿의 워크북 속성 복사
+      if (templateWorkbook.Props) {
+        wb.Props = templateWorkbook.Props;
+      }
+      if (templateWorkbook.Custprops) {
+        wb.Custprops = templateWorkbook.Custprops;
+      }
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Sheet0');
+
+      // 파일명 생성
+      const now = new Date();
+      const fileName = `네이버_옵션조합_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.xlsx`;
+
+      // 다운로드 (bookSST 옵션 추가)
+      XLSX.writeFile(wb, fileName, { cellStyles: true, bookSST: true, bookType: 'xlsx' });
+
+      alert(`네이버 옵션 조합 파일이 다운로드되었습니다.\n(${activeOptions.length}개 옵션)`);
+    } catch (error) {
+      console.error('템플릿 로드 실패, 기본 형식으로 다운로드합니다:', error);
+
+      // 템플릿 로드 실패 시 기본 형식으로 다운로드
+      const headers = [];
+      if (optionCount >= 1) headers.push(option1Header || '선택1');
+      if (optionCount >= 2) headers.push(option2Header || '선택2');
+      if (optionCount >= 3) headers.push(option3Header || '선택3');
+      headers.push('옵션가', '재고수량', '관리코드', '사용여부');
+
+      const dataRows = activeOptions.map(option => {
+        const row = [];
+        if (optionCount >= 1) row.push(option.option1 || '');
+        if (optionCount >= 2) row.push(option.option2 || '');
+        if (optionCount >= 3) row.push(option.option3 || '');
+        row.push(
+          option.optionPrice || option.priceDiff || 0,
+          option.stockQuantity || 0,
+          option.managementCode || '',
+          option.isActive ? 'Y' : 'N'
+        );
+        return row;
+      });
+
+      const wsData = [headers, ...dataRows];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Sheet0');
+
+      const now = new Date();
+      const fileName = `네이버_옵션조합_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.xlsx`;
+
+      XLSX.writeFile(wb, fileName);
+      alert(`네이버 옵션 조합 파일이 다운로드되었습니다.\n(${activeOptions.length}개 옵션)`);
     }
   };
 
@@ -563,7 +891,7 @@ export default function OptionPricing() {
           {/* 옵션명 개수 드롭다운 - 2번 */}
           <div style={{
             position: 'absolute',
-            top: '111px',
+            top: '105px',
             left: '110px',
             display: 'flex',
             alignItems: 'center',
@@ -591,14 +919,14 @@ export default function OptionPricing() {
               color: '#dc3545',
               whiteSpace: 'nowrap'
             }}>
-              옵션명 개수 선택
+              옵션제목 개수 선택
             </span>
           </div>
 
           {/* 판매가 불러오기 - 3번 */}
           <div style={{
             position: 'absolute',
-            top: '111px',
+            top: '105px',
             left: '255px',
             display: 'flex',
             alignItems: 'center',
@@ -626,15 +954,15 @@ export default function OptionPricing() {
               color: '#dc3545',
               whiteSpace: 'nowrap'
             }}>
-              판매가 불러오기
+              판매가 불러오기 or 품목추가 or 하단 테이블에 직접입력
             </span>
           </div>
 
           {/* 기준설정 - 4번 */}
           <div style={{
             position: 'absolute',
-            top: '230px',
-            left: '115px',
+            top: '200px',
+            left: '95px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -665,11 +993,11 @@ export default function OptionPricing() {
             </span>
           </div>
 
-          {/* 옵션1 입력 - 5-1번 */}
+          {/* 옵션2 입력 - 5번 */}
           <div style={{
             position: 'absolute',
             top: '230px',
-            left: '480px',
+            left: '585px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -683,12 +1011,12 @@ export default function OptionPricing() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '9px',
+              fontSize: '11px',
               fontWeight: '700',
               border: '2px solid #dc3545',
               flexShrink: 0
             }}>
-              5-1
+              5
             </div>
             <span style={{
               fontSize: '12px',
@@ -696,42 +1024,7 @@ export default function OptionPricing() {
               color: '#dc3545',
               whiteSpace: 'nowrap'
             }}>
-              옵션1 입력
-            </span>
-          </div>
-
-          {/* 옵션2 입력 - 5-2번 */}
-          <div style={{
-            position: 'absolute',
-            top: '230px',
-            left: '605px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}>
-            <div style={{
-              background: 'white',
-              color: '#dc3545',
-              width: '20px',
-              height: '20px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '9px',
-              fontWeight: '700',
-              border: '2px solid #dc3545',
-              flexShrink: 0
-            }}>
-              5-2
-            </div>
-            <span style={{
-              fontSize: '12px',
-              fontWeight: '400',
-              color: '#dc3545',
-              whiteSpace: 'nowrap'
-            }}>
-              옵션2 입력
+              옵션제목 & 옵션명 입력
             </span>
           </div>
 
@@ -739,8 +1032,8 @@ export default function OptionPricing() {
           {optionCount >= 3 && (
             <div style={{
               position: 'absolute',
-              top: '230px',
-              left: '730px',
+              top: '200px',
+              left: '710px',
               display: 'flex',
               alignItems: 'center',
               gap: '6px'
@@ -776,7 +1069,7 @@ export default function OptionPricing() {
           <div style={{
             position: 'absolute',
             top: '230px',
-            left: optionCount >= 3 ? '980px' : '855px',
+            left: optionCount >= 3 ? '1040px' : '915px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -811,7 +1104,7 @@ export default function OptionPricing() {
           <div style={{
             position: 'absolute',
             top: '230px',
-            left: optionCount >= 3 ? '1105px' : '980px',
+            left: optionCount >= 3 ? '1181px' : '1056px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -846,7 +1139,7 @@ export default function OptionPricing() {
           <div style={{
             position: 'absolute',
             top: '230px',
-            left: optionCount >= 3 ? '1230px' : '1105px',
+            left: optionCount >= 3 ? '1350px' : '1225px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -1007,6 +1300,56 @@ export default function OptionPricing() {
           </span>
         </div>
 
+        {/* 초기화 버튼 */}
+        <button
+          onClick={() => {
+            // 모든 state 초기화
+            setOptions([{ id: '1', name: '', price: '', option1: '', option2: '', option3: '', optionPrice: '', stockQuantity: '', managementCode: '', isActive: true, priceDiff: 0 }]);
+            setBaseOptionId('');
+            setSellingPrice('');
+            setDiscountPrice('');
+            setOption1Header('');
+            setOption2Header('');
+            setOption3Header('');
+            setOptionCount(2);
+            setSelectedCategory('');
+            setSelectedOptionIds(new Set());
+            setShowGuide(false);
+          }}
+          style={{
+            padding: '8px 16px',
+            background: '#6c757d',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '13px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s',
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
+            marginLeft: 'auto'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#5a6268';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#6c757d';
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" fill="white"/>
+          </svg>
+          초기화
+        </button>
+
         {/* 가이드 버튼 */}
         <button
           onClick={() => setShowGuide(!showGuide)}
@@ -1024,8 +1367,7 @@ export default function OptionPricing() {
             alignItems: 'center',
             gap: '6px',
             transition: 'all 0.2s',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
-            marginLeft: 'auto'
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'translateY(-2px)';
@@ -1218,40 +1560,43 @@ export default function OptionPricing() {
                 }}>
                   <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
                     <button
-                      onClick={() => {
-                        // 네이버 다운로드 로직 추가 예정
-                        alert('네이버 양식 다운로드 기능 준비 중입니다.');
-                      }}
+                      onClick={downloadNaverExcel}
+                      disabled={!isDownloadable()}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '3px',
                         padding: '4px 8px',
                         background: 'transparent',
-                        color: '#03C75A',
-                        border: '1px solid #03C75A',
+                        color: isDownloadable() ? '#03C75A' : '#adb5bd',
+                        border: `1px solid ${isDownloadable() ? '#03C75A' : '#adb5bd'}`,
                         borderRadius: '4px',
                         fontSize: '12px',
                         fontWeight: '500',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
+                        cursor: isDownloadable() ? 'pointer' : 'not-allowed',
+                        transition: 'all 0.2s',
+                        opacity: isDownloadable() ? 1 : 0.5
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#03C75A';
-                        e.currentTarget.style.color = 'white';
-                        const svg = e.currentTarget.querySelector('svg path');
-                        if (svg) (svg as SVGPathElement).setAttribute('fill', 'white');
+                        if (isDownloadable()) {
+                          e.currentTarget.style.background = '#03C75A';
+                          e.currentTarget.style.color = 'white';
+                          const svg = e.currentTarget.querySelector('svg path');
+                          if (svg) (svg as SVGPathElement).setAttribute('fill', 'white');
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.color = '#03C75A';
-                        const svg = e.currentTarget.querySelector('svg path');
-                        if (svg) (svg as SVGPathElement).setAttribute('fill', '#03C75A');
+                        if (isDownloadable()) {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = '#03C75A';
+                          const svg = e.currentTarget.querySelector('svg path');
+                          if (svg) (svg as SVGPathElement).setAttribute('fill', '#03C75A');
+                        }
                       }}
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 15L7 10H10V3H14V10H17L12 15Z" fill="#03C75A"/>
-                        <path d="M20 18H4V20H20V18Z" fill="#03C75A"/>
+                        <path d="M12 15L7 10H10V3H14V10H17L12 15Z" fill={isDownloadable() ? '#03C75A' : '#adb5bd'}/>
+                        <path d="M20 18H4V20H20V18Z" fill={isDownloadable() ? '#03C75A' : '#adb5bd'}/>
                       </svg>
                       네이버
                     </button>
@@ -1260,36 +1605,42 @@ export default function OptionPricing() {
                         // 카카오 다운로드 로직 추가 예정
                         alert('카카오 양식 다운로드 기능 준비 중입니다.');
                       }}
+                      disabled={!isDownloadable()}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '3px',
                         padding: '4px 8px',
                         background: 'transparent',
-                        color: '#191919',
-                        border: '1px solid #191919',
+                        color: isDownloadable() ? '#191919' : '#adb5bd',
+                        border: `1px solid ${isDownloadable() ? '#191919' : '#adb5bd'}`,
                         borderRadius: '4px',
                         fontSize: '12px',
                         fontWeight: '500',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
+                        cursor: isDownloadable() ? 'pointer' : 'not-allowed',
+                        transition: 'all 0.2s',
+                        opacity: isDownloadable() ? 1 : 0.5
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#191919';
-                        e.currentTarget.style.color = 'white';
-                        const svg = e.currentTarget.querySelector('svg path');
-                        if (svg) (svg as SVGPathElement).setAttribute('fill', 'white');
+                        if (isDownloadable()) {
+                          e.currentTarget.style.background = '#191919';
+                          e.currentTarget.style.color = 'white';
+                          const svg = e.currentTarget.querySelector('svg path');
+                          if (svg) (svg as SVGPathElement).setAttribute('fill', 'white');
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.color = '#191919';
-                        const svg = e.currentTarget.querySelector('svg path');
-                        if (svg) (svg as SVGPathElement).setAttribute('fill', '#191919');
+                        if (isDownloadable()) {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = '#191919';
+                          const svg = e.currentTarget.querySelector('svg path');
+                          if (svg) (svg as SVGPathElement).setAttribute('fill', '#191919');
+                        }
                       }}
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 15L7 10H10V3H14V10H17L12 15Z" fill="#191919"/>
-                        <path d="M20 18H4V20H20V18Z" fill="#191919"/>
+                        <path d="M12 15L7 10H10V3H14V10H17L12 15Z" fill={isDownloadable() ? '#191919' : '#adb5bd'}/>
+                        <path d="M20 18H4V20H20V18Z" fill={isDownloadable() ? '#191919' : '#adb5bd'}/>
                       </svg>
                       카카오
                     </button>
@@ -1305,22 +1656,66 @@ export default function OptionPricing() {
                     borderBottom: '2px solid #dee2e6',
                     width: '120px'
                   }}>
-                    <input
-                      type="text"
-                      value={option1Header}
-                      onChange={(e) => setOption1Header(e.target.value)}
-                      placeholder="ex:품종선택"
-                      style={{
-                        width: '100%',
-                        padding: '4px 8px',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '4px',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                        textAlign: 'center',
-                        background: '#ffffff'
-                      }}
-                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: '2px' }}>
+                        <button
+                          onClick={() => {
+                            // 모든 옵션의 option1을 옵션상품명으로 설정
+                            setOptions(prevOptions =>
+                              prevOptions.map(opt => ({
+                                ...opt,
+                                option1: opt.name
+                              }))
+                            );
+                          }}
+                          style={{
+                            padding: '2px 6px',
+                            background: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          옵션상품명
+                        </button>
+                        <button
+                          onClick={() => autoFillOption(1)}
+                          style={{
+                            padding: '2px 6px',
+                            background: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          자동채우기
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={option1Header}
+                        onChange={(e) => setOption1Header(e.target.value)}
+                        placeholder="ex:품종선택"
+                        style={{
+                          width: '100%',
+                          padding: '4px 8px',
+                          border: '1px solid #dee2e6',
+                          borderRadius: '4px',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          textAlign: 'center',
+                          background: '#ffffff'
+                        }}
+                      />
+                    </div>
                   </th>
                 )}
                 {optionCount >= 2 && (
@@ -1330,22 +1725,66 @@ export default function OptionPricing() {
                     borderBottom: '2px solid #dee2e6',
                     width: '120px'
                   }}>
-                    <input
-                      type="text"
-                      value={option2Header}
-                      onChange={(e) => setOption2Header(e.target.value)}
-                      placeholder="ex:중량"
-                      style={{
-                        width: '100%',
-                        padding: '4px 8px',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '4px',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                        textAlign: 'center',
-                        background: '#ffffff'
-                      }}
-                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: '2px' }}>
+                        <button
+                          onClick={() => {
+                            // 모든 옵션의 option2를 옵션상품명으로 설정
+                            setOptions(prevOptions =>
+                              prevOptions.map(opt => ({
+                                ...opt,
+                                option2: opt.name
+                              }))
+                            );
+                          }}
+                          style={{
+                            padding: '2px 6px',
+                            background: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          옵션상품명
+                        </button>
+                        <button
+                          onClick={() => autoFillOption(2)}
+                          style={{
+                            padding: '2px 6px',
+                            background: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          자동채우기
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={option2Header}
+                        onChange={(e) => setOption2Header(e.target.value)}
+                        placeholder="ex:중량"
+                        style={{
+                          width: '100%',
+                          padding: '4px 8px',
+                          border: '1px solid #dee2e6',
+                          borderRadius: '4px',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          textAlign: 'center',
+                          background: '#ffffff'
+                        }}
+                      />
+                    </div>
                   </th>
                 )}
                 {optionCount >= 3 && (
@@ -1355,22 +1794,66 @@ export default function OptionPricing() {
                     borderBottom: '2px solid #dee2e6',
                     width: '120px'
                   }}>
-                    <input
-                      type="text"
-                      value={option3Header}
-                      onChange={(e) => setOption3Header(e.target.value)}
-                      placeholder="옵션3"
-                      style={{
-                        width: '100%',
-                        padding: '4px 8px',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '4px',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                        textAlign: 'center',
-                        background: '#ffffff'
-                      }}
-                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: '2px' }}>
+                        <button
+                          onClick={() => {
+                            // 모든 옵션의 option3을 옵션상품명으로 설정
+                            setOptions(prevOptions =>
+                              prevOptions.map(opt => ({
+                                ...opt,
+                                option3: opt.name
+                              }))
+                            );
+                          }}
+                          style={{
+                            padding: '2px 6px',
+                            background: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          옵션상품명
+                        </button>
+                        <button
+                          onClick={() => autoFillOption(3)}
+                          style={{
+                            padding: '2px 6px',
+                            background: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          자동채우기
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={option3Header}
+                        onChange={(e) => setOption3Header(e.target.value)}
+                        placeholder="옵션3"
+                        style={{
+                          width: '100%',
+                          padding: '4px 8px',
+                          border: '1px solid #dee2e6',
+                          borderRadius: '4px',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          textAlign: 'center',
+                          background: '#ffffff'
+                        }}
+                      />
+                    </div>
                   </th>
                 )}
                 <th style={{
@@ -1440,7 +1923,39 @@ export default function OptionPricing() {
                   borderBottom: '2px solid #dee2e6',
                   width: '120px'
                 }}>
-                  관리코드
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
+                    <button
+                      onClick={() => {
+                        // 모든 옵션의 관리코드를 옵션상품명으로 설정
+                        setOptions(prevOptions =>
+                          prevOptions.map(opt => ({
+                            ...opt,
+                            managementCode: opt.name
+                          }))
+                        );
+                      }}
+                      style={{
+                        padding: '2px 6px',
+                        background: '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      옵션상품명
+                    </button>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#495057'
+                    }}>
+                      관리코드
+                    </span>
+                  </div>
                 </th>
                 <th style={{
                   padding: '6px 8px',
@@ -1858,6 +2373,24 @@ export default function OptionPricing() {
           </div>
         </div>
       )}
+
+      {/* 푸터 설명글 */}
+      <div style={{
+        marginTop: '24px',
+        padding: '20px',
+        background: '#f8f9fa',
+        borderRadius: '12px',
+        border: '1px solid #dee2e6',
+        textAlign: 'center'
+      }}>
+        <div style={{
+          fontSize: '14px',
+          color: '#6c757d',
+          lineHeight: '1.6'
+        }}>
+          마켓 옵션차액 제한정책에 맞게 <strong style={{ color: '#495057' }}>기준옵션 설정</strong>과 <strong style={{ color: '#495057' }}>옵션차액 설정</strong>을 손쉽게 할수 있으며, <strong style={{ color: '#495057' }}>다품목 옵션 등록업무</strong>가 훨씬 편리해집니다
+        </div>
+      </div>
     </div>
   );
 }

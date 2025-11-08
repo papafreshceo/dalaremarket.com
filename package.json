@@ -44,6 +44,7 @@
     "slate": "^0.118.1",
     "tailwind-merge": "^3.3.1",
     "uuid": "^13.0.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.1.12"
   },
   "devDependencies": {

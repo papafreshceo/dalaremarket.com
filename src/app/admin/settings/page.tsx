@@ -5,7 +5,7 @@ import {
   Palette, Bell, Shield, Database, Mail, Globe, Key,
   FileText, Building2, TrendingUp, Package, Truck, CreditCard,
   Image, Layout, MessageSquare, UserPlus, Settings, Wrench,
-  ClipboardList, FileSpreadsheet, ShoppingCart, Tags, UserCog, Award, TrendingUp as ChartUp, Calendar
+  ClipboardList, FileSpreadsheet, ShoppingCart, Tags, UserCog, Award, TrendingUp as ChartUp, Calendar, Boxes
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -158,6 +158,14 @@ export default function SettingsPage() {
           icon: Calendar,
           href: '/admin/settings/holidays',
           color: 'from-red-500 to-orange-500',
+        },
+        {
+          title: '도구 관리',
+          description: '업무 도구별 크레딧 비용 및 설정을 관리합니다',
+          icon: Boxes,
+          href: '/admin/settings/tools',
+          color: 'from-indigo-500 to-purple-500',
+          badge: 'NEW'
         },
       ]
     },

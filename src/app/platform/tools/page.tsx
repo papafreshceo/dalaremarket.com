@@ -18,16 +18,77 @@ interface Tool {
   usageCount: string;
   isNew: boolean;
   isPremium: boolean;
+  creditsRequired?: number;
 }
 
 export default function ToolsPage() {
   const [hoveredTool, setHoveredTool] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [favorites, setFavorites] = useState<string[]>(['margin-calculator', 'price-simulator']);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [isMobile, setIsMobile] = useState<boolean>(false);
-  const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
+  const [openModals, setOpenModals] = useState<Array<{ id: string; tool: Tool }>>([]);
+  const [usageCounts, setUsageCounts] = useState<Record<string, number>>({});
+  const [userCredits, setUserCredits] = useState<number>(0);
+  const [toolsFromDB, setToolsFromDB] = useState<Tool[]>([]);
+  const [loadingTools, setLoadingTools] = useState(true);
+
+  // 도구 목록, 즐겨찾기, 사용 횟수, 크레딧 불러오기
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        // 도구 목록 불러오기
+        const toolsResponse = await fetch('/api/tools');
+        const toolsData = await toolsResponse.json();
+
+        if (toolsData.success && toolsData.tools) {
+          // DB 데이터를 Tool 인터페이스 형식으로 변환
+          const formattedTools: Tool[] = toolsData.tools.map((t: any) => ({
+            id: t.id,
+            category: t.category,
+            name: t.name,
+            description: t.description || '',
+            bgGradient: t.icon_gradient || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            usageCount: '0회/월', // 이건 나중에 usageCounts로 대체됨
+            isNew: false,
+            isPremium: t.is_premium || false,
+            creditsRequired: t.credits_required || 0
+          }));
+          setToolsFromDB(formattedTools);
+        }
+
+        // 즐겨찾기 불러오기
+        const favResponse = await fetch('/api/user/favorite-tools');
+        const favData = await favResponse.json();
+
+        if (favData.success && favData.favoriteTools) {
+          setFavorites(favData.favoriteTools);
+        }
+
+        // 사용 횟수 불러오기
+        const usageResponse = await fetch('/api/user/tool-usage');
+        const usageData = await usageResponse.json();
+
+        if (usageData.success && usageData.usageCounts) {
+          setUsageCounts(usageData.usageCounts);
+        }
+
+        // 크레딧 불러오기
+        const creditsResponse = await fetch('/api/user/credits');
+        const creditsData = await creditsResponse.json();
+
+        if (creditsData.success) {
+          setUserCredits(creditsData.credits);
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error);
+      } finally {
+        setLoadingTools(false);
+      }
+    };
+
+    loadUserData();
+  }, []);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -57,15 +118,23 @@ export default function ToolsPage() {
   const icons: Record<string, JSX.Element> = {
     'margin-calculator': (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20Z" fill="white"/>
-        <path d="M11 7H13V9H11V7ZM11 11H13V17H11V11Z" fill="white"/>
-        <path d="M15.5 11.5L14 10L16.5 7.5L18 9L15.5 11.5ZM8 9L9.5 7.5L12 10L10.5 11.5L8 9Z" fill="white"/>
+        <rect x="4" y="3" width="16" height="18" rx="2" stroke="white" strokeWidth="2" fill="none"/>
+        <line x1="7" y1="7" x2="17" y2="7" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+        <line x1="7" y1="11" x2="17" y2="11" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+        <line x1="7" y1="15" x2="14" y2="15" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+        <circle cx="17" cy="18" r="3" fill="white"/>
+        <text x="17" y="19.5" fontSize="3" fill="#667eea" textAnchor="middle" fontWeight="bold">%</text>
       </svg>
     ),
     'price-simulator': (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M3 13H5L8 17L12 7L15 13H17V15H15L12 9L8 19L5 15H3V13Z" fill="white"/>
-        <path d="M19 3H21V12H19V3ZM15 8H17V12H15V8ZM11 10H13V12H11V10Z" fill="white"/>
+        <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="2" fill="none"/>
+        <path d="M7 15L10 12L13 14L17 8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="7" cy="15" r="1.5" fill="white"/>
+        <circle cx="10" cy="12" r="1.5" fill="white"/>
+        <circle cx="13" cy="14" r="1.5" fill="white"/>
+        <circle cx="17" cy="8" r="1.5" fill="white"/>
+        <line x1="7" y1="7" x2="11" y2="7" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
       </svg>
     ),
     'order-integration': (
@@ -265,8 +334,9 @@ export default function ToolsPage() {
     }
   ];
 
-  // 필터링된 도구
-  const filteredTools = tools.filter(tool => {
+  // 필터링된 도구 (DB에서 불러온 도구 사용)
+  const toolsToUse = toolsFromDB.length > 0 ? toolsFromDB : tools;
+  const filteredTools = toolsToUse.filter(tool => {
     const matchesCategory = selectedCategory === 'all' || tool.category === selectedCategory;
     const matchesSearch = tool.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           tool.description.toLowerCase().includes(searchTerm.toLowerCase());
@@ -274,33 +344,119 @@ export default function ToolsPage() {
   });
 
   // 즐겨찾기 토글
-  const toggleFavorite = (toolId: string) => {
-    setFavorites(prev =>
-      prev.includes(toolId)
-        ? prev.filter(id => id !== toolId)
-        : [...prev, toolId]
-    );
+  const toggleFavorite = async (toolId: string) => {
+    const newFavorites = favorites.includes(toolId)
+      ? favorites.filter(id => id !== toolId)
+      : [...favorites, toolId];
+
+    // 즉시 UI 업데이트
+    setFavorites(newFavorites);
+
+    // DB에 저장
+    try {
+      const response = await fetch('/api/user/favorite-tools', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ favoriteTools: newFavorites }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        console.error('Error saving favorites:', data.error);
+        // 실패 시 롤백
+        setFavorites(favorites);
+      }
+    } catch (error) {
+      console.error('Error saving favorites:', error);
+      // 실패 시 롤백
+      setFavorites(favorites);
+    }
   };
 
   // 도구 클릭 핸들러
-  const handleToolClick = (tool: Tool) => {
+  const handleToolClick = async (tool: Tool) => {
     console.log('Tool clicked:', tool); // 디버깅용
-    setSelectedTool(tool);
-    setModalOpen(true);
+
+    // 크레딧 체크 및 차감
+    const creditsRequired = tool.creditsRequired || 0;
+
+    if (creditsRequired > 0) {
+      // 크레딧이 부족한지 확인
+      if (userCredits < creditsRequired) {
+        alert(`크레딧이 부족합니다. 필요한 크레딧: ${creditsRequired}, 보유 크레딧: ${userCredits}`);
+        return;
+      }
+
+      // 크레딧 차감
+      try {
+        const response = await fetch('/api/user/use-credits', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ toolId: tool.id }),
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          alert(data.error || '크레딧 차감에 실패했습니다.');
+          return;
+        }
+
+        // 크레딧 잔액 업데이트
+        setUserCredits(data.balance || data.credits_after);
+      } catch (error) {
+        console.error('Error using credits:', error);
+        alert('크레딧 차감 중 오류가 발생했습니다.');
+        return;
+      }
+    }
+
+    // 사용 기록 저장
+    try {
+      await fetch('/api/user/tool-usage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ toolId: tool.id }),
+      });
+
+      // 사용 횟수 업데이트
+      setUsageCounts(prev => ({
+        ...prev,
+        [tool.id]: (prev[tool.id] || 0) + 1
+      }));
+    } catch (error) {
+      console.error('Error recording tool usage:', error);
+    }
+
+    // 이미 열린 모달인지 확인
+    const isAlreadyOpen = openModals.some(modal => modal.tool.id === tool.id);
+    if (!isAlreadyOpen) {
+      setOpenModals(prev => [...prev, { id: `modal-${Date.now()}`, tool }]);
+    }
   };
 
   // 모달 닫기 핸들러
-  const handleCloseModal = () => {
-    console.log('Modal closing'); // 디버깅용
-    setModalOpen(false);
-    setSelectedTool(null);
+  const handleCloseModal = (modalId: string) => {
+    console.log('Modal closing:', modalId); // 디버깅용
+    setOpenModals(prev => prev.filter(modal => modal.id !== modalId));
   };
 
-  // 시뮬레이터로 전환 핸들러
+  // 시뮬레이터로 전환 핸들러 (새 모달로 열기)
   const handleOpenSimulator = () => {
-    const simulatorTool = tools.find(t => t.id === 'price-simulator');
+    const toolsToUse = toolsFromDB.length > 0 ? toolsFromDB : tools;
+    const simulatorTool = toolsToUse.find(t => t.id === 'price-simulator');
     if (simulatorTool) {
-      setSelectedTool(simulatorTool);
+      const isAlreadyOpen = openModals.some(modal => modal.tool.id === 'price-simulator');
+      if (!isAlreadyOpen) {
+        setOpenModals(prev => [...prev, { id: `modal-${Date.now()}`, tool: simulatorTool }]);
+      }
     }
   };
 
@@ -367,97 +523,71 @@ export default function ToolsPage() {
             border: '1px solid #dee2e6'
           }}>
             <div style={{
-              fontSize: '14px',
-              fontWeight: '700',
-              color: '#6c757d',
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
               marginBottom: '12px'
             }}>
-              Business Tools
+              <div>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: '700',
+                  color: '#6c757d',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  marginBottom: '12px'
+                }}>
+                  Business Tools
+                </div>
+                <h1 style={{
+                  fontSize: isMobile ? '28px' : '36px',
+                  fontWeight: '600',
+                  marginBottom: '12px'
+                }}>
+                  업무도구
+                </h1>
+              </div>
+
+              {/* 크레딧 표시 */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 20px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white" stroke="white" strokeWidth="2" strokeLinejoin="round"/>
+                </svg>
+                <div>
+                  <div style={{
+                    fontSize: '11px',
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    fontWeight: '500',
+                    marginBottom: '2px'
+                  }}>
+                    보유 크레딧
+                  </div>
+                  <div style={{
+                    fontSize: '18px',
+                    color: '#ffffff',
+                    fontWeight: '700'
+                  }}>
+                    {loadingTools ? '...' : userCredits.toLocaleString()}
+                  </div>
+                </div>
+              </div>
             </div>
-            <h1 style={{
-              fontSize: isMobile ? '28px' : '36px',
-              fontWeight: '600',
-              marginBottom: '12px'
-            }}>
-              업무도구
-            </h1>
             <p style={{
               fontSize: '14px',
               color: '#6c757d',
-              lineHeight: '1.6',
-              marginBottom: '24px'
+              lineHeight: '1.6'
             }}>
               판매 업무를 더욱 효율적으로 만드는 다양한 도구들을 활용해보세요.
               마진 계산부터 데이터 분석까지 한 곳에서 관리할 수 있습니다.
             </p>
-
-            {/* 검색 바 */}
-            <div style={{
-              position: 'relative',
-              marginBottom: '24px'
-            }}>
-              <input
-                type="text"
-                placeholder="도구 검색..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px 40px 12px 16px',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  outline: 'none'
-                }}
-              />
-              <div style={{
-                position: 'absolute',
-                right: '16px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: '#6c757d'
-              }}>
-                🔍
-              </div>
-            </div>
-
-            {/* 카테고리 탭 */}
-            <div style={{
-              display: 'flex',
-              gap: '8px',
-              overflowX: 'auto',
-              paddingBottom: '8px'
-            }}>
-              {categories.map(category => (
-                <button
-                  key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
-                  style={{
-                    padding: '8px 16px',
-                    background: selectedCategory === category.id ? '#2563eb' : '#f8f9fa',
-                    color: selectedCategory === category.id ? '#ffffff' : '#495057',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {category.name}
-                  <span style={{
-                    marginLeft: '6px',
-                    opacity: 0.8,
-                    fontSize: '12px'
-                  }}>
-                    {category.count}
-                  </span>
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* 즐겨찾기 도구 */}
@@ -565,11 +695,35 @@ export default function ToolsPage() {
                       {tool.description}
                     </p>
                     <div style={{
-                      fontSize: '11px',
-                      color: '#2563eb',
-                      fontWeight: '500'
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
                     }}>
-                      {tool.usageCount} 사용
+                      <div style={{
+                        fontSize: '11px',
+                        color: '#2563eb',
+                        fontWeight: '500'
+                      }}>
+                        {usageCounts[tool.id] ? `${usageCounts[tool.id].toLocaleString()}회 사용` : '사용 기록 없음'}
+                      </div>
+                      {tool.creditsRequired && tool.creditsRequired > 0 && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '4px 8px',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          color: '#ffffff'
+                        }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/>
+                          </svg>
+                          {tool.creditsRequired}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -679,71 +833,56 @@ export default function ToolsPage() {
                     {tool.description}
                   </p>
                   <div style={{
-                    fontSize: '11px',
-                    color: '#6c757d',
-                    fontWeight: '500'
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
                   }}>
-                    {tool.usageCount} 사용
+                    <div style={{
+                      fontSize: '11px',
+                      color: '#6c757d',
+                      fontWeight: '500'
+                    }}>
+                      {usageCounts[tool.id] ? `${usageCounts[tool.id].toLocaleString()}회 사용` : '사용 기록 없음'}
+                    </div>
+                    {tool.creditsRequired && tool.creditsRequired > 0 && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 8px',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        color: '#ffffff'
+                      }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/>
+                        </svg>
+                        {tool.creditsRequired}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 하단 CTA */}
-          <div style={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '16px',
-            padding: isMobile ? '30px 20px' : '40px',
-            marginTop: '40px',
-            textAlign: 'center',
-            color: '#ffffff',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
-            <h3 style={{
-              fontSize: isMobile ? '24px' : '28px',
-              fontWeight: '600',
-              marginBottom: '12px',
-              background: 'linear-gradient(180deg, #ffffff 0%, #f0f0f0 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text'
-            }}>
-              더 많은 도구가 필요하신가요?
-            </h3>
-            <p style={{
-              fontSize: '16px',
-              color: 'rgba(255, 255, 255, 0.95)',
-              marginBottom: '24px',
-              fontWeight: '400'
-            }}>
-              필요한 기능을 제안해주시면 추가해드립니다 / 소요기간 1~2주
-            </p>
-            <button style={{
-              padding: '12px 32px',
-              background: '#ffffff',
-              color: '#667eea',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}>
-              도구 제안하기
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* 도구 모달 */}
-      <ToolModal
-        isOpen={modalOpen}
-        onClose={handleCloseModal}
-        toolId={selectedTool?.id}
-        toolName={selectedTool?.name}
-        onOpenSimulator={handleOpenSimulator}
-      />
+      {/* 도구 모달들 */}
+      {openModals.map((modal, index) => (
+        <ToolModal
+          key={modal.id}
+          isOpen={true}
+          onClose={() => handleCloseModal(modal.id)}
+          toolId={modal.tool.id}
+          toolName={modal.tool.name}
+          onOpenSimulator={handleOpenSimulator}
+          zIndex={10000 + index}
+        />
+      ))}
     </>
   );
 }

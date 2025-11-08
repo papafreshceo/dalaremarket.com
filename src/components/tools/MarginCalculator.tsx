@@ -48,80 +48,79 @@ export function SaveLoadUI({
   // 날짜 포맷 함수
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
+    const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${month}/${day} ${hours}:${minutes}`;
+    return `${year}/${month}/${day} ${hours}:${minutes}`;
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
-      {/* 저장 입력란 및 저장 버튼 */}
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <input
-          type="text"
-          value={saveName}
-          onChange={(e) => setSaveName(e.target.value)}
-          placeholder="저장명 입력"
-          style={{
-            padding: '6px 12px',
-            border: '1px solid #dee2e6',
-            borderRadius: '6px',
-            fontSize: '13px',
-            outline: 'none',
-            flex: 1
-          }}
-          onKeyPress={(e) => {
-            if (e.key === 'Enter') onSave();
-          }}
-        />
-        <button
-          onClick={onSave}
-          style={{
-            padding: '6px 16px',
-            background: 'transparent',
-            color: '#3b82f6',
-            border: '1px solid #3b82f6',
-            borderRadius: '6px',
-            fontSize: '13px',
-            fontWeight: '500',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap'
-          }}
-        >
-          저장
-        </button>
-      </div>
+    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', position: 'relative' }}>
+      {/* 저장명 입력란 */}
+      <input
+        type="text"
+        value={saveName}
+        onChange={(e) => setSaveName(e.target.value)}
+        placeholder="저장명"
+        style={{
+          width: '80px',
+          padding: '4px 8px',
+          border: '1px solid #dee2e6',
+          borderRadius: '4px',
+          fontSize: '12px',
+          outline: 'none'
+        }}
+        onKeyPress={(e) => {
+          if (e.key === 'Enter') onSave();
+        }}
+      />
 
-      {/* 불러오기 및 삭제 버튼 */}
-      <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
-        <button
-          onClick={() => {
-            if (savedConfigs.length === 0) {
-              alert('저장된 설정이 없습니다.');
-              return;
-            }
-            setShowLoadMenu(!showLoadMenu);
-            setShowDeleteMenu(false);
-          }}
-          disabled={savedConfigs.length === 0}
-          style={{
-            flex: 1,
-            padding: '6px 16px',
-            background: 'transparent',
-            color: savedConfigs.length > 0 ? '#10b981' : '#9ca3af',
-            border: `1px solid ${savedConfigs.length > 0 ? '#10b981' : '#d1d5db'}`,
-            borderRadius: '6px',
-            fontSize: '13px',
-            fontWeight: '500',
-            cursor: savedConfigs.length > 0 ? 'pointer' : 'not-allowed',
-            whiteSpace: 'nowrap',
-            opacity: savedConfigs.length > 0 ? 1 : 0.6
-          }}
-        >
-          불러오기
-        </button>
+      {/* 저장 버튼 */}
+      <button
+        onClick={onSave}
+        style={{
+          padding: '4px 12px',
+          background: 'transparent',
+          color: '#3b82f6',
+          border: '1px solid #3b82f6',
+          borderRadius: '4px',
+          fontSize: '12px',
+          fontWeight: '500',
+          cursor: 'pointer',
+          whiteSpace: 'nowrap'
+        }}
+      >
+        저장
+      </button>
+
+      {/* 불러오기 버튼 */}
+      <button
+        onClick={() => {
+          if (savedConfigs.length === 0) {
+            alert('저장된 설정이 없습니다.');
+            return;
+          }
+          setShowLoadMenu(!showLoadMenu);
+          setShowDeleteMenu(false);
+        }}
+        disabled={savedConfigs.length === 0}
+        style={{
+          padding: '4px 12px',
+          background: 'transparent',
+          color: savedConfigs.length > 0 ? '#10b981' : '#9ca3af',
+          border: `1px solid ${savedConfigs.length > 0 ? '#10b981' : '#d1d5db'}`,
+          borderRadius: '4px',
+          fontSize: '12px',
+          fontWeight: '500',
+          cursor: savedConfigs.length > 0 ? 'pointer' : 'not-allowed',
+          whiteSpace: 'nowrap',
+          opacity: savedConfigs.length > 0 ? 1 : 0.6
+        }}
+      >
+        불러오기
+      </button>
 
         {/* 불러오기 드롭다운 메뉴 */}
         {showLoadMenu && savedConfigs.length > 0 && (
@@ -163,7 +162,11 @@ export function SaveLoadUI({
                     padding: '12px 16px',
                     cursor: 'pointer',
                     borderBottom: index < savedConfigs.length - 1 ? '1px solid #f3f4f6' : 'none',
-                    transition: 'background 0.15s'
+                    transition: 'background 0.15s',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '12px'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = '#f9fafb';
@@ -176,13 +179,17 @@ export function SaveLoadUI({
                     fontSize: '13px',
                     fontWeight: '500',
                     color: '#111827',
-                    marginBottom: '2px'
+                    flex: 1,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
                   }}>
                     {config.name}
                   </div>
                   <div style={{
                     fontSize: '11px',
-                    color: '#9ca3af'
+                    color: '#9ca3af',
+                    whiteSpace: 'nowrap'
                   }}>
                     {formatDate(config.timestamp)}
                   </div>
@@ -192,102 +199,109 @@ export function SaveLoadUI({
           </>
         )}
 
-        <button
-          onClick={() => {
-            if (savedConfigs.length === 0) {
-              alert('저장된 설정이 없습니다.');
-              return;
-            }
-            setShowDeleteMenu(!showDeleteMenu);
-            setShowLoadMenu(false);
-          }}
-          disabled={savedConfigs.length === 0}
-          style={{
-            flex: 1,
-            padding: '6px 16px',
-            background: 'transparent',
-            color: savedConfigs.length > 0 ? '#ef4444' : '#9ca3af',
-            border: `1px solid ${savedConfigs.length > 0 ? '#ef4444' : '#d1d5db'}`,
-            borderRadius: '6px',
-            fontSize: '13px',
-            fontWeight: '500',
-            cursor: savedConfigs.length > 0 ? 'pointer' : 'not-allowed',
-            whiteSpace: 'nowrap',
-            opacity: savedConfigs.length > 0 ? 1 : 0.6
-          }}
-        >
-          삭제
-        </button>
+      {/* 삭제 버튼 */}
+      <button
+        onClick={() => {
+          if (savedConfigs.length === 0) {
+            alert('저장된 설정이 없습니다.');
+            return;
+          }
+          setShowDeleteMenu(!showDeleteMenu);
+          setShowLoadMenu(false);
+        }}
+        disabled={savedConfigs.length === 0}
+        style={{
+          padding: '4px 12px',
+          background: 'transparent',
+          color: savedConfigs.length > 0 ? '#ef4444' : '#9ca3af',
+          border: `1px solid ${savedConfigs.length > 0 ? '#ef4444' : '#d1d5db'}`,
+          borderRadius: '4px',
+          fontSize: '12px',
+          fontWeight: '500',
+          cursor: savedConfigs.length > 0 ? 'pointer' : 'not-allowed',
+          whiteSpace: 'nowrap',
+          opacity: savedConfigs.length > 0 ? 1 : 0.6
+        }}
+      >
+        삭제
+      </button>
 
-        {/* 삭제 드롭다운 메뉴 */}
-        {showDeleteMenu && savedConfigs.length > 0 && (
-          <>
-            <div
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                zIndex: 9998
-              }}
-              onClick={() => setShowDeleteMenu(false)}
-            />
-            <div
-              style={{
-                position: 'absolute',
-                top: 'calc(100% + 4px)',
-                right: 0,
-                minWidth: '280px',
-                background: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                maxHeight: '300px',
-                overflowY: 'auto',
-                zIndex: 9999
-              }}
-            >
-              {savedConfigs.map((config, index) => (
-                <div
-                  key={config.name}
-                  onClick={() => {
-                    onDelete(config.name);
-                    setShowDeleteMenu(false);
-                  }}
-                  style={{
-                    padding: '12px 16px',
-                    cursor: 'pointer',
-                    borderBottom: index < savedConfigs.length - 1 ? '1px solid #f3f4f6' : 'none',
-                    transition: 'background 0.15s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#fef2f2';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#ffffff';
-                  }}
-                >
-                  <div style={{
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    color: '#111827',
-                    marginBottom: '2px'
-                  }}>
-                    {config.name}
-                  </div>
-                  <div style={{
-                    fontSize: '11px',
-                    color: '#9ca3af'
-                  }}>
-                    {formatDate(config.timestamp)}
-                  </div>
+      {/* 삭제 드롭다운 메뉴 */}
+      {showDeleteMenu && savedConfigs.length > 0 && (
+        <>
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 9998
+            }}
+            onClick={() => setShowDeleteMenu(false)}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 4px)',
+              right: 0,
+              minWidth: '280px',
+              background: '#ffffff',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              maxHeight: '300px',
+              overflowY: 'auto',
+              zIndex: 9999
+            }}
+          >
+            {savedConfigs.map((config, index) => (
+              <div
+                key={config.name}
+                onClick={() => {
+                  onDelete(config.name);
+                  setShowDeleteMenu(false);
+                }}
+                style={{
+                  padding: '12px 16px',
+                  cursor: 'pointer',
+                  borderBottom: index < savedConfigs.length - 1 ? '1px solid #f3f4f6' : 'none',
+                  transition: 'background 0.15s',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#fef2f2';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#ffffff';
+                }}
+              >
+                <div style={{
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  color: '#111827',
+                  flex: 1,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {config.name}
                 </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+                <div style={{
+                  fontSize: '11px',
+                  color: '#9ca3af',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {formatDate(config.timestamp)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -985,7 +999,7 @@ export default function MarginCalculator({ onOpenSimulator }: { onOpenSimulator?
 
 
   return (
-    <div>
+    <div style={{ padding: '0 24px' }}>
       {/* 마켓별 수수료율 입력 - 최상단 배치 */}
       <div style={{
         border: '1px solid #dee2e6',
@@ -1006,15 +1020,6 @@ export default function MarginCalculator({ onOpenSimulator }: { onOpenSimulator?
             gap: '12px',
             flexWrap: 'wrap'
           }}>
-            <h5 style={{
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#495057',
-              margin: 0
-            }}>
-              마켓별 수수료율 설정
-            </h5>
-
             <button
               onClick={addMarket}
               disabled={marketFees.length >= 3}
@@ -1104,22 +1109,33 @@ export default function MarginCalculator({ onOpenSimulator }: { onOpenSimulator?
             })}
           </div>
 
-          <button
-            onClick={handleResetMarketFees}
-            style={{
-              padding: '4px 10px',
-              background: '#6c757d',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            초기화
-          </button>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <SaveLoadUI
+              saveName={saveName}
+              setSaveName={setSaveName}
+              savedConfigs={savedConfigs}
+              onSave={handleSave}
+              onLoad={handleLoad}
+              onDelete={handleDelete}
+            />
+
+            <button
+              onClick={handleResetMarketFees}
+              style={{
+                padding: '4px 12px',
+                background: 'transparent',
+                color: '#6c757d',
+                border: '1px solid #6c757d',
+                borderRadius: '4px',
+                fontSize: '12px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              초기화
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1250,23 +1266,6 @@ export default function MarginCalculator({ onOpenSimulator }: { onOpenSimulator?
                   시뮬레이션
                 </button>
 
-                {/* 구분선 */}
-                <div style={{
-                  height: '1px',
-                  background: '#dee2e6',
-                  margin: '16px 0'
-                }} />
-
-                {/* 저장/불러오기/삭제 UI */}
-                <SaveLoadUI
-                  saveName={saveName}
-                  setSaveName={setSaveName}
-                  savedConfigs={savedConfigs}
-                  onSave={handleSave}
-                  onLoad={handleLoad}
-                  onDelete={handleDelete}
-                />
-
               </div>
 
               {/* 칼럼 2: 선택된 품목이 있을 때만 계산 UI 표시 */}
@@ -1284,7 +1283,7 @@ export default function MarginCalculator({ onOpenSimulator }: { onOpenSimulator?
                       <div
                         onClick={() => setIsSellingPriceOpen(!isSellingPriceOpen)}
                         style={{
-                          padding: '6px 16px',
+                          padding: '6px 16px 6px 16px',
                           background: '#2563eb',
                           color: '#ffffff',
                           borderBottom: isSellingPriceOpen ? '1px solid #1e40af' : 'none',
@@ -1304,7 +1303,9 @@ export default function MarginCalculator({ onOpenSimulator }: { onOpenSimulator?
                         }}>
                           ›
                         </span>
-                        판매가 입력 방식 ({categories.find(c => c.category_4 === selectedCategory)?.option_products.length}개)
+                        <span style={{ flex: 1 }}>
+                          판매가 입력 방식 ({categories.find(c => c.category_4 === selectedCategory)?.option_products.length}개)
+                        </span>
                       </div>
                       {isSellingPriceOpen && (
                       <div style={{

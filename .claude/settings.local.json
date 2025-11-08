@@ -149,7 +149,14 @@
       "Bash(test:*)",
       "Bash(npx knip:*)",
       "Bash(if exist check-notices-table.js del /f check-notices-table.js)",
-      "Bash(\"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\.env.local\")"
+      "Bash(\"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\.env.local\")",
+      "Bash(if not exist \"src\\app\\api\\category4-products\" mkdir \"src\\app\\api\\category4-products\")",
+      "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\read-naver-template.js\" del /f \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\read-naver-template.js\")",
+      "Bash(Select-Object -First 30)",
+      "Bash(if exist apply-favorite-tools-migration.js del /f apply-favorite-tools-migration.js)",
+      "Bash(Select-String -Pattern \"업무도구|Business Tools\")",
+      "Bash(Select-Object -First 3)",
+      "Bash(if exist test-credits.js del /f test-credits.js)"
     ],
     "deny": [],
     "ask": []
