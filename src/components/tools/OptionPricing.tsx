@@ -159,6 +159,9 @@ export default function OptionPricing() {
   // 선택된 옵션 ID 목록
   const [selectedOptionIds, setSelectedOptionIds] = useState<Set<string>>(new Set());
 
+  // 가이드 오버레이 표시 여부
+  const [showGuide, setShowGuide] = useState<boolean>(false);
+
 
   // 카테고리 목록 가져오기
   useEffect(() => {
@@ -509,35 +512,300 @@ export default function OptionPricing() {
 
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: '24px', position: 'relative' }}>
+      {/* 가이드 오버레이 */}
+      {showGuide && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          zIndex: 9998,
+          pointerEvents: 'none'
+        }}>
+          {/* 판매가(정가) - 1번 */}
+          <div style={{
+            position: 'absolute',
+            top: '280px',
+            left: '150px',
+            background: '#ff6b6b',
+            color: 'white',
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '24px',
+            fontWeight: '700',
+            boxShadow: '0 4px 12px rgba(255, 107, 107, 0.5)',
+            border: '3px solid white'
+          }}>
+            1
+          </div>
+
+          {/* 옵션명 2개 드롭다운 - 2번 */}
+          <div style={{
+            position: 'absolute',
+            top: '395px',
+            left: '265px',
+            background: '#4ecdc4',
+            color: 'white',
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '24px',
+            fontWeight: '700',
+            boxShadow: '0 4px 12px rgba(78, 205, 196, 0.5)',
+            border: '3px solid white'
+          }}>
+            2
+          </div>
+
+          {/* 판매가 불러오기 - 3번 */}
+          <div style={{
+            position: 'absolute',
+            top: '395px',
+            left: '465px',
+            background: '#45b7d1',
+            color: 'white',
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '24px',
+            fontWeight: '700',
+            boxShadow: '0 4px 12px rgba(69, 183, 209, 0.5)',
+            border: '3px solid white'
+          }}>
+            3
+          </div>
+
+          {/* 기준설정 - 4번 */}
+          <div style={{
+            position: 'absolute',
+            top: '500px',
+            left: '205px',
+            background: '#f9ca24',
+            color: 'white',
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '24px',
+            fontWeight: '700',
+            boxShadow: '0 4px 12px rgba(249, 202, 36, 0.5)',
+            border: '3px solid white'
+          }}>
+            4
+          </div>
+
+          {/* 옵션1 입력 - 5-1번 */}
+          <div style={{
+            position: 'absolute',
+            top: '500px',
+            left: '590px',
+            background: '#a29bfe',
+            color: 'white',
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '18px',
+            fontWeight: '700',
+            boxShadow: '0 4px 12px rgba(162, 155, 254, 0.5)',
+            border: '3px solid white'
+          }}>
+            5-1
+          </div>
+
+          {/* 옵션2 입력 - 5-2번 */}
+          <div style={{
+            position: 'absolute',
+            top: '500px',
+            left: '720px',
+            background: '#fd79a8',
+            color: 'white',
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '18px',
+            fontWeight: '700',
+            boxShadow: '0 4px 12px rgba(253, 121, 168, 0.5)',
+            border: '3px solid white'
+          }}>
+            5-2
+          </div>
+
+          {/* 옵션3 입력 - 5-3번 (옵션 3개일 때만) */}
+          {optionCount >= 3 && (
+            <div style={{
+              position: 'absolute',
+              top: '500px',
+              left: '850px',
+              background: '#fdcb6e',
+              color: 'white',
+              width: '50px',
+              height: '50px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '18px',
+              fontWeight: '700',
+              boxShadow: '0 4px 12px rgba(253, 203, 110, 0.5)',
+              border: '3px solid white'
+            }}>
+              5-3
+            </div>
+          )}
+
+          {/* 재고수량 - 6번 */}
+          <div style={{
+            position: 'absolute',
+            top: '500px',
+            left: optionCount >= 3 ? '1100px' : '970px',
+            background: '#00b894',
+            color: 'white',
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '24px',
+            fontWeight: '700',
+            boxShadow: '0 4px 12px rgba(0, 184, 148, 0.5)',
+            border: '3px solid white'
+          }}>
+            6
+          </div>
+
+          {/* 관리코드 - 7번 */}
+          <div style={{
+            position: 'absolute',
+            top: '500px',
+            left: optionCount >= 3 ? '1230px' : '1100px',
+            background: '#e17055',
+            color: 'white',
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '24px',
+            fontWeight: '700',
+            boxShadow: '0 4px 12px rgba(225, 112, 85, 0.5)',
+            border: '3px solid white'
+          }}>
+            7
+          </div>
+
+          {/* 사용여부 - 8번 */}
+          <div style={{
+            position: 'absolute',
+            top: '500px',
+            left: optionCount >= 3 ? '1360px' : '1230px',
+            background: '#6c5ce7',
+            color: 'white',
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '24px',
+            fontWeight: '700',
+            boxShadow: '0 4px 12px rgba(108, 92, 231, 0.5)',
+            border: '3px solid white'
+          }}>
+            8
+          </div>
+        </div>
+      )}
+
       {/* 설명 섹션 */}
       <div style={{
         background: '#f0f9ff',
         padding: '16px 20px',
         borderRadius: '12px',
         marginBottom: '24px',
-        border: '1px solid #bfdbfe'
+        border: '1px solid #bfdbfe',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start'
       }}>
-        <h3 style={{
-          fontSize: '14px',
-          fontWeight: '600',
-          marginBottom: '8px',
-          color: '#1e40af'
-        }}>
-          💡 옵션가 세팅 사용 방법
-        </h3>
-        <ol style={{
-          fontSize: '13px',
-          color: '#1e3a8a',
-          lineHeight: '1.6',
-          margin: 0,
-          paddingLeft: '20px'
-        }}>
-          <li>마진계산기의 '판매가 불러오기' 또는 '품목 추가'로 옵션 상품 추가</li>
-          <li>판매가(정가) 입력 → 기준이 될 옵션 상품 1개 선택</li>
-          <li>할인금액, 할인율, 할인판매가, 옵션가가 자동으로 계산됩니다</li>
-          <li>옵션명 입력 후 네이버/카카오 양식으로 다운로드</li>
-        </ol>
+        <div>
+          <h3 style={{
+            fontSize: '14px',
+            fontWeight: '600',
+            marginBottom: '8px',
+            color: '#1e40af'
+          }}>
+            💡 옵션가 세팅 사용 방법
+          </h3>
+          <ol style={{
+            fontSize: '13px',
+            color: '#1e3a8a',
+            lineHeight: '1.6',
+            margin: 0,
+            paddingLeft: '20px'
+          }}>
+            <li>마진계산기의 '판매가 불러오기' 또는 '품목 추가'로 옵션 상품 추가</li>
+            <li>판매가(정가) 입력 → 기준이 될 옵션 상품 1개 선택</li>
+            <li>할인금액, 할인율, 할인판매가, 옵션가가 자동으로 계산됩니다</li>
+            <li>옵션명 입력 후 네이버/카카오 양식으로 다운로드</li>
+          </ol>
+        </div>
+
+        {/* 가이드 토글 버튼 */}
+        <button
+          onClick={() => setShowGuide(!showGuide)}
+          style={{
+            padding: '8px 16px',
+            background: showGuide ? '#dc3545' : '#10b981',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '13px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s',
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="white"/>
+          </svg>
+          {showGuide ? '가이드 해제' : '가이드 보기'}
+        </button>
       </div>
 
       {/* 판매가 및 할인금액 입력 */}
