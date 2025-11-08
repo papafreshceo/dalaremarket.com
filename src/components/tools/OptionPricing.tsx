@@ -521,7 +521,7 @@ export default function OptionPricing() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
+          background: 'transparent',
           zIndex: 9998,
           pointerEvents: 'none'
         }}>
