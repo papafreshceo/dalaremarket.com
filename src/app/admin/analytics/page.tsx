@@ -294,7 +294,7 @@ export default function AnalyticsPage() {
                         <p className="text-sm text-text-secondary">페이지 경험 지표</p>
                       </div>
                     </div>
-                  </div>
+                  </a>
                 </div>
               </div>
             </div>
