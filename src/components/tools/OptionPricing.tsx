@@ -528,8 +528,8 @@ export default function OptionPricing() {
           {/* 판매가(정가) - 1번 */}
           <div style={{
             position: 'absolute',
-            top: '8px',
-            left: '28px',
+            top: '0px',
+            left: '24px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -552,19 +552,19 @@ export default function OptionPricing() {
             </div>
             <span style={{
               fontSize: '12px',
-              fontWeight: '600',
+              fontWeight: '400',
               color: '#dc3545',
               whiteSpace: 'nowrap'
             }}>
-              판매정가를 입력합니다
+              판매정가 입력
             </span>
           </div>
 
           {/* 옵션명 개수 드롭다운 - 2번 */}
           <div style={{
             position: 'absolute',
-            top: '118px',
-            left: '190px',
+            top: '110px',
+            left: '302px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -587,19 +587,19 @@ export default function OptionPricing() {
             </div>
             <span style={{
               fontSize: '12px',
-              fontWeight: '600',
+              fontWeight: '400',
               color: '#dc3545',
               whiteSpace: 'nowrap'
             }}>
-              옵션명 개수를 선택합니다
+              옵션명 개수 선택
             </span>
           </div>
 
           {/* 판매가 불러오기 - 3번 */}
           <div style={{
             position: 'absolute',
-            top: '118px',
-            left: '360px',
+            top: '110px',
+            left: '435px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -622,11 +622,11 @@ export default function OptionPricing() {
             </div>
             <span style={{
               fontSize: '12px',
-              fontWeight: '600',
+              fontWeight: '400',
               color: '#dc3545',
               whiteSpace: 'nowrap'
             }}>
-              마진계산기에서 불러옵니다
+              판매가 불러오기
             </span>
           </div>
 
@@ -657,11 +657,11 @@ export default function OptionPricing() {
             </div>
             <span style={{
               fontSize: '12px',
-              fontWeight: '600',
+              fontWeight: '400',
               color: '#dc3545',
               whiteSpace: 'nowrap'
             }}>
-              기준 옵션을 선택합니다
+              기준 옵션 선택
             </span>
           </div>
 
@@ -692,11 +692,11 @@ export default function OptionPricing() {
             </div>
             <span style={{
               fontSize: '12px',
-              fontWeight: '600',
+              fontWeight: '400',
               color: '#dc3545',
               whiteSpace: 'nowrap'
             }}>
-              옵션1을 입력합니다
+              옵션1 입력
             </span>
           </div>
 
@@ -727,11 +727,11 @@ export default function OptionPricing() {
             </div>
             <span style={{
               fontSize: '12px',
-              fontWeight: '600',
+              fontWeight: '400',
               color: '#dc3545',
               whiteSpace: 'nowrap'
             }}>
-              옵션2를 입력합니다
+              옵션2 입력
             </span>
           </div>
 
@@ -763,11 +763,11 @@ export default function OptionPricing() {
               </div>
               <span style={{
                 fontSize: '12px',
-                fontWeight: '600',
+                fontWeight: '400',
                 color: '#dc3545',
                 whiteSpace: 'nowrap'
               }}>
-                옵션3을 입력합니다
+                옵션3 입력
               </span>
             </div>
           )}
@@ -799,11 +799,11 @@ export default function OptionPricing() {
             </div>
             <span style={{
               fontSize: '12px',
-              fontWeight: '600',
+              fontWeight: '400',
               color: '#dc3545',
               whiteSpace: 'nowrap'
             }}>
-              재고수량을 입력합니다
+              재고수량 입력
             </span>
           </div>
 
@@ -834,11 +834,11 @@ export default function OptionPricing() {
             </div>
             <span style={{
               fontSize: '12px',
-              fontWeight: '600',
+              fontWeight: '400',
               color: '#dc3545',
               whiteSpace: 'nowrap'
             }}>
-              관리코드를 입력합니다
+              관리코드 입력
             </span>
           </div>
 
@@ -869,11 +869,11 @@ export default function OptionPricing() {
             </div>
             <span style={{
               fontSize: '12px',
-              fontWeight: '600',
+              fontWeight: '400',
               color: '#dc3545',
               whiteSpace: 'nowrap'
             }}>
-              사용여부를 체크합니다
+              사용여부 체크
             </span>
           </div>
         </div>
