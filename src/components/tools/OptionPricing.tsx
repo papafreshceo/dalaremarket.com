@@ -528,213 +528,353 @@ export default function OptionPricing() {
           {/* 판매가(정가) - 1번 */}
           <div style={{
             position: 'absolute',
-            top: '165px',
-            left: '80px',
-            background: '#3b82f6',
-            color: 'white',
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
+            top: '152px',
+            left: '28px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '13px',
-            fontWeight: '700',
-            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
-            border: '2px solid white'
+            gap: '6px'
           }}>
-            1
-          </div>
-
-          {/* 옵션명 2개 드롭다운 - 2번 */}
-          <div style={{
-            position: 'absolute',
-            top: '278px',
-            left: '200px',
-            background: '#3b82f6',
-            color: 'white',
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '13px',
-            fontWeight: '700',
-            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
-            border: '2px solid white'
-          }}>
-            2
-          </div>
-
-          {/* 판매가 불러오기 - 3번 */}
-          <div style={{
-            position: 'absolute',
-            top: '278px',
-            left: '385px',
-            background: '#3b82f6',
-            color: 'white',
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '13px',
-            fontWeight: '700',
-            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
-            border: '2px solid white'
-          }}>
-            3
-          </div>
-
-          {/* 기준설정 - 4번 */}
-          <div style={{
-            position: 'absolute',
-            top: '390px',
-            left: '135px',
-            background: '#3b82f6',
-            color: 'white',
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '13px',
-            fontWeight: '700',
-            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
-            border: '2px solid white'
-          }}>
-            4
-          </div>
-
-          {/* 옵션1 입력 - 5-1번 */}
-          <div style={{
-            position: 'absolute',
-            top: '390px',
-            left: '500px',
-            background: '#3b82f6',
-            color: 'white',
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '11px',
-            fontWeight: '700',
-            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
-            border: '2px solid white'
-          }}>
-            5-1
-          </div>
-
-          {/* 옵션2 입력 - 5-2번 */}
-          <div style={{
-            position: 'absolute',
-            top: '390px',
-            left: '625px',
-            background: '#3b82f6',
-            color: 'white',
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '11px',
-            fontWeight: '700',
-            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
-            border: '2px solid white'
-          }}>
-            5-2
-          </div>
-
-          {/* 옵션3 입력 - 5-3번 (옵션 3개일 때만) */}
-          {optionCount >= 3 && (
             <div style={{
-              position: 'absolute',
-              top: '390px',
-              left: '750px',
-              background: '#3b82f6',
-              color: 'white',
-              width: '28px',
-              height: '28px',
+              background: 'white',
+              color: '#dc3545',
+              width: '20px',
+              height: '20px',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '11px',
               fontWeight: '700',
-              boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
-              border: '2px solid white'
+              border: '2px solid #dc3545',
+              flexShrink: 0
             }}>
-              5-3
+              1
+            </div>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#dc3545',
+              whiteSpace: 'nowrap'
+            }}>
+              판매정가를 입력합니다
+            </span>
+          </div>
+
+          {/* 옵션명 개수 드롭다운 - 2번 */}
+          <div style={{
+            position: 'absolute',
+            top: '265px',
+            left: '200px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <div style={{
+              background: 'white',
+              color: '#dc3545',
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '11px',
+              fontWeight: '700',
+              border: '2px solid #dc3545',
+              flexShrink: 0
+            }}>
+              2
+            </div>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#dc3545',
+              whiteSpace: 'nowrap'
+            }}>
+              옵션명 개수를 선택합니다
+            </span>
+          </div>
+
+          {/* 판매가 불러오기 - 3번 */}
+          <div style={{
+            position: 'absolute',
+            top: '265px',
+            left: '370px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <div style={{
+              background: 'white',
+              color: '#dc3545',
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '11px',
+              fontWeight: '700',
+              border: '2px solid #dc3545',
+              flexShrink: 0
+            }}>
+              3
+            </div>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#dc3545',
+              whiteSpace: 'nowrap'
+            }}>
+              마진계산기에서 불러옵니다
+            </span>
+          </div>
+
+          {/* 기준설정 - 4번 */}
+          <div style={{
+            position: 'absolute',
+            top: '377px',
+            left: '120px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <div style={{
+              background: 'white',
+              color: '#dc3545',
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '11px',
+              fontWeight: '700',
+              border: '2px solid #dc3545',
+              flexShrink: 0
+            }}>
+              4
+            </div>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#dc3545',
+              whiteSpace: 'nowrap'
+            }}>
+              기준 옵션을 선택합니다
+            </span>
+          </div>
+
+          {/* 옵션1 입력 - 5-1번 */}
+          <div style={{
+            position: 'absolute',
+            top: '377px',
+            left: '485px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <div style={{
+              background: 'white',
+              color: '#dc3545',
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '9px',
+              fontWeight: '700',
+              border: '2px solid #dc3545',
+              flexShrink: 0
+            }}>
+              5-1
+            </div>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#dc3545',
+              whiteSpace: 'nowrap'
+            }}>
+              옵션1을 입력합니다
+            </span>
+          </div>
+
+          {/* 옵션2 입력 - 5-2번 */}
+          <div style={{
+            position: 'absolute',
+            top: '377px',
+            left: '610px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <div style={{
+              background: 'white',
+              color: '#dc3545',
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '9px',
+              fontWeight: '700',
+              border: '2px solid #dc3545',
+              flexShrink: 0
+            }}>
+              5-2
+            </div>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#dc3545',
+              whiteSpace: 'nowrap'
+            }}>
+              옵션2를 입력합니다
+            </span>
+          </div>
+
+          {/* 옵션3 입력 - 5-3번 (옵션 3개일 때만) */}
+          {optionCount >= 3 && (
+            <div style={{
+              position: 'absolute',
+              top: '377px',
+              left: '735px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <div style={{
+                background: 'white',
+                color: '#dc3545',
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '9px',
+                fontWeight: '700',
+                border: '2px solid #dc3545',
+                flexShrink: 0
+              }}>
+                5-3
+              </div>
+              <span style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#dc3545',
+                whiteSpace: 'nowrap'
+              }}>
+                옵션3을 입력합니다
+              </span>
             </div>
           )}
 
           {/* 재고수량 - 6번 */}
           <div style={{
             position: 'absolute',
-            top: '390px',
-            left: optionCount >= 3 ? '1000px' : '875px',
-            background: '#3b82f6',
-            color: 'white',
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
+            top: '377px',
+            left: optionCount >= 3 ? '985px' : '860px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '13px',
-            fontWeight: '700',
-            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
-            border: '2px solid white'
+            gap: '6px'
           }}>
-            6
+            <div style={{
+              background: 'white',
+              color: '#dc3545',
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '11px',
+              fontWeight: '700',
+              border: '2px solid #dc3545',
+              flexShrink: 0
+            }}>
+              6
+            </div>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#dc3545',
+              whiteSpace: 'nowrap'
+            }}>
+              재고수량을 입력합니다
+            </span>
           </div>
 
           {/* 관리코드 - 7번 */}
           <div style={{
             position: 'absolute',
-            top: '390px',
-            left: optionCount >= 3 ? '1125px' : '1000px',
-            background: '#3b82f6',
-            color: 'white',
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
+            top: '377px',
+            left: optionCount >= 3 ? '1110px' : '985px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '13px',
-            fontWeight: '700',
-            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
-            border: '2px solid white'
+            gap: '6px'
           }}>
-            7
+            <div style={{
+              background: 'white',
+              color: '#dc3545',
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '11px',
+              fontWeight: '700',
+              border: '2px solid #dc3545',
+              flexShrink: 0
+            }}>
+              7
+            </div>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#dc3545',
+              whiteSpace: 'nowrap'
+            }}>
+              관리코드를 입력합니다
+            </span>
           </div>
 
           {/* 사용여부 - 8번 */}
           <div style={{
             position: 'absolute',
-            top: '390px',
-            left: optionCount >= 3 ? '1250px' : '1125px',
-            background: '#3b82f6',
-            color: 'white',
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
+            top: '377px',
+            left: optionCount >= 3 ? '1235px' : '1110px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '13px',
-            fontWeight: '700',
-            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
-            border: '2px solid white'
+            gap: '6px'
           }}>
-            8
+            <div style={{
+              background: 'white',
+              color: '#dc3545',
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '11px',
+              fontWeight: '700',
+              border: '2px solid #dc3545',
+              flexShrink: 0
+            }}>
+              8
+            </div>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#dc3545',
+              whiteSpace: 'nowrap'
+            }}>
+              사용여부를 체크합니다
+            </span>
           </div>
         </div>
       )}
