@@ -530,18 +530,18 @@ export default function OptionPricing() {
             position: 'absolute',
             top: '165px',
             left: '80px',
-            background: '#ff6b6b',
+            background: '#3b82f6',
             color: 'white',
-            width: '50px',
-            height: '50px',
+            width: '28px',
+            height: '28px',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '24px',
+            fontSize: '13px',
             fontWeight: '700',
-            boxShadow: '0 4px 12px rgba(255, 107, 107, 0.5)',
-            border: '3px solid white'
+            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
+            border: '2px solid white'
           }}>
             1
           </div>
@@ -551,18 +551,18 @@ export default function OptionPricing() {
             position: 'absolute',
             top: '278px',
             left: '200px',
-            background: '#4ecdc4',
+            background: '#3b82f6',
             color: 'white',
-            width: '50px',
-            height: '50px',
+            width: '28px',
+            height: '28px',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '24px',
+            fontSize: '13px',
             fontWeight: '700',
-            boxShadow: '0 4px 12px rgba(78, 205, 196, 0.5)',
-            border: '3px solid white'
+            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
+            border: '2px solid white'
           }}>
             2
           </div>
@@ -572,18 +572,18 @@ export default function OptionPricing() {
             position: 'absolute',
             top: '278px',
             left: '385px',
-            background: '#45b7d1',
+            background: '#3b82f6',
             color: 'white',
-            width: '50px',
-            height: '50px',
+            width: '28px',
+            height: '28px',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '24px',
+            fontSize: '13px',
             fontWeight: '700',
-            boxShadow: '0 4px 12px rgba(69, 183, 209, 0.5)',
-            border: '3px solid white'
+            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
+            border: '2px solid white'
           }}>
             3
           </div>
@@ -593,18 +593,18 @@ export default function OptionPricing() {
             position: 'absolute',
             top: '390px',
             left: '135px',
-            background: '#f9ca24',
+            background: '#3b82f6',
             color: 'white',
-            width: '50px',
-            height: '50px',
+            width: '28px',
+            height: '28px',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '24px',
+            fontSize: '13px',
             fontWeight: '700',
-            boxShadow: '0 4px 12px rgba(249, 202, 36, 0.5)',
-            border: '3px solid white'
+            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
+            border: '2px solid white'
           }}>
             4
           </div>
@@ -614,18 +614,18 @@ export default function OptionPricing() {
             position: 'absolute',
             top: '390px',
             left: '500px',
-            background: '#a29bfe',
+            background: '#3b82f6',
             color: 'white',
-            width: '50px',
-            height: '50px',
+            width: '28px',
+            height: '28px',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '18px',
+            fontSize: '11px',
             fontWeight: '700',
-            boxShadow: '0 4px 12px rgba(162, 155, 254, 0.5)',
-            border: '3px solid white'
+            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
+            border: '2px solid white'
           }}>
             5-1
           </div>
@@ -635,18 +635,18 @@ export default function OptionPricing() {
             position: 'absolute',
             top: '390px',
             left: '625px',
-            background: '#fd79a8',
+            background: '#3b82f6',
             color: 'white',
-            width: '50px',
-            height: '50px',
+            width: '28px',
+            height: '28px',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '18px',
+            fontSize: '11px',
             fontWeight: '700',
-            boxShadow: '0 4px 12px rgba(253, 121, 168, 0.5)',
-            border: '3px solid white'
+            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
+            border: '2px solid white'
           }}>
             5-2
           </div>
@@ -657,18 +657,18 @@ export default function OptionPricing() {
               position: 'absolute',
               top: '390px',
               left: '750px',
-              background: '#fdcb6e',
+              background: '#3b82f6',
               color: 'white',
-              width: '50px',
-              height: '50px',
+              width: '28px',
+              height: '28px',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '18px',
+              fontSize: '11px',
               fontWeight: '700',
-              boxShadow: '0 4px 12px rgba(253, 203, 110, 0.5)',
-              border: '3px solid white'
+              boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
+              border: '2px solid white'
             }}>
               5-3
             </div>
@@ -679,18 +679,18 @@ export default function OptionPricing() {
             position: 'absolute',
             top: '390px',
             left: optionCount >= 3 ? '1000px' : '875px',
-            background: '#00b894',
+            background: '#3b82f6',
             color: 'white',
-            width: '50px',
-            height: '50px',
+            width: '28px',
+            height: '28px',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '24px',
+            fontSize: '13px',
             fontWeight: '700',
-            boxShadow: '0 4px 12px rgba(0, 184, 148, 0.5)',
-            border: '3px solid white'
+            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
+            border: '2px solid white'
           }}>
             6
           </div>
@@ -700,18 +700,18 @@ export default function OptionPricing() {
             position: 'absolute',
             top: '390px',
             left: optionCount >= 3 ? '1125px' : '1000px',
-            background: '#e17055',
+            background: '#3b82f6',
             color: 'white',
-            width: '50px',
-            height: '50px',
+            width: '28px',
+            height: '28px',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '24px',
+            fontSize: '13px',
             fontWeight: '700',
-            boxShadow: '0 4px 12px rgba(225, 112, 85, 0.5)',
-            border: '3px solid white'
+            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
+            border: '2px solid white'
           }}>
             7
           </div>
@@ -721,18 +721,18 @@ export default function OptionPricing() {
             position: 'absolute',
             top: '390px',
             left: optionCount >= 3 ? '1250px' : '1125px',
-            background: '#6c5ce7',
+            background: '#3b82f6',
             color: 'white',
-            width: '50px',
-            height: '50px',
+            width: '28px',
+            height: '28px',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '24px',
+            fontSize: '13px',
             fontWeight: '700',
-            boxShadow: '0 4px 12px rgba(108, 92, 231, 0.5)',
-            border: '3px solid white'
+            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
+            border: '2px solid white'
           }}>
             8
           </div>
