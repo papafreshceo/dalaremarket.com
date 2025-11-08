@@ -144,8 +144,8 @@ export default function OptionPricing() {
   const [discountPrice, setDiscountPrice] = useState<string>('');
 
   // 옵션 헤더명
-  const [option1Header, setOption1Header] = useState<string>('옵션1(ex:품종선택)');
-  const [option2Header, setOption2Header] = useState<string>('옵션2(ex:중량)');
+  const [option1Header, setOption1Header] = useState<string>('옵션1');
+  const [option2Header, setOption2Header] = useState<string>('옵션2');
   const [option3Header, setOption3Header] = useState<string>('옵션3');
 
   // 옵션명 개수
@@ -1169,6 +1169,7 @@ export default function OptionPricing() {
                       type="text"
                       value={option1Header}
                       onChange={(e) => setOption1Header(e.target.value)}
+                      placeholder="ex:품종선택"
                       style={{
                         width: '100%',
                         padding: '4px 8px',
@@ -1193,6 +1194,7 @@ export default function OptionPricing() {
                       type="text"
                       value={option2Header}
                       onChange={(e) => setOption2Header(e.target.value)}
+                      placeholder="ex:중량"
                       style={{
                         width: '100%',
                         padding: '4px 8px',
@@ -1217,6 +1219,7 @@ export default function OptionPricing() {
                       type="text"
                       value={option3Header}
                       onChange={(e) => setOption3Header(e.target.value)}
+                      placeholder="옵션3"
                       style={{
                         width: '100%',
                         padding: '4px 8px',
