@@ -528,7 +528,7 @@ export default function OptionPricing() {
           {/* 판매가(정가) - 1번 */}
           <div style={{
             position: 'absolute',
-            top: '0px',
+            top: '24px',
             left: '24px',
             display: 'flex',
             alignItems: 'center',
@@ -563,8 +563,8 @@ export default function OptionPricing() {
           {/* 옵션명 개수 드롭다운 - 2번 */}
           <div style={{
             position: 'absolute',
-            top: '110px',
-            left: '302px',
+            top: '139px',
+            left: '210px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -598,8 +598,8 @@ export default function OptionPricing() {
           {/* 판매가 불러오기 - 3번 */}
           <div style={{
             position: 'absolute',
-            top: '110px',
-            left: '435px',
+            top: '139px',
+            left: '355px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
