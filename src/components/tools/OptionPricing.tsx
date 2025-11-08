@@ -739,69 +739,40 @@ export default function OptionPricing() {
         </div>
       )}
 
-      {/* 설명 섹션 */}
+      {/* 가이드 버튼 */}
       <div style={{
-        background: '#f0f9ff',
-        padding: '16px 20px',
-        borderRadius: '12px',
         marginBottom: '24px',
-        border: '1px solid #bfdbfe',
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start'
+        justifyContent: 'flex-end'
       }}>
-        <div>
-          <h3 style={{
-            fontSize: '14px',
-            fontWeight: '600',
-            marginBottom: '8px',
-            color: '#1e40af'
-          }}>
-            💡 옵션가 세팅 사용 방법
-          </h3>
-          <ol style={{
-            fontSize: '13px',
-            color: '#1e3a8a',
-            lineHeight: '1.6',
-            margin: 0,
-            paddingLeft: '20px'
-          }}>
-            <li>마진계산기의 '판매가 불러오기' 또는 '품목 추가'로 옵션 상품 추가</li>
-            <li>판매가(정가) 입력 → 기준이 될 옵션 상품 1개 선택</li>
-            <li>할인금액, 할인율, 할인판매가, 옵션가가 자동으로 계산됩니다</li>
-            <li>옵션명 입력 후 네이버/카카오 양식으로 다운로드</li>
-          </ol>
-        </div>
-
-        {/* 가이드 토글 버튼 */}
         <button
           onClick={() => setShowGuide(!showGuide)}
           style={{
-            padding: '8px 16px',
+            padding: '10px 20px',
             background: showGuide ? '#dc3545' : '#10b981',
             color: 'white',
             border: 'none',
-            borderRadius: '6px',
-            fontSize: '13px',
+            borderRadius: '8px',
+            fontSize: '14px',
             fontWeight: '600',
             cursor: 'pointer',
             whiteSpace: 'nowrap',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: '8px',
             transition: 'all 0.2s',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.2)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="white"/>
           </svg>
           {showGuide ? '가이드 해제' : '가이드 보기'}
