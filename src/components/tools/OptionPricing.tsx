@@ -528,7 +528,7 @@ export default function OptionPricing() {
           {/* 판매가(정가) - 1번 */}
           <div style={{
             position: 'absolute',
-            top: '152px',
+            top: '8px',
             left: '28px',
             display: 'flex',
             alignItems: 'center',
@@ -563,8 +563,8 @@ export default function OptionPricing() {
           {/* 옵션명 개수 드롭다운 - 2번 */}
           <div style={{
             position: 'absolute',
-            top: '265px',
-            left: '200px',
+            top: '118px',
+            left: '190px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -598,8 +598,8 @@ export default function OptionPricing() {
           {/* 판매가 불러오기 - 3번 */}
           <div style={{
             position: 'absolute',
-            top: '265px',
-            left: '370px',
+            top: '118px',
+            left: '360px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -633,8 +633,8 @@ export default function OptionPricing() {
           {/* 기준설정 - 4번 */}
           <div style={{
             position: 'absolute',
-            top: '377px',
-            left: '120px',
+            top: '230px',
+            left: '115px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -668,8 +668,8 @@ export default function OptionPricing() {
           {/* 옵션1 입력 - 5-1번 */}
           <div style={{
             position: 'absolute',
-            top: '377px',
-            left: '485px',
+            top: '230px',
+            left: '480px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -703,8 +703,8 @@ export default function OptionPricing() {
           {/* 옵션2 입력 - 5-2번 */}
           <div style={{
             position: 'absolute',
-            top: '377px',
-            left: '610px',
+            top: '230px',
+            left: '605px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -739,8 +739,8 @@ export default function OptionPricing() {
           {optionCount >= 3 && (
             <div style={{
               position: 'absolute',
-              top: '377px',
-              left: '735px',
+              top: '230px',
+              left: '730px',
               display: 'flex',
               alignItems: 'center',
               gap: '6px'
@@ -775,8 +775,8 @@ export default function OptionPricing() {
           {/* 재고수량 - 6번 */}
           <div style={{
             position: 'absolute',
-            top: '377px',
-            left: optionCount >= 3 ? '985px' : '860px',
+            top: '230px',
+            left: optionCount >= 3 ? '980px' : '855px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -810,8 +810,8 @@ export default function OptionPricing() {
           {/* 관리코드 - 7번 */}
           <div style={{
             position: 'absolute',
-            top: '377px',
-            left: optionCount >= 3 ? '1110px' : '985px',
+            top: '230px',
+            left: optionCount >= 3 ? '1105px' : '980px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -845,8 +845,8 @@ export default function OptionPricing() {
           {/* 사용여부 - 8번 */}
           <div style={{
             position: 'absolute',
-            top: '377px',
-            left: optionCount >= 3 ? '1235px' : '1110px',
+            top: '230px',
+            left: optionCount >= 3 ? '1230px' : '1105px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
