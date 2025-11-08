@@ -512,7 +512,7 @@ export default function OptionPricing() {
 
 
   return (
-    <div style={{ padding: '24px', position: 'relative' }}>
+    <div style={{ padding: '12px 24px 24px', position: 'relative' }}>
       {/* 가이드 오버레이 */}
       {showGuide && (
         <div style={{
