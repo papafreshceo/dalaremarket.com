@@ -61,9 +61,20 @@ export async function POST(request: NextRequest) {
 
     // 새로운 권한을 삽입
     if (permissions.length > 0) {
+      // id, created_at, updated_at 필드를 제거하고 필요한 필드만 추출
+      const permissionsToInsert = permissions.map(p => ({
+        role: p.role,
+        page_path: p.page_path,
+        can_access: p.can_access,
+        can_create: p.can_create,
+        can_read: p.can_read,
+        can_update: p.can_update,
+        can_delete: p.can_delete
+      }))
+
       const { data, error: insertError } = await supabase
         .from('permissions')
-        .insert(permissions)
+        .insert(permissionsToInsert)
         .select()
 
       if (insertError) throw insertError

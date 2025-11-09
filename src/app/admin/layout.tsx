@@ -13,6 +13,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { FloatingHtmlBuilder } from '@/components/admin/FloatingHtmlBuilder'
 import { CalendarPopup } from '@/components/admin/CalendarPopup'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { getUserAccessiblePages } from '@/lib/permissions'
 
 // React Query 클라이언트 설정 (최적화)
 const queryClient = new QueryClient({
@@ -41,6 +42,7 @@ export default function AdminLayout({
   const [showHtmlBuilder, setShowHtmlBuilder] = useState(false)
   const [showCalendarPopup, setShowCalendarPopup] = useState(false)
   const [themeLoaded, setThemeLoaded] = useState(false)
+  const [accessiblePages, setAccessiblePages] = useState<string[]>([])
   const supabase = createClient()
 
   useEffect(() => {
@@ -94,7 +96,7 @@ export default function AdminLayout({
     };
   }, []);
 
-  // 사용자 정보 가져오기
+  // 사용자 정보 및 접근 가능한 페이지 가져오기
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -105,7 +107,12 @@ export default function AdminLayout({
           .select('name, email, role')
           .eq('id', user.id)
           .single()
-        if (data) setUserData(data)
+        if (data) {
+          setUserData(data)
+          // 접근 가능한 페이지 조회
+          const pages = await getUserAccessiblePages(user.id)
+          setAccessiblePages(pages)
+        }
       }
     }
     getUser()
@@ -283,6 +290,14 @@ export default function AdminLayout({
     return pathname?.startsWith(href) || false
   }
 
+  // 권한 기반 메뉴 필터링
+  const filteredMenuItems = menuItems.filter(item => {
+    // super_admin은 모든 메뉴 표시
+    if (accessiblePages.includes('*')) return true
+    // 접근 가능한 페이지 목록에 있는지 확인
+    return accessiblePages.includes(item.href)
+  })
+
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
@@ -322,7 +337,26 @@ export default function AdminLayout({
           </div>
 
           {/* 헤더 우측 */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* 사용자 정보 */}
+            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-surface rounded-lg border border-border">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white">
+                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex flex-col">
+                <p className="font-medium text-text text-sm">
+                  {userData?.name || '관리자'}
+                </p>
+                <p className="text-xs text-text-tertiary">
+                  {user?.email || 'loading...'}
+                </p>
+              </div>
+            </div>
+
+            <div className="w-px h-5 bg-border hidden lg:block" />
+
             <div className="hidden md:flex items-center bg-background-secondary rounded-lg px-3 py-2">
               <svg className="w-4 h-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -412,30 +446,11 @@ export default function AdminLayout({
           text-[14px]                       /* ✅ 사이드바 기본 글자 크기 14px */
           [&_svg]:!w-[14px] [&_svg]:!h-[14px]  /* ✅ 사이드바 내부 아이콘 14px */
         `}>
-          
-          {/* 사용자 정보 */}
-          <div className="px-4 py-4 border-b border-border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-medium">
-                <svg viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium text-text text-[14px]">
-                  {userData?.name || '관리자'}
-                </p>
-                <p className="text-xs text-text-tertiary">
-                  {user?.email || 'loading...'}
-                </p>
-              </div>
-            </div>
-          </div>
 
           {/* 메뉴 */}
           <nav className="flex-1 py-4 overflow-y-auto">
             <div className="px-3">
-              {menuItems.map((item) => {
+              {filteredMenuItems.map((item) => {
                 const active = isActive(item.href)
                 return (
                   <Link

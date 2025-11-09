@@ -208,6 +208,13 @@ export default function SettingsPage() {
       category: '권한 관리',
       cards: [
         {
+          title: '사용자 관리',
+          description: '최고관리자, 관리자, 직원 등 사용자를 관리합니다',
+          icon: UserCog,
+          href: '/admin/settings/users',
+          color: 'from-blue-500 to-indigo-500',
+        },
+        {
           title: '사용자 초대',
           description: '관리자 및 직원을 초대합니다',
           icon: UserPlus,

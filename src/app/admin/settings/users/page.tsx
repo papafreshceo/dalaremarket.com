@@ -19,7 +19,7 @@ interface User {
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('all')
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'staff' | 'customers'>('staff')
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const supabase = createClient()
@@ -53,11 +53,17 @@ export default function UsersPage() {
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (filter === 'pending') {
+    // 필터링 조건
+    if (filter === 'staff') {
+      query = query.in('role', ['employee', 'admin', 'super_admin'])
+    } else if (filter === 'customers') {
+      query = query.in('role', ['customer', 'vip_customer', 'partner'])
+    } else if (filter === 'pending') {
       query = query.eq('approved', false)
     } else if (filter === 'approved') {
       query = query.eq('approved', true)
     }
+    // 'all'인 경우 필터링 없음
 
     const { data, error } = await query
 
@@ -124,6 +130,8 @@ export default function UsersPage() {
   }
 
   const handleRoleChange = async (userId: string, newRole: string, oldRole: string) => {
+    console.log('역할 변경 시도:', { userId, newRole, oldRole, currentUserId, currentUserRole })
+
     // 본인의 역할은 변경할 수 없음
     if (userId === currentUserId) {
       showToast('본인의 역할은 변경할 수 없습니다.', 'error')
@@ -133,23 +141,52 @@ export default function UsersPage() {
     // super_admin만 super_admin 역할 부여 가능
     if (newRole === 'super_admin' && currentUserRole !== 'super_admin') {
       showToast('최고관리자 역할은 최고관리자만 부여할 수 있습니다.', 'error')
+      fetchUsers() // 롤백을 위해 다시 불러오기
       return
     }
 
     // super_admin 역할을 가진 사용자는 super_admin만 변경 가능
     if (oldRole === 'super_admin' && currentUserRole !== 'super_admin') {
       showToast('최고관리자 역할을 변경할 권한이 없습니다.', 'error')
+      fetchUsers() // 롤백을 위해 다시 불러오기
       return
     }
 
-    const { error } = await supabase
+    // 역할 변경 확인
+    const roleNames: Record<string, string> = {
+      customer: '일반고객',
+      vip_customer: 'VIP고객',
+      partner: '파트너',
+      employee: '직원',
+      admin: '관리자',
+      super_admin: '최고관리자'
+    }
+
+    const confirmed = await confirm({
+      title: '역할 변경',
+      message: `역할을 "${roleNames[oldRole]}"에서 "${roleNames[newRole]}"(으)로 변경하시겠습니까?`,
+      confirmText: '변경',
+      cancelText: '취소',
+      type: 'info'
+    })
+
+    if (!confirmed) {
+      fetchUsers() // 취소 시 롤백
+      return
+    }
+
+    const { data, error } = await supabase
       .from('users')
       .update({ role: newRole })
       .eq('id', userId)
+      .select()
+
+    console.log('역할 변경 결과:', { data, error })
 
     if (error) {
-      showToast('역할 변경에 실패했습니다.', 'error')
+      showToast(`역할 변경에 실패했습니다: ${error.message}`, 'error')
       console.error(error)
+      fetchUsers() // 오류 시 롤백
     } else {
       showToast('역할이 변경되었습니다.', 'success')
       fetchUsers()
@@ -163,7 +200,27 @@ export default function UsersPage() {
         <p className="mt-1 text-sm text-gray-600">사용자 승인 및 역할 관리</p>
       </div>
 
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex gap-2 flex-wrap">
+        <button
+          onClick={() => setFilter('staff')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filter === 'staff'
+              ? 'bg-blue-600 text-white'
+              : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          임직원 (직원/관리자)
+        </button>
+        <button
+          onClick={() => setFilter('customers')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filter === 'customers'
+              ? 'bg-blue-600 text-white'
+              : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          고객 (일반/VIP/파트너)
+        </button>
         <button
           onClick={() => setFilter('all')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -229,7 +286,7 @@ export default function UsersPage() {
                       value={user.role}
                       onChange={(e) => handleRoleChange(user.id, e.target.value, user.role)}
                       className="text-xs border border-gray-300 rounded px-2 py-1"
-                      disabled={!user.approved || user.id === currentUserId}
+                      disabled={user.id === currentUserId}
                     >
                       <option value="customer">일반고객</option>
                       <option value="vip_customer">VIP고객</option>

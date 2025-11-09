@@ -172,6 +172,53 @@ export function clearUserPermissionsCache(userId: string) {
   }
 }
 
+/**
+ * 사용자가 접근 가능한 모든 페이지 경로를 반환합니다.
+ * @param userId - 사용자 ID
+ * @returns 접근 가능한 페이지 경로 배열
+ */
+export async function getUserAccessiblePages(userId: string): Promise<string[]> {
+  try {
+    const supabase = createClient()
+
+    // 사용자 역할 조회
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', userId)
+      .single()
+
+    if (userError || !userData) {
+      console.error('사용자 조회 오류:', userError)
+      return []
+    }
+
+    const role = userData.role as UserRole
+
+    // super_admin은 모든 페이지 접근 가능
+    if (role === 'super_admin') {
+      return ['*'] // 모든 페이지를 의미하는 와일드카드
+    }
+
+    // 해당 역할의 접근 가능한 페이지 조회
+    const { data: permissions, error: permissionError } = await supabase
+      .from('permissions')
+      .select('page_path')
+      .eq('role', role)
+      .eq('can_access', true)
+
+    if (permissionError || !permissions) {
+      console.error('권한 조회 오류:', permissionError)
+      return []
+    }
+
+    return permissions.map(p => p.page_path)
+  } catch (error) {
+    console.error('접근 가능한 페이지 조회 오류:', error)
+    return []
+  }
+}
+
 // 헬퍼 함수
 function createNoPermission(): PermissionCheck {
   return {
