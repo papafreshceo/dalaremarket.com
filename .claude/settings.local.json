@@ -157,7 +157,8 @@
       "Bash(Select-String -Pattern \"업무도구|Business Tools\")",
       "Bash(Select-Object -First 3)",
       "Bash(if exist test-credits.js del /f test-credits.js)",
-      "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\settings\\theme-test\" rmdir /s /q \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\settings\\theme-test\")"
+      "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\settings\\theme-test\" rmdir /s /q \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\settings\\theme-test\")",
+      "Bash(python -m pip:*)"
     ],
     "deny": [],
     "ask": []

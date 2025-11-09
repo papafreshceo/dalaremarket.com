@@ -390,21 +390,31 @@ export default function OrderIntegration() {
   };
 
   const handleIntegrate = async () => {
+    console.log('🚀 통합 시작');
+
     // 크레딧 차감 (버튼 ID: 'integrate')
     const canProceed = await executeWithCredit('integrate');
-    if (!canProceed) return;
+    if (!canProceed) {
+      console.log('❌ 크레딧 부족으로 중단');
+      return;
+    }
 
     setIntegrating(true);
 
     try {
       // 필드 매핑 가져오기
+      console.log('📥 필드 매핑 로드 중...');
       const fieldMappings = await fetchMarketFieldMappings();
+      console.log('✅ 필드 매핑 로드 완료:', fieldMappings.size, '개 마켓');
 
       // 통합 데이터를 담을 배열
       const integratedData: any[] = [];
 
+      console.log('📂 처리할 파일 수:', uploadedFiles.length);
+
       // 각 파일의 데이터 읽어서 추가
       for (const filePreview of uploadedFiles) {
+        console.log(`\n📄 파일 처리 시작: ${filePreview.name}`);
         const arrayBuffer = await filePreview.file.arrayBuffer();
         const sourceWorkbook = XLSX.read(arrayBuffer, { type: 'array' });
         const firstSheetName = sourceWorkbook.SheetNames[0];
@@ -417,7 +427,18 @@ export default function OrderIntegration() {
 
         // 마켓별 필드 매핑 가져오기
         const marketMapping = fieldMappings.get(template.market_name.toLowerCase());
-        if (!marketMapping) continue;
+        if (!marketMapping) {
+          console.warn(`⚠️ ${template.market_name} 마켓의 필드 매핑을 찾을 수 없습니다.`);
+          continue;
+        }
+
+        // 첫 번째 파일 처리 시 매핑 정보 출력
+        if (uploadedFiles.indexOf(filePreview) === 0) {
+          console.log(`📋 ${template.market_name} 마켓 매핑 정보:`, {
+            field_4_주문번호: marketMapping.field_4,
+            field_11_옵션상품: marketMapping.field_11,
+          });
+        }
 
         // SheetJS로 JSON 변환
         const allData = XLSX.utils.sheet_to_json(sourceSheet, {
@@ -455,11 +476,29 @@ export default function OrderIntegration() {
             // 쉼표로 구분된 여러 필드명 처리
             const fieldNames = fieldMapping.split(',').map(f => f.trim());
 
+            // 디버깅 로그 (첫 번째 행만)
+            if (i === headerRowIndex) {
+              console.log('🔍 다중 필드 매핑 테스트:', {
+                fieldMapping,
+                fieldNames,
+                availableFields: Object.keys(rowData).slice(0, 10),
+              });
+            }
+
             for (const fieldName of fieldNames) {
               const value = rowData[fieldName];
               if (value !== undefined && value !== null && value !== '') {
+                // 값을 찾았을 때 로그 (첫 번째 행만)
+                if (i === headerRowIndex) {
+                  console.log(`✅ 값 발견: "${fieldName}" = "${value}"`);
+                }
                 return String(value);
               }
+            }
+
+            // 값을 못 찾았을 때 로그 (첫 번째 행만)
+            if (i === headerRowIndex) {
+              console.log(`❌ 모든 필드에서 값 없음:`, fieldNames);
             }
 
             return '';

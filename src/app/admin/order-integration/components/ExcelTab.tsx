@@ -650,25 +650,37 @@ export default function ExcelTab() {
 
     for (let i = 1; i <= 50; i++) {
       const fieldKey = `field_${i}`;
-      const marketFieldName = marketFieldMappings[fieldKey]; // 예: "결제일"
+      const marketFieldName = marketFieldMappings[fieldKey]; // 예: "결제일" 또는 "옵션관리코드,판매자관리코드"
 
-      if (marketFieldName && row[marketFieldName] !== undefined) {
-        let value = row[marketFieldName];
+      if (marketFieldName) {
+        // 다중 필드 지원: 쉼표로 구분된 여러 필드명 처리
+        const fieldNames = String(marketFieldName).split(',').map(f => f.trim());
+        let value: any = null;
 
-        // Date 객체는 항상 문자열로 변환
-        if (value instanceof Date) {
-          value = convertExcelDate(value);
-        }
-        // 날짜 필드이면서 숫자인 경우에만 날짜로 변환
-        else if (dateFields.includes(i) && typeof value === 'number') {
-          value = convertExcelDate(value);
-        }
-        // 다른 값들은 그대로 유지하거나 문자열로 변환
-        else if (value !== null && value !== undefined) {
-          value = String(value);
+        // 여러 필드명 중 값이 있는 첫 번째 필드 찾기
+        for (const fname of fieldNames) {
+          if (row[fname] !== undefined && row[fname] !== null && row[fname] !== '') {
+            value = row[fname];
+            break;
+          }
         }
 
-        mappedData[fieldKey] = value;
+        if (value !== null && value !== undefined) {
+          // Date 객체는 항상 문자열로 변환
+          if (value instanceof Date) {
+            value = convertExcelDate(value);
+          }
+          // 날짜 필드이면서 숫자인 경우에만 날짜로 변환
+          else if (dateFields.includes(i) && typeof value === 'number') {
+            value = convertExcelDate(value);
+          }
+          // 다른 값들은 그대로 유지하거나 문자열로 변환
+          else {
+            value = String(value);
+          }
+
+          mappedData[fieldKey] = value;
+        }
       }
     }
 
