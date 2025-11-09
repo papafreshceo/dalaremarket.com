@@ -28,8 +28,12 @@ export default function PlatformLayout({
       // 기존 파비콘 모두 제거
       const existingFavicons = document.querySelectorAll("link[rel*='icon']");
       existingFavicons.forEach(el => {
-        if (el.parentNode) {
-          el.parentNode.removeChild(el);
+        try {
+          if (el.parentNode) {
+            el.parentNode.removeChild(el);
+          }
+        } catch (e) {
+          // 이미 제거된 경우 무시
         }
       });
 
