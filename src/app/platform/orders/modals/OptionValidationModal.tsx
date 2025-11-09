@@ -27,7 +27,7 @@ export default function OptionValidationModal({
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [bulkEditFrom, setBulkEditFrom] = useState('');
   const [bulkEditTo, setBulkEditTo] = useState('');
-  const [recommendedOptions, setRecommendedOptions] = useState<string[]>([]); // 추천 옵션명 목록
+  const [recommendedOptions, setRecommendedOptions] = useState<string[]>([]); // 추천 옵션상품 목록
   const [showMappingModal, setShowMappingModal] = useState(false);
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export default function OptionValidationModal({
     return 1 - distance / maxLen;
   };
 
-  // 유사한 옵션명 찾기 (상위 N개)
+  // 유사한 옵션상품 찾기 (상위 N개)
   const findSimilarOptions = (targetOption: string, topN: number = 5): string[] => {
     const allOptions = Array.from(optionProducts.keys());
     const similarities = allOptions.map(option => ({
@@ -86,7 +86,7 @@ export default function OptionValidationModal({
       .map(item => optionProducts.get(item.option)?.option_name || item.option);
   };
 
-  // 옵션명 검증 실행
+  // 옵션상품 검증 실행
   const validateOrders = (ordersToValidate?: any[]) => {
     const targetOrders = ordersToValidate || orders;
     const validated = targetOrders.map((order, index) => {
@@ -137,7 +137,7 @@ export default function OptionValidationModal({
     });
   };
 
-  // 개별 옵션명 수정
+  // 개별 옵션상품 수정
   const handleEditOptionName = (index: number) => {
     setEditingIndex(index);
     setEditValue(validatedOrders[index].optionName || '');
@@ -148,7 +148,7 @@ export default function OptionValidationModal({
     const updated = [...validatedOrders];
     const optionName = editValue.trim();
 
-    // 옵션명 업데이트
+    // 옵션상품 업데이트
     updated[index] = {
       ...updated[index],
       optionName: optionName,
@@ -221,7 +221,7 @@ export default function OptionValidationModal({
   // 일괄 수정 실행
   const handleBulkEdit = () => {
     if (!bulkEditFrom.trim() || !bulkEditTo.trim()) {
-      toast.error('수정할 옵션명과 새 옵션명을 모두 입력해주세요.', {
+      toast.error('수정할 옵션상품과 새 옵션상품을 모두 입력해주세요.', {
         position: 'top-center',
         duration: 3000
       });
@@ -284,7 +284,7 @@ export default function OptionValidationModal({
   const handleSaveToDatabase = () => {
     // 미매칭건이 있으면 저장 불가
     if (stats.unmatched > 0) {
-      toast.error('매칭 실패한 주문건은 발주서등록/확정이 불가능합니다.\n모든 옵션명을 매칭해주세요.', {
+      toast.error('매칭 실패한 주문건은 발주서등록/확정이 불가능합니다.\n모든 옵션상품을 매칭해주세요.', {
         position: 'top-center',
         duration: 3000
       });
@@ -335,14 +335,14 @@ export default function OptionValidationModal({
               color: 'var(--color-text)',
               margin: '0 0 8px 0'
             }}>
-              옵션명 검증
+              옵션상품 검증
             </h2>
             <p style={{
               fontSize: '14px',
               color: 'var(--color-text-secondary)',
               margin: 0
             }}>
-              매칭에 실패한 옵션명을 수정해주세요. 좌측 메뉴의{' '}
+              매칭에 실패한 옵션상품을 수정해주세요. 좌측 메뉴의{' '}
               <button
                 onClick={() => setShowMappingModal(true)}
                 style={{
@@ -362,7 +362,7 @@ export default function OptionValidationModal({
                 onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
                 onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
               >
-                옵션명매핑
+                옵션상품매핑
                 <ExternalLink size={12} />
               </button>{' '}
               탭에서 미리 설정해두시면 다음부터는 수정작업 없이 바로 등록이 가능합니다.
@@ -414,11 +414,11 @@ export default function OptionValidationModal({
             <button
               onClick={() => {
                 if (!showBulkEdit) {
-                  // 매칭 실패한 첫 번째 옵션명 찾기
+                  // 매칭 실패한 첫 번째 옵션상품 찾기
                   const unmatchedOrder = validatedOrders.find(o => o.matchStatus === 'unmatched');
                   if (unmatchedOrder?.optionName) {
                     const failedOptionName = unmatchedOrder.optionName;
-                    // 추천 옵션명 계산 (상위 5개)
+                    // 추천 옵션상품 계산 (상위 5개)
                     const recommendations = findSimilarOptions(failedOptionName, 5);
                     setRecommendedOptions(recommendations);
                     setBulkEditFrom(failedOptionName);
@@ -443,7 +443,7 @@ export default function OptionValidationModal({
                 cursor: 'pointer'
               }}
             >
-              옵션명 일괄수정
+              옵션상품 일괄수정
             </button>
           </div>
         </div>
@@ -463,7 +463,7 @@ export default function OptionValidationModal({
             }}>
               <input
                 type="text"
-                placeholder="수정할 옵션명"
+                placeholder="수정할 옵션상품"
                 value={bulkEditFrom}
                 onChange={(e) => setBulkEditFrom(e.target.value)}
                 style={{
@@ -479,7 +479,7 @@ export default function OptionValidationModal({
               <span style={{ color: 'var(--color-text-secondary)' }}>→</span>
               <input
                 type="text"
-                placeholder="새 옵션명"
+                placeholder="새 옵션상품"
                 value={bulkEditTo}
                 onChange={(e) => setBulkEditTo(e.target.value)}
                 style={{
@@ -509,7 +509,7 @@ export default function OptionValidationModal({
               </button>
             </div>
 
-            {/* 추천 옵션명 버튼 (2~5순위) */}
+            {/* 추천 옵션상품 버튼 (2~5순위) */}
             {recommendedOptions.length > 1 && (
               <div style={{
                 display: 'flex',
@@ -518,7 +518,7 @@ export default function OptionValidationModal({
                 flexWrap: 'wrap'
               }}>
                 <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginRight: '4px' }}>
-                  추천 옵션명:
+                  추천 옵션상품:
                 </span>
                 {recommendedOptions.slice(1, 5).map((option, index) => (
                   <button
@@ -564,7 +564,7 @@ export default function OptionValidationModal({
               <tr>
                 <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>상태</th>
                 <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>주문번호</th>
-                <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>옵션명</th>
+                <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>옵션상품</th>
                 <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>수량</th>
                 <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>공급단가</th>
                 <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)' }}>공급가</th>
@@ -671,7 +671,7 @@ export default function OptionValidationModal({
             ) : (
               <>
                 <CheckCircle size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} color="#059669" />
-                모든 옵션명이 성공적으로 매칭되었습니다
+                모든 옵션상품이 성공적으로 매칭되었습니다
               </>
             )}
           </div>
@@ -712,7 +712,7 @@ export default function OptionValidationModal({
         </div>
       </div>
 
-      {/* 옵션명매핑 플로팅 모달 */}
+      {/* 옵션상품매핑 플로팅 모달 */}
       {showMappingModal && (
         <div style={{
           position: 'fixed',
@@ -754,7 +754,7 @@ export default function OptionValidationModal({
                 color: 'var(--color-text)',
                 margin: 0
               }}>
-                옵션명매핑 설정
+                옵션상품매핑 설정
               </h2>
               <button
                 onClick={() => setShowMappingModal(false)}
@@ -777,13 +777,13 @@ export default function OptionValidationModal({
               overflow: 'hidden'
             }}>
               <iframe
-                src="/platform/orders?tab=옵션명매핑&modal=true"
+                src="/platform/orders?tab=옵션상품매핑&modal=true"
                 style={{
                   width: '100%',
                   height: '100%',
                   border: 'none'
                 }}
-                title="옵션명매핑 설정"
+                title="옵션상품매핑 설정"
               />
             </div>
           </div>

@@ -381,7 +381,7 @@ export default function RegisterOptionProductPage() {
       // 유효성 검사
       const emptyNameRows = optionRows.filter(row => !row.option_name.trim())
       if (emptyNameRows.length > 0) {
-        showToast('모든 행의 옵션명을 입력해주세요.', 'warning')
+        showToast('모든 행의 옵션상품을 입력해주세요.', 'warning')
         return
       }
 
@@ -655,7 +655,7 @@ export default function RegisterOptionProductPage() {
                   </th>
                   {/* 기본 정보 */}
                   <th className="border px-2 py-2 font-semibold min-w-[200px]">옵션코드</th>
-                  <th className="border px-2 py-2 font-semibold min-w-[120px]">옵션명*</th>
+                  <th className="border px-2 py-2 font-semibold min-w-[120px]">옵션상품*</th>
                   <th className="border px-2 py-2 font-semibold min-w-[80px]">규격1</th>
                   <th className="border px-2 py-2 font-semibold min-w-[80px]">규격2</th>
                   <th className="border px-2 py-2 font-semibold min-w-[80px]">규격3</th>

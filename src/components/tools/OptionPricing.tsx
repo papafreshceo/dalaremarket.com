@@ -149,7 +149,7 @@ export default function OptionPricing() {
   const [option2Header, setOption2Header] = useState<string>('');
   const [option3Header, setOption3Header] = useState<string>('');
 
-  // 옵션명 개수
+  // 옵션상품 개수
   const [optionCount, setOptionCount] = useState<number>(2);
 
   // 카테고리4 관련 state
@@ -275,7 +275,7 @@ export default function OptionPricing() {
       return;
     }
 
-    // 행이 1개이고 빈 행인지 확인 (옵션명이 비어있으면 빈 행으로 간주)
+    // 행이 1개이고 빈 행인지 확인 (옵션상품이 비어있으면 빈 행으로 간주)
     const isEmptyRow = options.length === 1 && !options[0].name.trim();
 
     let newOptions;
@@ -888,7 +888,7 @@ export default function OptionPricing() {
             </span>
           </div>
 
-          {/* 옵션명 개수 드롭다운 - 2번 */}
+          {/* 옵션상품 개수 드롭다운 - 2번 */}
           <div style={{
             position: 'absolute',
             top: '105px',
@@ -1024,7 +1024,7 @@ export default function OptionPricing() {
               color: '#dc3545',
               whiteSpace: 'nowrap'
             }}>
-              옵션제목 & 옵션명 입력
+              옵션제목 & 옵션상품 입력
             </span>
           </div>
 
@@ -1426,9 +1426,9 @@ export default function OptionPricing() {
                 minWidth: '110px'
               }}
             >
-              <option value={1}>옵션명 1개</option>
-              <option value={2}>옵션명 2개</option>
-              <option value={3}>옵션명 3개</option>
+              <option value={1}>옵션상품 1개</option>
+              <option value={2}>옵션상품 2개</option>
+              <option value={3}>옵션상품 3개</option>
             </select>
             {/* 판매가 불러오기 버튼 */}
             <LoadOnlyButton

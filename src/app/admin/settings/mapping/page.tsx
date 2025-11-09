@@ -148,7 +148,7 @@ export default function MappingSettingsPage() {
     recipient_phone: '수령인전화번호',
     recipient_address: '주소',
     delivery_message: '배송메세지',
-    option_name: '옵션명',
+    option_name: '옵션상품',
     quantity: '수량',
     market: '마켓',
     confirmation: '확인',
@@ -421,7 +421,12 @@ export default function MappingSettingsPage() {
 
       {/* 마켓 매핑 설정 */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">마켓 매핑 설정</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-gray-900">마켓 매핑 설정</h2>
+          <div className="text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-md border border-blue-200">
+            💡 다중 필드 지원: 쉼표로 구분하여 여러 필드명 입력 가능 (예: "옵션관리코드,판매자관리코드")
+          </div>
+        </div>
         {fieldsColumns.length > 0 && (
           <EditableAdminGrid
             columns={fieldsColumns}

@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase.from('product_mapping').select('*', { count: 'exact' });
 
-    // 옵션명 검색
+    // 옵션상품 검색
     if (optionName) {
       query = query.ilike('option_name', `%${optionName}%`);
     }
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     if (!body.option_name) {
       return NextResponse.json(
-        { success: false, error: '옵션명은 필수입니다.' },
+        { success: false, error: '옵션상품은 필수입니다.' },
         { status: 400 }
       );
     }

@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileSpreadsheet, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
-import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC } from '@/lib/date';
 import PasswordModal from './PasswordModal';
@@ -11,9 +11,9 @@ import DOMPurify from 'isomorphic-dompurify';
 
 interface UploadedOrder {
   id?: number;
-  _optionNameModified?: boolean;  // 옵션명 수정 여부
-  _optionNameInDB?: boolean;      // DB에 옵션명 존재 여부
-  _optionNameVerified?: boolean;  // 옵션명 검증 완료 여부
+  _optionNameModified?: boolean;  // 옵션상품 수정 여부
+  _optionNameInDB?: boolean;      // DB에 옵션상품 존재 여부
+  _optionNameVerified?: boolean;  // 옵션상품 검증 완료 여부
   match_status?: 'matched' | 'unmatched';
   field_1?: string;  // 마켓명
   field_2?: string;  // 연번
@@ -25,7 +25,7 @@ interface UploadedOrder {
   field_8?: string;  // 수령인전화번호
   field_9?: string;  // 주소
   field_10?: string; // 배송메세지
-  field_11?: string; // 옵션명
+  field_11?: string; // 옵션상품
   field_12?: string; // 수량
   field_13?: string; // 마켓
   field_14?: string; // 확인
@@ -256,7 +256,7 @@ export default function ExcelTab() {
                 column.isMarketColumn = true; // 마커 추가
               }
 
-              // field_11 (옵션명)에 특별 처리
+              // field_11 (옵션상품)에 특별 처리
               if (i === 11) {
                 column.renderer = (value: any, row: any, rowIndex: number, _dropdownHandler?: any) => {
                   const isModified = row?._optionNameModified;
@@ -428,10 +428,10 @@ export default function ExcelTab() {
     return mappedOrder;
   };
 
-  // 옵션명에 옵션상품 매칭 적용
+  // 옵션상품에 옵션상품 매칭 적용
   const applyProductMapping = (orders: UploadedOrder[]): UploadedOrder[] => {
     return orders.map((order) => {
-      // field_11이 옵션명
+      // field_11이 옵션상품
       const optionName = order.field_11;
 
       if (!optionName) {
@@ -703,39 +703,44 @@ export default function ExcelTab() {
         const file = files[i];
 
         try {
-          // xlsx 라이브러리의 console.error를 임시로 무시
-          const originalError = console.error;
-          console.error = (...args: any[]) => {
-            // "Bad uncompressed size" 에러만 무시
-            if (args[0]?.toString().includes('Bad uncompressed size')) {
-              return;
-            }
-            originalError(...args);
-          };
+          // 파일 타입 검증 (xlsx, xls, csv 모두 허용)
+          if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+            toast.error(`${file.name}은(는) 지원되지 않는 파일 형식입니다. (xlsx, xls, csv만 가능)`);
+            continue;
+          }
 
           const data = await file.arrayBuffer();
-          const workbook = new ExcelJS.Workbook();
-          await workbook.xlsx.load(data);
 
-          // console.error 복원
-          console.error = originalError;
-          const firstSheet = workbook.worksheets[0];
-
-          // 헤더 행 감지를 위해 먼저 읽기
-          const allData: any[][] = [];
-          firstSheet.eachRow((row) => {
-            const rowValues: any[] = [];
-            row.eachCell({ includeEmpty: true }, (cell) => {
-              rowValues.push(cell.value);
-            });
-            allData.push(rowValues);
+          // SheetJS로 파일 읽기 (XLS, XLSX, CSV 모두 지원)
+          const workbook = XLSX.read(data, {
+            type: 'array',
+            cellDates: true,
+            cellNF: false,
+            cellText: false
           });
+
+          const firstSheetName = workbook.SheetNames[0];
+          const firstSheet = workbook.Sheets[firstSheetName];
+
+          // SheetJS로 JSON 변환 (배열 형식)
+          const allData = XLSX.utils.sheet_to_json(firstSheet, {
+            header: 1,  // 배열 형식으로
+            defval: '',  // 빈 셀 기본값
+            raw: false   // 문자열로 변환
+          }) as any[][];
+
+          if (!allData || allData.length === 0) {
+            toast.error(`${file.name}에 데이터가 없습니다.`);
+            continue;
+          }
 
           // 첫 번째 데이터 행으로 템플릿 감지
           const firstDataRow = allData[0] || [];
           const headerObj: any = {};
           firstDataRow.forEach((header: any, index: number) => {
-            headerObj[header] = index;
+            if (header) {
+              headerObj[header] = index;
+            }
           });
 
           let template = detectMarketTemplate(file.name, headerObj);
@@ -748,9 +753,9 @@ export default function ExcelTab() {
             template = marketTemplates.get(marketName.toLowerCase()) || null;
           }
 
-          // 주문 건수 계산 (실제 데이터 행 개수 - 헤더와 동일한 방식으로)
+          // 주문 건수 계산 (헤더 제외)
           const headerRowIndex = (template?.header_row || 1);
-          const orderCount = firstSheet.rowCount - headerRowIndex;
+          const orderCount = allData.length - headerRowIndex;
 
           // 파일이 오늘 수정되었는지 확인
           const today = new Date();
@@ -835,8 +840,21 @@ export default function ExcelTab() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '파일 복호화에 실패했습니다.');
+        let errorMessage = '비밀번호가 올바르지 않습니다. 다시 시도해주세요.';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // JSON 파싱 실패 시 기본 메시지 사용
+        }
+
+        // 에러 발생 시 toast만 표시하고 모달 유지
+        toast.error(errorMessage, {
+          duration: 3000,
+          position: 'top-center',
+        });
+        setLoading(false);
+        return; // 모달을 닫지 않고 다시 입력 대기
       }
 
       // 복호화된 파일 받기
@@ -914,43 +932,52 @@ export default function ExcelTab() {
         const file = filePreview.file;
         const template = filePreview.detectedTemplate;
 
-        // xlsx 라이브러리의 console.error를 임시로 무시
-        const originalError = console.error;
-        console.error = (...args: any[]) => {
-          // "Bad uncompressed size" 에러만 무시
-          if (args[0]?.toString().includes('Bad uncompressed size')) {
-            return;
-          }
-          originalError(...args);
-        };
-
         const data = await file.arrayBuffer();
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(data);
 
-        // console.error 복원
-        console.error = originalError;
-        const firstSheet = workbook.worksheets[0];
+        // SheetJS로 파일 읽기 (XLS, XLSX, CSV 모두 지원)
+        const workbook = XLSX.read(data, {
+          type: 'array',
+          cellDates: true,
+          cellNF: false,
+          cellText: false
+        });
+
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
 
         let jsonData: any[];
 
         if (template) {
           // 템플릿이 있으면 헤더 행 고려
           const headerRowIndex = template.header_row || 1;
+
+          // SheetJS로 전체 데이터 읽기
+          const allData = XLSX.utils.sheet_to_json(worksheet, {
+            header: 1,
+            defval: '',
+            raw: false
+          }) as any[][];
+
+          // 실제 헤더 행 읽기 (DB에 설정된 header_row 사용)
+          const actualHeaderRowIndex = Math.max(0, headerRowIndex - 1);
+          const headers = allData[actualHeaderRowIndex] || [];
+
+          // 헤더 이후의 데이터만 처리
           jsonData = [];
-          const headers: any[] = [];
-          firstSheet.getRow(headerRowIndex).eachCell((cell) => {
-            headers.push(cell.value);
-          });
-          firstSheet.eachRow((row, rowNumber) => {
-            if (rowNumber <= headerRowIndex) return;
+          for (let i = headerRowIndex; i < allData.length; i++) {
+            const rowArray = allData[i];
             const rowData: any = {};
-            row.eachCell((cell, colNumber) => {
-              const header = headers[colNumber - 1];
-              if (header) rowData[header] = cell.value;
+
+            headers.forEach((header: any, colIndex: number) => {
+              if (header) {
+                rowData[String(header)] = rowArray[colIndex] || '';
+              }
             });
-            jsonData.push(rowData);
-          });
+
+            if (Object.keys(rowData).length > 0) {
+              jsonData.push(rowData);
+            }
+          }
 
           // 마켓별 필드 매핑 정보 가져오기
           const marketMapping = marketFieldMappings.get(template.market_name.toLowerCase());
@@ -989,20 +1016,29 @@ export default function ExcelTab() {
 
         } else {
           // 템플릿이 없으면 기존 방식 (fallback)
+          const allData = XLSX.utils.sheet_to_json(worksheet, {
+            header: 1,
+            defval: '',
+            raw: false
+          }) as any[][];
+
+          const headers = allData[0] || [];
           jsonData = [];
-          const headers: any[] = [];
-          firstSheet.getRow(1).eachCell((cell) => {
-            headers.push(cell.value);
-          });
-          firstSheet.eachRow((row, rowNumber) => {
-            if (rowNumber === 1) return;
+
+          for (let i = 1; i < allData.length; i++) {
+            const rowArray = allData[i];
             const rowData: any = {};
-            row.eachCell((cell, colNumber) => {
-              const header = headers[colNumber - 1];
-              if (header) rowData[header] = cell.value;
+
+            headers.forEach((header: any, colIndex: number) => {
+              if (header) {
+                rowData[String(header)] = rowArray[colIndex] || '';
+              }
             });
-            jsonData.push(rowData);
-          });
+
+            if (Object.keys(rowData).length > 0) {
+              jsonData.push(rowData);
+            }
+          }
 
           const marketName = filePreview.marketName;
 
@@ -1023,7 +1059,7 @@ export default function ExcelTab() {
             recipient_name: getFieldValue(row, '수취인', '수취인명', 'recipientName', '수령인', 'Recipient Name', '이름') || '',
             recipient_phone: getFieldValue(row, '전화번호', '연락처', 'phone', 'phoneNumber', '휴대폰', '핸드폰'),
             recipient_address: getFieldValue(row, '주소', 'address', '배송주소', 'deliveryAddress'),
-            option_name: getFieldValue(row, '옵션명', '상품명', 'optionName', 'productName', '옵션', '상품') || '',
+            option_name: getFieldValue(row, '옵션상품', '상품명', 'optionName', 'productName', '옵션', '상품') || '',
             quantity: parseInt(String(getFieldValue(row, '수량', 'quantity', 'qty', '개수') || '1')),
             seller_supply_price: parseFloat(String(getFieldValue(row, '셀러공급가', 'sellerSupplyPrice', '공급가') || '0')) || undefined,
           }));
@@ -1037,7 +1073,7 @@ export default function ExcelTab() {
       }
 
 
-      // 옵션명 기준으로 자동 매칭
+      // 옵션상품 기준으로 자동 매칭
       const ordersWithMapping = applyProductMapping(allOrders);
 
 
@@ -1060,9 +1096,9 @@ export default function ExcelTab() {
 
       setResultMessage({
         title: '주문 통합 완료',
-        content: `총 ${ordersWithMapping.length}개 주문\n✓ 옵션명 매칭 성공: ${matchedCount}개\n✗ 옵션명 매칭 실패: ${unmatchedCount}개\n\n${
+        content: `총 ${ordersWithMapping.length}개 주문\n✓ 옵션상품 매칭 성공: ${matchedCount}개\n✗ 옵션상품 매칭 실패: ${unmatchedCount}개\n\n${
           unmatchedCount > 0
-            ? '매칭 실패한 옵션명은 출고 정보가 자동으로 입력되지 않았습니다.'
+            ? '매칭 실패한 옵션상품은 출고 정보가 자동으로 입력되지 않았습니다.'
             : '모든 주문의 출고 정보가 자동으로 입력되었습니다!'
         }`
       });
@@ -1084,7 +1120,7 @@ export default function ExcelTab() {
     return '전화주문';
   };
 
-  // 옵션명 검증 실행
+  // 옵션상품 검증 실행
   const handleApplyProductMatching = async () => {
     if (orders.length === 0) {
       toast.error('검증할 주문 데이터가 없습니다.', {
@@ -1097,7 +1133,7 @@ export default function ExcelTab() {
     setLoading(true);
     try {
 
-      // field_11이 옵션명
+      // field_11이 옵션상품
       const ordersWithMapping = orders.map((order) => {
         const optionName = order.field_11;
 
@@ -1177,10 +1213,10 @@ export default function ExcelTab() {
 
       content += `</div>`;
 
-      // 수정된 옵션명 통계
+      // 수정된 옵션상품 통계
       if (modifiedMatched > 0 || modifiedUnmatched > 0) {
         content += `<div style="margin-bottom: 20px; padding: 15px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px;">`;
-        content += `<div style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">📝 수정된 옵션명</div>`;
+        content += `<div style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">📝 수정된 옵션상품</div>`;
         content += `<div style="display: flex; gap: 15px; margin-top: 10px;">`;
 
         if (modifiedMatched > 0) {
@@ -1203,8 +1239,8 @@ export default function ExcelTab() {
       // 안내 메시지
       content += `<div style="margin-top: 20px; padding: 15px; background: ${unmatchedCount > 0 ? '#fff3cd' : '#d4edda'}; border-radius: 8px;">`;
       if (unmatchedCount > 0) {
-        content += `<div style="color: #856404; font-weight: 500;">⚠️ 매칭 실패한 옵션명은 출고 정보가 자동으로 입력되지 않았습니다.</div>`;
-        content += `<div style="color: #856404; margin-top: 5px;">"옵션명 일괄수정" 버튼을 사용하여 수정하세요.</div>`;
+        content += `<div style="color: #856404; font-weight: 500;">⚠️ 매칭 실패한 옵션상품은 출고 정보가 자동으로 입력되지 않았습니다.</div>`;
+        content += `<div style="color: #856404; margin-top: 5px;">"옵션상품 일괄수정" 버튼을 사용하여 수정하세요.</div>`;
       } else {
         content += `<div style="color: #155724; font-weight: 500;">✅ 모든 주문의 출고 정보가 자동으로 입력되었습니다!</div>`;
       }
@@ -1213,14 +1249,14 @@ export default function ExcelTab() {
       content += `</div>`;
 
       setResultMessage({
-        title: '옵션명 검증 완료',
+        title: '옵션상품 검증 완료',
         content
       });
       setShowResultModal(true);
 
     } catch (error) {
-      console.error('옵션명 검증 오류:', error);
-      toast.error('옵션명 검증 중 오류가 발생했습니다.', {
+      console.error('옵션상품 검증 오류:', error);
+      toast.error('옵션상품 검증 중 오류가 발생했습니다.', {
         duration: 3000,
         position: 'top-center',
       });
@@ -1400,7 +1436,7 @@ export default function ExcelTab() {
     }>();
 
     ordersData.forEach(order => {
-      const optionName = order.field_11; // 옵션명
+      const optionName = order.field_11; // 옵션상품
       const quantity = parseInt(String(order.field_12 || '0'), 10); // 수량
       const market = order.field_1; // 마켓명
 
@@ -1421,7 +1457,7 @@ export default function ExcelTab() {
       }
     });
 
-    // Map을 배열로 변환하고 옵션명 기준 오름차순 정렬
+    // Map을 배열로 변환하고 옵션상품 기준 오름차순 정렬
     const statsArray = Array.from(statsMap.entries()).map(([optionName, data]) => ({
       optionName,
       quantity: data.quantity,
@@ -1438,13 +1474,13 @@ export default function ExcelTab() {
 
   // 데이터 수정 핸들러
   const handleDataChange = (updatedData: any[]) => {
-    // field_11 (옵션명)이 수정되었는지 확인
+    // field_11 (옵션상품)이 수정되었는지 확인
     const dataWithModifiedFlag = updatedData.map((row, index) => {
       const originalRow = orders[index];
 
-      // 옵션명(field_11)이 수정되었는지 확인
+      // 옵션상품(field_11)이 수정되었는지 확인
       if (originalRow && row.field_11 !== originalRow.field_11) {
-        // 수정한 옵션명이 DB에 있는지 확인
+        // 수정한 옵션상품이 DB에 있는지 확인
         const newOptionName = row.field_11;
         const isInDB = newOptionName ? optionProducts.has(newOptionName.trim().toLowerCase()) : false;
 
@@ -1519,7 +1555,7 @@ export default function ExcelTab() {
     return 1 - distance / maxLength;
   };
 
-  // 가장 유사한 옵션명 찾기
+  // 가장 유사한 옵션상품 찾기
   const findSimilarOptions = (targetOption: string, topN: number = 1): string[] => {
     if (!targetOption || optionProducts.size === 0) return [];
 
@@ -1555,7 +1591,7 @@ export default function ExcelTab() {
     });
   };
 
-  // 옵션명 일괄수정 모달 열기
+  // 옵션상품 일괄수정 모달 열기
   const handleOpenBatchEdit = () => {
     if (orders.length === 0) {
       toast.error('수정할 주문 데이터가 없습니다.', {
@@ -1565,7 +1601,7 @@ export default function ExcelTab() {
       return;
     }
 
-    // 매칭 실패한 옵션명 수집 (동일한 옵션명별로 그룹화)
+    // 매칭 실패한 옵션상품 수집 (동일한 옵션상품별로 그룹화)
     const unmatchedOptions: Record<string, number> = {};
 
     orders.forEach(order => {
@@ -1576,21 +1612,21 @@ export default function ExcelTab() {
     });
 
     if (Object.keys(unmatchedOptions).length === 0) {
-      toast.error('매칭 실패한 옵션명이 없습니다.', {
+      toast.error('매칭 실패한 옵션상품이 없습니다.', {
         duration: 3000,
         position: 'top-center',
       });
       return;
     }
 
-    // 추천 옵션명 계산
+    // 추천 옵션상품 계산
     const recommendations: Record<string, string[]> = {};
     Object.keys(unmatchedOptions).forEach(optionName => {
       recommendations[optionName] = findSimilarOptions(optionName, 1);
     });
     setRecommendedOptions(recommendations);
 
-    // batchEditData 초기화 (첫 번째 추천 옵션명을 기본값으로)
+    // batchEditData 초기화 (첫 번째 추천 옵션상품을 기본값으로)
     const initialData: Record<string, string> = {};
     Object.keys(unmatchedOptions).forEach(optionName => {
       const firstRecommendation = recommendations[optionName]?.[0] || '';
@@ -1601,13 +1637,13 @@ export default function ExcelTab() {
     setShowBatchEditModal(true);
   };
 
-  // 옵션명 일괄수정 적용
+  // 옵션상품 일괄수정 적용
   const handleApplyBatchEdit = () => {
-    // 입력된 대체 옵션명이 있는지 확인
+    // 입력된 대체 옵션상품이 있는지 확인
     const hasReplacements = Object.values(batchEditData).some(v => v.trim() !== '');
 
     if (!hasReplacements) {
-      toast.error('대체할 옵션명을 입력하세요.', {
+      toast.error('대체할 옵션상품을 입력하세요.', {
         duration: 3000,
         position: 'top-center',
       });
@@ -1617,7 +1653,7 @@ export default function ExcelTab() {
 
     let modifiedCount = 0;
 
-    // 동일한 옵션명을 가진 모든 주문에 일괄 적용
+    // 동일한 옵션상품을 가진 모든 주문에 일괄 적용
     const updatedOrders = orders.map((order, index) => {
       const currentOption = order.field_11;
 
@@ -1625,7 +1661,7 @@ export default function ExcelTab() {
         const newOptionName = batchEditData[currentOption].trim();
 
 
-        // 새 옵션명이 DB에 있는지 확인
+        // 새 옵션상품이 DB에 있는지 확인
         const product = optionProducts.get(newOptionName.toLowerCase());
 
         modifiedCount++;
@@ -1679,7 +1715,7 @@ export default function ExcelTab() {
     // 옵션별 통계 재계산
     calculateOptionStats(updatedOrders);
 
-    toast.success(`${modifiedCount}개 주문의 옵션명을 수정했습니다.`, {
+    toast.success(`${modifiedCount}개 주문의 옵션상품을 수정했습니다.`, {
       duration: 3000,
       position: 'top-center',
     });
@@ -1710,9 +1746,13 @@ export default function ExcelTab() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".xlsx,.xls"
+              accept=".xlsx,.xls,.csv"
               multiple
               onChange={handleFileSelect}
+              onClick={(e) => {
+                // 같은 파일을 다시 선택할 수 있도록 value 초기화
+                (e.target as HTMLInputElement).value = '';
+              }}
               className="hidden"
             />
           </div>
@@ -1887,10 +1927,10 @@ export default function ExcelTab() {
                   onClick={handleOpenBatchEdit}
                   disabled={loading || stats.unmatched === 0}
                   className="flex items-center gap-1 px-2.5 py-1.5 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:bg-gray-400 text-xs"
-                  title={stats.unmatched === 0 ? '매칭 실패한 옵션명이 없습니다' : ''}
+                  title={stats.unmatched === 0 ? '매칭 실패한 옵션상품이 없습니다' : ''}
                 >
                   <AlertCircle className="w-3.5 h-3.5" />
-                  옵션명 일괄수정
+                  옵션상품 일괄수정
                 </button>
                 <button
                   onClick={handleApplyProductMatching}
@@ -1898,7 +1938,7 @@ export default function ExcelTab() {
                   className="flex items-center gap-1 px-2.5 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-400 text-xs"
                 >
                   <CheckCircle className="w-3.5 h-3.5" />
-                  {loading ? '검증 중...' : '옵션명 검증'}
+                  {loading ? '검증 중...' : '옵션상품 검증'}
                 </button>
                 <button
                   onClick={handleSaveToDatabase}
@@ -1921,7 +1961,7 @@ export default function ExcelTab() {
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50">
                       <th className="px-4 py-2 text-left font-medium text-gray-700">순번</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-700">옵션명</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-700">옵션상품</th>
                       <th className="px-4 py-2 text-center font-medium text-gray-700">수량 합계</th>
                       <th className="px-4 py-2 text-center font-medium text-gray-700">주문 건수</th>
                       <th className="px-4 py-2 text-left font-medium text-gray-700">마켓</th>
@@ -1988,7 +2028,7 @@ export default function ExcelTab() {
         </div>
       )}
 
-      {/* 통합 결과 모달 (옵션명 매칭 안내) */}
+      {/* 통합 결과 모달 (옵션상품 매칭 안내) */}
       {showResultModal && (
         <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -2023,7 +2063,7 @@ export default function ExcelTab() {
                     <p className="text-orange-800 text-sm flex items-start gap-2">
                       <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                       <span>
-                        <strong>{unmatchedCount}개</strong> 주문이 옵션명 매칭되지 않았습니다.<br/>
+                        <strong>{unmatchedCount}개</strong> 주문이 옵션상품 매칭되지 않았습니다.<br/>
                         출고 정보가 자동으로 입력되지 않았습니다.
                       </span>
                     </p>
@@ -2050,9 +2090,9 @@ export default function ExcelTab() {
         );
       })()}
 
-      {/* 옵션명 일괄수정 모달 */}
+      {/* 옵션상품 일괄수정 모달 */}
       {showBatchEditModal && (() => {
-        // 매칭 실패한 옵션명별 카운트
+        // 매칭 실패한 옵션상품별 카운트
         const unmatchedOptions: Record<string, number> = {};
         orders.forEach(order => {
           if (order.match_status === 'unmatched' && order.field_11) {
@@ -2064,9 +2104,9 @@ export default function ExcelTab() {
         return (
           <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
             <div className="bg-white rounded-lg p-6 w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col" style={{ maxWidth: '770px' }}>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">옵션명 일괄수정</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">옵션상품 일괄수정</h3>
               <p className="text-sm text-gray-600 mb-4">
-                매칭 실패한 옵션명을 일괄 수정합니다. <strong className="text-orange-600">동일한 옵션명은 모두 일괄 변경됩니다.</strong>
+                매칭 실패한 옵션상품을 일괄 수정합니다. <strong className="text-orange-600">동일한 옵션상품은 모두 일괄 변경됩니다.</strong>
               </p>
 
               <div className="flex-1 overflow-y-auto mb-6 space-y-3">
@@ -2083,7 +2123,7 @@ export default function ExcelTab() {
                         <div className="text-gray-400 text-lg">→</div>
                         <input
                           type="text"
-                          placeholder="대체할 옵션명"
+                          placeholder="대체할 옵션상품"
                           value={batchEditData[optionName] || ''}
                           onChange={(e) => {
                             setBatchEditData({
@@ -2095,10 +2135,10 @@ export default function ExcelTab() {
                           className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder-red-400"
                         />
 
-                        {/* 추천 옵션명 - 같은 줄에 배치 */}
+                        {/* 추천 옵션상품 - 같은 줄에 배치 */}
                         {recommendations.length > 0 && (
                           <div className="flex items-center gap-2 flex-1">
-                            <div className="text-xs text-gray-500">추천 옵션명</div>
+                            <div className="text-xs text-gray-500">추천 옵션상품</div>
                             {recommendations.map((recommendation, idx) => (
                               <button
                                 key={idx}
@@ -2120,7 +2160,7 @@ export default function ExcelTab() {
                         {/* 추천 옵션이 없는 경우 */}
                         {recommendations.length === 0 && (
                           <div className="flex-1">
-                            <div className="text-xs text-gray-400 italic">유사한 옵션명이 없습니다</div>
+                            <div className="text-xs text-gray-400 italic">유사한 옵션상품이 없습니다</div>
                           </div>
                         )}
                       </div>

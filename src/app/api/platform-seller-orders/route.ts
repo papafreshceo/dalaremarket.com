@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '유효한 주문 데이터가 없습니다.' }, { status: 400 });
     }
 
-    // 옵션명 매핑 적용
+    // 옵션상품 매핑 적용
     const { data: mappings } = await supabase
       .from('option_name_mappings')
       .select('*')
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     // platform_seller_orders 테이블에 삽입할 데이터 준비
     const insertData = orders.map((order: any) => {
-      // 옵션명 매핑 적용
+      // 옵션상품 매핑 적용
       let optionName = order.optionName;
       if (optionName && mappingMap.has(optionName)) {
         optionName = mappingMap.get(optionName);

@@ -20,12 +20,13 @@ import { LocalThemeToggle } from './components/LocalThemeToggle';
 import PWAInstallBanner from './components/PWAInstallBanner';
 import TierBadge from '@/components/TierBadge';
 import LoadingScreen from '@/components/LoadingScreen';
-import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 import { validateRequiredColumns } from './utils/validation';
 import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC } from '@/lib/date';
 import { applyOptionMapping } from './utils/applyOptionMapping';
 import { showStatusToast } from './utils/statusToast';
+import PasswordModal from './modals/PasswordModal';
 
 function OrdersPageContent() {
   const searchParams = useSearchParams();
@@ -71,6 +72,11 @@ function OrdersPageContent() {
   const [showMappingResultModal, setShowMappingResultModal] = useState<boolean>(false);
   const [mappingResults, setMappingResults] = useState<any[]>([]);
   const [mappingStats, setMappingStats] = useState({ total: 0, mapped: 0 });
+
+  // 비밀번호 모달 상태
+  const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
+  const [currentPasswordFile, setCurrentPasswordFile] = useState<File | null>(null);
+  const [filePassword, setFilePassword] = useState<string>('');
 
   // 로컬 다크모드 상태 (발주관리 페이지 전용, 사용자별 DB 저장)
   const [localTheme, setLocalTheme] = useState<'light' | 'dark'>('light');
@@ -508,7 +514,7 @@ function OrdersPageContent() {
       return;
     }
 
-    if (tabParam && ['대시보드', '발주서등록', '건별등록', '정산관리', '옵션명매핑', '판매자정보', '지갑'].includes(tabParam)) {
+    if (tabParam && ['대시보드', '발주서등록', '건별등록', '정산관리', '옵션상품매핑', '판매자정보', '지갑'].includes(tabParam)) {
       setActiveTab(tabParam as Tab);
       localStorage.setItem('ordersActiveTab', tabParam);
     } else {
@@ -623,33 +629,77 @@ function OrdersPageContent() {
     }
   };
 
+  // 발주서 양식 다운로드
+  const handleDownloadTemplate = () => {
+    const link = document.createElement('a');
+    link.href = '/templates/발주서_양식.xlsx';
+    link.download = '달래마켓_발주서양식.xlsx';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleFiles = async (files: FileList) => {
     const file = files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const data = e.target?.result;
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(data as ArrayBuffer);
-        const worksheet = workbook.worksheets[0];
-        const jsonData: any[] = [];
+    // 파일 타입 검증 (xlsx, xls, csv 모두 허용)
+    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      toast.error(`${file.name}은(는) 지원되지 않는 파일 형식입니다. (xlsx, xls, csv만 가능)`, {
+        position: 'top-center',
+        duration: 3000
+      });
+      return;
+    }
 
-        worksheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) return; // Skip header row
-          const rowData: any = {};
-          const headers = worksheet.getRow(1).values as any[];
-          row.eachCell((cell, colNumber) => {
-            const header = headers[colNumber];
-            if (header) {
-              rowData[header] = cell.value;
-            }
-          });
-          if (Object.keys(rowData).length > 0) {
-            jsonData.push(rowData);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+
+      // SheetJS로 파일 읽기 (XLS, XLSX, CSV 모두 지원)
+      const workbook = XLSX.read(arrayBuffer, {
+        type: 'array',
+        cellDates: true,
+        cellNF: false,
+        cellText: false
+      });
+
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+
+      // SheetJS로 JSON 변환 (배열 형식)
+      const allData = XLSX.utils.sheet_to_json(worksheet, {
+        header: 1,  // 배열 형식으로
+        defval: '',  // 빈 셀 기본값
+        raw: false   // 문자열로 변환
+      }) as any[][];
+
+      if (!allData || allData.length === 0) {
+        toast.error('파일에 데이터가 없습니다.', {
+          position: 'top-center',
+          duration: 3000
+        });
+        return;
+      }
+
+      // 첫 번째 행을 헤더로 사용
+      const headers = allData[0] || [];
+      const jsonData: any[] = [];
+
+      // 헤더 이후의 데이터만 처리
+      for (let i = 1; i < allData.length; i++) {
+        const rowArray = allData[i];
+        const rowData: any = {};
+
+        headers.forEach((header: any, colIndex: number) => {
+          if (header) {
+            rowData[String(header)] = rowArray[colIndex] || '';
           }
         });
+
+        if (Object.keys(rowData).length > 0) {
+          jsonData.push(rowData);
+        }
+      }
 
 
         // 필수 칼럼 검증
@@ -676,8 +726,8 @@ function OrdersPageContent() {
         // UTC 시간 생성
         const utcTime = getCurrentTimeUTC();
 
-        // 옵션명 검증용으로만 option_products 조회 (저장 시에는 서버에서 자동 처리)
-        const uniqueOptionNames = [...new Set(jsonData.map((row: any) => String(row['옵션명'] || '')).filter(Boolean))];
+        // 옵션상품 검증용으로만 option_products 조회 (저장 시에는 서버에서 자동 처리)
+        const uniqueOptionNames = [...new Set(jsonData.map((row: any) => String(row['옵션상품'] || '')).filter(Boolean))];
 
         let optionProducts: any[] = [];
         if (uniqueOptionNames.length > 0) {
@@ -691,7 +741,7 @@ function OrdersPageContent() {
           }
         }
 
-        // 검증용 Map 생성 (옵션명 검증 모달에서 사용)
+        // 검증용 Map 생성 (옵션상품 검증 모달에서 사용)
         const productMap = new Map<string, any>();
         optionProducts.forEach((product: any) => {
           if (product.option_name) {
@@ -711,7 +761,7 @@ function OrdersPageContent() {
           recipientPhone: String(row['수령인전화번호'] || ''),
           address: String(row['주소'] || ''),
           deliveryMessage: String(row['배송메세지'] || ''),
-          optionName: String(row['옵션명'] || ''),
+          optionName: String(row['옵션상품'] || ''),
           optionCode: String(row['옵션코드'] || ''),
           quantity: String(row['수량'] || '1'),
           specialRequest: String(row['특이/요청사항'] || ''),
@@ -726,13 +776,13 @@ function OrdersPageContent() {
           }
         }));
 
-        // 1단계: 옵션명 매핑 적용
+        // 1단계: 옵션상품 매핑 적용
         const { orders: mappedOrders, mappingResults: results, totalOrders, mappedOrders: mappedCount } =
           await applyOptionMapping(ordersForValidation, user.id);
 
         ordersForValidation = mappedOrders;
 
-        // 매핑 후 변환된 옵션명도 검증용으로 조회
+        // 매핑 후 변환된 옵션상품도 검증용으로 조회
         if (results.length > 0) {
           const mappedOptionNames = [...new Set(ordersForValidation.map(order => String(order.optionName || '')).filter(Boolean))];
 
@@ -773,15 +823,87 @@ function OrdersPageContent() {
           setShowOptionValidationModal(true);
         }
 
-      } catch (error) {
-        console.error('엑셀 파일 읽기 오류:', error);
-        toast.error('엑셀 파일을 읽는 중 오류가 발생했습니다. 양식을 확인해주세요.', {
-          position: 'top-center',
-          duration: 3000
-        });
+    } catch (error: any) {
+      // 암호화된 파일 감지
+      if (
+        error.message && (
+          error.message.includes('password') ||
+          error.message.includes('encrypted') ||
+          error.message.includes('Unsupported') ||
+          error.message.includes('CFB') ||
+          error.message.toLowerCase().includes('encryption')
+        )
+      ) {
+        // 암호화된 파일 설정
+        setCurrentPasswordFile(file);
+        setShowPasswordModal(true);
+        return;
       }
-    };
-    reader.readAsArrayBuffer(file);
+
+      console.error('엑셀 파일 읽기 오류:', error);
+      toast.error('엑셀 파일을 읽는 중 오류가 발생했습니다. 양식을 확인해주세요.', {
+        position: 'top-center',
+        duration: 3000
+      });
+    }
+  };
+
+  // 비밀번호 제출 핸들러
+  const handlePasswordSubmit = async (password: string) => {
+    if (!currentPasswordFile) return;
+
+    try {
+      // FormData 생성
+      const formData = new FormData();
+      formData.append('file', currentPasswordFile);
+      formData.append('password', password);
+
+      // 서버에 복호화 요청
+      const response = await fetch('/api/decrypt-excel', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        let errorMessage = '비밀번호가 올바르지 않습니다. 다시 시도해주세요.';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // JSON 파싱 실패 시 기본 메시지 사용
+        }
+
+        toast.error(errorMessage, {
+          duration: 3000,
+          position: 'top-center',
+        });
+        return; // 모달을 닫지 않고 다시 입력 대기
+      }
+
+      // 복호화된 파일 받기
+      const decryptedBuffer = await response.arrayBuffer();
+
+      // 복호화된 파일을 새 File 객체로 생성
+      const decryptedFile = new File([decryptedBuffer], currentPasswordFile.name, {
+        type: currentPasswordFile.type,
+        lastModified: currentPasswordFile.lastModified,
+      });
+
+      // 모달 닫기
+      setShowPasswordModal(false);
+      setCurrentPasswordFile(null);
+
+      // 복호화된 파일로 다시 처리
+      const fileList = new DataTransfer();
+      fileList.items.add(decryptedFile);
+      await handleFiles(fileList.files);
+    } catch (error: any) {
+      console.error('복호화 처리 오류:', error);
+      toast.error('파일 처리 중 오류가 발생했습니다.', {
+        duration: 3000,
+        position: 'top-center',
+      });
+    }
   };
 
   const handleSaveValidatedOrders = async (validatedOrders: any[]) => {
@@ -1535,9 +1657,9 @@ function OrdersPageContent() {
             정산관리
           </button>
 
-          {/* 옵션명매핑 탭 */}
+          {/* 옵션상품매핑 탭 */}
           <button
-            onClick={() => handleTabChange('옵션명매핑')}
+            onClick={() => handleTabChange('옵션상품매핑')}
             style={{
               width: '100%',
               display: 'flex',
@@ -1545,23 +1667,23 @@ function OrdersPageContent() {
               gap: '12px',
               padding: isMobile ? '10px 8px' : '10px 16px',
               margin: isMobile ? '4px 6px' : '2px 8px',
-              background: activeTab === '옵션명매핑' ? 'var(--color-surface-hover)' : 'transparent',
+              background: activeTab === '옵션상품매핑' ? 'var(--color-surface-hover)' : 'transparent',
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
               fontSize: isMobile ? '12px' : '14px',
-              fontWeight: activeTab === '옵션명매핑' ? '600' : '400',
+              fontWeight: activeTab === '옵션상품매핑' ? '600' : '400',
               color: 'var(--color-text)',
               textAlign: 'left',
               transition: 'background 0.2s'
             }}
             onMouseEnter={(e) => {
-              if (activeTab !== '옵션명매핑') {
+              if (activeTab !== '옵션상품매핑') {
                 e.currentTarget.style.background = 'var(--color-surface-hover)';
               }
             }}
             onMouseLeave={(e) => {
-              if (activeTab !== '옵션명매핑') {
+              if (activeTab !== '옵션상품매핑') {
                 e.currentTarget.style.background = 'transparent';
               }
             }}
@@ -1572,7 +1694,7 @@ function OrdersPageContent() {
               <line x1="9" y1="15" x2="15" y2="15"></line>
               <line x1="12" y1="12" x2="12" y2="18"></line>
             </svg>
-            옵션명매핑
+            옵션상품매핑
           </button>
 
           {/* 판매자정보 탭 */}
@@ -1729,7 +1851,7 @@ function OrdersPageContent() {
             />
           </div>
         )}
-        {activeTab === '옵션명매핑' && (
+        {activeTab === '옵션상품매핑' && (
           <div style={{
             maxWidth: '1440px',
             margin: '0 auto'
@@ -1769,6 +1891,7 @@ function OrdersPageContent() {
           show={showValidationModal}
           onClose={() => setShowValidationModal(false)}
           errors={validationErrors}
+          onDownloadTemplate={handleDownloadTemplate}
         />
 
         <MappingResultModal
@@ -1805,6 +1928,17 @@ function OrdersPageContent() {
           orders={uploadedOrders}
           onSave={handleSaveValidatedOrders}
           optionProducts={optionProductsMap}
+        />
+
+        {/* 비밀번호 입력 모달 */}
+        <PasswordModal
+          show={showPasswordModal}
+          fileName={currentPasswordFile?.name || ''}
+          onSubmit={handlePasswordSubmit}
+          onCancel={() => {
+            setShowPasswordModal(false);
+            setCurrentPasswordFile(null);
+          }}
         />
       </div>
     </div>

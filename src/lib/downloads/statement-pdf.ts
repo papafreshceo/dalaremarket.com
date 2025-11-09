@@ -73,7 +73,7 @@ async function aggregateOrdersByOption(orders: Order[]): Promise<StatementItem[]
     const supabase = createClient();
     const optionNames = Array.from(optionStats.keys());
 
-    // 옵션명이 있을 때만 쿼리 실행
+    // 옵션상품이 있을 때만 쿼리 실행
     if (optionNames.length > 0) {
       // 타임아웃을 위한 Promise.race 사용 (5초)
       const queryPromise = supabase
@@ -97,7 +97,7 @@ async function aggregateOrdersByOption(orders: Order[]): Promise<StatementItem[]
       }
     }
   } catch (error) {
-    // 타임아웃이나 에러 발생 시 기본값(옵션명) 사용
+    // 타임아웃이나 에러 발생 시 기본값(옵션상품) 사용
   }
 
   // 거래명세서 품목 형식으로 변환
@@ -187,7 +187,7 @@ export async function downloadMonthlyStatementPDF(
       return;
     }
 
-    // 옵션명별로 집계
+    // 옵션상품별로 집계
     const items = await aggregateOrdersByOption(targetOrders);
 
     // API 호출
@@ -288,7 +288,7 @@ export async function downloadPeriodStatementPDF(
       return;
     }
 
-    // 옵션명별로 집계
+    // 옵션상품별로 집계
     const items = await aggregateOrdersByOption(shippedOrders);
 
     // API 호출

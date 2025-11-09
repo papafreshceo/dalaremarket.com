@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       console.error('DB 조회 오류:', error);
     }
 
-    // 출하중인 원물 (원물 + 옵션명)
+    // 출하중인 원물 (원물 + 옵션상품)
     const availableProducts = rawMaterials?.filter(p => p.supply_status === '출하중') || [];
     const productList = availableProducts.length > 0
       ? availableProducts.map(p => {

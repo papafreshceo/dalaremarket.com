@@ -108,8 +108,12 @@ export default function UploadModal({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xlsx,.xls"
+            accept=".xlsx,.xls,.csv"
             onChange={(e) => e.target.files && handleFiles(e.target.files)}
+            onClick={(e) => {
+              // 같은 파일을 다시 선택할 수 있도록 value 초기화
+              (e.target as HTMLInputElement).value = '';
+            }}
             style={{ display: 'none' }}
           />
           <button
@@ -132,7 +136,7 @@ export default function UploadModal({
             color: 'var(--color-text-secondary)',
             marginTop: '20px'
           }}>
-            * .xlsx, .xls 파일만 업로드 가능합니다
+            * .xlsx, .xls, .csv 파일 업로드 가능합니다
           </p>
         </div>
       </div>

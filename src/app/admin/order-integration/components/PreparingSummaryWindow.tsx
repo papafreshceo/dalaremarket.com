@@ -49,7 +49,7 @@ export default function PreparingSummaryWindow({ startDate, endDate }: Preparing
       const result = await res.json();
 
       if (result.success) {
-        // 옵션명 기준 가나다순 정렬
+        // 옵션상품 기준 가나다순 정렬
         const sortedOrders = (result.data?.orders || []).sort((a, b) =>
           a.option_name.localeCompare(b.option_name, 'ko-KR')
         );
@@ -143,7 +143,7 @@ export default function PreparingSummaryWindow({ startDate, endDate }: Preparing
                   <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                     <tr>
                       <th className="px-2 py-2 text-left text-sm font-medium text-gray-500">번호</th>
-                      <th className="px-2 py-2 text-left text-sm font-medium text-gray-500">옵션명</th>
+                      <th className="px-2 py-2 text-left text-sm font-medium text-gray-500">옵션상품</th>
                       <th className="px-2 py-2 text-left text-sm font-medium text-gray-500">벤더</th>
                       <th className="px-2 py-2 text-right text-sm font-medium text-gray-500">건수</th>
                       <th className="px-2 py-2 text-right text-sm font-medium text-gray-500">수량</th>

@@ -35,7 +35,7 @@ export default function OptionStatsTable({ optionStats }: OptionStatsTableProps)
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-gray-50">
-              <th rowSpan={2} style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'left', fontWeight: 500, color: '#4B5563', verticalAlign: 'middle', borderRight: '1px solid #E5E7EB' }}>옵션명</th>
+              <th rowSpan={2} style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'left', fontWeight: 500, color: '#4B5563', verticalAlign: 'middle', borderRight: '1px solid #E5E7EB' }}>옵션상품</th>
               <th colSpan={2} style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#9333EA', borderRight: '1px solid #E5E7EB' }}>접수</th>
               <th colSpan={2} style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#2563EB', borderRight: '1px solid #E5E7EB' }}>결제완료</th>
               <th colSpan={2} style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center', fontWeight: 500, color: '#CA8A04', borderRight: '1px solid #E5E7EB' }}>상품준비중</th>

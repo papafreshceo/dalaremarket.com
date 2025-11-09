@@ -53,7 +53,7 @@ export default function ProductGrid({ products, onProductClick, onShowPriceChart
                 품목
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                옵션명
+                옵션상품
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 규격1

@@ -115,13 +115,24 @@ export default function ToolModal({ isOpen, onClose, toolId, toolName, onOpenSim
             userSelect: 'none'
           }}
         >
-          <h2 style={{
-            fontSize: '24px',
-            fontWeight: '600',
-            margin: 0
-          }}>
-            {toolName || '업무도구'}
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '600',
+              margin: 0
+            }}>
+              {toolName || '업무도구'}
+            </h2>
+            {toolId === 'order-integration' && (
+              <p style={{
+                fontSize: '14px',
+                color: '#6c757d',
+                margin: 0
+              }}>
+                여러 마켓의 주문 파일을 업로드하고 하나로 통합하세요
+              </p>
+            )}
+          </div>
 
           <button
             onClick={onClose}

@@ -872,7 +872,7 @@ export default function OrderPlatformPage() {
       if (endDate && koreaDateStr > endDate) return false;
     }
 
-    // 검색어 필터 (주문번호, 옵션명, 셀러명)
+    // 검색어 필터 (주문번호, 옵션상품, 셀러명)
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       const sellerName = sellerNames.get(sellerId)?.toLowerCase() || '';
@@ -1198,7 +1198,7 @@ export default function OrderPlatformPage() {
               <Search className="w-4 h-4 text-gray-500" />
               <input
                 type="text"
-                placeholder="셀러명, 주문번호, 옵션명 검색..."
+                placeholder="셀러명, 주문번호, 옵션상품 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -1442,7 +1442,7 @@ export default function OrderPlatformPage() {
                         <tr className="text-gray-600">
                           <th className="px-4 py-2 text-center font-medium">주문번호</th>
                           <th className="px-4 py-2 text-center font-medium">벤더사</th>
-                          <th className="px-4 py-2 text-center font-medium">옵션명</th>
+                          <th className="px-4 py-2 text-center font-medium">옵션상품</th>
                           <th className="px-4 py-2 text-center font-medium">수량</th>
                           <th className="px-4 py-2 text-center font-medium">금액</th>
                           <th className="px-4 py-2 text-center font-medium">상태</th>

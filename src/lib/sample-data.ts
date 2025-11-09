@@ -8,7 +8,7 @@
 
 interface OptionProduct {
   id: string;
-  option_name: string; // 옵션명
+  option_name: string; // 옵션상품
   seller_supply_price?: number | null; // 공급단가
 }
 

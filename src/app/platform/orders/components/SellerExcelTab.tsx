@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileSpreadsheet, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
-import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { getCurrentTimeUTC } from '@/lib/date';
 import { showStatusToast, showErrorToast } from '../utils/statusToast';
@@ -26,7 +26,7 @@ interface SellerUploadedOrder {
   recipientPhone?: string;    // 수령인전화번호
   address?: string;           // 주소
   deliveryMessage?: string;   // 배송메세지
-  optionName?: string;        // 옵션명
+  optionName?: string;        // 옵션상품
   quantity?: number;          // 수량
   unitPrice?: number;         // 공급단가
   specialRequest?: string;    // 특이/요청사항
@@ -74,12 +74,12 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
   const [dragActive, setDragActive] = useState(false);
   const [marketFieldMappings, setMarketFieldMappings] = useState<Map<string, any>>(new Map());
 
-  // 옵션명 매핑 결과 모달 상태
+  // 옵션상품 매핑 결과 모달 상태
   const [showMappingResultModal, setShowMappingResultModal] = useState(false);
   const [mappingResults, setMappingResults] = useState<any[]>([]);
   const [mappingStats, setMappingStats] = useState({ total: 0, mapped: 0 });
 
-  // 옵션명 검증 모달 상태
+  // 옵션상품 검증 모달 상태
   const [showOptionValidationModal, setShowOptionValidationModal] = useState(false);
   const [optionProducts, setOptionProducts] = useState<Map<string, any>>(new Map());
   const [hasUnmatchedOptions, setHasUnmatchedOptions] = useState(false);
@@ -151,38 +151,60 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
         const file = files[i];
 
         try {
+          // 중복 파일 검증 (파일명 기준)
+          const isDuplicate = uploadedFiles.some(uploaded => uploaded.file.name === file.name);
+          if (isDuplicate) {
+            toast.error(`${file.name}은(는) 이미 추가된 파일입니다.`);
+            continue;
+          }
+
+          // 파일 타입 검증 (xlsx, xls, csv 모두 허용)
+          if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+            toast.error(`${file.name}은(는) 지원되지 않는 파일 형식입니다. (xlsx, xls, csv만 가능)`);
+            continue;
+          }
+
           const data = await file.arrayBuffer();
 
-          // 파일 읽기 (복호화된 파일이므로 비밀번호 불필요)
-          const workbook = new ExcelJS.Workbook();
-          await workbook.xlsx.load(data);
-
-          const firstSheet = workbook.worksheets[0];
-
-          // 헤더 행 감지
-          const firstDataRow: any[] = [];
-          const headerRow = firstSheet.getRow(1);
-          headerRow.eachCell((cell, colNumber) => {
-            firstDataRow[colNumber - 1] = cell.value;
+          // SheetJS로 파일 읽기 (XLS, XLSX, CSV 모두 지원)
+          const workbook = XLSX.read(data, {
+            type: 'array',
+            cellDates: true,
+            cellNF: false,
+            cellText: false
           });
 
+          const firstSheetName = workbook.SheetNames[0];
+          const firstSheet = workbook.Sheets[firstSheetName];
+
+          // SheetJS로 JSON 변환 (헤더 포함)
+          const jsonData = XLSX.utils.sheet_to_json(firstSheet, {
+            header: 1,  // 배열 형식으로 (헤더를 숫자 인덱스로)
+            defval: '',  // 빈 셀 기본값
+            raw: false   // 문자열로 변환
+          });
+
+          if (!jsonData || jsonData.length === 0) {
+            toast.error(`${file.name}에 데이터가 없습니다.`);
+            continue;
+          }
+
+          // 첫 번째 행을 헤더로 사용
+          const firstDataRow = jsonData[0] as any[];
           const headerObj: any = {};
           firstDataRow.forEach((header: any, index: number) => {
-            headerObj[header] = index;
+            if (header) {
+              headerObj[header] = index;
+            }
           });
 
           // 마켓 감지
           const template = detectMarketTemplate(file.name, headerObj, templates);
           const marketName = template?.market_name || '알 수 없음';
 
-          // 주문 건수 계산
+          // 주문 건수 계산 (헤더 제외)
           const headerRowIndex = (template?.header_row || 1);
-          let orderCount = 0;
-          firstSheet.eachRow((row, rowNumber) => {
-            if (rowNumber > headerRowIndex) {
-              orderCount++;
-            }
-          });
+          const orderCount = jsonData.length - headerRowIndex;
 
           // 파일이 오늘 수정되었는지 확인
           const today = new Date();
@@ -227,7 +249,8 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
         }
       }
 
-      setUploadedFiles(filePreviews);
+      // 기존 파일에 새 파일 추가 (교체가 아닌 추가)
+      setUploadedFiles(prev => [...prev, ...filePreviews]);
       setIntegrationStage('file-preview');
     } catch (error) {
       console.error('파일 읽기 실패:', error);
@@ -256,8 +279,21 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '파일 복호화에 실패했습니다.');
+        let errorMessage = '비밀번호가 올바르지 않습니다. 다시 시도해주세요.';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // JSON 파싱 실패 시 기본 메시지 사용
+        }
+
+        // 에러 발생 시 toast만 표시하고 모달 유지
+        toast.error(errorMessage, {
+          duration: 3000,
+          position: 'top-center',
+        });
+        setIsProcessing(false);
+        return; // 모달을 닫지 않고 다시 입력 대기
       }
 
       // 복호화된 파일 받기
@@ -306,8 +342,9 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       // 모든 파일 다시 처리
       await handleFileSelect(fileList.files);
     } catch (error: any) {
-      console.error('복호화 오류:', error);
-      toast.error(error.message || '비밀번호가 올바르지 않습니다.', {
+      // 예상치 못한 에러만 여기서 처리
+      console.error('복호화 처리 오류:', error);
+      toast.error('파일 처리 중 오류가 발생했습니다.', {
         duration: 3000,
         position: 'top-center',
       });
@@ -352,19 +389,18 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       for (const filePreview of uploadedFiles) {
         const arrayBuffer = await filePreview.file.arrayBuffer();
 
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(arrayBuffer);
-        const sheetName = workbook.worksheets[0].name;
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
 
         const orders = await processSheetAndReturnOrders(workbook, sheetName, filePreview.file.name);
         allOrders.push(...orders);
       }
 
-      // 1. 옵션명 매핑 먼저 적용
+      // 1. 옵션상품 매핑 먼저 적용
       const { orders: mappedOrders, mappingResults, totalOrders, mappedOrders: mappedCount } =
         await applyOptionMapping(allOrders, userId);
 
-      console.log('✅ 옵션명 매핑 완료:', {
+      console.log('✅ 옵션상품 매핑 완료:', {
         totalOrders,
         mappedOrders: mappedCount,
         mappingResults
@@ -373,7 +409,7 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       // 2. 옵션 상품 데이터 로드 (매핑 후 검증용)
       const productMap = await loadOptionProducts();
 
-      // 3. 매핑 후에도 매칭되지 않는 옵션명 찾기
+      // 3. 매핑 후에도 매칭되지 않는 옵션상품 찾기
       const unmatchedOrders = mappedOrders.filter(order => {
         const optionName = order.optionName || '';
         const trimmedOption = optionName.trim().toLowerCase();
@@ -392,17 +428,17 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
 
       const hasUnmatched = unmatchedOrders.length > 0;
 
-      // 6. 매칭 안된 옵션명 정보 저장
+      // 6. 매칭 안된 옵션상품 정보 저장
       setHasUnmatchedOptions(hasUnmatched);
 
       // 7. 매핑 결과가 있으면 먼저 매핑 결과 모달 표시
       if (mappingResults.length > 0) {
         setShowMappingResultModal(true);
       } else if (hasUnmatched) {
-        // 매핑 결과는 없지만 매칭 안된 옵션명이 있으면 바로 검증 모달 표시
+        // 매핑 결과는 없지만 매칭 안된 옵션상품이 있으면 바로 검증 모달 표시
         setShowOptionValidationModal(true);
       } else {
-        // 매핑 결과도 없고 모든 옵션명이 매칭되었으면 바로 통합 완료
+        // 매핑 결과도 없고 모든 옵션상품이 매칭되었으면 바로 통합 완료
         showStatusToast('registered', `${uploadedFiles.length}개 파일 ${mappedOrders.length}건 통합 완료`);
       }
     } catch (error) {
@@ -467,8 +503,8 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
   };
 
   // 시트 처리하고 주문 데이터 반환
-  const processSheetAndReturnOrders = async (workbook: ExcelJS.Workbook, sheetName: string, fileName: string = 'unknown'): Promise<SellerUploadedOrder[]> => {
-    const worksheet = workbook.worksheets[0];
+  const processSheetAndReturnOrders = async (workbook: XLSX.WorkBook, sheetName: string, fileName: string = 'unknown'): Promise<SellerUploadedOrder[]> => {
+    const worksheet = workbook.Sheets[sheetName];
 
     // 마켓 템플릿과 필드 매핑 병렬 로드
     const [templates, mappings] = await Promise.all([
@@ -476,16 +512,24 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       fetchMarketFieldMappings()
     ]);
 
-    // 첫 번째 행을 헤더로 읽기 (마켓 감지용)
-    const firstDataRow: any[] = [];
-    const headerRow = worksheet.getRow(1);
-    headerRow.eachCell((cell, colNumber) => {
-      firstDataRow[colNumber - 1] = cell.value;
-    });
+    // SheetJS로 JSON 변환
+    const allData = XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+      defval: '',
+      raw: false
+    }) as any[][];
 
+    if (!allData || allData.length === 0) {
+      return [];
+    }
+
+    // 첫 번째 행으로 일단 마켓 감지 (파일명으로 주로 감지됨)
+    const firstDataRow = allData[0];
     const headerObj: any = {};
     firstDataRow.forEach((header: any, index: number) => {
-      headerObj[header] = index;
+      if (header) {
+        headerObj[header] = index;
+      }
     });
 
     // 마켓 감지
@@ -496,31 +540,36 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       return [];
     }
 
-
     // 해당 마켓의 필드 매핑 가져오기
     const marketMapping = mappings.get(detected.market_name.toLowerCase());
+
     if (!marketMapping) {
       return [];
     }
 
-
-    // 헤더 행 기준으로 데이터 읽기
+    // 실제 헤더 행 읽기 (DB에 설정된 header_row 사용)
     const headerRowIndex = (detected.header_row || 1);
+    const actualHeaderRowIndex = Math.max(0, headerRowIndex - 1);
+    const actualHeaderRow = allData[actualHeaderRowIndex];
+
     const jsonData: any[] = [];
 
-    worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber <= headerRowIndex) return; // Skip header row
+    // 헤더 이후의 데이터만 처리
+    for (let i = headerRowIndex; i < allData.length; i++) {
+      const rowArray = allData[i];
       const rowData: any = {};
-      row.eachCell((cell, colNumber) => {
-        const header = worksheet.getRow(headerRowIndex).getCell(colNumber).value;
+
+      // actualHeaderRow 사용 (DB 설정된 헤더 행)
+      actualHeaderRow.forEach((header: any, colIndex: number) => {
         if (header) {
-          rowData[String(header)] = cell.value;
+          rowData[String(header)] = rowArray[colIndex] || '';
         }
       });
+
       if (Object.keys(rowData).length > 0) {
         jsonData.push(rowData);
       }
-    });
+    }
 
 
     if (jsonData.length === 0) {
@@ -540,7 +589,7 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
         recipientPhone: row[marketMapping.field_8] || '', // field_8 = 수령인전화번호
         address: row[marketMapping.field_9] || '',      // field_9 = 주소
         deliveryMessage: row[marketMapping.field_10] || '', // field_10 = 배송메시지
-        optionName: row[marketMapping.field_11] || '',  // field_11 = 옵션명
+        optionName: row[marketMapping.field_11] || '',  // field_11 = 옵션상품
         quantity: Number(row[marketMapping.field_12] || 1), // field_12 = 수량
       };
     });
@@ -656,12 +705,26 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
     { key: 'recipientPhone', title: '수령인전화번호', readOnly: false, align: 'center' as const },
     { key: 'address', title: '주소', readOnly: false, align: 'left' as const },
     { key: 'deliveryMessage', title: '배송메세지', readOnly: false, align: 'left' as const },
-    { key: 'optionName', title: '옵션명', readOnly: false, align: 'left' as const },
+    { key: 'optionName', title: '옵션상품', readOnly: false, align: 'left' as const },
     { key: 'quantity', title: '수량', type: 'number' as const, readOnly: false, align: 'center' as const }
   ];
 
   return (
     <div style={{ padding: '24px' }}>
+      {/* 숨겨진 파일 input (항상 렌더링) */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        multiple
+        onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
+        onClick={(e) => {
+          // 같은 파일을 다시 선택할 수 있도록 value 초기화
+          (e.target as HTMLInputElement).value = '';
+        }}
+        style={{ display: 'none' }}
+      />
+
       {/* 파일 업로드 영역 */}
       {integrationStage === 'idle' && (
         <div
@@ -688,14 +751,6 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
           <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
             클릭하거나 파일을 드래그하여 업로드하세요 (다중 선택 가능)
           </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            multiple
-            onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
-            style={{ display: 'none' }}
-          />
         </div>
       )}
 
@@ -720,6 +775,21 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
               업로드된 파일 ({uploadedFiles.length}개)
             </h3>
             <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  padding: '8px 16px',
+                  background: 'transparent',
+                  border: '1px solid #2563eb',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  color: '#2563eb',
+                  cursor: 'pointer',
+                  fontWeight: '500'
+                }}
+              >
+                + 파일 추가
+              </button>
               <button
                 onClick={() => {
                   setUploadedFiles([]);
@@ -916,7 +986,7 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
         </>
       )}
 
-      {/* 옵션명 검증 모달 */}
+      {/* 옵션상품 검증 모달 */}
       <OptionValidationModal
         show={showOptionValidationModal}
         onClose={() => {
@@ -995,7 +1065,7 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
         optionProducts={optionProducts}
       />
 
-      {/* 옵션명 매핑 결과 모달 */}
+      {/* 옵션상품 매핑 결과 모달 */}
       <MappingResultModal
         show={showMappingResultModal}
         onClose={() => {
@@ -1007,11 +1077,11 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
         onContinue={() => {
           setShowMappingResultModal(false);
 
-          // 매칭 안된 옵션명이 있으면 옵션명 검증 모달 표시
+          // 매칭 안된 옵션상품이 있으면 옵션상품 검증 모달 표시
           if (hasUnmatchedOptions) {
             setShowOptionValidationModal(true);
           } else {
-            // 모든 옵션명이 매칭되었으면 통합 완료
+            // 모든 옵션상품이 매칭되었으면 통합 완료
             showStatusToast('registered', `${uploadedFiles.length}개 파일 ${uploadedOrders.length}건 통합 완료`);
             setHasUnmatchedOptions(false);
           }

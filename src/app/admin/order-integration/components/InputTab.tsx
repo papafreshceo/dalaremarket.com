@@ -110,7 +110,7 @@ export default function InputTab() {
   // 옵션 상품 데이터 (드롭다운용)
   const [optionProducts, setOptionProducts] = useState<OptionProduct[]>([]);
 
-  // 옵션명 검증 상태 추적
+  // 옵션상품 검증 상태 추적
   const [verificationStatus, setVerificationStatus] = useState<Record<string, boolean>>({});
 
   // 주문 시퀀스 번호 (하루 기준)
@@ -135,7 +135,7 @@ export default function InputTab() {
   // 로그인한 사용자 정보
   const [currentUser, setCurrentUser] = useState<string>('');
 
-  // 옵션명 드롭다운 상태
+  // 옵션상품 드롭다운 상태
   const [activeDropdown, setActiveDropdown] = useState<{ sectionId: string; productId: string } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -543,7 +543,7 @@ export default function InputTab() {
                     }
                   }
 
-                  // 옵션명 선택 시 가격 자동 입력 (현재 shippingIncluded 상태에 따라 가격 설정)
+                  // 옵션상품 선택 시 가격 자동 입력 (현재 shippingIncluded 상태에 따라 가격 설정)
                   if (field === 'optionName' && typeof value === 'string') {
                     const selectedOption = optionProducts.find((op) => op.option_name === value);
                     if (selectedOption) {
@@ -645,7 +645,7 @@ export default function InputTab() {
 
       const invalidProducts = section.products.filter((p) => !p.optionName || p.quantity < 1);
       if (invalidProducts.length > 0) {
-        alert('모든 상품의 옵션명과 수량을 입력해주세요.');
+        alert('모든 상품의 옵션상품과 수량을 입력해주세요.');
         return;
       }
     }
@@ -795,7 +795,7 @@ export default function InputTab() {
     { key: 'recipient_phone', title: '수령인전화번호', width: 120 },
     { key: 'recipient_address', title: '주소', width: 250 },
     { key: 'delivery_message', title: '배송메시지', width: 150 },
-    { key: 'products_display', title: '옵션명', width: 200, readOnly: true },
+    { key: 'products_display', title: '옵션상품', width: 200, readOnly: true },
     { key: 'quantity_display', title: '수량', width: 60, readOnly: true },
     { key: 'total_amount', title: '합계금액', width: 100, readOnly: true },
     { key: 'special_request', title: '특이/요청사항', width: 150 },
@@ -1026,7 +1026,7 @@ export default function InputTab() {
 
             {/* 오른쪽 라벨 */}
             <div className="grid grid-cols-[20%_60px_50px_70px_70px_80px_70px_30px] gap-1">
-              <div className="text-xs font-medium text-gray-700">옵션명</div>
+              <div className="text-xs font-medium text-gray-700">옵션상품</div>
               <div className="text-xs font-medium text-gray-700 text-center">배송비</div>
               <div className="text-xs font-medium text-gray-700 text-center">수량</div>
               <div className="text-xs font-medium text-gray-700 text-center">단가</div>
@@ -1140,7 +1140,7 @@ export default function InputTab() {
                         }}
                         onFocus={() => setActiveDropdown({ sectionId: section.id, productId: product.id })}
                         className="w-full h-8 px-2 py-1 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="옵션명 입력 *"
+                        placeholder="옵션상품 입력 *"
                       />
                       {activeDropdown?.sectionId === section.id && activeDropdown?.productId === product.id && product.optionName && (
                         <div

@@ -19,7 +19,7 @@ export interface OptionProductInfo {
  * 여러 주문 데이터에 옵션 상품 정보를 일괄 매핑
  *
  * 처리 흐름:
- * 1. 중복 옵션명 제거 후 일괄 조회
+ * 1. 중복 옵션상품 제거 후 일괄 조회
  * 2. option_products 테이블에서 공급단가 및 발송 정보 조회
  * 3. 각 주문에 옵션 정보 매핑
  * 4. 정산금액(공급단가 × 수량) 자동 계산
@@ -32,7 +32,7 @@ export async function enrichOrdersWithOptionInfo<T extends { option_name: string
 ): Promise<Array<T & OptionProductInfo & { settlement_amount?: number }>> {
   const supabase = await createClient();
 
-  // 중복 제거: 동일 옵션명은 한번만 조회
+  // 중복 제거: 동일 옵션상품은 한번만 조회
   const uniqueOptionNames = [...new Set(ordersData.map(order => order.option_name).filter(Boolean))];
 
   if (uniqueOptionNames.length === 0) {
@@ -62,7 +62,7 @@ export async function enrichOrdersWithOptionInfo<T extends { option_name: string
   }
 
 
-  // 옵션명별 정보 맵 생성 (빠른 조회를 위해)
+  // 옵션상품별 정보 맵 생성 (빠른 조회를 위해)
   const optionInfoMap = new Map<string, OptionProductInfo>();
   if (optionProducts) {
     optionProducts.forEach((product: any) => {
@@ -138,7 +138,7 @@ export function validateOrderData(orderData: any): { valid: boolean; errors: str
   const errors: string[] = [];
 
   if (!orderData.option_name || orderData.option_name.trim() === '') {
-    errors.push('옵션명은 필수입니다.');
+    errors.push('옵션상품은 필수입니다.');
   }
 
   // 추가 유효성 검사 규칙을 여기에 추가 가능

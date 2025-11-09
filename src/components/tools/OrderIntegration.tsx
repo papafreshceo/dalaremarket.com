@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileSpreadsheet, Download, RefreshCw } from 'lucide-react';
 import { useCreditOnAction } from '@/hooks/useCreditOnAction';
-import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import PasswordModal from './PasswordModal';
 
@@ -45,6 +45,10 @@ export default function OrderIntegration() {
   const [processedPreviews, setProcessedPreviews] = useState<FilePreview[]>([]);
   const [filePasswords, setFilePasswords] = useState<Map<string, string>>(new Map());
 
+  // 통합 결과 상태
+  const [integratedOrders, setIntegratedOrders] = useState<any[]>([]);
+  const [showIntegratedResult, setShowIntegratedResult] = useState(false);
+
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -62,6 +66,28 @@ export default function OrderIntegration() {
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFileSelect(e.dataTransfer.files);
+    }
+  };
+
+  // 마켓 필드 매핑 조회
+  const fetchMarketFieldMappings = async () => {
+    try {
+      const response = await fetch('/api/mapping-settings/fields');
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        const mappings = new Map<string, any>();
+        result.data.forEach((row: any) => {
+          if (row.market_name !== '표준필드') {
+            mappings.set(row.market_name.toLowerCase(), row);
+          }
+        });
+        return mappings;
+      }
+      return new Map();
+    } catch (error) {
+      console.error('필드 매핑 로드 실패:', error);
+      return new Map();
     }
   };
 
@@ -152,38 +178,66 @@ export default function OrderIntegration() {
         const file = files[i];
 
         try {
+          // 중복 파일 검증 (파일명 기준)
+          const isDuplicate = uploadedFiles.some(uploaded => uploaded.name === file.name);
+          if (isDuplicate) {
+            toast.error(`${file.name}은(는) 이미 추가된 파일입니다.`);
+            continue;
+          }
+
+          // 파일 타입 검증 (xlsx, xls, csv 모두 허용)
+          if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+            toast.error(`${file.name}은(는) 지원되지 않는 파일 형식입니다. (xlsx, xls, csv만 가능)`);
+            continue;
+          }
+
+          // 파일 크기 검증 (100MB 제한)
+          if (file.size > 100 * 1024 * 1024) {
+            toast.error(`${file.name}은(는) 파일 크기가 너무 큽니다. (최대 100MB)`);
+            continue;
+          }
+
           const data = await file.arrayBuffer();
 
-          // 파일 읽기
-          const workbook = new ExcelJS.Workbook();
-          await workbook.xlsx.load(data);
-
-          const firstSheet = workbook.worksheets[0];
-
-          // 헤더 행 감지
-          const firstDataRow: any[] = [];
-          const headerRow = firstSheet.getRow(1);
-          headerRow.eachCell((cell, colNumber) => {
-            firstDataRow[colNumber - 1] = cell.value;
+          // SheetJS로 파일 읽기 (XLS, XLSX, CSV 모두 지원)
+          const workbook = XLSX.read(data, {
+            type: 'array',
+            cellDates: true,
+            cellNF: false,
+            cellText: false
           });
 
+          const firstSheetName = workbook.SheetNames[0];
+          const firstSheet = workbook.Sheets[firstSheetName];
+
+          // SheetJS로 JSON 변환 (헤더 포함)
+          const jsonData = XLSX.utils.sheet_to_json(firstSheet, {
+            header: 1,
+            defval: '',
+            raw: false
+          });
+
+          if (!jsonData || jsonData.length === 0) {
+            toast.error(`${file.name}에 데이터가 없습니다.`);
+            continue;
+          }
+
+          // 첫 번째 행을 헤더로 사용
+          const firstDataRow = jsonData[0] as any[];
           const headerObj: any = {};
           firstDataRow.forEach((header: any, index: number) => {
-            headerObj[header] = index;
+            if (header) {
+              headerObj[header] = index;
+            }
           });
 
           // 마켓 감지
           const template = detectMarketTemplate(file.name, headerObj, templates);
           const marketName = template?.market_name || '알 수 없음';
 
-          // 주문 건수 계산
+          // 주문 건수 계산 (헤더 제외)
           const headerRowIndex = (template?.header_row || 1);
-          let orderCount = 0;
-          firstSheet.eachRow((row, rowNumber) => {
-            if (rowNumber > headerRowIndex) {
-              orderCount++;
-            }
-          });
+          const orderCount = jsonData.length - headerRowIndex;
 
           // 파일이 오늘 수정되었는지 확인
           const today = new Date();
@@ -228,7 +282,8 @@ export default function OrderIntegration() {
         }
       }
 
-      setUploadedFiles(filePreviews);
+      // 기존 파일에 새 파일 추가 (교체가 아닌 추가)
+      setUploadedFiles(prev => [...prev, ...filePreviews]);
     } catch (error) {
       console.error('파일 읽기 실패:', error);
       toast.error('파일을 읽는 중 오류가 발생했습니다.');
@@ -256,8 +311,21 @@ export default function OrderIntegration() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '파일 복호화에 실패했습니다.');
+        let errorMessage = '비밀번호가 올바르지 않습니다. 다시 시도해주세요.';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // JSON 파싱 실패 시 기본 메시지 사용
+        }
+
+        // 에러 발생 시 toast만 표시하고 모달 유지
+        toast.error(errorMessage, {
+          duration: 3000,
+          position: 'top-center',
+        });
+        setIntegrating(false);
+        return; // 모달을 닫지 않고 다시 입력 대기
       }
 
       // 복호화된 파일 받기
@@ -306,8 +374,9 @@ export default function OrderIntegration() {
       // 모든 파일 다시 처리
       await handleFileSelect(fileList.files);
     } catch (error: any) {
-      console.error('복호화 오류:', error);
-      toast.error(error.message || '비밀번호가 올바르지 않습니다.', {
+      // 예상치 못한 에러만 여기서 처리
+      console.error('복호화 처리 오류:', error);
+      toast.error('파일 처리 중 오류가 발생했습니다.', {
         duration: 3000,
         position: 'top-center',
       });
@@ -328,82 +397,96 @@ export default function OrderIntegration() {
     setIntegrating(true);
 
     try {
-      // 엑셀 데이터를 통합하여 다운로드
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('통합주문');
+      // 필드 매핑 가져오기
+      const fieldMappings = await fetchMarketFieldMappings();
 
-      // 헤더 설정 (표준 형식)
-      worksheet.columns = [
-        { header: '마켓명', key: 'marketName', width: 15 },
-        { header: '주문번호', key: 'orderNumber', width: 20 },
-        { header: '주문자', key: 'orderer', width: 12 },
-        { header: '주문자전화번호', key: 'ordererPhone', width: 15 },
-        { header: '수령인', key: 'recipient', width: 12 },
-        { header: '수령인전화번호', key: 'recipientPhone', width: 15 },
-        { header: '주소', key: 'address', width: 40 },
-        { header: '배송메시지', key: 'deliveryMessage', width: 25 },
-        { header: '옵션명', key: 'optionName', width: 30 },
-        { header: '수량', key: 'quantity', width: 8 },
-        { header: '단가', key: 'unitPrice', width: 12 },
-        { header: '특이사항', key: 'specialRequest', width: 25 },
-      ];
+      // 통합 데이터를 담을 배열
+      const integratedData: any[] = [];
 
       // 각 파일의 데이터 읽어서 추가
       for (const filePreview of uploadedFiles) {
         const arrayBuffer = await filePreview.file.arrayBuffer();
-        const sourceWorkbook = new ExcelJS.Workbook();
-        await sourceWorkbook.xlsx.load(arrayBuffer);
-        const sourceSheet = sourceWorkbook.worksheets[0];
+        const sourceWorkbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const firstSheetName = sourceWorkbook.SheetNames[0];
+        const sourceSheet = sourceWorkbook.Sheets[firstSheetName];
 
         const template = filePreview.detectedTemplate;
-        const headerRowIndex = template?.header_row || 1;
-        const fieldMappings = template?.field_mappings || {};
+        if (!template) continue;
 
-        // 헤더 읽기
-        const headerRow = sourceSheet.getRow(headerRowIndex);
-        const headers: any = {};
-        headerRow.eachCell((cell, colNumber) => {
-          headers[cell.value as string] = colNumber - 1;
-        });
+        const headerRowIndex = template.header_row || 1;
 
-        // 데이터 행 읽기
-        sourceSheet.eachRow((row, rowNumber) => {
-          if (rowNumber <= headerRowIndex) return; // 헤더 행 건너뛰기
+        // 마켓별 필드 매핑 가져오기
+        const marketMapping = fieldMappings.get(template.market_name.toLowerCase());
+        if (!marketMapping) continue;
 
+        // SheetJS로 JSON 변환
+        const allData = XLSX.utils.sheet_to_json(sourceSheet, {
+          header: 1,
+          defval: '',
+          raw: false
+        }) as any[][];
+
+        if (!allData || allData.length === 0) continue;
+
+        // 올바른 헤더 행 사용 (headerRowIndex는 1-based이므로 -1)
+        const actualHeaderRowIndex = Math.max(0, headerRowIndex - 1);
+        const actualHeaderRow = allData[actualHeaderRowIndex];
+
+        // 헤더 이후의 데이터만 처리
+
+        for (let i = headerRowIndex; i < allData.length; i++) {
+          const rowArray = allData[i];
           const rowData: any = {};
-          row.eachCell((cell, colNumber) => {
-            rowData[colNumber - 1] = cell.value;
+
+          // DB 설정된 헤더 행 사용
+          actualHeaderRow.forEach((header: any, colIndex: number) => {
+            if (header) {
+              rowData[String(header)] = rowArray[colIndex] || '';
+            }
           });
 
-          // 필드 매핑 적용
-          const mappedData: any = {
-            marketName: filePreview.marketName
+          if (Object.keys(rowData).length === 0) continue;
+
+          // 다중 필드 값 가져오기 헬퍼 함수
+          // "필드1,필드2,필드3" 형식으로 설정된 경우 순서대로 확인하여 값이 있는 첫 번째 필드 반환
+          const getFieldValue = (fieldMapping: string): string => {
+            if (!fieldMapping) return '';
+
+            // 쉼표로 구분된 여러 필드명 처리
+            const fieldNames = fieldMapping.split(',').map(f => f.trim());
+
+            for (const fieldName of fieldNames) {
+              const value = rowData[fieldName];
+              if (value !== undefined && value !== null && value !== '') {
+                return String(value);
+              }
+            }
+
+            return '';
           };
 
-          // 각 표준 필드에 대해 매핑
-          for (const [standardField, sourceField] of Object.entries(fieldMappings)) {
-            const columnIndex = headers[sourceField];
-            if (columnIndex !== undefined) {
-              mappedData[standardField] = rowData[columnIndex];
-            }
-          }
+          // 필드 매핑 적용 (field_4 = 주문번호, field_5 = 주문자 등)
+          const mappedData: any = {
+            마켓명: template.market_name,
+            주문번호: getFieldValue(marketMapping.field_4),
+            주문자: getFieldValue(marketMapping.field_5),
+            주문자전화번호: getFieldValue(marketMapping.field_6),
+            수령인: getFieldValue(marketMapping.field_7),
+            수령인전화번호: getFieldValue(marketMapping.field_8),
+            주소: getFieldValue(marketMapping.field_9),
+            배송메시지: getFieldValue(marketMapping.field_10),
+            옵션상품: getFieldValue(marketMapping.field_11),
+            수량: Number(getFieldValue(marketMapping.field_12) || 1),
+          };
 
-          worksheet.addRow(mappedData);
-        });
+          integratedData.push(mappedData);
+        }
       }
 
-      // 파일 다운로드
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `통합주문_${new Date().toISOString().split('T')[0]}.xlsx`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-
+      // 통합 결과 저장하고 테이블로 표시
+      setIntegratedOrders(integratedData);
+      setShowIntegratedResult(true);
       toast.success(`${uploadedFiles.length}개 파일 통합 완료!`);
-      setUploadedFiles([]);
     } catch (error) {
       console.error('통합 오류:', error);
       toast.error('통합 중 오류가 발생했습니다.');
@@ -412,61 +495,47 @@ export default function OrderIntegration() {
     }
   };
 
-  const handleDownloadTemplate = async () => {
-    // 크레딧 차감 (버튼 ID: 'download')
-    const canProceed = await executeWithCredit('download');
-    if (!canProceed) return;
+  const handleDownloadIntegrated = () => {
+    if (integratedOrders.length === 0) {
+      toast.error('다운로드할 주문이 없습니다.');
+      return;
+    }
 
     try {
-      // 표준 템플릿 생성
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('주문템플릿');
+      // SheetJS로 엑셀 파일 생성
+      const outputWorkbook = XLSX.utils.book_new();
+      const outputWorksheet = XLSX.utils.json_to_sheet(integratedOrders);
 
-      worksheet.columns = [
-        { header: '마켓명', key: 'marketName', width: 15 },
-        { header: '주문번호', key: 'orderNumber', width: 20 },
-        { header: '주문자', key: 'orderer', width: 12 },
-        { header: '주문자전화번호', key: 'ordererPhone', width: 15 },
-        { header: '수령인', key: 'recipient', width: 12 },
-        { header: '수령인전화번호', key: 'recipientPhone', width: 15 },
-        { header: '주소', key: 'address', width: 40 },
-        { header: '배송메시지', key: 'deliveryMessage', width: 25 },
-        { header: '옵션명', key: 'optionName', width: 30 },
-        { header: '수량', key: 'quantity', width: 8 },
-        { header: '단가', key: 'unitPrice', width: 12 },
-        { header: '특이사항', key: 'specialRequest', width: 25 },
+      // 컬럼 너비 설정
+      outputWorksheet['!cols'] = [
+        { wch: 15 }, // 마켓명
+        { wch: 20 }, // 주문번호
+        { wch: 12 }, // 주문자
+        { wch: 15 }, // 주문자전화번호
+        { wch: 12 }, // 수령인
+        { wch: 15 }, // 수령인전화번호
+        { wch: 40 }, // 주소
+        { wch: 25 }, // 배송메시지
+        { wch: 30 }, // 옵션상품
+        { wch: 8 },  // 수량
       ];
 
-      // 샘플 데이터 추가
-      worksheet.addRow({
-        marketName: '쿠팡',
-        orderNumber: 'CP20250108-001',
-        orderer: '홍길동',
-        ordererPhone: '010-1234-5678',
-        recipient: '김철수',
-        recipientPhone: '010-9876-5432',
-        address: '서울시 강남구 테헤란로 123',
-        deliveryMessage: '문 앞에 놔주세요',
-        optionName: '상품A 옵션1',
-        quantity: 2,
-        unitPrice: 15000,
-        specialRequest: ''
-      });
+      XLSX.utils.book_append_sheet(outputWorkbook, outputWorksheet, '통합주문');
 
       // 파일 다운로드
-      const buffer = await workbook.xlsx.writeBuffer();
+      const buffer = XLSX.write(outputWorkbook, { type: 'array', bookType: 'xlsx' });
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = '주문통합_템플릿.xlsx';
+      a.download = `통합주문_${new Date().toISOString().split('T')[0]}.xlsx`;
       a.click();
       window.URL.revokeObjectURL(url);
 
-      toast.success('템플릿 다운로드 완료!');
+      toast.success('엑셀 파일 다운로드 완료!');
     } catch (error) {
-      console.error('템플릿 다운로드 오류:', error);
-      toast.error('템플릿 다운로드 중 오류가 발생했습니다.');
+      console.error('다운로드 오류:', error);
+      toast.error('다운로드 중 오류가 발생했습니다.');
     }
   };
 
@@ -478,18 +547,166 @@ export default function OrderIntegration() {
 
   return (
     <div style={{ padding: '24px' }}>
-      {/* 헤더 */}
-      <div style={{ marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
-          마켓 주문 파일 통합
-        </h3>
-        <p style={{ fontSize: '14px', color: '#6c757d' }}>
-          여러 마켓의 주문 파일을 업로드하고 하나로 통합하세요
-        </p>
-      </div>
 
-      {/* 파일 업로드 영역 */}
-      {uploadedFiles.length === 0 ? (
+      {/* 통합 결과 테이블 */}
+      {showIntegratedResult ? (
+        <div>
+          {/* 마켓별 통계와 새로 통합하기 버튼 */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '16px'
+          }}>
+            {/* 전체 건수 통계 카드 */}
+            <div
+              style={{
+                padding: '12px',
+                background: '#2563eb',
+                border: '1px solid #2563eb',
+                borderRadius: '8px',
+                textAlign: 'center',
+                minWidth: '120px'
+              }}
+            >
+              <div style={{ fontSize: '12px', color: '#ffffff', marginBottom: '4px' }}>
+                전체
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: '700', color: '#ffffff' }}>
+                {integratedOrders.length}건
+              </div>
+            </div>
+
+            {/* 마켓별 통계 카드들 */}
+            {(() => {
+              // 마켓별 건수 집계
+              const marketStats = integratedOrders.reduce((acc, order) => {
+                const market = order.마켓명 || '알 수 없음';
+                acc[market] = (acc[market] || 0) + 1;
+                return acc;
+              }, {} as Record<string, number>);
+
+              return Object.entries(marketStats).map(([market, count]) => (
+                <div
+                  key={market}
+                  style={{
+                    padding: '12px',
+                    background: '#f8f9fa',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '8px',
+                    textAlign: 'center',
+                    minWidth: '120px'
+                  }}
+                >
+                  <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px' }}>
+                    {market}
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: '700', color: '#2563eb' }}>
+                    {count}건
+                  </div>
+                </div>
+              ));
+            })()}
+
+            {/* 새로 통합하기 버튼 (오른쪽 끝) */}
+            <button
+              onClick={() => {
+                setShowIntegratedResult(false);
+                setIntegratedOrders([]);
+                setUploadedFiles([]);
+              }}
+              style={{
+                padding: '10px 16px',
+                background: '#f8f9fa',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                fontSize: '13px',
+                cursor: 'pointer',
+                marginLeft: 'auto',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              새로 통합하기
+            </button>
+          </div>
+
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #dee2e6',
+            borderTop: 'none',
+            borderRadius: '8px',
+            overflow: 'auto',
+            maxHeight: '500px',
+            marginBottom: '16px'
+          }}>
+            <table style={{
+              width: '100%',
+              borderCollapse: 'separate',
+              borderSpacing: 0,
+              fontSize: '13px'
+            }}>
+              <thead style={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 10
+              }}>
+                <tr>
+                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>마켓명</th>
+                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>주문번호</th>
+                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>주문자</th>
+                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>주문자전화번호</th>
+                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>수령인</th>
+                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>수령인전화번호</th>
+                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', minWidth: '200px', background: '#f8f9fa' }}>주소</th>
+                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>배송메시지</th>
+                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>옵션상품</th>
+                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'center', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>수량</th>
+                </tr>
+              </thead>
+              <tbody>
+                {integratedOrders.map((order, index) => (
+                  <tr key={index} style={{
+                    borderBottom: index < integratedOrders.length - 1 ? '1px solid #f0f0f0' : 'none'
+                  }}>
+                    <td style={{ padding: '12px' }}>{order.마켓명}</td>
+                    <td style={{ padding: '12px' }}>{order.주문번호}</td>
+                    <td style={{ padding: '12px' }}>{order.주문자}</td>
+                    <td style={{ padding: '12px' }}>{order.주문자전화번호}</td>
+                    <td style={{ padding: '12px' }}>{order.수령인}</td>
+                    <td style={{ padding: '12px' }}>{order.수령인전화번호}</td>
+                    <td style={{ padding: '12px', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.주소}</td>
+                    <td style={{ padding: '12px' }}>{order.배송메시지}</td>
+                    <td style={{ padding: '12px' }}>{order.옵션상품}</td>
+                    <td style={{ padding: '12px', textAlign: 'center' }}>{order.수량}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <button
+            onClick={handleDownloadIntegrated}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            <Download size={16} />
+            엑셀 다운로드
+          </button>
+        </div>
+      ) : uploadedFiles.length === 0 ? (
         <div
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -515,14 +732,18 @@ export default function OrderIntegration() {
             클릭하거나 파일을 드래그하여 업로드하세요
           </p>
           <p style={{ fontSize: '12px', color: '#9ca3af' }}>
-            지원 형식: .xlsx, .xls (다중 선택 가능)
+            지원 형식: .xlsx, .xls, .csv (다중 선택 가능)
           </p>
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xlsx,.xls"
+            accept=".xlsx,.xls,.csv"
             multiple
             onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
+            onClick={(e) => {
+              // 같은 파일을 다시 선택할 수 있도록 value 초기화
+              (e.target as HTMLInputElement).value = '';
+            }}
             style={{ display: 'none' }}
           />
         </div>
@@ -555,9 +776,13 @@ export default function OrderIntegration() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 multiple
                 onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
+                onClick={(e) => {
+                  // 같은 파일을 다시 선택할 수 있도록 value 초기화
+                  (e.target as HTMLInputElement).value = '';
+                }}
                 style={{ display: 'none' }}
               />
             </div>
@@ -657,47 +882,6 @@ export default function OrderIntegration() {
           </div>
         </>
       )}
-
-      {/* 템플릿 다운로드 */}
-      <div style={{
-        marginTop: '24px',
-        padding: '16px',
-        background: '#f0fdf4',
-        border: '1px solid #86efac',
-        borderRadius: '8px'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h5 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>
-              엑셀 템플릿 다운로드
-            </h5>
-            <p style={{ fontSize: '12px', color: '#6c757d' }}>
-              표준 형식의 주문 템플릿을 다운로드하세요
-            </p>
-          </div>
-          <button
-            onClick={handleDownloadTemplate}
-            disabled={isProcessing}
-            style={{
-              padding: '8px 16px',
-              background: '#10b981',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: '500',
-              cursor: isProcessing ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              opacity: isProcessing ? 0.6 : 1
-            }}
-          >
-            <Download size={16} />
-            다운로드 (1 크레딧)
-          </button>
-        </div>
-      </div>
 
       {/* 비밀번호 모달 */}
       <PasswordModal

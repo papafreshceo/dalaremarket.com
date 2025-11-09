@@ -98,7 +98,7 @@ export default function AllProductsPage() {
 
   // 카테고리2 필터링 적용
   const filteredProducts = products.filter(product => {
-    // 검색어 필터 (옵션명, 코드, 소분류, 품목명으로 검색)
+    // 검색어 필터 (옵션상품, 코드, 소분류, 품목명으로 검색)
     const matchesSearch = searchTerm === '' ||
       product.option_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.option_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -887,7 +887,7 @@ export default function AllProductsPage() {
                                     </div>
                                   )}
 
-                                  {/* 옵션명 */}
+                                  {/* 옵션상품 */}
                                   <div className="w-48 flex-shrink-0">
                                     <h4 className="text-sm font-medium text-gray-900 truncate">
                                       {product.option_name}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Toaster } from 'react-hot-toast';
 import ToolModal from '@/components/tools/ToolModal';
 
 interface Category {
@@ -883,6 +884,19 @@ export default function ToolsPage() {
           zIndex={10000 + index}
         />
       ))}
+
+      {/* Toast 알림 */}
+      <Toaster
+        position="top-center"
+        reverseOrder={false}
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+        }}
+      />
     </>
   );
 }

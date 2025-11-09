@@ -24,12 +24,12 @@ export async function GET(request: NextRequest) {
       shipping_vendor:partners!shipping_vendor_id(name)
     `);
 
-    // 다중 옵션명 조회 (우선순위)
+    // 다중 옵션상품 조회 (우선순위)
     if (optionNames) {
       const nameArray = optionNames.split(',').map(n => n.trim());
       query = query.in('option_name', nameArray);
     }
-    // 단일 옵션명 조회
+    // 단일 옵션상품 조회
     else if (optionName) {
       query = query.eq('option_name', optionName);
     }

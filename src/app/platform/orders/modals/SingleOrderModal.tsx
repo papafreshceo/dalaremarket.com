@@ -209,7 +209,7 @@ export default function SingleOrderModal({
 
         // 선택된 수령인에 선택된 배지가 있는지 확인
         if (recipient.selectedBadgeId !== null) {
-          // 선택된 배지가 있으면 해당 배지의 옵션명 변경
+          // 선택된 배지가 있으면 해당 배지의 옵션상품 변경
           return {
             ...recipient,
             badges: recipient.badges.map(badge =>
@@ -946,7 +946,7 @@ export default function SingleOrderModal({
                 ) : (
                   <div>
                     {(() => {
-                      // 옵션명의 앞부분(공백 전까지)으로 그룹화
+                      // 옵션상품의 앞부분(공백 전까지)으로 그룹화
                       const groups: { [key: string]: OptionProduct[] } = {};
                       optionProducts.forEach(option => {
                         const baseKey = option.option_name.split(' ')[0] || option.option_name;
@@ -1445,7 +1445,7 @@ export default function SingleOrderModal({
                     boxShadow: recipient.selectedBadgeId === badge.id ? '0 2px 8px rgba(0,0,0,0.15)' : 'none'
                   }}
                 >
-                  {/* 옵션명 표시 */}
+                  {/* 옵션상품 표시 */}
                   <div style={{
                     padding: '4px 8px',
                     fontSize: '12px',

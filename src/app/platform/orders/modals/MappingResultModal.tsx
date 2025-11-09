@@ -68,14 +68,14 @@ export default function MappingResultModal({
               color: 'var(--color-text)',
               margin: '0 0 8px 0'
             }}>
-              옵션명 자동 변환 결과
+              옵션상품 자동 변환 결과
             </h2>
             <p style={{
               fontSize: '14px',
               color: 'var(--color-text-secondary)',
               margin: 0
             }}>
-              옵션명매핑 설정에 따라 자동으로 변환되었습니다
+              옵션상품매핑 설정에 따라 자동으로 변환되었습니다
             </p>
           </div>
           <button
@@ -196,7 +196,7 @@ export default function MappingResultModal({
               padding: '40px 20px',
               color: 'var(--color-text-secondary)'
             }}>
-              변환된 옵션명이 없습니다
+              변환된 옵션상품이 없습니다
             </div>
           )}
         </div>
@@ -214,12 +214,12 @@ export default function MappingResultModal({
             {unmappedCount > 0 ? (
               <>
                 <AlertCircle size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} color="#f87171" />
-                변환되지 않은 옵션명이 {unmappedCount}건 있습니다
+                변환되지 않은 옵션상품이 {unmappedCount}건 있습니다
               </>
             ) : (
               <>
                 <CheckCircle size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} color="#059669" />
-                모든 옵션명이 성공적으로 변환되었습니다
+                모든 옵션상품이 성공적으로 변환되었습니다
               </>
             )}
           </div>

@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       (a, b) => b.total_quantity - a.total_quantity
     );
 
-    // 옵션명 목록 추출
+    // 옵션상품 목록 추출
     const optionNames = [...new Set(orders.map(o => o.option_name).filter(Boolean))];
 
     // 옵션상품 및 원물 정보 조회
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
     // 옵션상품 ID 목록
     const optionProductIds = optionProductsData?.map(op => op.id) || [];
 
-    // 옵션명으로 매핑
+    // 옵션상품으로 매핑
     const optionNameToId = new Map(
       optionProductsData?.map(op => [op.option_name, op.id]) || []
     );

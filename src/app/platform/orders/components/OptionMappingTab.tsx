@@ -25,7 +25,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
     site_option_name: ''
   });
 
-  // 사이트 옵션명 목록 가져오기
+  // 사이트 옵션상품 목록 가져오기
   useEffect(() => {
     fetchSiteOptions();
     fetchMappings();
@@ -44,8 +44,8 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
       const uniqueOptions = [...new Set(data.map(item => item.option_name))];
       setSiteOptions(uniqueOptions);
     } catch (error) {
-      console.error('사이트 옵션명 조회 오류:', error);
-      toast.error('사이트 옵션명을 불러오는데 실패했습니다.');
+      console.error('사이트 옵션상품 조회 오류:', error);
+      toast.error('사이트 옵션상품을 불러오는데 실패했습니다.');
     }
   };
 
@@ -83,7 +83,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
       console.error('매핑 조회 오류:', error);
       // 테이블이 없는 경우는 에러 메시지 표시하지 않음
       if (error?.code !== '42P01') {
-        toast.error('옵션명 매핑을 불러오는데 실패했습니다.');
+        toast.error('옵션상품 매핑을 불러오는데 실패했습니다.');
       }
     } finally {
       setLoading(false);
@@ -92,7 +92,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
 
   const handleAddMapping = async () => {
     if (!newMapping.user_option_name.trim() || !newMapping.site_option_name.trim()) {
-      toast.error('판매자 옵션명과 사이트 옵션명을 모두 입력해주세요.');
+      toast.error('판매자 옵션상품과 사이트 옵션상품을 모두 입력해주세요.');
       return;
     }
 
@@ -115,19 +115,19 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
 
       if (error) {
         if (error.code === '23505') {
-          toast.error('이미 등록된 판매자 옵션명입니다.');
+          toast.error('이미 등록된 판매자 옵션상품입니다.');
         } else {
           throw error;
         }
         return;
       }
 
-      toast.success('옵션명 매핑이 추가되었습니다.');
+      toast.success('옵션상품 매핑이 추가되었습니다.');
       setNewMapping({ user_option_name: '', site_option_name: '' });
       fetchMappings();
     } catch (error) {
       console.error('매핑 추가 오류:', error);
-      toast.error('옵션명 매핑 추가에 실패했습니다.');
+      toast.error('옵션상품 매핑 추가에 실패했습니다.');
     }
   };
 
@@ -149,7 +149,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
 
   const handleSaveEdit = async (id: number) => {
     if (!editMapping.user_option_name.trim() || !editMapping.site_option_name.trim()) {
-      toast.error('판매자 옵션명과 사이트 옵션명을 모두 입력해주세요.');
+      toast.error('판매자 옵션상품과 사이트 옵션상품을 모두 입력해주세요.');
       return;
     }
 
@@ -165,19 +165,19 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
 
       if (error) {
         if (error.code === '23505') {
-          toast.error('이미 등록된 판매자 옵션명입니다.');
+          toast.error('이미 등록된 판매자 옵션상품입니다.');
         } else {
           throw error;
         }
         return;
       }
 
-      toast.success('옵션명 매핑이 수정되었습니다.');
+      toast.success('옵션상품 매핑이 수정되었습니다.');
       setEditingId(null);
       fetchMappings();
     } catch (error) {
       console.error('매핑 수정 오류:', error);
-      toast.error('옵션명 매핑 수정에 실패했습니다.');
+      toast.error('옵션상품 매핑 수정에 실패했습니다.');
     }
   };
 
@@ -193,11 +193,11 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
 
       if (error) throw error;
 
-      toast.success('옵션명 매핑이 삭제되었습니다.');
+      toast.success('옵션상품 매핑이 삭제되었습니다.');
       fetchMappings();
     } catch (error) {
       console.error('매핑 삭제 오류:', error);
-      toast.error('옵션명 매핑 삭제에 실패했습니다.');
+      toast.error('옵션상품 매핑 삭제에 실패했습니다.');
     }
   };
 
@@ -211,14 +211,14 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
           color: 'var(--color-text)',
           marginBottom: '8px'
         }}>
-          옵션명 매핑 설정
+          옵션상품 매핑 설정
         </h2>
         <p style={{
           fontSize: '14px',
           color: 'var(--color-text-secondary)',
           lineHeight: '1.6'
         }}>
-          사이트 표준 옵션명을 선택한 후, 판매자님이 사용하시는 옵션명을 입력하여 매핑해두면<br />
+          사이트 표준 옵션상품을 선택한 후, 판매자님이 사용하시는 옵션상품을 입력하여 매핑해두면<br />
           발주서 업로드 시 자동으로 변환되어 편리하게 사용하실 수 있습니다.
         </p>
       </div>
@@ -244,7 +244,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
             ⚠️ 데이터베이스 설정 필요
           </h3>
           <p style={{ fontSize: '14px', lineHeight: '1.6', marginBottom: '12px' }}>
-            옵션명 매핑 기능을 사용하려면 Supabase에서 데이터베이스 테이블을 생성해야 합니다.
+            옵션상품 매핑 기능을 사용하려면 Supabase에서 데이터베이스 테이블을 생성해야 합니다.
           </p>
           <ol style={{ fontSize: '13px', lineHeight: '1.8', paddingLeft: '20px', marginBottom: '12px' }}>
             <li>Supabase 대시보드 접속</li>
@@ -280,7 +280,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
           color: 'var(--color-text)',
           marginBottom: '16px'
         }}>
-          새 옵션명 매핑 추가
+          새 옵션상품 매핑 추가
         </h3>
 
         <div style={{
@@ -297,7 +297,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
               color: 'var(--color-text)',
               marginBottom: '6px'
             }}>
-              사이트 표준 옵션명
+              사이트 표준 옵션상품
             </label>
             <select
               value={newMapping.site_option_name}
@@ -312,7 +312,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
                 color: 'var(--color-text)'
               }}
             >
-              <option value="">옵션명 선택</option>
+              <option value="">옵션상품 선택</option>
               {siteOptions.map((option) => (
                 <option key={option} value={option}>
                   {option}
@@ -329,7 +329,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
               color: 'var(--color-text)',
               marginBottom: '6px'
             }}>
-              판매자 옵션명
+              판매자 옵션상품
             </label>
             <input
               type="text"
@@ -394,7 +394,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
             fontWeight: '600',
             color: 'var(--color-text)'
           }}>
-            등록된 옵션명 매핑 ({mappings.length}개)
+            등록된 옵션상품 매핑 ({mappings.length}개)
           </h3>
         </div>
 
@@ -412,7 +412,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
             textAlign: 'center',
             color: 'var(--color-text-secondary)'
           }}>
-            등록된 옵션명 매핑이 없습니다.<br />
+            등록된 옵션상품 매핑이 없습니다.<br />
             위에서 새 매핑을 추가해주세요.
           </div>
         ) : (
@@ -433,7 +433,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
                     fontWeight: '600',
                     color: 'var(--color-text)'
                   }}>
-                    사이트 표준 옵션명
+                    사이트 표준 옵션상품
                   </th>
                   <th style={{
                     padding: '12px 24px',
@@ -442,7 +442,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
                     fontWeight: '600',
                     color: 'var(--color-text)'
                   }}>
-                    판매자 옵션명
+                    판매자 옵션상품
                   </th>
                   <th style={{
                     padding: '12px 24px',
@@ -477,7 +477,7 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
                               color: 'var(--color-text)'
                             }}
                           >
-                            <option value="">옵션명 선택</option>
+                            <option value="">옵션상품 선택</option>
                             {siteOptions.map((option) => (
                               <option key={option} value={option}>
                                 {option}
@@ -677,8 +677,8 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
           lineHeight: '1.8',
           paddingLeft: '20px'
         }}>
-          <li>먼저 사이트 표준 옵션명을 선택한 후, 판매자님이 사용하시는 옵션명을 입력합니다.</li>
-          <li>발주서 업로드 시 판매자 옵션명이 자동으로 사이트 표준 옵션명으로 변환됩니다.</li>
+          <li>먼저 사이트 표준 옵션상품을 선택한 후, 판매자님이 사용하시는 옵션상품을 입력합니다.</li>
+          <li>발주서 업로드 시 판매자 옵션상품이 자동으로 사이트 표준 옵션상품으로 변환됩니다.</li>
           <li>한 번 등록해두면 매번 엑셀 파일을 수정하지 않아도 됩니다.</li>
         </ul>
       </div>

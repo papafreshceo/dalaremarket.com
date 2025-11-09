@@ -20,11 +20,11 @@ export function validateRequiredColumns(data: any[]): string[] {
       errors.push(`${rowNumber}번째 주문건의 '주소' 값이 누락되었습니다`);
     }
 
-    // 옵션명 또는 옵션코드 검증 (둘 중 하나는 반드시 있어야 함)
-    const hasOptionName = row['옵션명'] && String(row['옵션명']).trim() !== '';
+    // 옵션상품 또는 옵션코드 검증 (둘 중 하나는 반드시 있어야 함)
+    const hasOptionName = row['옵션상품'] && String(row['옵션상품']).trim() !== '';
     const hasOptionCode = row['옵션코드'] && String(row['옵션코드']).trim() !== '';
     if (!hasOptionName && !hasOptionCode) {
-      errors.push(`${rowNumber}번째 주문건의 '옵션명' 또는 '옵션코드' 값이 누락되었습니다`);
+      errors.push(`${rowNumber}번째 주문건의 '옵션상품' 또는 '옵션코드' 값이 누락되었습니다`);
     }
 
     // 수량 검증

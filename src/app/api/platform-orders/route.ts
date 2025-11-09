@@ -229,7 +229,7 @@ export async function GET(request: NextRequest) {
  *
  * 처리 흐름:
  * 1. 사용자 인증 확인
- * 2. 옵션명 매핑 적용 (사용자 설정 기준)
+ * 2. 옵션상품 매핑 적용 (사용자 설정 기준)
  * 3. 옵션 상품 정보 조회 및 매핑 (공급단가, 발송정보 등)
  * 4. DB 저장
  */
@@ -262,7 +262,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 1단계: 옵션명 매핑 적용 (사용자 설정 기준)
+      // 1단계: 옵션상품 매핑 적용 (사용자 설정 기준)
       orders = await applyOptionMappingToOrdersServer(orders, user.id);
 
       // 2단계: 옵션 상품 정보 자동 매핑 (공급단가, 발송정보 등)
@@ -303,7 +303,7 @@ export async function POST(request: NextRequest) {
       // 필수 필드 검증
       if (!orderData.option_name) {
         return NextResponse.json(
-          { success: false, error: '옵션명은 필수입니다.' },
+          { success: false, error: '옵션상품은 필수입니다.' },
           { status: 400 }
         );
       }

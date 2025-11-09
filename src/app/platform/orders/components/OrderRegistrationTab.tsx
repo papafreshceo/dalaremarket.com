@@ -170,7 +170,7 @@ export default function OrderRegistrationTab({
       const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
 
-      // 모든 옵션명 수집 (중복 제거)
+      // 모든 옵션상품 수집 (중복 제거)
       const uniqueOptionNames = [...new Set(filteredOrders.map(order => order.products).filter(Boolean))];
 
 
@@ -188,7 +188,7 @@ export default function OrderRegistrationTab({
       }
 
 
-      // 옵션명 -> 공급단가 맵 생성
+      // 옵션상품 -> 공급단가 맵 생성
       const priceMap = new Map<string, number>();
       (optionProducts || []).forEach((product: any) => {
         if (product.option_name && product.seller_supply_price) {
@@ -312,12 +312,12 @@ export default function OrderRegistrationTab({
       return;
     }
 
-    // 2단계: 옵션명 검증 시작
+    // 2단계: 옵션상품 검증 시작
     try {
       const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
 
-      // 모든 옵션명 수집 (중복 제거)
+      // 모든 옵션상품 수집 (중복 제거)
       const uniqueOptionNames = [...new Set(filteredOrders.map(order => order.products).filter(Boolean))];
 
 
@@ -328,12 +328,12 @@ export default function OrderRegistrationTab({
         .in('option_name', uniqueOptionNames);
 
       if (optionError) {
-        console.error('❌ 옵션명 조회 오류:', optionError);
+        console.error('❌ 옵션상품 조회 오류:', optionError);
       } else {
       }
 
 
-      // 옵션상품 Map 저장 (옵션명 소문자 키로 저장)
+      // 옵션상품 Map 저장 (옵션상품 소문자 키로 저장)
       const productMap = new Map<string, any>();
       (optionProducts || []).forEach((product: any) => {
         if (product.option_name) {
@@ -741,7 +741,7 @@ export default function OrderRegistrationTab({
       },
       {
         key: 'optionName',
-        title: '옵션명',
+        title: '옵션상품',
         readOnly: true,
         align: 'left' as const
       },
@@ -836,7 +836,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'optionName',
-          title: '옵션명',
+          title: '옵션상품',
           readOnly: true,
           align: 'left' as const
         },
@@ -947,7 +947,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'optionName',
-          title: '옵션명',
+          title: '옵션상품',
           readOnly: true,
           align: 'left' as const
         },
@@ -1058,7 +1058,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'optionName',
-          title: '옵션명',
+          title: '옵션상품',
           readOnly: true,
           align: 'left' as const
         },
@@ -1192,7 +1192,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'optionName',
-          title: '옵션명',
+          title: '옵션상품',
           readOnly: true,
           align: 'left' as const
         },
@@ -1307,7 +1307,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'optionName',
-          title: '옵션명',
+          title: '옵션상품',
           readOnly: true,
           align: 'left' as const
         },
@@ -1426,7 +1426,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'optionName',
-          title: '옵션명',
+          title: '옵션상품',
           readOnly: true,
           align: 'left' as const
         },
@@ -1578,7 +1578,7 @@ export default function OrderRegistrationTab({
         },
         {
           key: 'optionName',
-          title: '옵션명',
+          title: '옵션상품',
           readOnly: true,
           align: 'left' as const
         },
@@ -1668,7 +1668,7 @@ export default function OrderRegistrationTab({
       },
       {
         key: 'optionName',
-        title: '옵션명',
+        title: '옵션상품',
         readOnly: true,
         align: 'left' as const
       },
@@ -1793,7 +1793,7 @@ export default function OrderRegistrationTab({
               // 고정값
               row[col.column_name] = col.static_value || '';
             } else if (fieldType === 'computed') {
-              // 계산 필드 (예: 상품명+옵션명)
+              // 계산 필드 (예: 상품명+옵션상품)
               const computedLogic = col.computed_logic;
               if (computedLogic === 'product_option') {
                 row[col.column_name] = `${order.optionName || ''}`;
@@ -1811,7 +1811,7 @@ export default function OrderRegistrationTab({
           수취인: order.recipient,
           전화번호: order.recipientPhone || '',
           주소: order.address || '',
-          옵션명: order.optionName,
+          옵션상품: order.optionName,
           수량: order.quantity,
           택배사: order.courier || '',
           송장번호: order.trackingNo || '',
@@ -3089,7 +3089,7 @@ export default function OrderRegistrationTab({
                   order_number: orderNo,
                   confirmed_at: now,
                   seller_id: userId, // 셀러 ID 저장
-                  option_name: order.optionName, // 수정된 옵션명
+                  option_name: order.optionName, // 수정된 옵션상품
                   seller_supply_price: unitPrice,
                   settlement_amount: supplyPrice,
                   final_payment_amount: Math.round(finalPaymentAmount).toString() // 최종입금액 저장

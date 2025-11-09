@@ -847,7 +847,7 @@ export default function MaterialMatchingPage() {
                     type="text"
                     value={productSearchTerm}
                     onChange={(e) => setProductSearchTerm(e.target.value)}
-                    placeholder="옵션명 또는 옵션코드 검색..."
+                    placeholder="옵션상품 또는 옵션코드 검색..."
                     className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
                 </div>
@@ -959,7 +959,7 @@ export default function MaterialMatchingPage() {
                           }`}
                         >
                           <div className="flex items-center justify-between gap-3">
-                            {/* 왼쪽 그룹: 옵션코드 + 체크/배지 + 옵션명 + 표준수량 */}
+                            {/* 왼쪽 그룹: 옵션코드 + 체크/배지 + 옵션상품 + 표준수량 */}
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded flex-shrink-0">
                                 {product.option_code}

@@ -106,7 +106,7 @@ export default function CSTab() {
     { key: 'orderer_name', title: '주문자', width: 100, type: 'text' as const },
     { key: 'recipient_name', title: '수령인', width: 100, type: 'text' as const },
     { key: 'recipient_phone', title: '수령인전화', width: 120, type: 'text' as const },
-    { key: 'option_name', title: '옵션명', width: 200, type: 'text' as const },
+    { key: 'option_name', title: '옵션상품', width: 200, type: 'text' as const },
     { key: 'quantity', title: '수량', width: 60, type: 'number' as const },
     { key: 'cs_type', title: 'CS유형', width: 100, type: 'text' as const },
     { key: 'cs_content', title: 'CS내용', width: 250, type: 'text' as const },
@@ -445,7 +445,7 @@ export default function CSTab() {
               <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
                 <div className="space-y-2.5">
                   <div className="flex flex-col">
-                    <span className="text-gray-600 mb-1">옵션명</span>
+                    <span className="text-gray-600 mb-1">옵션상품</span>
                     <span className="text-gray-900 font-semibold bg-white rounded px-3 py-2 border border-purple-200">
                       {selectedOrderDetail.option_name || '-'}
                     </span>

@@ -477,7 +477,7 @@ export default function SearchTab() {
             'recipient_phone',          // field_8 - 수령인전화번호
             'recipient_address',        // field_9 - 주소
             'delivery_message',         // field_10 - 배송메세지
-            'option_name',              // field_11 - 옵션명
+            'option_name',              // field_11 - 옵션상품
             'quantity',                 // field_12 - 수량
             'market_check',             // field_13 - 마켓
             'confirmation',             // field_14 - 확인
@@ -617,7 +617,7 @@ export default function SearchTab() {
               if (i === 8) column.width = 120; // 수령인전화번호
               if (i === 9) column.width = 250; // 주소
               if (i === 10) column.width = 120; // 배송메시지
-              if (i === 11) column.width = 200; // 옵션명
+              if (i === 11) column.width = 200; // 옵션상품
               if (i === 12) column.width = 40; // 수량
 
               // field_1 (마켓명) - 마켓 배지 렌더러는 제거 (useEffect에서 처리)
@@ -911,7 +911,7 @@ export default function SearchTab() {
       수취인: order.recipient_name,
       전화번호: order.recipient_phone || '',
       주소: order.recipient_address || '',
-      옵션명: order.option_name,
+      옵션상품: order.option_name,
       수량: order.quantity,
       셀러공급가: order.seller_supply_price || '',
       출고처: order.shipping_source || '',
@@ -1655,7 +1655,7 @@ export default function SearchTab() {
           수취인: order.recipient_name,
           전화번호: order.recipient_phone || '',
           주소: order.recipient_address || '',
-          옵션명: order.option_name,
+          옵션상품: order.option_name,
           수량: order.quantity,
           발송상태: order.shipping_status,
           택배사: order.courier_company || '',
@@ -2097,7 +2097,7 @@ export default function SearchTab() {
         수취인: order.recipient_name,
         전화번호: order.recipient_phone || '',
         주소: order.recipient_address || '',
-        옵션명: order.option_name,
+        옵션상품: order.option_name,
         수량: order.quantity,
         발송상태: order.shipping_status,
         택배사: order.courier_company || '',
@@ -2615,7 +2615,7 @@ export default function SearchTab() {
     }
   };
 
-  // 옵션명으로 매핑 정보 가져오기
+  // 옵션상품으로 매핑 정보 가져오기
   const fetchMappingByOptionName = async (optionName: string) => {
     try {
       const response = await fetch(`/api/option-products?option_name=${encodeURIComponent(optionName)}`);
@@ -2636,7 +2636,7 @@ export default function SearchTab() {
       }
       return null;
     } catch (error) {
-      console.error('옵션명 매핑 조회 실패:', error);
+      console.error('옵션상품 매핑 조회 실패:', error);
       return null;
     }
   };
@@ -2761,11 +2761,11 @@ export default function SearchTab() {
         const seconds = String(now.getSeconds()).padStart(2, '0');
         const csOrderNumber = `CS${year}${month}${day}${hours}${minutes}${seconds}001`;
 
-        // 옵션명 (서버에서 자동 매핑됨)
+        // 옵션상품 (서버에서 자동 매핑됨)
         const optionName = csFormData.resendOption || selectedOrder.option_name;
 
         // 새 주문 데이터 생성 (한국 시간 기준)
-        // ✅ 옵션명만 전달하면 서버(/api/integrated-orders POST)에서 자동으로 공급단가, 발송정보 등을 매핑함
+        // ✅ 옵션상품만 전달하면 서버(/api/integrated-orders POST)에서 자동으로 공급단가, 발송정보 등을 매핑함
         const koreanDate = getKoreanDate();
         const newOrderData = {
           sheet_date: koreanDate,
@@ -2775,7 +2775,7 @@ export default function SearchTab() {
           recipient_phone: csFormData.phone || selectedOrder.recipient_phone,
           recipient_address: csFormData.address || selectedOrder.recipient_address,
           delivery_message: csFormData.resendNote || '',
-          option_name: optionName, // ✅ 이 옵션명 기준으로 서버에서 자동 매핑됨
+          option_name: optionName, // ✅ 이 옵션상품 기준으로 서버에서 자동 매핑됨
           quantity: csFormData.resendQty || selectedOrder.quantity,
           shipping_status: '접수',
           memo: `원주문: ${selectedOrder.order_number} / CS유형: ${csFormData.category}`,
@@ -2850,7 +2850,7 @@ export default function SearchTab() {
   // 추가주문 제출 핸들러
   const handleAdditionalOrderSubmit = async () => {
     if (!additionalOrderData.option_name) {
-      alert('옵션명을 입력해주세요.');
+      alert('옵션상품을 입력해주세요.');
       return;
     }
     if (!additionalOrderData.recipient_name) {
@@ -2869,7 +2869,7 @@ export default function SearchTab() {
       const seconds = String(now.getSeconds()).padStart(2, '0');
       const additionalOrderNumber = `ADD${year}${month}${day}${hours}${minutes}${seconds}001`;
 
-      // 옵션명으로 매핑 정보 가져오기
+      // 옵션상품으로 매핑 정보 가져오기
       const mappingData = await fetchMappingByOptionName(additionalOrderData.option_name);
 
       // 새 주문 데이터 생성 (한국 시간 기준)
@@ -2888,7 +2888,7 @@ export default function SearchTab() {
         shipping_status: '접수',
         shipping_request_date: additionalOrderData.shipping_request_date || null,
         memo: `원주문: ${additionalOrderData.original_order_number}`,
-        // 옵션명 기준 자동 매핑
+        // 옵션상품 기준 자동 매핑
         seller_supply_price: mappingData?.seller_supply_price || '',
         shipping_source: mappingData?.shipping_source || '',
         invoice_issuer: mappingData?.invoice_issuer || '',
@@ -3483,7 +3483,7 @@ export default function SearchTab() {
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">마켓명</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">주문번호</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">주문자</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">옵션명</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">옵션상품</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">수량</th>
               </tr>
             </thead>
@@ -3683,7 +3683,7 @@ export default function SearchTab() {
                         <span className="ml-2 font-medium">{selectedOrder.recipient_address || '-'}</span>
                       </div>
                       <div>
-                        <span className="text-gray-600">옵션명:</span>
+                        <span className="text-gray-600">옵션상품:</span>
                         <span className="ml-2 font-medium">{selectedOrder.option_name || '-'}</span>
                       </div>
                       <div>
@@ -3923,8 +3923,8 @@ export default function SearchTab() {
                         onChange={(e) => setCSFormData(prev => ({ ...prev, resendOption: e.target.value }))}
                         onKeyDown={handleCSKeyDown}
                         onFocus={(e) => e.target.placeholder = ''}
-                        onBlur={(e) => e.target.placeholder = '옵션명'}
-                        placeholder="옵션명"
+                        onBlur={(e) => e.target.placeholder = '옵션상품'}
+                        placeholder="옵션상품"
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
@@ -4147,7 +4147,7 @@ export default function SearchTab() {
               <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
                 <div className="space-y-2.5">
                   <div className="flex flex-col">
-                    <span className="text-gray-600 mb-1">옵션명</span>
+                    <span className="text-gray-600 mb-1">옵션상품</span>
                     <span className="text-gray-900 font-semibold bg-white rounded px-3 py-2 border border-purple-200">
                       {selectedOrderDetail.option_name || '-'}
                     </span>
@@ -4295,10 +4295,10 @@ export default function SearchTab() {
               <h4 className="text-sm font-semibold text-gray-900">추가주문 정보 (수정 가능)</h4>
 
               <div className="grid grid-cols-2 gap-4">
-                {/* 옵션명 */}
+                {/* 옵션상품 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    옵션명 <span className="text-red-500">*</span>
+                    옵션상품 <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -4384,7 +4384,7 @@ export default function SearchTab() {
             {/* 안내 메시지 */}
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
               <p className="text-sm text-amber-800">
-                💡 옵션명을 기준으로 셀러공급가, 출고처, 벤더사 등의 정보가 자동으로 매핑됩니다.
+                💡 옵션상품을 기준으로 셀러공급가, 출고처, 벤더사 등의 정보가 자동으로 매핑됩니다.
               </p>
             </div>
           </div>
@@ -4510,7 +4510,7 @@ export default function SearchTab() {
                 <tr>
                   <th className="px-3 py-2 text-left">주문번호</th>
                   <th className="px-3 py-2 text-left">수령인</th>
-                  <th className="px-3 py-2 text-left">옵션명</th>
+                  <th className="px-3 py-2 text-left">옵션상품</th>
                 </tr>
               </thead>
               <tbody>

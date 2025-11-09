@@ -16,7 +16,7 @@ interface ApplyMappingResult {
 }
 
 /**
- * 주문 목록에 옵션명 매핑을 적용
+ * 주문 목록에 옵션상품 매핑을 적용
  * @param orders - 원본 주문 목록
  * @param userId - 사용자 ID
  * @returns 매핑이 적용된 주문 목록과 변환 결과
@@ -28,14 +28,14 @@ export async function applyOptionMapping(
   try {
     const supabase = createClient();
 
-    // 사용자의 옵션명 매핑 설정 가져오기
+    // 사용자의 옵션상품 매핑 설정 가져오기
     const { data: mappings, error } = await supabase
       .from('option_name_mappings')
       .select('user_option_name, site_option_name')
       .eq('seller_id', userId);
 
     if (error) {
-      console.error('옵션명 매핑 조회 오류:', error);
+      console.error('옵션상품 매핑 조회 오류:', error);
       return {
         orders,
         mappingResults: [],
@@ -109,7 +109,7 @@ export async function applyOptionMapping(
       mappedOrders: mappedCount
     };
   } catch (error) {
-    console.error('옵션명 매핑 적용 오류:', error);
+    console.error('옵션상품 매핑 적용 오류:', error);
     return {
       orders,
       mappingResults: [],

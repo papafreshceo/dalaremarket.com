@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
       query = query.eq('vendor_name', vendorName);
     }
 
-    // 검색어 (주문번호, 수취인명, 옵션명)
+    // 검색어 (주문번호, 수취인명, 옵션상품)
     if (searchKeyword) {
       query = query.or(
         `order_number.ilike.%${searchKeyword}%,recipient_name.ilike.%${searchKeyword}%,option_name.ilike.%${searchKeyword}%`

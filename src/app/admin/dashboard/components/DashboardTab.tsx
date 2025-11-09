@@ -565,7 +565,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     return stats;
   }, [orders, currentYear, currentMonth]);
 
-  // 품목 발주 TOP 10 (옵션명의 category_4 기준)
+  // 품목 발주 TOP 10 (옵션상품의 category_4 기준)
   const [productTop10, setProductTop10] = useState<Array<{ name: string; category3: string; amount: number; percent: number }>>([]);
   const [allProducts, setAllProducts] = useState<Array<{ name: string; category3: string; amount: number; percent: number }>>([]);
   const [optionNameToCategory4, setOptionNameToCategory4] = useState<Map<string, string>>(new Map());
@@ -655,7 +655,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
   useEffect(() => {
     const fetchProductTop10 = async () => {
-      // 1) 옵션명별 금액 집계 (필터링된 주문 사용)
+      // 1) 옵션상품별 금액 집계 (필터링된 주문 사용)
       const optionMap: Record<string, number> = {};
       filteredOrders.forEach(order => {
         const optionName = order.optionName || order.option_name || '미지정';

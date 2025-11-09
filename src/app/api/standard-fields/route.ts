@@ -23,7 +23,7 @@ export async function GET() {
       { value: 'recipient_phone', label: '수령인전화번호' },  // field_8
       { value: 'recipient_address', label: '주소' },          // field_9
       { value: 'delivery_message', label: '배송메세지' },     // field_10
-      { value: 'option_name', label: '옵션명' },              // field_11
+      { value: 'option_name', label: '옵션상품' },              // field_11
       { value: 'quantity', label: '수량' },                   // field_12
       { value: 'market_check', label: '마켓' },               // field_13
       { value: 'confirmation', label: '확인' },               // field_14

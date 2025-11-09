@@ -10,7 +10,7 @@ import { requireAuth } from '@/lib/api-security';
  *   - 마켓명
  *   - 발송상태
  *   - 벤더사
- *   - 검색어 (주문번호/수취인명/옵션명)
+ *   - 검색어 (주문번호/수취인명/옵션상품)
  *
  * Updated: PostgreSQL RPC 함수 사용으로 95% 성능 개선
  */

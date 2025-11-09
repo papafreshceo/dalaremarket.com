@@ -1,14 +1,14 @@
 import { createClient } from '@/lib/supabase/server';
 
 /**
- * 서버사이드 옵션명 매핑 적용
+ * 서버사이드 옵션상품 매핑 적용
  *
- * 사용자가 설정한 옵션명 매핑 규칙을 적용하여 마켓의 옵션명을 사이트 옵션명으로 변환
+ * 사용자가 설정한 옵션상품 매핑 규칙을 적용하여 마켓의 옵션상품을 사이트 옵션상품으로 변환
  * 예: "반시2.5kg (중)" → "반시2.5kg(중)" (공백 차이 보정)
  *
  * @param orders - 주문 데이터 배열 (option_name 필드 포함)
  * @param userId - 사용자 ID
- * @returns 옵션명이 매핑된 주문 배열
+ * @returns 옵션상품이 매핑된 주문 배열
  */
 export async function applyOptionMappingToOrdersServer(
   orders: any[],
@@ -17,7 +17,7 @@ export async function applyOptionMappingToOrdersServer(
   try {
     const supabase = await createClient();
 
-    // 사용자의 옵션명 매핑 설정 조회
+    // 사용자의 옵션상품 매핑 설정 조회
     const { data: mappings, error } = await supabase
       .from('option_name_mappings')
       .select('user_option_name, site_option_name')

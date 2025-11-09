@@ -2,9 +2,10 @@ interface ValidationErrorModalProps {
   show: boolean;
   onClose: () => void;
   errors: string[];
+  onDownloadTemplate?: () => void;
 }
 
-export default function ValidationErrorModal({ show, onClose, errors }: ValidationErrorModalProps) {
+export default function ValidationErrorModal({ show, onClose, errors, onDownloadTemplate }: ValidationErrorModalProps) {
   if (!show) return null;
 
   return (
@@ -47,9 +48,11 @@ export default function ValidationErrorModal({ show, onClose, errors }: Validati
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '20px'
+              fontSize: '20px',
+              color: '#ef4444',
+              fontWeight: '700'
             }}>
-              ⚠️
+              !
             </div>
             <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#ef4444', margin: 0 }}>
               필수 칼럼 누락
@@ -92,15 +95,45 @@ export default function ValidationErrorModal({ show, onClose, errors }: Validati
           marginBottom: '24px'
         }}>
           <div style={{ fontSize: '13px', fontWeight: '600', color: '#0369a1', marginBottom: '8px' }}>
-            📋 필수 칼럼 목록
+            필수 칼럼 목록
           </div>
           <div style={{ fontSize: '13px', color: '#075985', lineHeight: '1.6' }}>
             • 수령인<br />
             • 수령인전화번호<br />
             • 주소<br />
-            • 옵션명 또는 옵션코드 (둘 중 하나는 필수)<br />
+            • 옵션상품 또는 옵션코드 (둘 중 하나는 필수)<br />
             • 수량
           </div>
+        </div>
+
+        {/* 안내 문구 */}
+        <div
+          onClick={onDownloadTemplate}
+          style={{
+          textAlign: 'center',
+          fontSize: '13px',
+          color: onDownloadTemplate ? '#2563eb' : '#6b7280',
+          marginBottom: '16px',
+          padding: '12px',
+          background: '#f9fafb',
+          borderRadius: '6px',
+          cursor: onDownloadTemplate ? 'pointer' : 'default',
+          transition: 'all 0.2s'
+        }}
+        onMouseEnter={(e) => {
+          if (onDownloadTemplate) {
+            e.currentTarget.style.background = '#eff6ff';
+            e.currentTarget.style.color = '#1d4ed8';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (onDownloadTemplate) {
+            e.currentTarget.style.background = '#f9fafb';
+            e.currentTarget.style.color = '#2563eb';
+          }
+        }}
+        >
+          발주서 양식을 사용하세요
         </div>
 
         {/* 닫기 버튼 */}
