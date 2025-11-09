@@ -30,12 +30,20 @@ def decrypt_file(input_path, output_path, password):
 
 if __name__ == '__main__':
     if len(sys.argv) != 4:
-        print("ERROR: Invalid arguments. Usage: python decrypt_excel.py <input_file> <output_file> <password>", file=sys.stderr)
+        print("ERROR: Invalid arguments. Usage: python decrypt_excel.py <input_file> <output_file> <password_file>", file=sys.stderr)
         sys.exit(1)
 
     input_file = sys.argv[1]
     output_file = sys.argv[2]
-    password = sys.argv[3]
+    password_file = sys.argv[3]
+
+    # 비밀번호 파일에서 읽기
+    try:
+        with open(password_file, 'r', encoding='utf-8') as f:
+            password = f.read().strip()
+    except Exception as e:
+        print(f"ERROR: Failed to read password file: {str(e)}", file=sys.stderr)
+        sys.exit(1)
 
     success = decrypt_file(input_file, output_file, password)
     sys.exit(0 if success else 1)

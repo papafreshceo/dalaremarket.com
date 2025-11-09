@@ -576,21 +576,39 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       return [];
     }
 
+    // 다중 필드 값 가져오기 헬퍼 함수
+    // "필드1,필드2,필드3" 형식으로 설정된 경우 순서대로 확인하여 값이 있는 첫 번째 필드 반환
+    const getFieldValue = (row: any, fieldMapping: string): string => {
+      if (!fieldMapping) return '';
+
+      // 쉼표로 구분된 여러 필드명 처리
+      const fieldNames = String(fieldMapping).split(',').map(f => f.trim());
+
+      for (const fieldName of fieldNames) {
+        const value = row[fieldName];
+        if (value !== undefined && value !== null && value !== '') {
+          return String(value);
+        }
+      }
+
+      return '';
+    };
+
     // 마켓별 필드 매핑을 사용하여 주문 데이터 생성
     // marketMapping의 field_4, field_5 등이 실제 엑셀 컬럼명을 가리킴
     const orders: SellerUploadedOrder[] = jsonData.map((row: any, index: number) => {
       return {
         id: index + 1,
         marketName: detected.market_name || '',
-        orderNumber: row[marketMapping.field_4] || '',  // field_4 = 주문번호
-        orderer: row[marketMapping.field_5] || '',      // field_5 = 주문자/구매자
-        ordererPhone: row[marketMapping.field_6] || '', // field_6 = 주문자전화번호
-        recipient: row[marketMapping.field_7] || '',    // field_7 = 수령인/수취인
-        recipientPhone: row[marketMapping.field_8] || '', // field_8 = 수령인전화번호
-        address: row[marketMapping.field_9] || '',      // field_9 = 주소
-        deliveryMessage: row[marketMapping.field_10] || '', // field_10 = 배송메시지
-        optionName: row[marketMapping.field_11] || '',  // field_11 = 옵션상품
-        quantity: Number(row[marketMapping.field_12] || 1), // field_12 = 수량
+        orderNumber: getFieldValue(row, marketMapping.field_4),  // field_4 = 주문번호
+        orderer: getFieldValue(row, marketMapping.field_5),      // field_5 = 주문자/구매자
+        ordererPhone: getFieldValue(row, marketMapping.field_6), // field_6 = 주문자전화번호
+        recipient: getFieldValue(row, marketMapping.field_7),    // field_7 = 수령인/수취인
+        recipientPhone: getFieldValue(row, marketMapping.field_8), // field_8 = 수령인전화번호
+        address: getFieldValue(row, marketMapping.field_9),      // field_9 = 주소
+        deliveryMessage: getFieldValue(row, marketMapping.field_10), // field_10 = 배송메시지
+        optionName: getFieldValue(row, marketMapping.field_11),  // field_11 = 옵션상품
+        quantity: Number(getFieldValue(row, marketMapping.field_12) || 1), // field_12 = 수량
       };
     });
 

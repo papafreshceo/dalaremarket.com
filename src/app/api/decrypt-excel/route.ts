@@ -54,20 +54,21 @@ export async function POST(request: NextRequest) {
 
     // Python 스크립트 실행
     try {
-      const command = `python "${scriptPath}" "${inputFilePath}" "${outputFilePath}" "${password}"`;
-      console.log('실행 명령:', command);
+      // 비밀번호를 파일로 저장하여 전달 (특수문자 이스케이핑 문제 방지)
+      const passwordFilePath = path.join(tempDir, `password_${uniqueId}.txt`);
+      await fs.writeFile(passwordFilePath, password, 'utf-8');
+
+      const command = `python "${scriptPath}" "${inputFilePath}" "${outputFilePath}" "${passwordFilePath}"`;
 
       const { stdout, stderr } = await execAsync(command);
 
-      console.log('Python stdout:', stdout);
-      if (stderr) {
-        console.error('Python stderr:', stderr);
-      }
+      // 비밀번호 파일 삭제
+      await fs.unlink(passwordFilePath).catch(() => {});
 
       // 복호화된 파일이 생성되었는지 확인
       try {
         await fs.access(outputFilePath);
-      } catch {
+      } catch (accessError) {
         throw new Error('복호화된 파일이 생성되지 않았습니다.');
       }
 
@@ -91,11 +92,6 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (decryptError: any) {
-      console.error('복호화 오류 전체:', decryptError);
-      console.error('오류 메시지:', decryptError.message);
-      console.error('오류 stderr:', decryptError.stderr);
-      console.error('오류 stdout:', decryptError.stdout);
-
       // 임시 파일 삭제
       if (inputFilePath) await fs.unlink(inputFilePath).catch(() => {});
       if (outputFilePath) await fs.unlink(outputFilePath).catch(() => {});

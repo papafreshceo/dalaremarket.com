@@ -701,8 +701,7 @@ export default function ExcelTab() {
   };
 
   // 엑셀 파일 읽기 (1단계: 파일 목록만 표시)
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+  const handleFileSelect = async (files: FileList) => {
     if (!files || files.length === 0) return;
 
     setLoading(true);
@@ -799,8 +798,14 @@ export default function ExcelTab() {
           ) {
             // 이미 처리된 파일들을 저장
             setProcessedPreviews(filePreviews);
-            // 원본 FileList 저장
-            setPendingFiles(files);
+
+            // 원본 FileList를 File[] 배열로 변환하여 저장 (참조 유지)
+            const filesArray = Array.from(files);
+
+            // DataTransfer로 FileList 재생성
+            const dt = new DataTransfer();
+            filesArray.forEach(f => dt.items.add(f));
+            setPendingFiles(dt.files);
             // 암호화된 파일 설정
             setCurrentPasswordFile(file);
             setShowPasswordModal(true);
@@ -819,7 +824,8 @@ export default function ExcelTab() {
         return orderA - orderB;
       });
 
-      setUploadedFiles(filePreviews);
+      // 기존 파일에 새 파일 추가 (교체가 아닌 추가)
+      setUploadedFiles(prev => [...prev, ...filePreviews]);
       setIntegrationStage('file-preview');
     } catch (error) {
       console.error('파일 읽기 실패:', error);
@@ -889,7 +895,7 @@ export default function ExcelTab() {
       setCurrentPasswordFile(null);
 
       // 모든 파일을 다시 조합 (이미 처리된 파일 + 복호화된 파일 + 나머지 파일)
-      const fileList = new DataTransfer();
+      const filesToProcess: File[] = [];
 
       if (pendingFiles) {
         // 모든 원본 파일을 순회하며 추가
@@ -897,27 +903,29 @@ export default function ExcelTab() {
           const file = pendingFiles[i];
           if (file.name === passwordFileName) {
             // 암호화된 파일 대신 복호화된 파일 추가
-            fileList.items.add(decryptedFile);
+            filesToProcess.push(decryptedFile);
           } else {
             // 일반 파일은 그대로 추가
-            fileList.items.add(file);
+            filesToProcess.push(file);
           }
         }
       } else {
         // pendingFiles가 없으면 복호화된 파일만 추가
-        fileList.items.add(decryptedFile);
+        filesToProcess.push(decryptedFile);
       }
 
       // 상태 초기화
       setPendingFiles(null);
       setProcessedPreviews([]);
 
-      // 모든 파일 다시 처리 (합성 이벤트 생성)
-      const syntheticEvent = {
-        target: { files: fileList.files }
-      } as React.ChangeEvent<HTMLInputElement>;
+      // DataTransfer를 사용하여 FileList 생성
+      const dt = new DataTransfer();
+      filesToProcess.forEach(file => {
+        dt.items.add(file);
+      });
 
-      await handleFileSelect(syntheticEvent);
+      // FileList를 직접 전달
+      await handleFileSelect(dt.files);
     } catch (error: any) {
       console.error('복호화 오류:', error);
       toast.error(error.message || '비밀번호가 올바르지 않습니다.', {
@@ -1760,7 +1768,7 @@ export default function ExcelTab() {
               type="file"
               accept=".xlsx,.xls,.csv"
               multiple
-              onChange={handleFileSelect}
+              onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
               onClick={(e) => {
                 // 같은 파일을 다시 선택할 수 있도록 value 초기화
                 (e.target as HTMLInputElement).value = '';
