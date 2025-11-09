@@ -30,9 +30,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 임시 디렉토리 생성
-    const tempDir = path.join(process.cwd(), 'temp');
-    await fs.mkdir(tempDir, { recursive: true });
+    // 임시 디렉토리 생성 (OS의 임시 디렉토리 사용)
+    const os = await import('os');
+    const tempDir = os.tmpdir();
+
+    // 또는 프로젝트 내 temp 디렉토리 사용
+    // const tempDir = path.join(process.cwd(), 'temp');
+    // await fs.mkdir(tempDir, { recursive: true });
 
     // 고유한 파일명 생성
     const uniqueId = uuidv4();
@@ -51,9 +55,11 @@ export async function POST(request: NextRequest) {
     // Python 스크립트 실행
     try {
       const command = `python "${scriptPath}" "${inputFilePath}" "${outputFilePath}" "${password}"`;
+      console.log('실행 명령:', command);
 
       const { stdout, stderr } = await execAsync(command);
 
+      console.log('Python stdout:', stdout);
       if (stderr) {
         console.error('Python stderr:', stderr);
       }
@@ -85,20 +91,24 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (decryptError: any) {
-      console.error('복호화 오류:', decryptError);
+      console.error('복호화 오류 전체:', decryptError);
+      console.error('오류 메시지:', decryptError.message);
+      console.error('오류 stderr:', decryptError.stderr);
+      console.error('오류 stdout:', decryptError.stdout);
 
       // 임시 파일 삭제
       if (inputFilePath) await fs.unlink(inputFilePath).catch(() => {});
       if (outputFilePath) await fs.unlink(outputFilePath).catch(() => {});
 
       const errorMessage = decryptError.message || decryptError.stderr || '';
+      const fullError = `${errorMessage} ${decryptError.stdout || ''}`;
 
       if (
-        errorMessage.includes('password') ||
-        errorMessage.includes('Password') ||
-        errorMessage.includes('incorrect') ||
-        errorMessage.includes('decrypt') ||
-        errorMessage.includes('Invalid')
+        fullError.includes('password') ||
+        fullError.includes('Password') ||
+        fullError.includes('incorrect') ||
+        fullError.includes('decrypt') ||
+        fullError.includes('Invalid')
       ) {
         return NextResponse.json(
           { error: '비밀번호가 올바르지 않습니다.' },
@@ -107,7 +117,12 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json(
-        { error: '파일 복호화에 실패했습니다: ' + errorMessage },
+        {
+          error: '파일 복호화에 실패했습니다.',
+          details: errorMessage,
+          stdout: decryptError.stdout,
+          stderr: decryptError.stderr
+        },
         { status: 500 }
       );
     }
