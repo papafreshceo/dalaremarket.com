@@ -9,6 +9,60 @@
    ======================== */
 
 :root {
+  /* ==================== Shadcn/UI 디자인 시스템 (oklch) ==================== */
+  --background: oklch(0.8452 0 0);
+  --foreground: oklch(0.2393 0 0);
+  --card: oklch(0.7572 0 0);
+  --card-foreground: oklch(0.2393 0 0);
+  --popover: oklch(0.7572 0 0);
+  --popover-foreground: oklch(0.2393 0 0);
+  --primary: oklch(0.5016 0.1887 27.4816);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.4955 0.0896 126.1858);
+  --secondary-foreground: oklch(1.0000 0 0);
+  --muted: oklch(0.7826 0 0);
+  --muted-foreground: oklch(0.4091 0 0);
+  --accent: oklch(0.5880 0.0993 245.7394);
+  --accent-foreground: oklch(1.0000 0 0);
+  --destructive: oklch(0.7076 0.1975 46.4558);
+  --destructive-foreground: oklch(0 0 0);
+  --border: oklch(0.4313 0 0);
+  --input: oklch(0.4313 0 0);
+  --ring: oklch(0.5016 0.1887 27.4816);
+  --chart-1: oklch(0.5016 0.1887 27.4816);
+  --chart-2: oklch(0.4955 0.0896 126.1858);
+  --chart-3: oklch(0.5880 0.0993 245.7394);
+  --chart-4: oklch(0.7076 0.1975 46.4558);
+  --chart-5: oklch(0.5656 0.0431 40.4319);
+  --sidebar: oklch(0.7572 0 0);
+  --sidebar-foreground: oklch(0.2393 0 0);
+  --sidebar-primary: oklch(0.5016 0.1887 27.4816);
+  --sidebar-primary-foreground: oklch(1.0000 0 0);
+  --sidebar-accent: oklch(0.5880 0.0993 245.7394);
+  --sidebar-accent-foreground: oklch(1.0000 0 0);
+  --sidebar-border: oklch(0.4313 0 0);
+  --sidebar-ring: oklch(0.5016 0.1887 27.4816);
+  --font-sans: "Oxanium", sans-serif;
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: "Source Code Pro", monospace;
+  --radius: 0px;
+  --shadow-x: 0px;
+  --shadow-y: 2px;
+  --shadow-blur: 4px;
+  --shadow-spread: 0px;
+  --shadow-opacity: 0.4;
+  --shadow-color: hsl(0 0% 0%);
+  --shadow-2xs: 0px 2px 4px 0px hsl(0 0% 0% / 0.20);
+  --shadow-xs: 0px 2px 4px 0px hsl(0 0% 0% / 0.20);
+  --shadow-sm: 0px 2px 4px 0px hsl(0 0% 0% / 0.40), 0px 1px 2px -1px hsl(0 0% 0% / 0.40);
+  --shadow: 0px 2px 4px 0px hsl(0 0% 0% / 0.40), 0px 1px 2px -1px hsl(0 0% 0% / 0.40);
+  --shadow-md: 0px 2px 4px 0px hsl(0 0% 0% / 0.40), 0px 2px 4px -1px hsl(0 0% 0% / 0.40);
+  --shadow-lg: 0px 2px 4px 0px hsl(0 0% 0% / 0.40), 0px 4px 6px -1px hsl(0 0% 0% / 0.40);
+  --shadow-xl: 0px 2px 4px 0px hsl(0 0% 0% / 0.40), 0px 8px 10px -1px hsl(0 0% 0% / 0.40);
+  --shadow-2xl: 0px 2px 4px 0px hsl(0 0% 0% / 1.00);
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+
   /* ==================== 라이트 모드 색상 시스템 ==================== */
 
   /* Primary (파란색 - 메인 브랜드 컬러) */
@@ -154,6 +208,54 @@
 
 /* ==================== 다크 모드 색상 시스템 ==================== */
 .dark {
+  /* Shadcn/UI 다크모드 (oklch) */
+  --background: oklch(0.2178 0 0);
+  --foreground: oklch(0.9067 0 0);
+  --card: oklch(0.2850 0 0);
+  --card-foreground: oklch(0.9067 0 0);
+  --popover: oklch(0.2850 0 0);
+  --popover-foreground: oklch(0.9067 0 0);
+  --primary: oklch(0.6083 0.2090 27.0276);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.6423 0.1467 133.0145);
+  --secondary-foreground: oklch(0 0 0);
+  --muted: oklch(0.2645 0 0);
+  --muted-foreground: oklch(0.7058 0 0);
+  --accent: oklch(0.7482 0.1235 244.7492);
+  --accent-foreground: oklch(0 0 0);
+  --destructive: oklch(0.7839 0.1719 68.0943);
+  --destructive-foreground: oklch(0 0 0);
+  --border: oklch(0.4091 0 0);
+  --input: oklch(0.4091 0 0);
+  --ring: oklch(0.6083 0.2090 27.0276);
+  --chart-1: oklch(0.6083 0.2090 27.0276);
+  --chart-2: oklch(0.6423 0.1467 133.0145);
+  --chart-3: oklch(0.7482 0.1235 244.7492);
+  --chart-4: oklch(0.7839 0.1719 68.0943);
+  --chart-5: oklch(0.6471 0.0334 40.7963);
+  --sidebar: oklch(0.1913 0 0);
+  --sidebar-foreground: oklch(0.9067 0 0);
+  --sidebar-primary: oklch(0.6083 0.2090 27.0276);
+  --sidebar-primary-foreground: oklch(1.0000 0 0);
+  --sidebar-accent: oklch(0.7482 0.1235 244.7492);
+  --sidebar-accent-foreground: oklch(0 0 0);
+  --sidebar-border: oklch(0.4091 0 0);
+  --sidebar-ring: oklch(0.6083 0.2090 27.0276);
+  --shadow-x: 0px;
+  --shadow-y: 2px;
+  --shadow-blur: 5px;
+  --shadow-spread: 0px;
+  --shadow-opacity: 0.6;
+  --shadow-color: hsl(0 0% 0%);
+  --shadow-2xs: 0px 2px 5px 0px hsl(0 0% 0% / 0.30);
+  --shadow-xs: 0px 2px 5px 0px hsl(0 0% 0% / 0.30);
+  --shadow-sm: 0px 2px 5px 0px hsl(0 0% 0% / 0.60), 0px 1px 2px -1px hsl(0 0% 0% / 0.60);
+  --shadow: 0px 2px 5px 0px hsl(0 0% 0% / 0.60), 0px 1px 2px -1px hsl(0 0% 0% / 0.60);
+  --shadow-md: 0px 2px 5px 0px hsl(0 0% 0% / 0.60), 0px 2px 4px -1px hsl(0 0% 0% / 0.60);
+  --shadow-lg: 0px 2px 5px 0px hsl(0 0% 0% / 0.60), 0px 4px 6px -1px hsl(0 0% 0% / 0.60);
+  --shadow-xl: 0px 2px 5px 0px hsl(0 0% 0% / 0.60), 0px 8px 10px -1px hsl(0 0% 0% / 0.60);
+  --shadow-2xl: 0px 2px 5px 0px hsl(0 0% 0% / 1.50);
+
   /* Primary (파란색) - 라이트모드보다 밝게 */
   --color-primary-50: #1e3a8a;
   --color-primary-100: #1e40af;
@@ -361,6 +463,7 @@ table td {
 }
 
 /* bg-primary, bg-danger 등 CSS 변수 기반 클래스 강제 적용 */
+/* 기본 bg-primary (테마가 아닐 때) */
 .bg-primary {
   background-color: var(--color-primary) !important;
 }
@@ -374,6 +477,27 @@ table td {
 }
 
 .dark .hover\:bg-primary-hover:hover {
+  background-color: var(--color-primary-hover) !important;
+}
+
+/* 테마 활성화 시 bg-primary (테마 변수 사용) */
+.theme-enabled .bg-primary {
+  background-color: var(--primary) !important;
+}
+
+.theme-enabled .text-primary-foreground {
+  color: var(--primary-foreground) !important;
+}
+
+.theme-enabled .hover\:bg-primary-hover:hover {
+  background-color: var(--color-primary-hover) !important;
+}
+
+.dark.theme-enabled .bg-primary {
+  background-color: var(--primary) !important;
+}
+
+.dark.theme-enabled .hover\:bg-primary-hover:hover {
   background-color: var(--color-primary-hover) !important;
 }
 
@@ -455,6 +579,269 @@ span[style*="font"].text-warning {
 
 .dark .hover\:bg-purple-hover:hover {
   background-color: #8b5cf6 !important;
+}
+
+/* ==================== 테마 시스템 클래스 (admin/settings에서만 적용) ==================== */
+/* admin/settings 경로에서만 테마 변수 사용 */
+.theme-enabled .bg-background {
+  background-color: var(--background) !important;
+}
+
+.theme-enabled .bg-foreground {
+  background-color: var(--foreground) !important;
+}
+
+.theme-enabled .text-foreground {
+  color: var(--foreground) !important;
+}
+
+/* surface (카드, 패널 배경) */
+.theme-enabled .bg-surface {
+  background-color: var(--color-surface, var(--card, #ffffff)) !important;
+}
+
+.theme-enabled .hover\:bg-surface:hover,
+.theme-enabled .hover\:bg-surface-hover:hover {
+  background-color: var(--color-surface-hover, var(--muted, #f9fafb)) !important;
+}
+
+/* text colors */
+.theme-enabled .text-text {
+  color: var(--color-text, var(--foreground, #111827)) !important;
+}
+
+.theme-enabled .text-text-secondary {
+  color: var(--color-text-secondary, var(--muted-foreground, #4b5563)) !important;
+}
+
+.theme-enabled .text-text-tertiary {
+  color: var(--color-text-tertiary, var(--muted-foreground, #6b7280)) !important;
+}
+
+/* border */
+.theme-enabled .border-border {
+  border-color: var(--color-border, var(--border, #e5e7eb)) !important;
+}
+
+.theme-enabled .hover\:border-border:hover {
+  border-color: var(--color-border-hover, var(--border, #d1d5db)) !important;
+}
+
+/* ring (focus) */
+.theme-enabled .focus\:ring-primary:focus {
+  --tw-ring-color: var(--color-primary, var(--primary, #2563eb)) !important;
+}
+
+.theme-enabled .ring {
+  border-color: var(--ring) !important;
+}
+
+/* card */
+.theme-enabled .bg-card {
+  background-color: var(--card) !important;
+}
+
+.theme-enabled .text-card-foreground {
+  color: var(--card-foreground) !important;
+}
+
+/* muted */
+.theme-enabled .bg-muted {
+  background-color: var(--muted) !important;
+}
+
+.theme-enabled .text-muted-foreground {
+  color: var(--muted-foreground) !important;
+}
+
+/* accent */
+.theme-enabled .bg-accent {
+  background-color: var(--accent) !important;
+}
+
+.theme-enabled .text-accent-foreground {
+  color: var(--accent-foreground) !important;
+}
+
+/* destructive */
+.theme-enabled .bg-destructive {
+  background-color: var(--destructive) !important;
+}
+
+.theme-enabled .text-destructive-foreground {
+  color: var(--destructive-foreground) !important;
+}
+
+/* popover */
+.theme-enabled .bg-popover {
+  background-color: var(--popover) !important;
+}
+
+.theme-enabled .text-popover-foreground {
+  color: var(--popover-foreground) !important;
+}
+
+/* secondary */
+.theme-enabled .bg-secondary {
+  background-color: var(--secondary) !important;
+}
+
+.theme-enabled .text-secondary-foreground {
+  color: var(--secondary-foreground) !important;
+}
+
+/* input */
+.theme-enabled .border-input {
+  border-color: var(--input) !important;
+}
+
+/* sidebar */
+.theme-enabled .bg-sidebar {
+  background-color: var(--sidebar) !important;
+}
+
+.theme-enabled .text-sidebar-foreground {
+  color: var(--sidebar-foreground) !important;
+}
+
+.theme-enabled .bg-sidebar-primary {
+  background-color: var(--sidebar-primary) !important;
+}
+
+.theme-enabled .text-sidebar-primary-foreground {
+  color: var(--sidebar-primary-foreground) !important;
+}
+
+.theme-enabled .bg-sidebar-accent {
+  background-color: var(--sidebar-accent) !important;
+}
+
+.theme-enabled .text-sidebar-accent-foreground {
+  color: var(--sidebar-accent-foreground) !important;
+}
+
+.theme-enabled .border-sidebar-border {
+  border-color: var(--sidebar-border) !important;
+}
+
+/* chart colors */
+.theme-enabled .chart-1 {
+  color: var(--chart-1) !important;
+}
+
+.theme-enabled .chart-2 {
+  color: var(--chart-2) !important;
+}
+
+.theme-enabled .chart-3 {
+  color: var(--chart-3) !important;
+}
+
+.theme-enabled .chart-4 {
+  color: var(--chart-4) !important;
+}
+
+.theme-enabled .chart-5 {
+  color: var(--chart-5) !important;
+}
+
+/* ==================== 테마 radius & shadow 적용 ==================== */
+/* rounded 클래스들이 테마의 --radius 사용 */
+.theme-enabled .rounded,
+.theme-enabled .rounded-lg,
+.theme-enabled .rounded-md,
+.theme-enabled .rounded-sm,
+.theme-enabled .rounded-xl,
+.theme-enabled .rounded-2xl {
+  border-radius: var(--radius, 0.5rem) !important;
+}
+
+/* shadow 클래스들이 테마의 shadow 변수 사용 */
+.theme-enabled .shadow-sm {
+  box-shadow: var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05)) !important;
+}
+
+.theme-enabled .shadow,
+.theme-enabled .shadow-md {
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1)) !important;
+}
+
+.theme-enabled .shadow-lg {
+  box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1)) !important;
+}
+
+.theme-enabled .shadow-xl {
+  box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1)) !important;
+}
+
+.theme-enabled .shadow-2xl {
+  box-shadow: var(--shadow-2xl, 0 25px 50px -12px rgba(0, 0, 0, 0.25)) !important;
+}
+
+/* ==================== 테마 폰트 적용 ==================== */
+.theme-enabled body,
+.theme-enabled .font-sans {
+  font-family: var(--font-sans, ui-sans-serif, system-ui) !important;
+}
+
+.theme-enabled .font-serif {
+  font-family: var(--font-serif, ui-serif, Georgia) !important;
+}
+
+.theme-enabled .font-mono {
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+}
+
+/* gradient (Tailwind gradients) */
+.theme-enabled .from-primary {
+  --tw-gradient-from: var(--primary) !important;
+  --tw-gradient-to: rgb(from var(--primary) r g b / 0) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.theme-enabled .to-primary {
+  --tw-gradient-to: var(--primary) !important;
+}
+
+.theme-enabled .to-primary\/80 {
+  --tw-gradient-to: rgb(from var(--primary) r g b / 0.8) !important;
+}
+
+.theme-enabled .from-secondary {
+  --tw-gradient-from: var(--secondary) !important;
+  --tw-gradient-to: rgb(from var(--secondary) r g b / 0) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.theme-enabled .to-secondary {
+  --tw-gradient-to: var(--secondary) !important;
+}
+
+.theme-enabled .from-accent {
+  --tw-gradient-from: var(--accent) !important;
+  --tw-gradient-to: rgb(from var(--accent) r g b / 0) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.theme-enabled .to-accent {
+  --tw-gradient-to: var(--accent) !important;
+}
+
+/* hover states */
+.theme-enabled .hover\:bg-surface-hover:hover {
+  background-color: var(--color-surface-hover, #f9fafb) !important;
+}
+
+.theme-enabled .hover\:text-primary:hover {
+  color: var(--primary) !important;
+}
+
+.theme-enabled .group:hover .group-hover\:text-primary {
+  color: var(--primary) !important;
+}
+
+.theme-enabled .group:hover .group-hover\:scale-110 {
+  transform: scale(1.1);
 }
 
 /* ==================== 카드 스타일 (그림자 + 그라데이션) ==================== */

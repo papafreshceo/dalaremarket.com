@@ -1,0 +1,72 @@
+{
+  "name": "Platform Orders Default Theme",
+  "description": "platform/orders 페이지 기본 테마 (2025-01-09 저장)",
+  "scope": "platform-orders",
+  "version": "1.0.0",
+  "savedAt": "2025-01-09",
+  "cssVariables": {
+    "comment": "Light Mode Colors",
+    "--color-primary": "#2563eb",
+    "--color-primary-hover": "#1d4ed8",
+    "--color-success": "#10b981",
+    "--color-success-hover": "#059669",
+    "--color-warning": "#f59e0b",
+    "--color-warning-hover": "#d97706",
+    "--color-danger": "#ef4444",
+    "--color-danger-hover": "#dc2626",
+
+    "--color-background": "#ffffff",
+    "--color-background-secondary": "#f9fafb",
+    "--color-surface": "#ffffff",
+    "--color-surface-hover": "#f9fafb",
+
+    "--color-text": "#111827",
+    "--color-text-secondary": "#4b5563",
+    "--color-text-tertiary": "#6b7280",
+    "--color-text-disabled": "#9ca3af",
+
+    "--color-border": "#e5e7eb",
+    "--color-border-hover": "#d1d5db",
+    "--color-border-focus": "#3b82f6",
+
+    "--spacing-xs": "0.25rem",
+    "--spacing-sm": "0.5rem",
+    "--spacing-md": "1rem",
+    "--spacing-lg": "1.5rem",
+    "--spacing-xl": "2rem",
+
+    "--radius-sm": "0.25rem",
+    "--radius-md": "0.5rem",
+    "--radius-lg": "0.75rem",
+    "--radius-xl": "1rem",
+
+    "--shadow-sm": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+    "--shadow-md": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+    "--shadow-lg": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)"
+  },
+  "darkModeVariables": {
+    "comment": "Dark Mode Colors",
+    "--color-primary": "#3b82f6",
+    "--color-primary-hover": "#60a5fa",
+    "--color-success": "#22c55e",
+    "--color-success-hover": "#4ade80",
+    "--color-warning": "#f59e0b",
+    "--color-warning-hover": "#fbbf24",
+    "--color-danger": "#ef4444",
+    "--color-danger-hover": "#f87171",
+
+    "--color-background": "#1e1e1e",
+    "--color-background-secondary": "#252526",
+    "--color-surface": "#2d2d30",
+    "--color-surface-hover": "#3e3e42",
+
+    "--color-text": "#cccccc",
+    "--color-text-secondary": "#9c9c9c",
+    "--color-text-tertiary": "#6e6e6e",
+    "--color-text-disabled": "#5a5a5a",
+
+    "--color-border": "#3e3e42",
+    "--color-border-hover": "#505050",
+    "--color-border-focus": "#60a5fa"
+  }
+}

@@ -1,7 +1,6 @@
-// src/components/ui/index.tsx
+// src/components/ui/index.ts
 // 모든 UI 컴포넌트를 한 곳에서 export
 
-// src/components/ui/index.tsx
 export { Button } from './Button'
 export { Card } from './Card'
 export { DataTable } from './DataTable'

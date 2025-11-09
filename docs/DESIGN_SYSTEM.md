@@ -2,41 +2,93 @@
 
 ## 📋 목차
 1. [페이지 레이아웃 구조](#페이지-레이아웃-구조)
-2. [컴포넌트 스타일 가이드](#컴포넌트-스타일-가이드)
-3. [색상 시스템](#색상-시스템)
-4. [타이포그래피](#타이포그래피)
-5. [반복 사용 패턴](#반복-사용-패턴)
+2. [공통 컴포넌트 사용](#공통-컴포넌트-사용)
+3. [컴포넌트 스타일 가이드](#컴포넌트-스타일-가이드)
+4. [색상 시스템](#색상-시스템)
+5. [타이포그래피](#타이포그래피)
+
+---
+
+## ⚠️ 중요: 공통 컴포넌트를 사용하세요!
+
+### ❌ 절대 하지 마세요
+```tsx
+// 직접 스타일 하드코딩
+<div className="bg-white shadow rounded-lg p-6">
+  <input className="w-full px-3 py-2 border..." />
+  <button className="px-4 py-2 bg-blue-600...">저장</button>
+</div>
+```
+
+### ✅ 반드시 공통 컴포넌트 사용
+```tsx
+import { Button, Input, Card } from '@/components/ui'
+import { PageLayout, PageSection, FormGrid } from '@/components/admin'
+
+<PageLayout title="페이지 제목" description="설명">
+  <PageSection>
+    <FormGrid columns={2}>
+      <Input label="필드명" />
+    </FormGrid>
+    <ActionBar>
+      <Button variant="primary">저장</Button>
+    </ActionBar>
+  </PageSection>
+</PageLayout>
+```
+
+---
+
+## 공통 컴포넌트 사용
+
+### 사용 가능한 컴포넌트
+
+#### UI 컴포넌트 (`@/components/ui`)
+- `Button` - 버튼
+- `Card` - 카드
+- `Input` - 입력 필드
+- `Select` - 선택 박스
+- `Badge` - 배지
+- `DataTable` - 데이터 테이블
+- `Modal` - 모달
+- `Tabs` - 탭
+- `DatePicker` - 날짜 선택
+
+#### 관리자 컴포넌트 (`@/components/admin`)
+- `PageLayout` - 페이지 레이아웃
+- `PageSection` - 페이지 섹션
+- `FormGrid` - 폼 그리드
+- `ActionBar` - 액션 버튼 영역
+- `InfoBanner` - 알림 배너
 
 ---
 
 ## 페이지 레이아웃 구조
 
-### 기본 페이지 구조
+### 기본 페이지 구조 (공통 컴포넌트 사용)
 ```tsx
+import { Button, Input } from '@/components/ui'
+import { PageLayout, PageSection, FormGrid, ActionBar } from '@/components/admin'
+
 export default function PageName() {
   return (
-    <div>
-      {/* 1. 페이지 헤더 */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">페이지 제목</h1>
-        <p className="mt-1 text-sm text-gray-600">페이지 설명</p>
-      </div>
+    <PageLayout
+      title="페이지 제목"
+      description="페이지 설명"
+      actions={<Button variant="primary">추가</Button>}
+    >
+      <PageSection title="섹션 제목">
+        <FormGrid columns={2}>
+          <Input label="필드 1" />
+          <Input label="필드 2" />
+        </FormGrid>
 
-      {/* 2. 필터/탭 영역 (선택사항) */}
-      <div className="mb-4 flex gap-2 flex-wrap">
-        {/* 필터 버튼들 */}
-      </div>
-
-      {/* 3. 메인 컨텐츠 */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        {/* 테이블, 폼, 카드 등 */}
-      </div>
-
-      {/* 4. 액션 버튼 영역 (선택사항) */}
-      <div className="mt-6 flex justify-end gap-3">
-        {/* 저장, 취소 등 버튼 */}
-      </div>
-    </div>
+        <ActionBar position="right">
+          <Button variant="outline">취소</Button>
+          <Button variant="primary">저장</Button>
+        </ActionBar>
+      </PageSection>
+    </PageLayout>
   )
 }
 ```
@@ -298,12 +350,49 @@ export default function PageName() {
 
 ## 색상 시스템
 
-### 주요 색상
-- **Primary (파란색)**: `bg-blue-600`, `text-blue-600`, `border-blue-600`
+### ⭐ CSS 변수 사용 (권장)
+
+**절대 하드코딩된 색상을 사용하지 마세요!** 대신 `globals.css`에 정의된 CSS 변수를 사용하세요.
+
+#### 배경 색상
+```tsx
+// ❌ 하드코딩
+<button className="bg-blue-600 hover:bg-blue-700">
+
+// ✅ CSS 변수 클래스 사용
+<button className="bg-primary hover:bg-primary-hover">
+<button className="bg-success hover:bg-success-hover">
+<button className="bg-danger hover:bg-danger-hover">
+<button className="bg-warning hover:bg-warning-hover">
+
+// ✅ 직접 CSS 변수 사용
+<div style={{ backgroundColor: 'var(--color-primary)' }}>
+<div style={{ backgroundColor: 'var(--color-success)' }}>
+```
+
+#### 텍스트 색상
+```tsx
+<span className="text-primary">파란색 텍스트</span>
+<span className="text-success">초록색 텍스트</span>
+<span className="text-danger">빨간색 텍스트</span>
+<span className="text-warning">노란색 텍스트</span>
+```
+
+#### 사용 가능한 CSS 변수
+- `--color-primary` / `--color-primary-hover` (파란색)
+- `--color-success` / `--color-success-hover` (초록색)
+- `--color-danger` / `--color-danger-hover` (빨간색)
+- `--color-warning` / `--color-warning-hover` (노란색)
+- `--color-background` / `--color-background-secondary`
+- `--color-text` / `--color-text-secondary` / `--color-text-tertiary`
+- `--color-border` / `--color-border-hover`
+
+### Tailwind 색상 (비권장)
+CSS 변수를 사용할 수 없는 경우에만 사용:
+- **Primary (파란색)**: `bg-blue-600`, `text-blue-600`
 - **Success (초록색)**: `bg-green-600`, `text-green-600`
 - **Warning (노란색)**: `bg-yellow-600`, `text-yellow-600`
 - **Danger (빨간색)**: `bg-red-600`, `text-red-600`
-- **Gray (회색)**: `bg-gray-600`, `text-gray-600`
 
 ### 배경 색상
 - **흰색 카드**: `bg-white`

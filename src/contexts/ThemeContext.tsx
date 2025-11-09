@@ -36,6 +36,43 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // DB에서 활성 테마의 CSS 변수 불러와서 적용 (admin/settings 경로에서만)
+  useEffect(() => {
+    const loadActiveTheme = async () => {
+      // admin/settings 경로 체크
+      const isSettingsPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin/settings')
+
+      if (!isSettingsPage) {
+        // settings 페이지가 아니면 theme-enabled 클래스 제거
+        document.documentElement.classList.remove('theme-enabled')
+        return
+      }
+
+      // settings 페이지면 theme-enabled 클래스 추가
+      document.documentElement.classList.add('theme-enabled')
+
+      try {
+        const response = await fetch('/api/design-theme/active')
+        const result = await response.json()
+
+        if (result.success && result.data?.css_variables) {
+          const cssVars = result.data.css_variables
+
+          // CSS 변수를 :root에 동적으로 적용
+          Object.entries(cssVars).forEach(([key, value]) => {
+            document.documentElement.style.setProperty(key, value as string)
+          })
+
+          console.log('✅ 테마 CSS 변수 적용 완료:', Object.keys(cssVars).length, '개')
+        }
+      } catch (error) {
+        console.error('테마 로드 실패:', error)
+      }
+    }
+
+    loadActiveTheme()
+  }, [])
+
   // 테마 변경 시 HTML 클래스 업데이트
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
