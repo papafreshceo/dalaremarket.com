@@ -1,16 +1,26 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
-import { requireAdmin } from '@/lib/api-security';
+import { requireStaff } from '@/lib/api-security';
+import { canCreateServer, canUpdateServer, canDeleteServer } from '@/lib/permissions-server';
 
 /**
  * POST /api/integrated-orders/bulk
  * 대량 주문 생성/업데이트 (UPSERT)
  */
 export async function POST(request: NextRequest) {
-  // 🔒 보안: 관리자만 접근 가능
-  const auth = await requireAdmin(request);
+  // 🔒 보안: 직원 이상 접근 가능
+  const auth = await requireStaff(request);
   if (!auth.authorized) return auth.error;
+
+  // 🔒 권한 체크: 생성 권한 확인
+  const hasCreatePermission = await canCreateServer(auth.user!.id, '/admin/order-integration');
+  if (!hasCreatePermission) {
+    return NextResponse.json(
+      { success: false, error: '주문 생성 권한이 없습니다.' },
+      { status: 403 }
+    );
+  }
 
   try {
     const supabase = await createClient();
@@ -249,9 +259,18 @@ export async function POST(request: NextRequest) {
  * 대량 주문 수정
  */
 export async function PUT(request: NextRequest) {
-  // 🔒 보안: 관리자만 접근 가능
-  const auth = await requireAdmin(request);
+  // 🔒 보안: 직원 이상 접근 가능
+  const auth = await requireStaff(request);
   if (!auth.authorized) return auth.error;
+
+  // 🔒 권한 체크: 수정 권한 확인
+  const hasUpdatePermission = await canUpdateServer(auth.user!.id, '/admin/order-integration');
+  if (!hasUpdatePermission) {
+    return NextResponse.json(
+      { success: false, error: '주문 수정 권한이 없습니다.' },
+      { status: 403 }
+    );
+  }
 
   try {
     const supabase = await createClient();
@@ -341,9 +360,18 @@ export async function PUT(request: NextRequest) {
  * 대량 주문 삭제
  */
 export async function DELETE(request: NextRequest) {
-  // 🔒 보안: 관리자만 접근 가능
-  const auth = await requireAdmin(request);
+  // 🔒 보안: 직원 이상 접근 가능
+  const auth = await requireStaff(request);
   if (!auth.authorized) return auth.error;
+
+  // 🔒 권한 체크: 삭제 권한 확인
+  const hasDeletePermission = await canDeleteServer(auth.user!.id, '/admin/order-integration');
+  if (!hasDeletePermission) {
+    return NextResponse.json(
+      { success: false, error: '주문 삭제 권한이 없습니다.' },
+      { status: 403 }
+    );
+  }
 
   try {
     const supabase = await createClient();

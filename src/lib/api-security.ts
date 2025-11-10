@@ -32,7 +32,32 @@ export async function requireAuth(request: NextRequest) {
 }
 
 /**
- * 관리자 이상 권한 필요
+ * 직원 이상 권한 필요 (employee, admin, super_admin 모두 허용)
+ */
+export async function requireStaff(request: NextRequest) {
+  const authResult = await withAuth(request, {
+    requireRole: ['super_admin', 'admin', 'employee']
+  })
+
+  if (!authResult.authorized) {
+    return {
+      authorized: false,
+      error: authResult.response,
+      user: null,
+      userData: null,
+    }
+  }
+
+  return {
+    authorized: true,
+    error: null,
+    user: authResult.user,
+    userData: authResult.userData,
+  }
+}
+
+/**
+ * 관리자 이상 권한 필요 (admin, super_admin만 허용)
  */
 export async function requireAdmin(request: NextRequest) {
   const authResult = await withAuth(request, {

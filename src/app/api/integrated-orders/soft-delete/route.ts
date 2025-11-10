@@ -1,15 +1,25 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-security';
+import { requireStaff } from '@/lib/api-security';
+import { canDeleteServer } from '@/lib/permissions-server';
 
 /**
  * POST /api/integrated-orders/soft-delete
  * 주문 소프트 삭제 (is_deleted = true)
  */
 export async function POST(request: NextRequest) {
-  // 🔒 보안: 관리자만 접근 가능
-  const auth = await requireAdmin(request);
+  // 🔒 보안: 직원 이상 접근 가능
+  const auth = await requireStaff(request);
   if (!auth.authorized) return auth.error;
+
+  // 🔒 권한 체크: 삭제 권한 확인
+  const hasDeletePermission = await canDeleteServer(auth.user!.id, '/admin/order-integration');
+  if (!hasDeletePermission) {
+    return NextResponse.json(
+      { success: false, error: '주문 삭제 권한이 없습니다.' },
+      { status: 403 }
+    );
+  }
 
   try {
     const supabase = await createClient();

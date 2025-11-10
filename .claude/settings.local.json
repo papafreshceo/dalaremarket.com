@@ -158,7 +158,9 @@
       "Bash(Select-Object -First 3)",
       "Bash(if exist test-credits.js del /f test-credits.js)",
       "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\settings\\theme-test\" rmdir /s /q \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\admin\\settings\\theme-test\")",
-      "Bash(python -m pip:*)"
+      "Bash(python -m pip:*)",
+      "Bash(python:*)",
+      "Bash(/tmp/dashboardtab_last_commit.txt)"
     ],
     "deny": [],
     "ask": []
