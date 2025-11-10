@@ -2576,8 +2576,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
         {/* 두 번째/세 번째 열 */}
         <div
           style={{
-            flex: '0 1 auto',
-            minWidth: '800px',
+            flex: 1,
+            minWidth: 0,
             display: 'flex',
             flexDirection: 'column',
             gap: '20px'
