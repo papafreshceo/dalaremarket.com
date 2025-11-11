@@ -117,12 +117,6 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    console.log('기존 외래 키:', {
-      oldOptionProductId: oldImage?.option_product_id,
-      oldRawMaterialId: oldImage?.raw_material_id,
-      oldCategory4Id: oldImage?.category_4_id
-    });
-
     // 1. 먼저 현재 이미지를 업데이트 (외래 키 + 대표이미지 설정)
     const hasAnyForeignKey = !!(newOptionProductId || newRawMaterialId || newCategory4Id);
 

@@ -181,7 +181,6 @@ export default function UserHeader() {
         // tier 설정 (NULL 허용)
         const validTiers = ['light', 'standard', 'advance', 'elite', 'legend'];
         const tier = userData?.tier?.toLowerCase();
-        console.log('🔍 [UserHeader] DB tier:', userData?.tier, 'lowercase:', tier, 'final userTier:', tier && validTiers.includes(tier) ? tier : null);
         setUserTier(tier && validTiers.includes(tier) ? tier : null);
       } else {
         setUserRole(null);

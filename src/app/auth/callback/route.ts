@@ -49,7 +49,6 @@ export async function GET(request: NextRequest) {
           // ✅ 신규 사용자: 기본 조직 자동 생성
           try {
             await autoCreateOrganizationFromUser(session.user.id)
-            console.log('✅ 기본 조직 자동 생성 완료:', session.user.id)
           } catch (error) {
             console.error('❌ 조직 자동 생성 실패:', error)
             // 조직 생성 실패해도 로그인은 진행
@@ -72,7 +71,6 @@ export async function GET(request: NextRequest) {
 
           if (!userData?.primary_organization_id) {
             await autoCreateOrganizationFromUser(session.user.id)
-            console.log('✅ 기존 사용자 조직 자동 생성 완료:', session.user.id)
           }
         } catch (error) {
           console.error('❌ 조직 확인/생성 실패:', error)

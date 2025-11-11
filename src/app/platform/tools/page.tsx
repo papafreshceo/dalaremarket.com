@@ -250,8 +250,6 @@ export default function ToolsPage() {
 
   // 도구 클릭 핸들러
   const handleToolClick = async (tool: Tool) => {
-    console.log('Tool clicked:', tool); // 디버깅용
-
     // 크레딧 체크 및 차감
     const creditsRequired = tool.creditsRequired || 0;
 
@@ -316,7 +314,6 @@ export default function ToolsPage() {
 
   // 모달 닫기 핸들러
   const handleCloseModal = (modalId: string) => {
-    console.log('Modal closing:', modalId); // 디버깅용
     setOpenModals(prev => prev.filter(modal => modal.id !== modalId));
   };
 

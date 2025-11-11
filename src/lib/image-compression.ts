@@ -90,13 +90,6 @@ export async function compressImage(
               lastModified: Date.now(),
             });
 
-            console.log(`이미지 압축 완료:`, {
-              원본크기: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
-              압축후크기: `${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`,
-              압축률: `${((1 - compressedFile.size / file.size) * 100).toFixed(1)}%`,
-              해상도: `${img.width}x${img.height} → ${width}x${height}`,
-            });
-
             resolve(compressedFile);
           },
           file.type,

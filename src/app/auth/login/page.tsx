@@ -47,8 +47,6 @@ export default function LoginPage() {
           .eq('id', data.user.id)
           .single()
 
-        console.log('User Data:', userData)  // 디버깅용
-
         if (!userData?.approved) {
           await supabase.auth.signOut()
           setError('계정이 아직 승인되지 않았습니다.')

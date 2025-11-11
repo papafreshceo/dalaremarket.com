@@ -57,8 +57,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           Object.entries(cssVars).forEach(([key, value]) => {
             document.documentElement.style.setProperty(key, value as string)
           })
-
-          console.log('✅ 테마 CSS 변수 적용 완료:', Object.keys(cssVars).length, '개')
         }
       } catch (error) {
         console.error('테마 로드 실패:', error)

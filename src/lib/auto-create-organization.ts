@@ -47,7 +47,6 @@ export async function autoCreateOrganizationFromUser(userId: string) {
     '내 조직'
 
   // 4. 조직 생성 (RLS 우회를 위해 raw SQL 사용)
-  console.log('[조직 생성] 시작:', { userId, organizationName })
 
   const { error: orgError } = await supabase.rpc('exec_sql', {
     sql: `
@@ -81,8 +80,6 @@ export async function autoCreateOrganizationFromUser(userId: string) {
     return { success: false, error: '조직 생성에 실패했습니다' }
   }
 
-  console.log('[조직 생성] 성공')
-
   // 생성된 조직 ID 조회
   const { data: newOrg, error: fetchError } = await supabase
     .from('organizations')
@@ -98,7 +95,6 @@ export async function autoCreateOrganizationFromUser(userId: string) {
   }
 
   const organization = newOrg
-  console.log('[조직 조회] 성공:', organization)
 
   // 5. 소유자를 조직 멤버로 추가 (Service Role로 RLS 우회)
   const ownerPermissions = getDefaultPermissions('owner')

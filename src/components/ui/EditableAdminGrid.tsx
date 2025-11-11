@@ -953,16 +953,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
       const normalizedOriginal = normalizeValue(originalValue)
       const isValueChanged = normalizedProcessed !== normalizedOriginal
 
-      // 디버깅용 로그
-      if (column?.type === 'dropdown') {
-        console.log('[Dropdown 변경]', {
-          column: editingCell.col,
-          processedValue,
-          originalValue,
-          isValueChanged,
-          cellKey
-        })
-      }
+      // Dropdown 변경 처리
 
       if (!isValueChanged) {
         // 원래 값으로 돌아간 경우 modifiedCells에서 제거
