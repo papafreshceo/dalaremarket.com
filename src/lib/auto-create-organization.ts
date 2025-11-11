@@ -41,9 +41,9 @@ export async function autoCreateOrganizationFromUser(userId: string) {
   // 우선순위: company_name > profile_name > name > email
   const organizationName =
     user.company_name ||
-    (user.profile_name ? `${user.profile_name}의 셀러계정` : null) ||
-    (user.name ? `${user.name}의 셀러계정` : null) ||
-    `${user.email?.split('@')[0]}의 셀러계정` ||
+    (user.profile_name ? `${user.profile_name}님의 셀러계정` : null) ||
+    (user.name ? `${user.name}님의 셀러계정` : null) ||
+    `${user.email?.split('@')[0]}님의 셀러계정` ||
     '내 셀러계정'
 
   // 4. 조직 생성 (RLS 우회를 위해 raw SQL 사용)
@@ -165,7 +165,10 @@ export async function syncOrganizationFromUser(userId: string) {
 
   // 2. 셀러계정 정보 업데이트
   const organizationName =
-    user.company_name || user.profile_name || user.email?.split('@')[0] || '내 셀러계정'
+    user.company_name ||
+    (user.profile_name ? `${user.profile_name}님의 셀러계정` : null) ||
+    `${user.email?.split('@')[0]}님의 셀러계정` ||
+    '내 셀러계정'
 
   const { error: updateError } = await supabase
     .from('organizations')
