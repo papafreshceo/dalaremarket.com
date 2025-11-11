@@ -5,12 +5,9 @@ import { requireAdmin } from '@/lib/api-security';
 /**
  * GET /api/admin/promotional-images
  * 홍보 이미지 목록 조회 (Cloudinary 이미지 포함)
+ * 🔓 공개 API: 모든 사용자가 홍보 이미지를 볼 수 있음
  */
 export async function GET(request: NextRequest) {
-  // 🔒 보안: 관리자만 접근 가능
-  const auth = await requireAdmin(request);
-  if (!auth.authorized) return auth.error;
-
   try {
     const supabase = await createClient();
 

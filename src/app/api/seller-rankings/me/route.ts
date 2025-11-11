@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
+import { getUserPrimaryOrganization } from '@/lib/organization-utils';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * 내 랭킹 조회 API
+ * 내 조직 랭킹 조회 API
  *
  * GET /api/seller-rankings/me?period=monthly
  */
@@ -20,23 +21,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // 사용자의 조직 정보 가져오기
+    const organization = await getUserPrimaryOrganization(user.id);
+    if (!organization) {
+      return NextResponse.json({
+        success: false,
+        error: '조직 정보를 찾을 수 없습니다.'
+      }, { status: 404 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const periodType = searchParams.get('period') || 'monthly';
 
-    // 내 최신 랭킹 조회
+    // 내 조직의 최신 랭킹 조회 (organization_id 기준)
     const { data: myRanking, error: rankingError } = await supabase
       .from('seller_rankings')
       .select(`
         *,
-        users!seller_rankings_seller_id_fkey (
+        organizations!seller_rankings_organization_id_fkey (
           id,
           name,
-          profile_name,
-          email,
-          business_name
+          business_number
         )
       `)
-      .eq('seller_id', user.id)
+      .eq('organization_id', organization.id)
       .eq('period_type', periodType)
       .order('period_start', { ascending: false })
       .limit(1)
@@ -58,7 +66,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 내 배지 조회
+    // 내 조직의 배지 조회 (organization_id 기준)
     const currentMonth = myRanking.period_start.substring(0, 7) + '-01';
     const { data: badges } = await supabase
       .from('seller_badges')
@@ -70,7 +78,7 @@ export async function GET(request: NextRequest) {
           description
         )
       `)
-      .eq('seller_id', user.id)
+      .eq('organization_id', organization.id)
       .eq('period_month', currentMonth);
 
     // 전체 랭킹 수 조회 (내 순위의 의미 파악용)

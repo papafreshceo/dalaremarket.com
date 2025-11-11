@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import ToolModal from '@/components/tools/ToolModal';
+import { useUserBalance } from '@/contexts/UserBalanceContext';
 
 interface Category {
   id: string;
@@ -30,27 +31,36 @@ export default function ToolsPage() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [openModals, setOpenModals] = useState<Array<{ id: string; tool: Tool }>>([]);
   const [usageCounts, setUsageCounts] = useState<Record<string, number>>({});
-  const [userCredits, setUserCredits] = useState<number>(0);
+  const { creditBalance: userCredits, setCreditBalance } = useUserBalance();
   const [toolsFromDB, setToolsFromDB] = useState<Tool[]>([]);
   const [loadingTools, setLoadingTools] = useState(true);
 
-  // 도구 목록, 즐겨찾기, 사용 횟수, 크레딧 불러오기
+  // 도구 목록, 즐겨찾기, 사용 횟수 불러오기 (크레딧은 헤더에서 관리)
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        // 도구 목록 불러오기
-        const toolsResponse = await fetch('/api/tools');
-        const toolsData = await toolsResponse.json();
+        // 3개 API를 병렬로 호출하여 로딩 시간 단축
+        const [toolsResponse, favResponse, usageResponse] = await Promise.all([
+          fetch('/api/tools'),
+          fetch('/api/user/favorite-tools'),
+          fetch('/api/user/tool-usage')
+        ]);
 
+        const [toolsData, favData, usageData] = await Promise.all([
+          toolsResponse.json(),
+          favResponse.json(),
+          usageResponse.json()
+        ]);
+
+        // 도구 목록
         if (toolsData.success && toolsData.tools) {
-          // DB 데이터를 Tool 인터페이스 형식으로 변환
           const formattedTools: Tool[] = toolsData.tools.map((t: any) => ({
             id: t.id,
             category: t.category,
             name: t.name,
             description: t.description || '',
             bgGradient: t.icon_gradient || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            usageCount: '0회/월', // 이건 나중에 usageCounts로 대체됨
+            usageCount: '0회/월',
             isNew: false,
             isPremium: t.is_premium || false,
             creditsRequired: t.credits_required || 0
@@ -58,28 +68,14 @@ export default function ToolsPage() {
           setToolsFromDB(formattedTools);
         }
 
-        // 즐겨찾기 불러오기
-        const favResponse = await fetch('/api/user/favorite-tools');
-        const favData = await favResponse.json();
-
+        // 즐겨찾기
         if (favData.success && favData.favoriteTools) {
           setFavorites(favData.favoriteTools);
         }
 
-        // 사용 횟수 불러오기
-        const usageResponse = await fetch('/api/user/tool-usage');
-        const usageData = await usageResponse.json();
-
+        // 사용 횟수
         if (usageData.success && usageData.usageCounts) {
           setUsageCounts(usageData.usageCounts);
-        }
-
-        // 크레딧 불러오기
-        const creditsResponse = await fetch('/api/user/credits');
-        const creditsData = await creditsResponse.json();
-
-        if (creditsData.success) {
-          setUserCredits(creditsData.credits);
         }
       } catch (error) {
         console.error('Error loading user data:', error);
@@ -211,133 +207,8 @@ export default function ToolsPage() {
     )
   };
 
-  // 도구 목록
-  const tools: Tool[] = [
-    {
-      id: 'margin-calculator',
-      category: 'essential',
-      name: '마진계산기',
-      description: '원가와 판매가를 입력하여 마진율을 자동 계산',
-      bgGradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      usageCount: '2,341회/월',
-      isNew: false,
-      isPremium: false
-    },
-    {
-      id: 'price-simulator',
-      category: 'essential',
-      name: '판매가 시뮬레이터',
-      description: '다양한 조건에서의 최적 판매가격을 시뮬레이션',
-      bgGradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-      usageCount: '1,892회/월',
-      isNew: false,
-      isPremium: false
-    },
-    {
-      id: 'order-integration',
-      category: 'data',
-      name: '주문통합 (Excel)',
-      description: '여러 채널의 주문을 하나의 엑셀로 통합 관리',
-      bgGradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-      usageCount: '3,127회/월',
-      isNew: false,
-      isPremium: false
-    },
-    {
-      id: 'option-pricing',
-      category: 'pricing',
-      name: '옵션가 세팅',
-      description: '상품 옵션별 가격을 효율적으로 설정 및 관리',
-      bgGradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-      usageCount: '892회/월',
-      isNew: true,
-      isPremium: false
-    },
-    {
-      id: 'sales-analytics',
-      category: 'analytics',
-      name: '매출 분석',
-      description: '기간별, 상품별 매출 현황을 시각화하여 분석',
-      bgGradient: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-      usageCount: '2,890회/월',
-      isNew: false,
-      isPremium: true
-    },
-    {
-      id: 'customer-message',
-      category: 'communication',
-      name: '고객 메시지',
-      description: '고객에게 발송할 메시지 템플릿 관리',
-      bgGradient: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
-      usageCount: '445회/월',
-      isNew: false,
-      isPremium: false
-    },
-    {
-      id: 'transaction-statement',
-      category: 'essential',
-      name: '거래명세서 즉시 발급',
-      description: '거래명세서를 PDF, JPG, PNG로 즉시 발급',
-      bgGradient: 'linear-gradient(135deg, #cfd9df 0%, #e2ebf0 100%)',
-      usageCount: '1,234회/월',
-      isNew: false,
-      isPremium: false
-    },
-    {
-      id: 'trend-analysis',
-      category: 'analytics',
-      name: '트렌드 분석',
-      description: '시장 트렌드와 판매 데이터 상관관계 분석',
-      bgGradient: 'linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)',
-      usageCount: '892회/월',
-      isNew: true,
-      isPremium: true
-    },
-    {
-      id: 'competitor-monitor',
-      category: 'analytics',
-      name: '경쟁사 모니터링',
-      description: '경쟁사 가격 변동 실시간 추적',
-      bgGradient: 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
-      usageCount: '445회/월',
-      isNew: false,
-      isPremium: true
-    },
-    {
-      id: 'product-name-optimizer',
-      category: 'essential',
-      name: '상품명 최적화 도구',
-      description: '검색 엔진 최적화를 고려한 효과적인 상품명 생성',
-      bgGradient: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
-      usageCount: '1,023회/월',
-      isNew: true,
-      isPremium: false
-    },
-    {
-      id: 'review-analyzer',
-      category: 'analytics',
-      name: '리뷰 분석',
-      description: '고객 리뷰의 감정을 분석하고 대응 전략 제안',
-      bgGradient: 'linear-gradient(135deg, #a6c0fe 0%, #f68084 100%)',
-      usageCount: '756회/월',
-      isNew: true,
-      isPremium: false
-    },
-    {
-      id: 'category-rank-checker',
-      category: 'analytics',
-      name: '카테고리 순위 확인',
-      description: '각 플랫폼별 카테고리 내 상품 순위 실시간 확인',
-      bgGradient: 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
-      usageCount: '2,145회/월',
-      isNew: true,
-      isPremium: true
-    }
-  ];
-
-  // 필터링된 도구 (DB에서 불러온 도구 사용)
-  const toolsToUse = toolsFromDB.length > 0 ? toolsFromDB : tools;
-  const filteredTools = toolsToUse.filter(tool => {
+  // 필터링된 도구
+  const filteredTools = toolsFromDB.filter(tool => {
     const matchesCategory = selectedCategory === 'all' || tool.category === selectedCategory;
     const matchesSearch = tool.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           tool.description.toLowerCase().includes(searchTerm.toLowerCase());
@@ -408,8 +279,8 @@ export default function ToolsPage() {
           return;
         }
 
-        // 크레딧 잔액 업데이트
-        setUserCredits(data.balance || data.credits_after);
+        // 크레딧 잔액 업데이트 (Context에 반영)
+        setCreditBalance(data.balance || data.credits_after);
       } catch (error) {
         console.error('Error using credits:', error);
         alert('크레딧 차감 중 오류가 발생했습니다.');
@@ -451,8 +322,7 @@ export default function ToolsPage() {
 
   // 시뮬레이터로 전환 핸들러 (새 모달로 열기)
   const handleOpenSimulator = () => {
-    const toolsToUse = toolsFromDB.length > 0 ? toolsFromDB : tools;
-    const simulatorTool = toolsToUse.find(t => t.id === 'price-simulator');
+    const simulatorTool = toolsFromDB.find(t => t.id === 'price-simulator');
     if (simulatorTool) {
       const isAlreadyOpen = openModals.some(modal => modal.tool.id === 'price-simulator');
       if (!isAlreadyOpen) {

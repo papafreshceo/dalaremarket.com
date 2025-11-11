@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import UserHeader from '@/components/layout/UserHeader'
 import MobileBottomNav from '@/components/layout/MobileBottomNav'
 import PlatformFooter from '@/components/PlatformFooter'
+import { UserBalanceProvider } from '@/contexts/UserBalanceContext'
 
 export default function PlatformLayout({
   children,
@@ -63,11 +64,13 @@ export default function PlatformLayout({
   const showHeaderAndNav = !isMounted || isInIframe === false
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {showHeaderAndNav && <UserHeader />}
-      <main className="flex-1">{children}</main>
-      {showHeaderAndNav && <PlatformFooter />}
-      {showHeaderAndNav && <MobileBottomNav />}
-    </div>
+    <UserBalanceProvider>
+      <div className="flex flex-col min-h-screen">
+        {showHeaderAndNav && <UserHeader />}
+        <main className="flex-1">{children}</main>
+        {showHeaderAndNav && <PlatformFooter />}
+        {showHeaderAndNav && <MobileBottomNav />}
+      </div>
+    </UserBalanceProvider>
   )
 }

@@ -16,7 +16,7 @@ interface ApplyMappingResult {
 }
 
 /**
- * 주문 목록에 옵션상품 매핑을 적용
+ * 주문 목록에 옵션상품 매핑을 적용 (조직 단위)
  * @param orders - 원본 주문 목록
  * @param userId - 사용자 ID
  * @returns 매핑이 적용된 주문 목록과 변환 결과
@@ -28,11 +28,29 @@ export async function applyOptionMapping(
   try {
     const supabase = createClient();
 
-    // 사용자의 옵션상품 매핑 설정 가져오기
+    // 🔒 사용자의 조직 정보 가져오기
+    const { data: userData } = await supabase
+      .from('users')
+      .select('primary_organization_id')
+      .eq('id', userId)
+      .single();
+
+    if (!userData?.primary_organization_id) {
+      console.warn('[applyOptionMapping] 조직 정보 없음:', userId);
+      return {
+        orders,
+        mappingResults: [],
+        totalOrders: orders.length,
+        mappedOrders: 0,
+        unmatchedCount: 0
+      };
+    }
+
+    // 조직의 옵션상품 매핑 설정 가져오기
     const { data: mappings, error } = await supabase
       .from('option_name_mappings')
       .select('user_option_name, site_option_name')
-      .eq('seller_id', userId);
+      .eq('organization_id', userData.primary_organization_id);
 
     if (error) {
       console.error('옵션상품 매핑 조회 오류:', error);
@@ -40,7 +58,8 @@ export async function applyOptionMapping(
         orders,
         mappingResults: [],
         totalOrders: orders.length,
-        mappedOrders: 0
+        mappedOrders: 0,
+        unmatchedCount: 0
       };
     }
 
@@ -50,7 +69,8 @@ export async function applyOptionMapping(
         orders,
         mappingResults: [],
         totalOrders: orders.length,
-        mappedOrders: 0
+        mappedOrders: 0,
+        unmatchedCount: 0
       };
     }
 
@@ -114,7 +134,8 @@ export async function applyOptionMapping(
       orders,
       mappingResults: [],
       totalOrders: orders.length,
-      mappedOrders: 0
+      mappedOrders: 0,
+      unmatchedCount: 0
     };
   }
 }

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
 import { requireStaff } from '@/lib/api-security';
 import { canCreateServer, canUpdateServer, canDeleteServer } from '@/lib/permissions-server';
+import { getOrganizationDataFilter } from '@/lib/organization-utils';
 
 /**
  * POST /api/integrated-orders/bulk
@@ -33,10 +34,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // sheet_date 기본값 설정
+    // 🔒 조직 ID 자동 설정
+    const organizationId = await getOrganizationDataFilter(auth.user.id);
+
+    // sheet_date 기본값 및 조직 ID 설정
     const ordersWithDate = orders.map((order) => {
       if (!order.sheet_date) {
         order.sheet_date = new Date().toISOString().split('T')[0];
+      }
+      if (organizationId) {
+        order.organization_id = organizationId;
       }
       return order;
     });
@@ -237,6 +244,17 @@ export async function POST(request: NextRequest) {
       .eq('is_deleted', false);
 
     const actualNewCount = (afterCount || 0) - (beforeCount || 0);
+
+    // 발주일 점수 추가 (하루 1회)
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.rpc('add_order_points', { p_user_id: user.id });
+      }
+    } catch (pointsError) {
+      console.error('Order points error:', pointsError);
+      // 점수 추가 실패해도 주문은 성공으로 처리
+    }
 
     return NextResponse.json({
       success: true,

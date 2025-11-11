@@ -53,6 +53,8 @@ interface TierCriteria {
 interface TierPointSettings {
   login_points_per_day: number;
   points_per_day: number;
+  post_points: number;
+  comment_points: number;
   milestones: Array<{
     days: number;
     bonus: number;
@@ -195,7 +197,7 @@ export default function RankingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           is_participating: newSettings.isParticipating,
-          show_score: true,  // 참여 시 모든 정보 공개
+          show_score: true,
           show_sales_performance: true
         })
       });
@@ -205,7 +207,6 @@ export default function RankingPage() {
       if (result.success) {
         setParticipation(newSettings);
         toast.success('설정이 저장되었습니다.');
-        // 참여 상태가 변경되면 랭킹 다시 조회
         if (updates.isParticipating !== undefined) {
           fetchRankings();
         }
@@ -291,17 +292,16 @@ export default function RankingPage() {
   };
 
   const getTierName = (tier: string) => {
-    // 티어명 그대로 반환
     return tier;
   };
 
   const getTierColor = (tier: string) => {
     const colors: Record<string, { bg: string; text: string; border: string }> = {
-      LEGEND: { bg: '#0b1020', text: '#FFD447', border: '#FFD447' },
-      ELITE: { bg: '#0b1020', text: '#24E3A8', border: '#24E3A8' },
-      ADVANCE: { bg: '#0b1020', text: '#B05CFF', border: '#B05CFF' },
-      STANDARD: { bg: '#0b1020', text: '#4BB3FF', border: '#4BB3FF' },
-      LIGHT: { bg: '#0b1020', text: '#7BE9FF', border: '#7BE9FF' }
+      LEGEND: { bg: '#fef3c7', text: '#92400e', border: '#f59e0b' },
+      ELITE: { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' },
+      ADVANCE: { bg: '#e9d5ff', text: '#6b21a8', border: '#a855f7' },
+      STANDARD: { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
+      LIGHT: { bg: '#f3f4f6', text: '#374151', border: '#9ca3af' }
     };
     return colors[tier] || colors.LIGHT;
   };
@@ -325,1246 +325,973 @@ export default function RankingPage() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#ffffff',
-      padding: '80px 24px'
-    }}>
-      {/* 점수 툴팁 (fixed position) */}
-      {showScoreTooltip && (
-        <div style={{
-          position: 'fixed',
-          left: `${tooltipPosition.x}px`,
-          top: `${tooltipPosition.y}px`,
-          transform: 'translateX(-50%)',
-          background: '#1e293b',
-          color: '#ffffff',
-          padding: '12px 16px',
-          borderRadius: '6px',
-          fontSize: '12px',
-          fontWeight: '400',
-          lineHeight: '1.6',
-          whiteSpace: 'nowrap',
-          zIndex: 9999,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          border: '1px solid #334155',
-          pointerEvents: 'none'
-        }}>
-          발주금액, 건수, 연속발주, 활동점수 등을<br />
-          종합하여 산출합니다
-          {/* 화살표 */}
-          <div style={{
-            position: 'absolute',
-            top: '-6px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 0,
-            height: 0,
-            borderLeft: '6px solid transparent',
-            borderRight: '6px solid transparent',
-            borderBottom: '6px solid #334155'
-          }}></div>
-        </div>
-      )}
-
+    <>
       <div style={{
-        maxWidth: '1400px',
-        margin: '0 auto'
+        minHeight: '100vh',
+        background: 'linear-gradient(180deg, #eff6ff, #ffffff 25%, #ffffff)',
+        paddingTop: '0px',
+        position: 'relative',
+        overflow: 'hidden'
       }}>
-        {/* 페이지 헤더 */}
-        <div style={{ marginBottom: '48px' }}>
-          <h1 style={{
-            fontSize: '56px',
-            fontWeight: '900',
-            color: '#000000',
-            fontFamily: 'var(--font-sans)',
-            letterSpacing: '-0.02em'
-          }}>
-            SELLER RANKING
-          </h1>
-        </div>
-
-        {/* 기간 선택 + 새로고침 */}
+        {/* 배경 장식 */}
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '32px',
-          gap: '16px'
+          position: 'absolute',
+          top: '-120px',
+          left: '-140px',
+          width: '260px',
+          height: '260px',
+          background: '#bfdbfe',
+          borderRadius: '999px',
+          filter: 'blur(60px)',
+          opacity: 0.5,
+          pointerEvents: 'none'
+        }} />
+        <div style={{
+          position: 'absolute',
+          right: '-120px',
+          bottom: '-140px',
+          width: '300px',
+          height: '300px',
+          background: '#93c5fd',
+          borderRadius: '999px',
+          filter: 'blur(60px)',
+          opacity: 0.5,
+          pointerEvents: 'none'
+        }} />
+
+        {/* 점수 툴팁 */}
+        {showScoreTooltip && (
+          <div style={{
+            position: 'fixed',
+            left: `${tooltipPosition.x}px`,
+            top: `${tooltipPosition.y}px`,
+            transform: 'translateX(-50%)',
+            background: '#1e293b',
+            color: '#ffffff',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            fontSize: '12px',
+            fontWeight: '400',
+            lineHeight: '1.6',
+            whiteSpace: 'nowrap',
+            zIndex: 9999,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            border: '1px solid #334155',
+            pointerEvents: 'none'
+          }}>
+            발주금액, 건수, 연속발주, 기여점수 등을<br />
+            종합하여 산출합니다
+            <div style={{
+              position: 'absolute',
+              top: '-6px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 0,
+              height: 0,
+              borderLeft: '6px solid transparent',
+              borderRight: '6px solid transparent',
+              borderBottom: '6px solid #334155'
+            }}></div>
+          </div>
+        )}
+
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          padding: '12px 20px 24px'
         }}>
+          {/* 히어로 섹션 */}
+          <div style={{
+            textAlign: 'center',
+            marginBottom: '36px',
+            marginTop: '24px',
+            position: 'relative'
+          }}>
+            <h1 style={{
+              fontSize: '38px',
+              lineHeight: '1.15',
+              margin: 0,
+              color: '#1d4ed8',
+              fontWeight: '700'
+            }}>
+              SELLER RANKING
+            </h1>
+            <p style={{
+              margin: '12px auto 0',
+              color: '#64748b',
+              maxWidth: '900px',
+              fontSize: '15px',
+              whiteSpace: 'nowrap'
+            }}>
+              셀러 랭킹은 판매자분들의 작은 재미와 동기부여를 위한 기능입니다. 가볍게 즐겨주세요! 😊
+            </p>
+          </div>
+
+          {/* 기간 선택 + 새로고침 */}
           <div style={{
             display: 'flex',
-            gap: '8px'
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '32px',
+            gap: '16px',
+            flexWrap: 'wrap'
           }}>
-            {(['daily', 'weekly', 'monthly'] as const).map((period) => (
+            <div style={{
+              display: 'inline-flex',
+              background: '#ffffff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '18px',
+              boxShadow: '0 8px 24px rgba(2,6,23,0.06)'
+            }}>
+              {(['daily', 'weekly', 'monthly'] as const).map((period) => (
+                <button
+                  key={period}
+                  onClick={() => setPeriodType(period)}
+                  style={{
+                    border: 0,
+                    background: periodType === period ? '#2563eb' : 'transparent',
+                    padding: '10px 16px',
+                    borderRadius: '14px',
+                    fontWeight: '700',
+                    color: periodType === period ? '#ffffff' : '#1d4ed8',
+                    cursor: 'pointer',
+                    boxShadow: periodType === period ? '0 10px 20px rgba(37,99,235,0.25)' : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {period === 'daily' ? 'DAILY' : period === 'weekly' ? 'WEEKLY' : 'MONTHLY'}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
               <button
-                key={period}
-                onClick={() => setPeriodType(period)}
+                onClick={openTierGuideModal}
                 style={{
-                  padding: '12px 24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 16px',
+                  background: '#ffffff',
+                  border: '1px solid #93c5fd',
+                  borderRadius: '14px',
                   fontSize: '14px',
                   fontWeight: '700',
-                  fontFamily: 'var(--font-sans)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  border: '2px solid #000000',
-                  background: periodType === period ? '#000000' : '#ffffff',
-                  color: periodType === period ? '#ffffff' : '#000000',
+                  color: '#1d4ed8',
                   cursor: 'pointer',
-                  transition: 'all 0.15s',
-                  boxShadow: periodType === period
-                    ? '4px 4px 0px 0px #000000'
-                    : 'none'
+                  transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  if (periodType !== period) {
-                    e.currentTarget.style.transform = 'translate(-2px, -2px)';
-                    e.currentTarget.style.boxShadow = '4px 4px 0px 0px #000000';
+                  e.currentTarget.style.background = '#eff6ff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#ffffff';
+                }}
+              >
+                <BookOpen style={{ width: '16px', height: '16px' }} />
+                티어 가이드
+              </button>
+              <button
+                onClick={fetchRankings}
+                disabled={loading}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 16px',
+                  background: '#ffffff',
+                  border: '1px solid #93c5fd',
+                  borderRadius: '14px',
+                  fontSize: '14px',
+                  fontWeight: '700',
+                  color: '#1d4ed8',
+                  cursor: 'pointer',
+                  opacity: loading ? 0.5 : 1,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (!loading) {
+                    e.currentTarget.style.background = '#eff6ff';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (periodType !== period) {
-                    e.currentTarget.style.transform = 'translate(0, 0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }
+                  e.currentTarget.style.background = '#ffffff';
                 }}
               >
-                {period === 'daily' ? 'DAILY' : period === 'weekly' ? 'WEEKLY' : 'MONTHLY'}
+                <RefreshCw style={{ width: '16px', height: '16px' }} className={loading ? 'animate-spin' : ''} />
+                새로고침
               </button>
-            ))}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              onClick={openTierGuideModal}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '12px 20px',
-                background: '#3b82f6',
-                border: '2px solid #000000',
-                fontSize: '14px',
-                fontWeight: '700',
-                color: '#ffffff',
-                cursor: 'pointer',
-                fontFamily: 'var(--font-sans)',
-                transition: 'all 0.15s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translate(-2px, -2px)';
-                e.currentTarget.style.boxShadow = '4px 4px 0px 0px #000000';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translate(0, 0)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              <BookOpen className="w-4 h-4" />
-              TIER GUIDE
-            </button>
-            <button
-              onClick={fetchRankings}
-              disabled={loading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '12px 20px',
-                background: '#ffffff',
-                border: '2px solid #000000',
-                fontSize: '14px',
-                fontWeight: '700',
-                color: '#000000',
-                cursor: 'pointer',
-                opacity: loading ? 0.5 : 1,
-                fontFamily: 'var(--font-sans)'
-              }}
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              REFRESH
-            </button>
-          </div>
-        </div>
 
-        {/* 내 순위 카드 */}
-        {myRanking && (
-          <div style={{
-            background: '#000000',
-            border: '2px solid #000000',
-            padding: '32px',
-            marginBottom: '32px',
-            boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 0.15)',
-            color: '#ffffff'
-          }}>
+          {/* 내 순위 카드 */}
+          {myRanking && (
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
+              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+              border: '1px solid #1e40af',
+              borderRadius: '22px',
+              padding: '32px',
+              marginBottom: '32px',
+              boxShadow: '0 24px 60px -20px rgba(37,99,235,0.35)',
+              color: '#ffffff',
+              transition: 'all 0.25s'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                <div style={{
-                  width: '100px',
-                  height: '100px',
-                  background: '#ffffff',
-                  border: '2px solid #000000',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '48px',
-                  fontWeight: '900',
-                  color: '#000000',
-                  fontFamily: 'var(--font-mono)'
-                }}>
-                  #{myRanking.rank}
-                </div>
-                <div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '24px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
                   <div style={{
-                    fontSize: '14px',
+                    width: '80px',
+                    height: '80px',
+                    background: '#ffffff',
+                    borderRadius: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '36px',
+                    fontWeight: '900',
+                    color: '#2563eb',
+                    boxShadow: '0 8px 16px rgba(0,0,0,0.1)'
+                  }}>
+                    #{myRanking.rank}
+                  </div>
+                  <div>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '8px',
+                      opacity: 0.9,
+                      letterSpacing: '0.05em'
+                    }}>
+                      MY RANKING
+                    </div>
+                    <div style={{
+                      fontSize: '28px',
+                      fontWeight: '900',
+                      letterSpacing: '-0.02em'
+                    }}>
+                      {getTierName(myRanking.tier)}
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginTop: '8px',
+                      fontSize: '14px',
+                      fontWeight: '700'
+                    }}>
+                      {getRankChangeIcon(myRanking.rank_change)}
+                    </div>
+                  </div>
+                </div>
+                <div style={{
+                  textAlign: 'right'
+                }}>
+                  <div style={{
+                    fontSize: '12px',
                     fontWeight: '700',
                     marginBottom: '8px',
-                    opacity: 0.7,
-                    letterSpacing: '0.1em'
+                    opacity: 0.9,
+                    letterSpacing: '0.05em'
                   }}>
-                    MY RANKING
+                    TOTAL SCORE
+                  </div>
+                  <div style={{
+                    fontSize: '56px',
+                    fontWeight: '900',
+                    lineHeight: '1'
+                  }}>
+                    {myRanking.total_score.toFixed(1)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 등급별 통계 */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+            gap: '16px',
+            marginBottom: '32px'
+          }}>
+            {(['LIGHT', 'STANDARD', 'ADVANCE', 'ELITE', 'LEGEND'] as const).map((tier) => {
+              const color = getTierColor(tier);
+              return (
+                <div
+                  key={tier}
+                  style={{
+                    background: color.bg,
+                    border: `1px solid ${color.border}`,
+                    borderRadius: '16px',
+                    padding: '20px',
+                    textAlign: 'center',
+                    transition: 'all 0.25s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-3px)';
+                    e.currentTarget.style.boxShadow = '0 18px 44px rgba(2,6,23,0.08)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  <div style={{
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    color: color.text,
+                    marginBottom: '8px',
+                    letterSpacing: '0.05em'
+                  }}>
+                    {getTierName(tier)}
                   </div>
                   <div style={{
                     fontSize: '32px',
                     fontWeight: '900',
-                    fontFamily: 'var(--font-sans)',
-                    letterSpacing: '-0.02em'
+                    color: color.text
                   }}>
-                    {getTierName(myRanking.tier)}
-                  </div>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginTop: '8px',
-                    fontSize: '14px',
-                    fontWeight: '700'
-                  }}>
-                    {getRankChangeIcon(myRanking.rank_change)}
+                    {tierStats[tier]}
                   </div>
                 </div>
-              </div>
-              <div style={{
-                textAlign: 'right'
-              }}>
-                <div style={{
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  marginBottom: '8px',
-                  opacity: 0.7,
-                  letterSpacing: '0.1em'
-                }}>
-                  TOTAL SCORE
-                </div>
-                <div style={{
-                  fontSize: '72px',
-                  fontWeight: '900',
-                  fontFamily: 'var(--font-mono)',
-                  lineHeight: '1'
-                }}>
-                  {myRanking.total_score.toFixed(1)}
-                </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
-        )}
 
-        {/* 등급별 통계 */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
-          gap: '16px',
-          marginBottom: '32px'
-        }}>
-          {(['LIGHT', 'STANDARD', 'ADVANCE', 'ELITE', 'LEGEND'] as const).map((tier) => {
-            const color = getTierColor(tier);
-            return (
-              <div
-                key={tier}
-                style={{
-                  background: color.bg,
-                  border: `2px solid ${color.border}`,
-                  padding: '16px',
-                  textAlign: 'center',
-                  boxShadow: `0 0 12px ${color.border}55, 4px 4px 0px 0px rgba(0, 0, 0, 0.3)`
-                }}
-              >
-                <div style={{
-                  fontSize: '11px',
-                  fontWeight: '700',
-                  color: color.text,
-                  marginBottom: '4px',
-                  letterSpacing: '0.1em',
-                  textShadow: `0 0 8px ${color.text}88`
-                }}>
-                  {getTierName(tier)}
-                </div>
-                <div style={{
-                  fontSize: '32px',
-                  fontWeight: '900',
-                  color: color.text,
-                  fontFamily: 'var(--font-mono)',
-                  textShadow: `0 0 12px ${color.text}99`
-                }}>
-                  {tierStats[tier]}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* 랭킹 테이블 */}
-        <div style={{
-          background: '#ffffff',
-          border: '2px solid #000000',
-          boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 0.15)',
-          overflow: 'hidden'
-        }}>
-          <table style={{
-            width: '100%',
-            borderCollapse: 'collapse'
+          {/* 랭킹 테이블 */}
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '22px',
+            boxShadow: '0 8px 24px rgba(2,6,23,0.06)',
+            overflow: 'hidden'
           }}>
-            <thead>
-              <tr style={{ background: '#fef3c7', color: '#000000', borderBottom: '2px solid #000000' }}>
-                {['RANK', 'CHANGE', 'SELLER', 'SCORE', 'SALES', 'ORDERS', 'CANCEL'].map((header) => (
-                  <th
-                    key={header}
-                    style={{
-                      padding: '10px 12px',
-                      textAlign: 'center',
-                      fontSize: '11px',
-                      fontWeight: '700',
-                      fontFamily: 'var(--font-sans)',
-                      letterSpacing: '0.1em',
-                      position: 'relative'
-                    }}
-                  >
-                    {header === 'SCORE' ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                        {header}
-                        <div
-                          style={{ display: 'inline-flex' }}
-                          onMouseEnter={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            setTooltipPosition({
-                              x: rect.left + rect.width / 2,
-                              y: rect.bottom + 8
-                            });
-                            setShowScoreTooltip(true);
-                          }}
-                          onMouseLeave={() => setShowScoreTooltip(false)}
-                        >
-                          <HelpCircle
-                            style={{
-                              width: '14px',
-                              height: '14px',
-                              cursor: 'help',
-                              opacity: 0.6
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      header
-                    )}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    style={{
-                      padding: '60px',
-                      textAlign: 'center',
-                      color: '#94a3b8'
-                    }}
-                  >
-                    <RefreshCw className="w-5 h-5 animate-spin" style={{ margin: '0 auto' }} />
-                  </td>
-                </tr>
-              ) : rankings.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    style={{
-                      padding: '60px',
-                      textAlign: 'center',
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: '#94a3b8'
-                    }}
-                  >
-                    NO RANKING DATA
-                  </td>
-                </tr>
-              ) : (
-                <>
-                  {/* 내 랭킹 고정 표시 */}
-                  {myRanking && (
-                    <>
-                      {(() => {
-                        const tierColor = getTierColor(myRanking.tier);
-                        return (
-                          <tr
-                            key={`my-${myRanking.id}`}
-                            style={{
-                              borderBottom: '3px solid #fbbf24',
-                              background: '#fef3c7'
-                            }}
-                          >
-                            <td style={{
-                              padding: '8px 12px',
-                              textAlign: 'center'
-                            }}>
-                              <div style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                minWidth: '32px',
-                                height: '32px',
-                                background: '#000000',
-                                color: '#ffffff',
-                                border: '2px solid #000000',
-                                fontSize: '14px',
-                                fontWeight: '900',
-                                fontFamily: 'var(--font-mono)'
-                              }}>
-                                {myRanking.rank}
-                              </div>
-                            </td>
-                            <td style={{
-                              padding: '8px 12px',
-                              textAlign: 'center',
-                              fontSize: '13px',
-                              fontWeight: '700',
-                              fontFamily: 'var(--font-mono)'
-                            }}>
-                              {getRankChangeIcon(myRanking.rank_change)}
-                            </td>
-                            <td style={{
-                              padding: '8px 12px',
-                              textAlign: 'center'
-                            }}>
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                fontSize: '14px',
-                                fontWeight: '700',
-                                color: '#000000',
-                                fontFamily: 'var(--font-sans)'
-                              }}>
-                                <div style={{ transform: 'scale(0.8)' }}>
-                                  <TierBadge
-                                    tier={myRanking.tier.toLowerCase() as 'light' | 'standard' | 'advance' | 'elite' | 'legend'}
-                                    iconOnly={true}
-                                    glow={0}
-                                  />
-                                </div>
-                                {myRanking.users?.profile_name || myRanking.users?.name || 'Unknown'}
-                                <span style={{
-                                  padding: '2px 8px',
-                                  background: '#000000',
-                                  color: '#ffffff',
-                                  fontSize: '10px',
-                                  fontWeight: '700',
-                                  letterSpacing: '0.1em'
-                                }}>
-                                  ME
-                                </span>
-                              </div>
-                            </td>
-                            <td style={{
-                              padding: '8px 12px',
-                              textAlign: 'center',
-                              fontSize: '16px',
-                              fontWeight: '900',
-                              color: '#000000',
-                              fontFamily: 'var(--font-mono)'
-                            }}>
-                              {myRanking.total_score.toFixed(1)}
-                            </td>
-                            <td style={{
-                              padding: '8px 12px',
-                              textAlign: 'right',
-                              fontSize: '13px',
-                              fontWeight: '600',
-                              color: '#475569',
-                              fontFamily: 'var(--font-mono)'
-                            }}>
-                              {myRanking.total_sales.toLocaleString()}
-                            </td>
-                            <td style={{
-                              padding: '8px 12px',
-                              textAlign: 'right',
-                              fontSize: '13px',
-                              fontWeight: '600',
-                              color: '#475569',
-                              fontFamily: 'var(--font-mono)'
-                            }}>
-                              {myRanking.order_count.toLocaleString()}
-                            </td>
-                            <td style={{
-                              padding: '8px 12px',
-                              textAlign: 'center',
-                              fontSize: '13px',
-                              fontWeight: '600',
-                              color: '#475569',
-                              fontFamily: 'var(--font-mono)'
-                            }}>
-                              {myRanking.cancel_rate.toFixed(1)}%
-                            </td>
-                          </tr>
-                        );
-                      })()}
-                    </>
-                  )}
-                  {/* 전체 랭킹 리스트 */}
-                  {rankings.map((ranking, index) => {
-                    const isMe = myRanking?.seller_id === ranking.seller_id;
-                    const tierColor = getTierColor(ranking.tier);
-                    return (
-                      <tr
-                        key={ranking.id}
-                        style={{
-                          borderBottom: index < rankings.length - 1 ? '2px solid #e5e7eb' : 'none',
-                          background: isMe ? '#fef3c7' : '#ffffff'
-                        }}
-                      >
-                      <td style={{
-                        padding: '8px 12px',
-                        textAlign: 'center'
-                      }}>
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          minWidth: '32px',
-                          height: '32px',
-                          background: ranking.rank <= 3 ? '#000000' : 'transparent',
-                          color: ranking.rank <= 3 ? '#ffffff' : '#000000',
-                          border: '2px solid #000000',
-                          fontSize: '14px',
-                          fontWeight: '900',
-                          fontFamily: 'var(--font-mono)'
-                        }}>
-                          {ranking.rank}
-                        </div>
-                      </td>
-                      <td style={{
-                        padding: '8px 12px',
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse'
+            }}>
+              <thead>
+                <tr style={{ background: '#f0f9ff', color: '#1d4ed8' }}>
+                  {['순위', '변동', '판매자', '점수', '매출', '건수', '취소율'].map((header, index) => (
+                    <th
+                      key={header}
+                      style={{
+                        padding: '16px 12px',
                         textAlign: 'center',
-                        fontSize: '13px',
+                        fontSize: '12px',
                         fontWeight: '700',
-                        fontFamily: 'var(--font-mono)'
-                      }}>
-                        {getRankChangeIcon(ranking.rank_change)}
-                      </td>
-                      <td style={{
-                        padding: '8px 12px',
-                        textAlign: 'center'
-                      }}>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px',
-                          fontSize: '14px',
-                          fontWeight: '700',
-                          color: '#000000',
-                          fontFamily: 'var(--font-sans)'
-                        }}>
-                          <div style={{ transform: 'scale(0.8)' }}>
-                            <TierBadge
-                              tier={ranking.tier.toLowerCase() as 'light' | 'standard' | 'advance' | 'elite' | 'legend'}
-                              iconOnly={true}
-                              glow={0}
+                        letterSpacing: '0.05em',
+                        borderBottom: '1px solid #bfdbfe'
+                      }}
+                    >
+                      {header === '점수' ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                          {header}
+                          <div
+                            style={{ display: 'inline-flex' }}
+                            onMouseEnter={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setTooltipPosition({
+                                x: rect.left + rect.width / 2,
+                                y: rect.bottom + 8
+                              });
+                              setShowScoreTooltip(true);
+                            }}
+                            onMouseLeave={() => setShowScoreTooltip(false)}
+                          >
+                            <HelpCircle
+                              style={{
+                                width: '14px',
+                                height: '14px',
+                                cursor: 'help',
+                                opacity: 0.6
+                              }}
                             />
                           </div>
-                          {ranking.users.profile_name || ranking.users.name}
-                          {isMe && (
+                        </div>
+                      ) : (
+                        header
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      style={{
+                        padding: '60px',
+                        textAlign: 'center',
+                        color: '#94a3b8'
+                      }}
+                    >
+                      <RefreshCw className="w-5 h-5 animate-spin" style={{ margin: '0 auto' }} />
+                    </td>
+                  </tr>
+                ) : rankings.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      style={{
+                        padding: '40px 20px',
+                        textAlign: 'center'
+                      }}
+                    >
+                      {/* 랭킹 참여 설정 */}
+                      <div style={{
+                        maxWidth: '500px',
+                        margin: '0 auto',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '16px',
+                        background: '#ffffff',
+                        borderRadius: '12px',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <div>
+                          <div style={{
+                            fontSize: '11px',
+                            color: '#64748b'
+                          }}>
+                            참여하면 본인과 다른 참여자들의 랭킹을 볼 수 있습니다
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => updateParticipation({ isParticipating: !participation.isParticipating })}
+                          disabled={participationLoading}
+                          style={{
+                            padding: '8px 20px',
+                            background: participation.isParticipating ? '#10b981' : '#2563eb',
+                            borderRadius: '12px',
+                            border: 'none',
+                            color: '#ffffff',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            opacity: participationLoading ? 0.5 : 1,
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!participationLoading) {
+                              e.currentTarget.style.filter = 'brightness(1.1)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.filter = 'brightness(1)';
+                          }}
+                        >
+                          {participation.isParticipating ? '참여중' : '참여하기'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <>
+                    {myRanking && (
+                      <tr
+                        key={`my-${myRanking.id}`}
+                        style={{
+                          borderBottom: '2px solid #fbbf24',
+                          background: '#fef3c7'
+                        }}
+                      >
+                        <td style={{ padding: '16px 12px', textAlign: 'center' }}>
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            minWidth: '40px',
+                            height: '40px',
+                            background: '#2563eb',
+                            color: '#ffffff',
+                            borderRadius: '12px',
+                            fontSize: '16px',
+                            fontWeight: '900',
+                            boxShadow: '0 4px 8px rgba(37,99,235,0.3)'
+                          }}>
+                            {myRanking.rank}
+                          </div>
+                        </td>
+                        <td style={{
+                          padding: '16px 12px',
+                          textAlign: 'center',
+                          fontSize: '14px',
+                          fontWeight: '700'
+                        }}>
+                          {getRankChangeIcon(myRanking.rank_change)}
+                        </td>
+                        <td style={{ padding: '16px 12px', textAlign: 'center' }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            fontSize: '14px',
+                            fontWeight: '700',
+                            color: '#000000'
+                          }}>
+                            <div style={{ transform: 'scale(0.8)' }}>
+                              <TierBadge
+                                tier={myRanking.tier.toLowerCase() as 'light' | 'standard' | 'advance' | 'elite' | 'legend'}
+                                iconOnly={true}
+                                glow={0}
+                              />
+                            </div>
+                            {myRanking.users?.profile_name || myRanking.users?.name || 'Unknown'}
                             <span style={{
-                              padding: '2px 8px',
-                              background: '#000000',
+                              padding: '4px 8px',
+                              background: '#2563eb',
                               color: '#ffffff',
                               fontSize: '10px',
                               fontWeight: '700',
-                              letterSpacing: '0.1em'
+                              borderRadius: '6px',
+                              letterSpacing: '0.05em'
                             }}>
                               ME
                             </span>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{
-                        padding: '8px 12px',
-                        textAlign: 'center',
-                        fontSize: '16px',
-                        fontWeight: '900',
-                        color: '#000000',
-                        fontFamily: 'var(--font-mono)'
-                      }}>
-                        {ranking.total_score.toFixed(1)}
-                      </td>
-                      <td style={{
-                        padding: '8px 12px',
-                        textAlign: 'right',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                        color: '#475569',
-                        fontFamily: 'var(--font-mono)'
-                      }}>
-                        {ranking.total_sales.toLocaleString()}
-                      </td>
-                      <td style={{
-                        padding: '8px 12px',
-                        textAlign: 'right',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                        color: '#475569',
-                        fontFamily: 'var(--font-mono)'
-                      }}>
-                        {ranking.order_count.toLocaleString()}
-                      </td>
-                      <td style={{
-                        padding: '8px 12px',
-                        textAlign: 'center',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                        color: '#475569',
-                        fontFamily: 'var(--font-mono)'
-                      }}>
-                        {ranking.cancel_rate.toFixed(1)}%
-                      </td>
-                    </tr>
-                  );
-                })}
-                </>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* 점수 산정 방식 안내 */}
-        {scoreSettings && (
-          <div style={{
-            marginTop: '32px',
-            background: '#ffffff',
-            border: '2px solid #000000',
-            padding: '32px',
-            boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 0.15)'
-          }}>
-            <h3 style={{
-              fontSize: '18px',
-              fontWeight: '900',
-              color: '#000000',
-              marginBottom: '16px',
-              fontFamily: 'var(--font-sans)',
-              letterSpacing: '0.05em'
-            }}>
-              점수 산정 방식
-            </h3>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '16px',
-              marginBottom: '24px'
-            }}>
-              {/* 발주금액 점수 */}
-              <div style={{
-                padding: '16px',
-                background: '#f9fafb',
-                border: '2px solid #000000'
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: '900',
-                  color: '#64748b',
-                  marginBottom: '8px',
-                  letterSpacing: '0.05em'
-                }}>
-                  발주금액 점수
-                </div>
-                <div style={{
-                  fontSize: '16px',
-                  fontWeight: '900',
-                  color: '#000000',
-                  fontFamily: 'var(--font-mono)'
-                }}>
-                  {scoreSettings.sales_per_point.toLocaleString()}원당 1점
-                </div>
-              </div>
-
-              {/* 발주건수 점수 */}
-              <div style={{
-                padding: '16px',
-                background: '#f9fafb',
-                border: '2px solid #000000'
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: '900',
-                  color: '#64748b',
-                  marginBottom: '8px',
-                  letterSpacing: '0.05em'
-                }}>
-                  발주건수 점수
-                </div>
-                <div style={{
-                  fontSize: '16px',
-                  fontWeight: '900',
-                  color: '#000000',
-                  fontFamily: 'var(--font-mono)'
-                }}>
-                  1건당 {scoreSettings.orders_per_point}점
-                </div>
-              </div>
-
-              {/* 주간 연속발주 보너스 */}
-              <div style={{
-                padding: '16px',
-                background: '#f9fafb',
-                border: '2px solid #000000'
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: '900',
-                  color: '#64748b',
-                  marginBottom: '8px',
-                  letterSpacing: '0.05em'
-                }}>
-                  주간 연속발주 보너스
-                </div>
-                <div style={{
-                  fontSize: '16px',
-                  fontWeight: '900',
-                  color: '#000000',
-                  fontFamily: 'var(--font-mono)'
-                }}>
-                  {scoreSettings.weekly_consecutive_bonus}점
-                </div>
-                <div style={{
-                  fontSize: '11px',
-                  color: '#64748b',
-                  marginTop: '4px'
-                }}>
-                  매주 토요일 가산 (일~금 발주 시)
-                </div>
-              </div>
-
-              {/* 월간 연속발주 보너스 */}
-              <div style={{
-                padding: '16px',
-                background: '#f9fafb',
-                border: '2px solid #000000'
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: '900',
-                  color: '#64748b',
-                  marginBottom: '8px',
-                  letterSpacing: '0.05em'
-                }}>
-                  월간 연속발주 보너스
-                </div>
-                <div style={{
-                  fontSize: '16px',
-                  fontWeight: '900',
-                  color: '#000000',
-                  fontFamily: 'var(--font-mono)'
-                }}>
-                  {scoreSettings.monthly_consecutive_bonus}점
-                </div>
-                <div style={{
-                  fontSize: '11px',
-                  color: '#64748b',
-                  marginTop: '4px'
-                }}>
-                  다음달 1일 가산 (토요일 제외 전일 발주 시)
-                </div>
-              </div>
-
-              {/* 활동 점수 */}
-              <div style={{
-                padding: '16px',
-                background: '#f9fafb',
-                border: '2px solid #000000'
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: '900',
-                  color: '#64748b',
-                  marginBottom: '8px',
-                  letterSpacing: '0.05em'
-                }}>
-                  활동 점수
-                </div>
-                <div style={{
-                  fontSize: '13px',
-                  fontWeight: '700',
-                  color: '#000000',
-                  fontFamily: 'var(--font-mono)'
-                }}>
-                  <div>로그인: {scoreSettings.login_score}점</div>
-                  <div>게시글: {scoreSettings.post_score}점</div>
-                  <div>댓글: {scoreSettings.comment_score}점</div>
-                </div>
-              </div>
-            </div>
-
-            {/* 중요 안내 */}
-            <div style={{
-              padding: '20px',
-              background: '#fef3c7',
-              border: '2px solid #f59e0b',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '12px'
-            }}>
-              <div style={{
-                fontSize: '20px',
-                flexShrink: 0
-              }}>
-                ⚠️
-              </div>
-              <div>
-                <div style={{
-                  fontSize: '14px',
-                  fontWeight: '900',
-                  color: '#000000',
-                  marginBottom: '4px',
-                  fontFamily: 'var(--font-sans)'
-                }}>
-                  셀러 등급은 랭킹과 무관합니다
-                </div>
-                <div style={{
-                  fontSize: '13px',
-                  color: '#64748b',
-                  lineHeight: '1.6',
-                  fontFamily: 'var(--font-sans)'
-                }}>
-                  셀러 랭킹은 기간별 순위 경쟁이며, 셀러 등급(LIGHT/STANDARD/ADVANCE/ELITE/LEGEND)은 실적 또는 활동점수 누적을 기준으로 별도 산정됩니다.
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 랭킹 참여 설정 */}
-        <div style={{
-          marginTop: '32px',
-          background: notParticipating ? '#fef3c7' : '#ffffff',
-          border: '2px solid #000000',
-          padding: '32px',
-          boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 0.15)'
-        }}>
-          <h3 style={{
-            fontSize: '18px',
-            fontWeight: '900',
-            color: '#000000',
-            marginBottom: '8px',
-            fontFamily: 'var(--font-sans)',
-            letterSpacing: '0.05em'
-          }}>
-            RANKING PARTICIPATION
-          </h3>
-          <p style={{
-            fontSize: '13px',
-            color: '#475569',
-            marginBottom: '24px',
-            fontFamily: 'var(--font-sans)'
-          }}>
-            {notParticipating
-              ? '랭킹을 보려면 참여 설정을 활성화해주세요. 참여 시 모든 정보(순위/점수/판매실적)가 공개됩니다.'
-              : '랭킹 참여 중입니다. 모든 정보(순위/점수/판매실적)가 다른 참여자에게 공개되고 있습니다.'}
-          </p>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr',
-            gap: '16px'
-          }}>
-            {/* 참여 토글 */}
-            <div style={{
-              padding: '20px',
-              background: '#f9fafb',
-              border: '2px solid #000000',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <div>
-                <div style={{
-                  fontSize: '14px',
-                  fontWeight: '900',
-                  color: '#000000',
-                  marginBottom: '4px'
-                }}>
-                  랭킹전 참여
-                </div>
-                <div style={{
-                  fontSize: '12px',
-                  color: '#64748b'
-                }}>
-                  참여하면 본인과 다른 참여자들의 랭킹을 볼 수 있습니다
-                </div>
-              </div>
-              <button
-                onClick={() => updateParticipation({ isParticipating: !participation.isParticipating })}
-                disabled={participationLoading}
-                style={{
-                  padding: '8px 24px',
-                  background: participation.isParticipating ? '#10b981' : '#94a3b8',
-                  border: '2px solid #000000',
-                  color: '#ffffff',
-                  fontSize: '14px',
-                  fontWeight: '900',
-                  cursor: 'pointer',
-                  opacity: participationLoading ? 0.5 : 1,
-                  fontFamily: 'var(--font-sans)'
-                }}
-              >
-                {participation.isParticipating ? '참여중' : '참여하기'}
-              </button>
-            </div>
-
-          </div>
-
-          {/* 안내 문구 */}
-          <div style={{
-            marginTop: '16px',
-            padding: '16px',
-            background: '#f8fafc',
-            border: '1px dashed #cbd5e1',
-            borderRadius: '4px'
-          }}>
-            <div style={{
-              fontSize: '12px',
-              color: '#64748b',
-              lineHeight: '1.6',
-              textAlign: 'center',
-              fontFamily: 'var(--font-sans)'
-            }}>
-              💡 셀러 랭킹은 판매자분들의 작은 <strong>재미</strong>와 <strong>동기부여</strong>를 위한 기능입니다.<br />
-              순위에 너무 집착하지 마시고 가볍게 즐겨주세요! 😊
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* 티어 가이드 모달 */}
-      {showTierGuideModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '24px'
-          }}
-          onClick={() => setShowTierGuideModal(false)}
-        >
-          <div
-            style={{
-              background: '#ffffff',
-              border: '2px solid #000000',
-              boxShadow: '8px 8px 0px 0px #000000',
-              maxWidth: '1400px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflow: 'auto',
-              position: 'relative'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* 닫기 버튼 */}
-            <button
-              onClick={() => setShowTierGuideModal(false)}
-              style={{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-                background: '#000000',
-                border: '2px solid #000000',
-                color: '#ffffff',
-                width: '40px',
-                height: '40px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                zIndex: 10
-              }}
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {tierGuideLoading ? (
-              <div style={{
-                minHeight: '400px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <div style={{
-                  padding: '40px',
-                  background: '#000000',
-                  border: '2px solid #000000',
-                  boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 0.15)',
-                  color: '#ffffff',
-                  fontSize: '20px',
-                  fontWeight: '900',
-                  fontFamily: 'var(--font-sans)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.1em'
-                }}>
-                  LOADING...
-                </div>
-              </div>
-            ) : (
-              <div style={{ padding: '40px' }}>
-                {/* 헤더 */}
-                <div style={{
-                  textAlign: 'center',
-                  marginBottom: '24px',
-                  padding: '20px',
-                  background: '#ffffff',
-                  border: '2px solid #000000',
-                  boxShadow: '6px 6px 0px 0px rgba(0, 0, 0, 0.15)',
-                  color: '#000000'
-                }}>
-                  <h1 style={{
-                    fontSize: '32px',
-                    fontWeight: '900',
-                    marginBottom: '8px',
-                    fontFamily: 'var(--font-sans)',
-                    letterSpacing: '-0.02em',
-                    textTransform: 'uppercase'
-                  }}>
-                    TIER SYSTEM
-                  </h1>
-                  <p style={{
-                    fontSize: '13px',
-                    opacity: 0.9,
-                    fontFamily: 'var(--font-sans)'
-                  }}>
-                    실적방식(매월 1일 판정) 또는 활동점수방식(실시간 판정) 중 더 높은 등급 자동 적용
-                  </p>
-                </div>
-
-                {/* 티어 테이블 */}
-                <div style={{
-                  background: '#ffffff',
-                  border: '2px solid #000000',
-                  boxShadow: '6px 6px 0px 0px #000000',
-                  overflow: 'hidden'
-                }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: '#f9fafb', color: '#000000' }}>
-                        <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: '900', fontFamily: 'var(--font-sans)', textTransform: 'uppercase', borderRight: '2px solid #000000' }}>
-                          TIER
-                        </th>
-                        <th style={{ padding: '16px', textAlign: 'center', fontSize: '14px', fontWeight: '900', fontFamily: 'var(--font-sans)', textTransform: 'uppercase', borderRight: '2px solid #000000' }}>
-                          할인율
-                        </th>
-                        <th style={{ padding: '16px', textAlign: 'center', fontSize: '14px', fontWeight: '900', fontFamily: 'var(--font-sans)', textTransform: 'uppercase', borderRight: '2px solid #000000' }}>
-                          실적방식 (3개월)
-                        </th>
-                        <th style={{ padding: '16px', textAlign: 'center', fontSize: '14px', fontWeight: '900', fontFamily: 'var(--font-sans)', textTransform: 'uppercase' }}>
-                          활동점수방식 (누적)
-                        </th>
+                          </div>
+                        </td>
+                        <td style={{
+                          padding: '16px 12px',
+                          textAlign: 'center',
+                          fontSize: '18px',
+                          fontWeight: '900',
+                          color: '#1d4ed8'
+                        }}>
+                          {myRanking.total_score.toFixed(1)}
+                        </td>
+                        <td style={{
+                          padding: '16px 12px',
+                          textAlign: 'right',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          color: '#475569'
+                        }}>
+                          {myRanking.total_sales.toLocaleString()}
+                        </td>
+                        <td style={{
+                          padding: '16px 12px',
+                          textAlign: 'right',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          color: '#475569'
+                        }}>
+                          {myRanking.order_count.toLocaleString()}
+                        </td>
+                        <td style={{
+                          padding: '16px 12px',
+                          textAlign: 'center',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          color: '#475569'
+                        }}>
+                          {myRanking.cancel_rate.toFixed(1)}%
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {tierCriteria.map((tier, index) => {
-                        const pointCriteria = pointSettings?.accumulated_point_criteria.find(
-                          (p) => p.tier === tier.tier
-                        );
-
-                        return (
-                          <tr
-                            key={tier.tier}
-                            style={{
-                              borderBottom: index < tierCriteria.length - 1 ? '2px solid #000000' : 'none',
-                              background: index % 2 === 0 ? '#ffffff' : '#f9fafb'
-                            }}
-                          >
-                            <td style={{ padding: '20px', borderRight: '2px solid #000000' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    )}
+                    {rankings.map((ranking, index) => {
+                      const isMe = myRanking?.seller_id === ranking.seller_id;
+                      return (
+                        <tr
+                          key={ranking.id}
+                          style={{
+                            borderBottom: index < rankings.length - 1 ? '1px solid #e5e7eb' : 'none',
+                            background: isMe ? '#fef3c7' : index % 2 === 0 ? '#ffffff' : '#f9fafb',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isMe) {
+                              e.currentTarget.style.background = '#eff6ff';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isMe) {
+                              e.currentTarget.style.background = index % 2 === 0 ? '#ffffff' : '#f9fafb';
+                            }
+                          }}
+                        >
+                          <td style={{ padding: '16px 12px', textAlign: 'center' }}>
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              minWidth: '40px',
+                              height: '40px',
+                              background: ranking.rank <= 3 ? '#2563eb' : '#f3f4f6',
+                              color: ranking.rank <= 3 ? '#ffffff' : '#000000',
+                              borderRadius: '12px',
+                              fontSize: '16px',
+                              fontWeight: '900',
+                              boxShadow: ranking.rank <= 3 ? '0 4px 8px rgba(37,99,235,0.3)' : 'none'
+                            }}>
+                              {ranking.rank}
+                            </div>
+                          </td>
+                          <td style={{
+                            padding: '16px 12px',
+                            textAlign: 'center',
+                            fontSize: '14px',
+                            fontWeight: '700'
+                          }}>
+                            {getRankChangeIcon(ranking.rank_change)}
+                          </td>
+                          <td style={{ padding: '16px 12px', textAlign: 'center' }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              fontSize: '14px',
+                              fontWeight: '700',
+                              color: '#000000'
+                            }}>
+                              <div style={{ transform: 'scale(0.8)' }}>
                                 <TierBadge
-                                  tier={tier.tier.toLowerCase() as 'light' | 'standard' | 'advance' | 'elite' | 'legend'}
-                                  compact={true}
+                                  tier={ranking.tier.toLowerCase() as 'light' | 'standard' | 'advance' | 'elite' | 'legend'}
+                                  iconOnly={true}
                                   glow={0}
                                 />
                               </div>
-                            </td>
-                            <td style={{ padding: '20px', textAlign: 'center', borderRight: '2px solid #000000' }}>
-                              <div style={{
-                                display: 'inline-block',
-                                padding: '8px 16px',
-                                background: '#000000',
-                                color: '#ffffff',
-                                fontSize: '18px',
-                                fontWeight: '900',
-                                fontFamily: 'var(--font-mono)'
-                              }}>
-                                {tier.discount_rate}%
-                              </div>
-                            </td>
-                            <td style={{ padding: '20px', textAlign: 'center', borderRight: '2px solid #000000' }}>
-                              {tier.tier === 'LIGHT' ? (
-                                <div style={{ fontSize: '14px', fontFamily: 'var(--font-mono)', fontWeight: '700' }}>
-                                  {tier.min_order_count}건 + {(tier.min_total_sales / 10000).toLocaleString()}만원 <span style={{ fontSize: '11px', color: '#6b7280' }}>(즉시 승급)</span>
-                                </div>
-                              ) : (
-                                <div style={{ fontSize: '14px', fontFamily: 'var(--font-mono)', fontWeight: '700' }}>
-                                  {tier.min_order_count.toLocaleString()}건 + {(tier.min_total_sales / 10000).toLocaleString()}만원
-                                </div>
+                              {ranking.users.profile_name || ranking.users.name}
+                              {isMe && (
+                                <span style={{
+                                  padding: '4px 8px',
+                                  background: '#2563eb',
+                                  color: '#ffffff',
+                                  fontSize: '10px',
+                                  fontWeight: '700',
+                                  borderRadius: '6px',
+                                  letterSpacing: '0.05em'
+                                }}>
+                                  ME
+                                </span>
                               )}
-                            </td>
-                            <td style={{ padding: '20px', textAlign: 'center' }}>
-                              {pointCriteria ? (
-                                <div style={{ fontSize: '14px', fontFamily: 'var(--font-mono)', fontWeight: '700' }}>
-                                  {pointCriteria.requiredPoints.toLocaleString()}점
-                                </div>
-                              ) : (
-                                <div style={{ fontSize: '14px', color: '#9ca3af' }}>-</div>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* 활동점수방식 세부 설정 */}
-                {pointSettings && (
-                  <div style={{
-                    marginTop: '24px',
-                    background: '#ffffff',
-                    border: '2px solid #000000',
-                    boxShadow: '6px 6px 0px 0px rgba(0, 0, 0, 0.15)',
-                    padding: '20px'
-                  }}>
-                    <h2 style={{
-                      fontSize: '20px',
-                      fontWeight: '900',
-                      marginBottom: '16px',
-                      fontFamily: 'var(--font-sans)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '-0.02em'
-                    }}>
-                      활동점수 적립 안내
-                    </h2>
-
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                      gap: '16px',
-                      fontSize: '13px',
-                      fontFamily: 'var(--font-sans)'
-                    }}>
-                      {/* 기본 점수 */}
-                      <div style={{
-                        padding: '12px',
-                        background: '#f9fafb',
-                        border: '2px solid #000000'
-                      }}>
-                        <div style={{ fontWeight: '900', marginBottom: '8px', fontSize: '14px' }}>기본 점수</div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontWeight: '700' }}>
-                          <div>로그인: {pointSettings.login_points_per_day}점/일</div>
-                          <div>발주: {pointSettings.points_per_day}점/일</div>
-                        </div>
-                      </div>
-
-                      {/* 마일스톤 보너스 */}
-                      {pointSettings.milestones.filter(m => m.enabled).length > 0 && (
-                        <div style={{
-                          padding: '12px',
-                          background: '#f9fafb',
-                          border: '2px solid #000000'
-                        }}>
-                          <div style={{ fontWeight: '900', marginBottom: '8px', fontSize: '14px' }}>마일스톤 보너스</div>
-                          <div style={{ fontFamily: 'var(--font-mono)', fontWeight: '700' }}>
-                            {pointSettings.milestones.filter(m => m.enabled).map((m, i) => (
-                              <div key={i}>발주 {m.days}일 누적: +{m.bonus}점</div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 연속성 보너스 */}
-                      {pointSettings.consecutive_bonuses.filter(c => c.enabled).length > 0 && (
-                        <div style={{
-                          padding: '12px',
-                          background: '#f9fafb',
-                          border: '2px solid #000000'
-                        }}>
-                          <div style={{ fontWeight: '900', marginBottom: '8px', fontSize: '14px' }}>연속성 보너스</div>
-                          <div style={{ fontFamily: 'var(--font-mono)', fontWeight: '700' }}>
-                            {pointSettings.consecutive_bonuses.filter(c => c.enabled).map((c, i) => (
-                              <div key={i}>{c.days}일 연속 발주: +{c.bonus}점</div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 월간 보너스 */}
-                      {pointSettings.monthly_bonuses.filter(m => m.enabled).length > 0 && (
-                        <div style={{
-                          padding: '12px',
-                          background: '#f9fafb',
-                          border: '2px solid #000000'
-                        }}>
-                          <div style={{ fontWeight: '900', marginBottom: '8px', fontSize: '14px' }}>월간 보너스</div>
-                          <div style={{ fontFamily: 'var(--font-mono)', fontWeight: '700' }}>
-                            {pointSettings.monthly_bonuses.filter(m => m.enabled).map((m, i) => (
-                              <div key={i}>월 {m.minDays}일 이상 발주: +{m.bonus}점/월</div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 미접속 페널티 */}
-                      {pointSettings.no_login_penalties.filter(p => p.enabled).length > 0 && (
-                        <div style={{
-                          padding: '12px',
-                          background: '#f9fafb',
-                          border: '2px solid #000000'
-                        }}>
-                          <div style={{ fontWeight: '900', marginBottom: '8px', fontSize: '14px' }}>미접속 페널티</div>
-                          <div style={{ fontFamily: 'var(--font-mono)', fontWeight: '700' }}>
-                            {pointSettings.no_login_penalties.filter(p => p.enabled).map((p, i) => (
-                              <div key={i}>{p.days}일 연속 미접속: -{p.penalty}점</div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                            </div>
+                          </td>
+                          <td style={{
+                            padding: '16px 12px',
+                            textAlign: 'center',
+                            fontSize: '16px',
+                            fontWeight: '900',
+                            color: '#1d4ed8'
+                          }}>
+                            {ranking.total_score.toFixed(1)}
+                          </td>
+                          <td style={{
+                            padding: '16px 12px',
+                            textAlign: 'right',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            color: '#475569'
+                          }}>
+                            {ranking.total_sales.toLocaleString()}
+                          </td>
+                          <td style={{
+                            padding: '16px 12px',
+                            textAlign: 'right',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            color: '#475569'
+                          }}>
+                            {ranking.order_count.toLocaleString()}
+                          </td>
+                          <td style={{
+                            padding: '16px 12px',
+                            textAlign: 'center',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            color: '#475569'
+                          }}>
+                            {ranking.cancel_rate.toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </>
                 )}
-              </div>
-            )}
+              </tbody>
+            </table>
           </div>
+
+          {/* 점수 산정 방식 안내 */}
+          {scoreSettings && (
+            <div style={{
+              marginTop: '24px',
+              padding: '12px 0',
+              textAlign: 'center'
+            }}>
+              <div style={{
+                fontSize: '11px',
+                color: '#64748b',
+                lineHeight: '1.8'
+              }}>
+                발주금액 {scoreSettings.sales_per_point.toLocaleString()}원당 1p · 발주건수 1건당 {scoreSettings.orders_per_point}p · 주간 연속발주 보너스 {scoreSettings.weekly_consecutive_bonus}p (매주 토요일 가산) · 월간 연속발주 보너스 {scoreSettings.monthly_consecutive_bonus}p (다음달 1일 가산) · 로그인 {scoreSettings.login_score}p · 게시글 {scoreSettings.post_score}p · 댓글 {scoreSettings.comment_score}p
+              </div>
+              <div style={{
+                fontSize: '10px',
+                color: '#94a3b8',
+                marginTop: '8px'
+              }}>
+                * 셀러 랭킹은 기간별 순위 경쟁이며, 셀러 등급(LIGHT/STANDARD/ADVANCE/ELITE/LEGEND)은 실적 또는 기여점수 누적을 기준으로 별도 산정됩니다.
+              </div>
+            </div>
+          )}
+
+
         </div>
-      )}
-    </div>
+
+        {/* 티어 가이드 모달 */}
+        {showTierGuideModal && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '24px'
+            }}
+            onClick={() => setShowTierGuideModal(false)}
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                maxWidth: '1200px',
+                width: '100%',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                position: 'relative'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowTierGuideModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  background: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: '12px',
+                  color: '#000000',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  zIndex: 10,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6';
+                }}
+              >
+                <X style={{ width: '20px', height: '20px' }} />
+              </button>
+
+              {tierGuideLoading ? (
+                <div style={{
+                  minHeight: '400px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <RefreshCw className="w-8 h-8 animate-spin" style={{ color: '#2563eb' }} />
+                </div>
+              ) : (
+                <div style={{ padding: '40px' }}>
+                  <div style={{
+                    textAlign: 'center',
+                    marginBottom: '32px'
+                  }}>
+                    <h1 style={{
+                      fontSize: '32px',
+                      fontWeight: '700',
+                      marginBottom: '8px',
+                      color: '#1d4ed8'
+                    }}>
+                      티어 시스템
+                    </h1>
+                    <p style={{
+                      fontSize: '14px',
+                      color: '#64748b'
+                    }}>
+                      실적방식(매월 1일 판정) 또는 기여점수방식(실시간 판정) 중 더 높은 등급 자동 적용
+                    </p>
+                  </div>
+
+                  <div style={{
+                    background: '#ffffff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '16px',
+                    overflow: 'hidden'
+                  }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: '#f9fafb', color: '#000000' }}>
+                          <th style={{ padding: '16px', textAlign: 'center', fontSize: '14px', fontWeight: '700', borderBottom: '1px solid #e5e7eb' }}>
+                            티어
+                          </th>
+                          <th style={{ padding: '16px', textAlign: 'center', fontSize: '14px', fontWeight: '700', borderBottom: '1px solid #e5e7eb' }}>
+                            할인율
+                          </th>
+                          <th style={{ padding: '16px', textAlign: 'center', fontSize: '14px', fontWeight: '700', borderBottom: '1px solid #e5e7eb' }}>
+                            실적방식 (3개월)
+                          </th>
+                          <th style={{ padding: '16px', textAlign: 'center', fontSize: '14px', fontWeight: '700', borderBottom: '1px solid #e5e7eb' }}>
+                            기여점수방식 (누적)
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tierCriteria.map((tier, index) => {
+                          const pointCriteria = pointSettings?.accumulated_point_criteria.find(
+                            (p) => p.tier === tier.tier
+                          );
+
+                          return (
+                            <tr
+                              key={tier.tier}
+                              style={{
+                                borderBottom: index < tierCriteria.length - 1 ? '1px solid #e5e7eb' : 'none',
+                                background: index % 2 === 0 ? '#ffffff' : '#f9fafb'
+                              }}
+                            >
+                              <td style={{ padding: '20px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <TierBadge
+                                    tier={tier.tier.toLowerCase() as 'light' | 'standard' | 'advance' | 'elite' | 'legend'}
+                                    compact={true}
+                                    glow={0}
+                                  />
+                                </div>
+                              </td>
+                              <td style={{ padding: '20px', textAlign: 'center' }}>
+                                <div style={{
+                                  display: 'inline-block',
+                                  padding: '4px 10px',
+                                  background: '#2563eb',
+                                  color: '#ffffff',
+                                  borderRadius: '6px',
+                                  fontSize: '13px',
+                                  fontWeight: '600'
+                                }}>
+                                  {tier.discount_rate}%
+                                </div>
+                              </td>
+                              <td style={{ padding: '20px', textAlign: 'center' }}>
+                                {tier.tier === 'LIGHT' ? (
+                                  <div style={{ fontSize: '14px', fontWeight: '700' }}>
+                                    {tier.min_order_count}건 + {(tier.min_total_sales / 10000).toLocaleString()}만원 <span style={{ fontSize: '11px', color: '#6b7280' }}>(즉시 승급)</span>
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: '14px', fontWeight: '700' }}>
+                                    {tier.min_order_count.toLocaleString()}건 + {(tier.min_total_sales / 10000).toLocaleString()}만원
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: '20px', textAlign: 'center' }}>
+                                {pointCriteria ? (
+                                  <div style={{ fontSize: '14px', fontWeight: '700' }}>
+                                    {pointCriteria.requiredPoints.toLocaleString()}점
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: '14px', color: '#9ca3af' }}>-</div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {pointSettings && (
+                    <div style={{
+                      marginTop: '32px',
+                      background: '#f9fafb',
+                      borderRadius: '16px',
+                      padding: '24px'
+                    }}>
+                      <h2 style={{
+                        fontSize: '20px',
+                        fontWeight: '700',
+                        marginBottom: '16px',
+                        color: '#1d4ed8'
+                      }}>
+                        기여점수 적립 안내
+                      </h2>
+
+                      <div style={{
+                        fontSize: '12px',
+                        color: '#64748b',
+                        lineHeight: '1.8'
+                      }}>
+                        {/* 기본 점수 */}
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong style={{ color: '#1d4ed8' }}>기본 점수</strong> 로그인 {pointSettings.login_points_per_day}p/일 · 발주 {pointSettings.points_per_day}p/일 · 게시글 작성 {pointSettings.post_points}p · 댓글 작성 {pointSettings.comment_points}p
+                        </div>
+
+                        {/* 마일스톤 보너스 */}
+                        {pointSettings.milestones.filter(m => m.enabled).length > 0 && (
+                          <div style={{ marginBottom: '8px' }}>
+                            <strong style={{ color: '#1d4ed8' }}>마일스톤 보너스</strong> {pointSettings.milestones.filter(m => m.enabled).map((m, i, arr) => (
+                              <span key={i}>발주 {m.days}일 누적 +{m.bonus}p{i < arr.length - 1 ? ' · ' : ''}</span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 연속성 보너스 */}
+                        {pointSettings.consecutive_bonuses.filter(c => c.enabled).length > 0 && (
+                          <div style={{ marginBottom: '8px' }}>
+                            <strong style={{ color: '#1d4ed8' }}>연속성 보너스</strong> {pointSettings.consecutive_bonuses.filter(c => c.enabled).map((c, i, arr) => (
+                              <span key={i}>{c.days}일 연속 발주 +{c.bonus}p{i < arr.length - 1 ? ' · ' : ''}</span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 월간 보너스 */}
+                        {pointSettings.monthly_bonuses.filter(m => m.enabled).length > 0 && (
+                          <div style={{ marginBottom: '8px' }}>
+                            <strong style={{ color: '#1d4ed8' }}>월간 보너스</strong> {pointSettings.monthly_bonuses.filter(m => m.enabled).map((m, i, arr) => (
+                              <span key={i}>월 {m.minDays}일 이상 발주 +{m.bonus}p/월{i < arr.length - 1 ? ' · ' : ''}</span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 미접속 페널티 */}
+                        {pointSettings.no_login_penalties.filter(p => p.enabled).length > 0 && (
+                          <div style={{ marginBottom: '8px' }}>
+                            <strong style={{ color: '#1d4ed8' }}>미접속 페널티</strong> {pointSettings.no_login_penalties.filter(p => p.enabled).map((p, i, arr) => (
+                              <span key={i}>{p.days}일 연속 미접속 -{p.penalty}p{i < arr.length - 1 ? ' · ' : ''}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

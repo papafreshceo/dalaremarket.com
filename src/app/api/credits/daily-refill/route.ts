@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getUserPrimaryOrganization } from '@/lib/organization-utils';
 
 /**
  * POST /api/credits/daily-refill
- * 일일 크레딧 리필 (최대 1000, 저축 불가)
+ * 일일 크레딧 리필 (조직 단위, 최대 1000, 저축 불가)
  * 날짜가 바뀌면 무조건 1000으로 리셋
  */
 export async function POST(request: NextRequest) {
@@ -37,19 +38,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 사용자의 조직 정보 가져오기
+    let organization = await getUserPrimaryOrganization(effectiveUserId);
+
+    // 조직이 없으면 자동 생성
+    if (!organization) {
+      const { autoCreateOrganizationFromUser } = await import('@/lib/auto-create-organization');
+      const result = await autoCreateOrganizationFromUser(effectiveUserId);
+
+      if (!result.success) {
+        return NextResponse.json(
+          { success: false, error: result.error || '조직 생성에 실패했습니다.' },
+          { status: 500 }
+        );
+      }
+
+      // 다시 조직 정보 조회
+      organization = await getUserPrimaryOrganization(effectiveUserId);
+
+      if (!organization) {
+        return NextResponse.json(
+          { success: false, error: '조직 생성 후에도 조직을 찾을 수 없습니다.' },
+          { status: 500 }
+        );
+      }
+    }
+
     // 오늘 날짜 (KST)
     const now = new Date();
-    const kstOffset = 9 * 60 * 60 * 1000;
+    const kstOffset = 9 * 60 * 60 * 60 * 1000;
     const kstDate = new Date(now.getTime() + kstOffset);
     const today = kstDate.toISOString().split('T')[0]; // YYYY-MM-DD
 
     const DAILY_CREDIT_LIMIT = 1000;
 
-    // 크레딧 계정 조회
+    // 조직 크레딧 계정 조회 (organization_id 기준)
     let { data: userCredit, error: creditError } = await dbClient
       .from('user_credits')
       .select('*')
-      .eq('user_id', effectiveUserId)
+      .eq('organization_id', organization.id)
       .single();
 
     // impersonate 모드에서는 읽기 전용 (지급/리필하지 않음)
@@ -79,6 +106,7 @@ export async function POST(request: NextRequest) {
         .from('user_credits')
         .insert({
           user_id: effectiveUserId,
+          organization_id: organization.id,
           balance: DAILY_CREDIT_LIMIT,
           last_refill_date: today
         })
@@ -86,31 +114,60 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (insertError) {
-        console.error('[POST /api/credits/daily-refill] 크레딧 생성 오류:', insertError);
-        return NextResponse.json(
-          { success: false, error: '크레딧 정보를 생성할 수 없습니다.' },
-          { status: 500 }
-        );
-      }
+        // 중복 키 오류 (23505) - 이미 존재하는 경우 다시 조회
+        if (insertError.code === '23505') {
+          const { data: existingCredit } = await dbClient
+            .from('user_credits')
+            .select('*')
+            .eq('organization_id', organization.id)
+            .single();
 
-      // 거래 이력 추가
-      await dbClient
-        .from('user_credit_transactions')
-        .insert({
-          user_id: effectiveUserId,
-          type: 'daily_refill',
-          amount: DAILY_CREDIT_LIMIT,
-          balance_after: DAILY_CREDIT_LIMIT,
-          description: '일일 크레딧 지급',
-          metadata: { date: today }
+          if (existingCredit) {
+            userCredit = existingCredit;
+            // 날짜 확인 후 리필 처리는 아래 로직에서 수행
+          } else {
+            console.error('[POST /api/credits/daily-refill] 크레딧 조회 실패:', insertError);
+            return NextResponse.json(
+              { success: false, error: '크레딧 정보를 생성할 수 없습니다.' },
+              { status: 500 }
+            );
+          }
+        } else {
+          console.error('[POST /api/credits/daily-refill] 크레딧 생성 오류:', insertError);
+          return NextResponse.json(
+            { success: false, error: '크레딧 정보를 생성할 수 없습니다.' },
+            { status: 500 }
+          );
+        }
+      } else {
+        // 신규 생성 성공 - 거래 이력 추가
+        await dbClient
+          .from('user_credit_transactions')
+          .insert({
+            user_id: effectiveUserId,
+            organization_id: organization.id,
+            type: 'daily_refill',
+            amount: DAILY_CREDIT_LIMIT,
+            balance_after: DAILY_CREDIT_LIMIT,
+            description: '일일 크레딧 지급',
+            metadata: { date: today }
+          });
+
+        return NextResponse.json({
+          success: true,
+          balance: DAILY_CREDIT_LIMIT,
+          refilled: true,
+          message: '일일 크레딧이 지급되었습니다.'
         });
+      }
+    }
 
-      return NextResponse.json({
-        success: true,
-        balance: DAILY_CREDIT_LIMIT,
-        refilled: true,
-        message: '일일 크레딧이 지급되었습니다.'
-      });
+    // 여기까지 오면 userCredit이 존재함
+    if (!userCredit) {
+      return NextResponse.json(
+        { success: false, error: '크레딧 정보를 찾을 수 없습니다.' },
+        { status: 500 }
+      );
     }
 
     // 마지막 리필 날짜와 오늘 날짜 비교
@@ -139,6 +196,7 @@ export async function POST(request: NextRequest) {
         .from('user_credit_transactions')
         .insert({
           user_id: effectiveUserId,
+          organization_id: organization.id,
           type: 'daily_refill',
           amount: DAILY_CREDIT_LIMIT - userCredit.balance,
           balance_after: DAILY_CREDIT_LIMIT,

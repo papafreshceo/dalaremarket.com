@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { autoCreateOrganizationFromUser, syncOrganizationFromUser } from '@/lib/auto-create-organization';
 
 export async function GET(request: NextRequest) {
   try {
@@ -149,6 +150,35 @@ export async function PUT(request: NextRequest) {
         { success: false, error: '프로필 업데이트에 실패했습니다.', details: updateError.message },
         { status: 500 }
       );
+    }
+
+    // 🆕 사업자 정보가 입력되었으면 조직 자동 생성/업데이트
+    const hasBusinessInfo =
+      business_name ||
+      business_number ||
+      representative_name ||
+      business_address;
+
+    if (hasBusinessInfo) {
+      try {
+        // 조직이 이미 있는지 확인
+        const { data: userData } = await supabase
+          .from('users')
+          .select('primary_organization_id')
+          .eq('id', user.id)
+          .single();
+
+        if (userData?.primary_organization_id) {
+          // 조직이 있으면 동기화
+          await syncOrganizationFromUser(user.id);
+        } else {
+          // 조직이 없으면 생성
+          await autoCreateOrganizationFromUser(user.id);
+        }
+      } catch (error) {
+        console.error('조직 자동 생성/동기화 오류:', error);
+        // 조직 생성/동기화 실패해도 프로필 업데이트는 성공으로 처리
+      }
     }
 
     return NextResponse.json({

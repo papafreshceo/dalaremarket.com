@@ -79,17 +79,50 @@ export default function CompetitorMonitor() {
     setError('');
 
     try {
-      // 실제로는 API를 통해 상품 정보를 가져와야 하지만,
-      // 여기서는 데모용으로 URL 기반으로 기본 정보 생성
-      const market = detectMarket(newProductUrl);
+      // API를 통해 상품 정보 자동 수집
+      const response = await fetch('/api/scrape-price', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: newProductUrl }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        // 실패해도 기본 정보로 추가 가능하도록
+        const market = detectMarket(newProductUrl);
+        setError(result.error || '가격 정보를 자동으로 가져올 수 없습니다. 수동으로 입력해주세요.');
+
+        const newProduct: CompetitorProduct = {
+          id: Date.now().toString(),
+          url: newProductUrl,
+          productName: result.productName || '상품명을 클릭하여 수정하세요',
+          market: result.market || market,
+          currentPrice: 0,
+          inStock: true,
+          lastChecked: new Date().toISOString(),
+          priceHistory: []
+        };
+
+        const newProducts = [...products, newProduct];
+        setProducts(newProducts);
+        saveToStorage(newProducts);
+        setNewProductUrl('');
+        return;
+      }
+
+      // 성공: 자동으로 수집된 정보로 상품 추가
+      const { data } = result;
       const newProduct: CompetitorProduct = {
         id: Date.now().toString(),
         url: newProductUrl,
-        productName: '상품명을 클릭하여 수정하세요',
-        market,
-        currentPrice: 0,
-        inStock: true,
-        lastChecked: new Date().toISOString(),
+        productName: data.productName,
+        market: data.market,
+        currentPrice: data.price,
+        inStock: data.inStock,
+        lastChecked: data.scrapedAt,
         priceHistory: []
       };
 
@@ -97,6 +130,7 @@ export default function CompetitorMonitor() {
       setProducts(newProducts);
       saveToStorage(newProducts);
       setNewProductUrl('');
+      setError(''); // 성공 시 에러 메시지 초기화
     } catch (err) {
       setError('상품을 추가하는데 실패했습니다.');
     } finally {
@@ -111,7 +145,30 @@ export default function CompetitorMonitor() {
     saveToStorage(newProducts);
   };
 
-  // 가격 업데이트
+  // 잘못된 URL 상품 모두 삭제
+  const removeInvalidProducts = () => {
+    const validProducts = products.filter(p => {
+      try {
+        new URL(p.url);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    const removedCount = products.length - validProducts.length;
+    if (removedCount > 0) {
+      if (confirm(`${removedCount}개의 잘못된 URL 상품을 삭제하시겠습니까?`)) {
+        setProducts(validProducts);
+        saveToStorage(validProducts);
+        setError(`${removedCount}개의 잘못된 상품을 삭제했습니다.`);
+      }
+    } else {
+      setError('잘못된 URL을 가진 상품이 없습니다.');
+    }
+  };
+
+  // 가격 업데이트 (수동)
   const updatePrice = (id: string, newPrice: number) => {
     const newProducts = products.map(p => {
       if (p.id === id) {
@@ -134,6 +191,132 @@ export default function CompetitorMonitor() {
     });
     setProducts(newProducts);
     saveToStorage(newProducts);
+  };
+
+  // 가격 자동 갱신 (단일 상품, 재시도 포함)
+  const refreshPrice = async (id: string, skipLoadingState = false, retryCount = 0): Promise<{ success: boolean; error?: string }> => {
+    const product = products.find(p => p.id === id);
+    if (!product) return { success: false, error: '상품을 찾을 수 없습니다.' };
+
+    if (!skipLoadingState) {
+      setLoading(true);
+      setError('');
+    }
+
+    try {
+      const response = await fetch('/api/scrape-price', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: product.url }),
+      });
+
+      const result = await response.json();
+
+      // 429 에러 처리 (Too Many Requests)
+      if (response.status === 429 && retryCount < 2) {
+        // 5초 대기 후 재시도
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        return refreshPrice(id, skipLoadingState, retryCount + 1);
+      }
+
+      if (!response.ok) {
+        const errorMsg = `${product.productName}: ${result.error || '가격 정보를 가져올 수 없습니다.'}`;
+        if (!skipLoadingState) {
+          setError(errorMsg);
+        }
+        return { success: false, error: errorMsg };
+      }
+
+      const { data } = result;
+
+      // 가격 업데이트
+      setProducts(prevProducts => {
+        const newProducts = prevProducts.map(p => {
+          if (p.id === id) {
+            const history = p.priceHistory || [];
+            if (p.currentPrice > 0 && p.currentPrice !== data.price) {
+              history.push({
+                date: new Date().toISOString(),
+                price: p.currentPrice
+              });
+            }
+            return {
+              ...p,
+              previousPrice: p.currentPrice,
+              currentPrice: data.price,
+              productName: data.productName || p.productName,
+              inStock: data.inStock,
+              priceHistory: history,
+              lastChecked: data.scrapedAt
+            };
+          }
+          return p;
+        });
+        saveToStorage(newProducts);
+        return newProducts;
+      });
+
+      return { success: true };
+    } catch (err) {
+      const errorMsg = `${product.productName}: 가격을 갱신하는데 실패했습니다.`;
+      if (!skipLoadingState) {
+        setError(errorMsg);
+      }
+      return { success: false, error: errorMsg };
+    } finally {
+      if (!skipLoadingState) {
+        setLoading(false);
+      }
+    }
+  };
+
+  // 모든 상품 가격 갱신
+  const refreshAllPrices = async () => {
+    if (products.length === 0) return;
+
+    setLoading(true);
+    setError('갱신을 시작합니다...');
+
+    const errors: string[] = [];
+    let successCount = 0;
+
+    for (let i = 0; i < products.length; i++) {
+      const product = products[i];
+
+      // 진행 상황 표시
+      setError(`진행 중: ${i + 1}/${products.length} - ${product.productName} 처리 중...`);
+
+      // URL 유효성 검사
+      try {
+        new URL(product.url);
+      } catch {
+        errors.push(`${product.productName}: 올바르지 않은 URL입니다.`);
+        continue;
+      }
+
+      const result = await refreshPrice(product.id, true);
+
+      if (!result.success && result.error) {
+        errors.push(result.error);
+      } else if (result.success) {
+        successCount++;
+      }
+
+      // 마지막 상품이 아니면 4초 대기 (429 에러 방지)
+      if (i < products.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 4000));
+      }
+    }
+
+    if (errors.length > 0) {
+      setError(`✅ 갱신 완료 - 성공: ${successCount}개, 실패: ${errors.length}개\n\n❌ 실패 목록:\n${errors.join('\n')}`);
+    } else if (successCount > 0) {
+      setError(`✅ 모든 상품 갱신 완료! (${successCount}개 성공)`);
+    }
+
+    setLoading(false);
   };
 
   // 상품명 수정 시작
@@ -237,11 +420,12 @@ export default function CompetitorMonitor() {
         {error && (
           <div style={{
             padding: '12px',
-            background: '#fff5f5',
-            border: '1px solid #feb2b2',
+            background: error.includes('✅') ? '#f0fdf4' : '#fff5f5',
+            border: `1px solid ${error.includes('✅') ? '#bbf7d0' : '#feb2b2'}`,
             borderRadius: '6px',
-            color: '#c53030',
-            fontSize: '13px'
+            color: error.includes('✅') ? '#166534' : '#c53030',
+            fontSize: '13px',
+            whiteSpace: 'pre-line'
           }}>
             {error}
           </div>
@@ -252,7 +436,7 @@ export default function CompetitorMonitor() {
           color: '#6c757d',
           marginTop: '8px'
         }}>
-          💡 상품 URL을 추가하면 자동으로 마켓을 감지합니다. 상품명과 가격은 수동으로 입력해주세요.
+          💡 상품 URL을 추가하면 자동으로 상품명, 가격, 재고 정보를 가져옵니다.
         </div>
       </div>
 
@@ -280,6 +464,40 @@ export default function CompetitorMonitor() {
             }}>
               모니터링 상품 목록 ({products.length}개)
             </h3>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={removeInvalidProducts}
+                disabled={loading}
+                style={{
+                  padding: '8px 16px',
+                  background: 'transparent',
+                  color: '#dc3545',
+                  border: '1px solid #dc3545',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: loading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                🗑️ 잘못된 상품 삭제
+              </button>
+              <button
+                onClick={refreshAllPrices}
+                disabled={loading}
+                style={{
+                  padding: '8px 16px',
+                  background: loading ? '#6c757d' : '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: loading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {loading ? '갱신 중...' : '🔄 전체 갱신'}
+              </button>
+            </div>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -530,22 +748,22 @@ export default function CompetitorMonitor() {
                         textAlign: 'center'
                       }}>
                         <button
-                          onClick={() => {
-                            updatePrice(product.id, product.currentPrice);
-                          }}
+                          onClick={() => refreshPrice(product.id)}
+                          disabled={loading}
                           style={{
                             padding: '6px 12px',
                             background: 'transparent',
                             border: '1px solid #3b82f6',
                             borderRadius: '4px',
-                            color: '#3b82f6',
+                            color: loading ? '#6c757d' : '#3b82f6',
                             fontSize: '12px',
                             fontWeight: '500',
-                            cursor: 'pointer',
+                            cursor: loading ? 'not-allowed' : 'pointer',
                             marginRight: '4px'
                           }}
+                          title="상품 페이지에서 최신 가격을 자동으로 가져옵니다"
                         >
-                          갱신
+                          🔄 갱신
                         </button>
                         <button
                           onClick={() => {
@@ -628,11 +846,12 @@ export default function CompetitorMonitor() {
           margin: 0,
           paddingLeft: '20px'
         }}>
-          <li>경쟁사 상품 URL을 입력하여 모니터링 목록에 추가하세요.</li>
+          <li>경쟁사 상품 URL을 입력하면 <strong>자동으로 상품명, 가격, 재고 정보</strong>를 가져옵니다.</li>
+          <li>지원 마켓: 네이버 스마트스토어, 쿠팡, G마켓, 11번가, 옥션, 인터파크</li>
+          <li>🔄 갱신 버튼을 클릭하면 최신 가격을 자동으로 업데이트합니다.</li>
+          <li>🔄 전체 갱신 버튼으로 모든 상품의 가격을 한 번에 업데이트할 수 있습니다.</li>
           <li>상품명을 클릭하면 수정할 수 있습니다.</li>
-          <li>현재가를 입력하면 이전 가격과 자동 비교됩니다.</li>
-          <li>재고 상태를 클릭하여 변경할 수 있습니다.</li>
-          <li>갱신 버튼을 클릭하면 마지막 확인 시간이 업데이트됩니다.</li>
+          <li>가격 변동이 있으면 변동률이 자동으로 표시됩니다.</li>
           <li>모든 데이터는 브라우저에 저장되어 다음 방문 시에도 유지됩니다.</li>
         </ul>
       </div>

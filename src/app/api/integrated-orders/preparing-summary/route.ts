@@ -1,12 +1,19 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/api-security';
+import { getOrganizationDataFilter } from '@/lib/organization-utils';
 
 /**
  * GET /api/integrated-orders/preparing-summary
  * 상품준비중 주문의 옵션별 집계 조회
+ * Security: 인증 필요, 조직 단위 필터링
  */
 export async function GET(request: NextRequest) {
   try {
+    // 🔒 보안: 로그인한 사용자만 접근 가능
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.error;
+
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
 
@@ -21,13 +28,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 상품준비중 주문 조회
-    const { data: orders, error } = await supabase
+    // 상품준비중 주문 조회 (조직 필터 적용)
+    let query = supabase
       .from('integrated_orders')
       .select('option_name, quantity, final_payment_amount, vendor_name')
       .eq('shipping_status', shippingStatus)
       .gte('sheet_date', startDate)
       .lte('sheet_date', endDate);
+
+    // 🔒 조직 필터: 같은 조직의 주문만 조회 (관리자 제외)
+    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin') {
+      const organizationId = await getOrganizationDataFilter(auth.user.id);
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      } else {
+        // 조직이 없으면 본인이 등록한 주문만 조회
+        query = query.eq('seller_id', auth.user.id);
+      }
+    }
+
+    const { data: orders, error } = await query;
 
     if (error) {
       console.error('주문 조회 오류:', error);

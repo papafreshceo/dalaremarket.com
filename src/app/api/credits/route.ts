@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getUserPrimaryOrganization } from '@/lib/organization-utils';
 
 /**
  * GET /api/credits
- * 현재 사용자의 크레딧 잔액 조회
+ * 조직의 크레딧 잔액 조회 (organization_id 기준)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -19,18 +20,32 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 크레딧 잔액 조회
+    // 사용자의 조직 정보 가져오기
+    const organization = await getUserPrimaryOrganization(user.id);
+
+    if (!organization) {
+      return NextResponse.json(
+        { success: false, error: '조직 정보를 찾을 수 없습니다.', balance: 0 },
+        { status: 404 }
+      );
+    }
+
+    // 조직 크레딧 잔액 조회 (organization_id 기준)
     let { data: userCredit, error: creditError } = await supabase
       .from('user_credits')
       .select('balance')
-      .eq('user_id', user.id)
+      .eq('organization_id', organization.id)
       .single();
 
     // 크레딧 계정이 없으면 생성
     if (creditError || !userCredit) {
       const { data: newCredit, error: insertError } = await supabase
         .from('user_credits')
-        .insert({ user_id: user.id, balance: 0 })
+        .insert({
+          user_id: user.id,
+          organization_id: organization.id,
+          balance: 0
+        })
         .select('balance')
         .single();
 
@@ -46,7 +61,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      balance: userCredit.balance
+      balance: userCredit.balance,
+      organization_id: organization.id
     });
 
   } catch (error: any) {

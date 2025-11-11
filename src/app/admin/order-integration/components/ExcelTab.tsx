@@ -702,6 +702,9 @@ export default function ExcelTab() {
 
   // 엑셀 파일 읽기 (1단계: 파일 목록만 표시)
   const handleFileSelect = async (files: FileList) => {
+    console.log('%c🚀 파일 선택됨!', 'background: green; color: white; font-size: 20px; padding: 10px;');
+    console.log('선택된 파일 수:', files.length);
+
     if (!files || files.length === 0) return;
 
     setLoading(true);
@@ -727,17 +730,24 @@ export default function ExcelTab() {
             type: 'array',
             cellDates: true,
             cellNF: false,
-            cellText: false
+            cellText: false,
+            WTF: false  // XLSX 라이브러리 경고 메시지 억제
           });
 
           const firstSheetName = workbook.SheetNames[0];
           const firstSheet = workbook.Sheets[firstSheetName];
 
+          // 엑셀 시트의 실제 범위 확인
+          const range = XLSX.utils.decode_range(firstSheet['!ref'] || 'A1');
+          const sheetStartRow = range.s.r; // 0-based
+          const sheetEndRow = range.e.r; // 0-based
+
           // SheetJS로 JSON 변환 (배열 형식)
           const allData = XLSX.utils.sheet_to_json(firstSheet, {
             header: 1,  // 배열 형식으로
             defval: '',  // 빈 셀 기본값
-            raw: false   // 문자열로 변환
+            raw: false,   // 문자열로 변환
+            blankrows: true  // 빈 행도 포함
           }) as any[][];
 
           if (!allData || allData.length === 0) {
@@ -764,9 +774,10 @@ export default function ExcelTab() {
             template = marketTemplates.get(marketName.toLowerCase()) || null;
           }
 
-          // 주문 건수 계산 (헤더 제외)
-          const headerRowIndex = (template?.header_row || 1);
-          const orderCount = allData.length - headerRowIndex;
+          // 주문 건수 계산
+          // 엑셀 실제 행 번호로 계산: (마지막행 - 헤더행)
+          const headerRowIndex = (template?.header_row || 1); // 1-based
+          const orderCount = sheetEndRow - (headerRowIndex - 1);
 
           // 파일이 오늘 수정되었는지 확인
           const today = new Date();
@@ -948,9 +959,15 @@ export default function ExcelTab() {
       const marketSequences = new Map<string, number>(); // 마켓별 시퀀스 카운터
 
       // 모든 파일 처리
+      console.log('%c📁 전체 파일 수: ' + uploadedFiles.length, 'background: blue; color: white; font-size: 16px; padding: 5px;');
+
       for (const filePreview of uploadedFiles) {
         const file = filePreview.file;
         const template = filePreview.detectedTemplate;
+
+        console.log('%c🔍 파일 처리 중:', 'background: orange; color: white; font-size: 14px; padding: 5px;', file.name);
+        console.log('템플릿 존재 여부:', !!template);
+        console.log('템플릿 정보:', template);
 
         const data = await file.arrayBuffer();
 
@@ -959,7 +976,8 @@ export default function ExcelTab() {
           type: 'array',
           cellDates: true,
           cellNF: false,
-          cellText: false
+          cellText: false,
+          WTF: false  // XLSX 라이브러리 경고 메시지 억제
         });
 
         const firstSheetName = workbook.SheetNames[0];
@@ -967,24 +985,45 @@ export default function ExcelTab() {
 
         let jsonData: any[];
 
+        console.log('%ctemplate 체크:', 'background: purple; color: white; font-size: 14px; padding: 5px;', !!template);
+
         if (template) {
           // 템플릿이 있으면 헤더 행 고려
           const headerRowIndex = template.header_row || 1;
 
-          // SheetJS로 전체 데이터 읽기
+          // 엑셀 시트의 실제 시작 행 번호 확인 (예: A2:X5이면 startRow=1, 0-based)
+          const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+          const sheetStartRow = range.s.r; // 0-based (엑셀 1행 = 0, 엑셀 2행 = 1)
+
+          // SheetJS로 전체 데이터 읽기 (빈 행도 포함)
           const allData = XLSX.utils.sheet_to_json(worksheet, {
             header: 1,
             defval: '',
-            raw: false
+            raw: false,
+            blankrows: true  // 빈 행도 포함
           }) as any[][];
 
-          // 실제 헤더 행 읽기 (DB에 설정된 header_row 사용)
-          const actualHeaderRowIndex = Math.max(0, headerRowIndex - 1);
+          // 엑셀 실제 행 번호를 배열 인덱스로 변환
+          // headerRowIndex는 엑셀의 실제 행 번호 (1-based)
+          // sheetStartRow는 시트가 시작하는 엑셀 행 번호 (0-based)
+          // 예: 엑셀 1행 빈행, 2행 헤더 => sheetStartRow=1, headerRowIndex=2
+          //     allData[0] = 엑셀 2행, actualHeaderRowIndex = 2-1-1 = 0
+          const actualHeaderRowIndex = Math.max(0, headerRowIndex - sheetStartRow - 1);
           const headers = allData[actualHeaderRowIndex] || [];
 
+          console.log('%c=== 🔍 파일 디버깅 ===', 'background: #ff0000; color: #fff; font-size: 16px; padding: 5px;');
+          console.log('마켓명:', template.market_name);
+          console.log('시트 범위:', worksheet['!ref']);
+          console.log('시트 시작 행 (0-based):', sheetStartRow);
+          console.log('header_row (DB설정, 1-based):', headerRowIndex);
+          console.log('actualHeaderRowIndex (배열):', actualHeaderRowIndex);
+          console.log('읽은 헤더:', headers.slice(0, 5), '...');
+
           // 헤더 이후의 데이터만 처리
+          // 데이터 시작 인덱스 = actualHeaderRowIndex + 1
           jsonData = [];
-          for (let i = headerRowIndex; i < allData.length; i++) {
+          const dataStartIndex = actualHeaderRowIndex + 1;
+          for (let i = dataStartIndex; i < allData.length; i++) {
             const rowArray = allData[i];
             const rowData: any = {};
 
@@ -997,6 +1036,11 @@ export default function ExcelTab() {
             if (Object.keys(rowData).length > 0) {
               jsonData.push(rowData);
             }
+          }
+
+          console.log('변환된 jsonData 개수:', jsonData.length);
+          if (jsonData.length > 0) {
+            console.log('첫 번째 데이터 샘플:', Object.keys(jsonData[0]).slice(0, 3));
           }
 
           // 마켓별 필드 매핑 정보 가져오기

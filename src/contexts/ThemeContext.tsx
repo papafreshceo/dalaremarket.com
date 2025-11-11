@@ -19,20 +19,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null)
   const supabase = createClient()
 
-  // 초기 로드 시 테마 적용
+  // 초기 로드 시 테마 적용 (이미 FOUC 방지 스크립트에서 적용되었으므로 state만 동기화)
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
       const savedTheme = localStorage.getItem('theme') as Theme
       const initialTheme = savedTheme || 'light'
 
+      // state만 설정하고 DOM은 건드리지 않음 (이미 layout.tsx의 스크립트에서 처리됨)
       setTheme(initialTheme)
-
-      // HTML 클래스 적용
-      if (initialTheme === 'dark') {
-        document.documentElement.classList.add('dark')
-      } else {
-        document.documentElement.classList.remove('dark')
-      }
     }
   }, [])
 
@@ -43,8 +37,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const isSettingsPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin/settings')
 
       if (!isSettingsPage) {
-        // settings 페이지가 아니면 theme-enabled 클래스 제거
+        // settings 페이지가 아니면 theme-enabled 클래스 제거하고 종료
         document.documentElement.classList.remove('theme-enabled')
+        // CSS 변수를 원래대로 되돌리지 않고 그대로 둠 (기본 CSS 파일의 값 유지)
         return
       }
 

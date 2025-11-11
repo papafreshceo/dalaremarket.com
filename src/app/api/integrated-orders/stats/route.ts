@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-security';
+import { getOrganizationDataFilter } from '@/lib/organization-utils';
 
 /**
  * GET /api/integrated-orders/stats
@@ -11,8 +12,9 @@ import { requireAuth } from '@/lib/api-security';
  *   - 발송상태
  *   - 벤더사
  *   - 검색어 (주문번호/수취인명/옵션상품)
+ *   - 조직 필터링 (organization_id)
  *
- * Updated: PostgreSQL RPC 함수 사용으로 95% 성능 개선
+ * Updated: PostgreSQL RPC 함수 사용으로 95% 성능 개선 + 조직 필터링 추가
  */
 export async function GET(request: NextRequest) {
   try {
@@ -32,6 +34,12 @@ export async function GET(request: NextRequest) {
     const vendorName = searchParams.get('vendorName');
     const searchKeyword = searchParams.get('searchKeyword');
 
+    // 🔒 조직 필터: 같은 조직의 통계만 조회 (관리자는 전체 조회)
+    let organizationId: string | null = null;
+    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin') {
+      organizationId = await getOrganizationDataFilter(auth.user.id);
+    }
+
     console.log('📊 통계 조회 파라미터:', {
       startDate,
       endDate,
@@ -40,6 +48,7 @@ export async function GET(request: NextRequest) {
       shippingStatus,
       vendorName,
       searchKeyword,
+      organizationId,
     });
 
     // ⚡ PostgreSQL RPC 함수 호출 (단일 쿼리로 모든 통계 계산)
@@ -51,6 +60,7 @@ export async function GET(request: NextRequest) {
       p_shipping_status: shippingStatus || null,
       p_vendor_name: vendorName || null,
       p_search_keyword: searchKeyword || null,
+      p_organization_id: organizationId,
     });
 
     if (error) {

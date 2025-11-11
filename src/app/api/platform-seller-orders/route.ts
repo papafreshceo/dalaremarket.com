@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getUserPrimaryOrganization } from '@/lib/organization-utils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,18 +23,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '유효한 주문 데이터가 없습니다.' }, { status: 400 });
     }
 
-    // 옵션상품 매핑 적용
+    // 🔒 사용자의 조직 정보 가져오기
+    const organization = await getUserPrimaryOrganization(user.id);
+    if (!organization) {
+      console.error('❌ 조직 정보 없음');
+      return NextResponse.json({ error: '조직 정보를 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    // 옵션상품 매핑 적용 (조직 기준)
     const { data: mappings } = await supabase
       .from('option_name_mappings')
       .select('*')
-      .eq('seller_id', user.id);
+      .eq('organization_id', organization.id);
 
 
     const mappingMap = new Map(
       (mappings || []).map(m => [m.user_option_name, m.site_option_name])
     );
 
-    // platform_seller_orders 테이블에 삽입할 데이터 준비
+    // platform_seller_orders 테이블에 삽입할 데이터 준비 (조직 ID 포함)
     const insertData = orders.map((order: any) => {
       // 옵션상품 매핑 적용
       let optionName = order.optionName;
@@ -43,6 +51,7 @@ export async function POST(request: NextRequest) {
 
       return {
         seller_id: user.id,
+        organization_id: organization.id, // 🔒 조직 ID 추가
         order_number: order.orderNumber || null,
         orderer: order.orderer || null,
         orderer_phone: order.ordererPhone || null,

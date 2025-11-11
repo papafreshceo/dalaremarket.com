@@ -8,6 +8,7 @@ import { AuthModal } from '@/components/auth/AuthModal';
 import { useToast } from '@/components/ui/Toast';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
 import TierBadge from '@/components/TierBadge';
+import { useUserBalance } from '@/contexts/UserBalanceContext';
 
 interface NavItem {
   path: string;
@@ -25,7 +26,7 @@ export default function UserHeader() {
   const [showSubmenu, setShowSubmenu] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [userTier, setUserTier] = useState<'light' | 'standard' | 'advance' | 'elite' | 'legend'>('light');
+  const [userTier, setUserTier] = useState<'light' | 'standard' | 'advance' | 'elite' | 'legend' | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
   const [isMobile, setIsMobile] = useState<boolean>(false);
@@ -39,10 +40,11 @@ export default function UserHeader() {
   const supabase = createClient();
   const { showToast } = useToast();
   const [orders, setOrders] = useState<any[]>([]);
-  const [cashBalance, setCashBalance] = useState<number>(0);
-  const [creditBalance, setCreditBalance] = useState<number>(0);
+  const { cashBalance, creditBalance, setCashBalance, setCreditBalance } = useUserBalance();
   const [showCashTooltip, setShowCashTooltip] = useState(false);
   const [showCreditTooltip, setShowCreditTooltip] = useState(false);
+  const [contributionPoints, setContributionPoints] = useState(0);
+  const [showContributionTooltip, setShowContributionTooltip] = useState(false);
 
   // 활동 시간 추적 (로그인 시에만)
   useActivityTracker({
@@ -169,19 +171,22 @@ export default function UserHeader() {
       if (user) {
         const { data: userData } = await supabase
           .from('users')
-          .select('role, tier')
+          .select('role, tier, accumulated_points')
           .eq('id', user.id)
           .single();
 
         setUserRole(userData?.role || null);
+        setContributionPoints(userData?.accumulated_points || 0);
 
-        // tier 유효성 검사
+        // tier 설정 (NULL 허용)
         const validTiers = ['light', 'standard', 'advance', 'elite', 'legend'];
-        const tier = userData?.tier;
-        setUserTier(validTiers.includes(tier) ? tier : 'light');
+        const tier = userData?.tier?.toLowerCase();
+        console.log('🔍 [UserHeader] DB tier:', userData?.tier, 'lowercase:', tier, 'final userTier:', tier && validTiers.includes(tier) ? tier : null);
+        setUserTier(tier && validTiers.includes(tier) ? tier : null);
       } else {
         setUserRole(null);
-        setUserTier('light');
+        setUserTier(null);
+        setContributionPoints(0);
       }
     };
 
@@ -193,7 +198,8 @@ export default function UserHeader() {
       } else {
         setUser(null);
         setUserRole(null);
-        setUserTier('light');
+        setUserTier(null);
+        setContributionPoints(0);
       }
     });
 
@@ -308,6 +314,7 @@ export default function UserHeader() {
     },
     { path: '/platform/pricing', text: '요금제' },
     { path: '/platform/ranking', text: '🏆 셀러랭킹' },
+    { path: '/platform/organization', text: '👥 조직관리' },
     { path: '/platform/winwin', text: 'Win-Win', special: true },
     { path: '/platform/notice', text: '공지사항' },
     {
@@ -788,8 +795,70 @@ export default function UserHeader() {
                   )}
                 </div>
 
+                {/* 기여점수 표시 */}
+                <div
+                  style={{
+                    position: 'relative',
+                    display: 'inline-block'
+                  }}
+                  onMouseEnter={() => setShowContributionTooltip(true)}
+                  onMouseLeave={() => setShowContributionTooltip(false)}
+                >
+                  <div style={{
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '24px',
+                    padding: '0px 6px',
+                    border: '1.5px solid #f59e0b',
+                    borderRadius: '6px',
+                    background: 'transparent'
+                  }}>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#f59e0b',
+                      fontFamily: 'Oxanium, monospace',
+                      letterSpacing: '0.5px',
+                      lineHeight: '1'
+                    }}>
+                      {contributionPoints.toLocaleString()}p
+                    </span>
+                  </div>
+                  {showContributionTooltip && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 8px)',
+                      right: '0',
+                      padding: '8px 12px',
+                      background: 'rgba(0, 0, 0, 0.9)',
+                      color: 'white',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      whiteSpace: 'nowrap',
+                      zIndex: 10000
+                    }}>
+                      <div style={{ fontWeight: '600', marginBottom: '4px' }}>기여점수</div>
+                      <div style={{ fontSize: '11px', opacity: 0.9 }}>셀러 등급 판정 및 혜택 기준</div>
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '100%',
+                        right: '8px',
+                        width: 0,
+                        height: 0,
+                        borderLeft: '5px solid transparent',
+                        borderRight: '5px solid transparent',
+                        borderBottom: '5px solid rgba(0, 0, 0, 0.9)'
+                      }}></div>
+                    </div>
+                  )}
+                </div>
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <TierBadge tier={userTier} iconOnly glow={0} />
+                  {userTier && <TierBadge tier={userTier as 'light' | 'standard' | 'advance' | 'elite' | 'legend'} iconOnly glow={0} />}
                   <span style={{ fontSize: '14px', color: '#495057' }}>
                     {user.email}
                   </span>
@@ -1003,7 +1072,7 @@ export default function UserHeader() {
                 <>
                   {/* 포인트 배지들 (모바일) */}
                   <div style={{ marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                       {/* 캐시 잔액 표시 */}
                       <div>
                         <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '2px', fontWeight: '500' }}>달래캐시</div>
@@ -1055,14 +1124,40 @@ export default function UserHeader() {
                           </span>
                         </div>
                       </div>
+
+                      {/* 기여점수 표시 */}
+                      <div>
+                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '2px', fontWeight: '500' }}>기여점수</div>
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          height: '26px',
+                          padding: '0px 8px',
+                          border: '1.5px solid #f59e0b',
+                          borderRadius: '8px',
+                          background: 'transparent'
+                        }}>
+                          <span style={{
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            color: '#f59e0b',
+                            fontFamily: 'Oxanium, monospace',
+                            letterSpacing: '0.5px',
+                            lineHeight: '1'
+                          }}>
+                            {contributionPoints.toLocaleString()}p
+                          </span>
+                        </div>
+                      </div>
                     </div>
                     <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '4px' }}>
-                      캐시: 활동보상 | 크레딧: 매일 1,000 리필
+                      캐시: 활동보상 | 크레딧: 매일 1,000 리필 | 기여점수: 등급 판정
                     </div>
                   </div>
 
                   <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <TierBadge tier={userTier} iconOnly glow={0} />
+                    {userTier && <TierBadge tier={userTier as 'light' | 'standard' | 'advance' | 'elite' | 'legend'} iconOnly glow={0} />}
                     {user.email}
                   </div>
                   {(userRole === 'admin' || userRole === 'employee' || userRole === 'super_admin') && (

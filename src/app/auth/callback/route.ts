@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { autoCreateOrganizationFromUser } from '@/lib/auto-create-organization'
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
@@ -44,6 +45,15 @@ export async function GET(request: NextRequest) {
         if (insertError) {
           console.error('Failed to create user profile:', insertError)
           // 프로필 생성 실패해도 로그인은 진행
+        } else {
+          // ✅ 신규 사용자: 기본 조직 자동 생성
+          try {
+            await autoCreateOrganizationFromUser(session.user.id)
+            console.log('✅ 기본 조직 자동 생성 완료:', session.user.id)
+          } catch (error) {
+            console.error('❌ 조직 자동 생성 실패:', error)
+            // 조직 생성 실패해도 로그인은 진행
+          }
         }
       } else {
         // 기존 사용자의 last_login_provider 업데이트
@@ -51,6 +61,30 @@ export async function GET(request: NextRequest) {
           .from('users')
           .update({ last_login_provider: provider })
           .eq('id', session.user.id)
+
+        // ✅ 기존 사용자: 조직이 없으면 자동 생성
+        try {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('primary_organization_id')
+            .eq('id', session.user.id)
+            .single()
+
+          if (!userData?.primary_organization_id) {
+            await autoCreateOrganizationFromUser(session.user.id)
+            console.log('✅ 기존 사용자 조직 자동 생성 완료:', session.user.id)
+          }
+        } catch (error) {
+          console.error('❌ 조직 확인/생성 실패:', error)
+        }
+      }
+
+      // 로그인 점수 추가 (하루 1회)
+      try {
+        await supabase.rpc('add_login_points', { p_user_id: session.user.id })
+      } catch (error) {
+        console.error('Login points error:', error)
+        // 점수 추가 실패해도 로그인은 진행
       }
 
       // 로그인 성공 - 메인 페이지로 리다이렉트

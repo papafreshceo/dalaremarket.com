@@ -1,11 +1,12 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, auditLog } from '@/lib/api-security';
+import { getOrganizationDataFilter } from '@/lib/organization-utils';
 
 /**
  * POST /api/integrated-orders/hard-delete
  * 주문 완전 삭제 (DB에서 영구 삭제)
- * Security: 관리자 이상 권한 필요
+ * Security: 관리자 이상 권한 필요, 조직 단위 필터링
  * 제약: 접수 상태인 주문만 삭제 가능
  */
 export async function POST(request: NextRequest) {
@@ -25,10 +26,20 @@ export async function POST(request: NextRequest) {
     }
 
     // 삭제 전 주문 정보 조회 (감사 로그용 & 접수 상태 확인)
-    const { data: ordersToDelete, error: fetchError } = await supabase
+    let fetchQuery = supabase
       .from('integrated_orders')
       .select('id, order_number, market_name, shipping_status')
       .in('id', ids);
+
+    // 🔒 조직 필터: super_admin이 아니면 조직 단위로 제한
+    if (auth.user.role !== 'super_admin') {
+      const organizationId = await getOrganizationDataFilter(auth.user.id);
+      if (organizationId) {
+        fetchQuery = fetchQuery.eq('organization_id', organizationId);
+      }
+    }
+
+    const { data: ordersToDelete, error: fetchError } = await fetchQuery;
 
     if (fetchError) {
       console.error('주문 조회 실패:', fetchError);
@@ -54,11 +65,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 완전 삭제 실행
-    const { error: deleteError, count } = await supabase
+    // 완전 삭제 실행 (조직 필터 적용)
+    let deleteQuery = supabase
       .from('integrated_orders')
       .delete()
       .in('id', ids);
+
+    // 🔒 조직 필터: super_admin이 아니면 조직 단위로 제한
+    if (auth.user.role !== 'super_admin') {
+      const organizationId = await getOrganizationDataFilter(auth.user.id);
+      if (organizationId) {
+        deleteQuery = deleteQuery.eq('organization_id', organizationId);
+      }
+    }
+
+    const { error: deleteError, count } = await deleteQuery;
 
     if (deleteError) {
       console.error('완전 삭제 실패:', deleteError);

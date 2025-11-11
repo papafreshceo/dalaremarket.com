@@ -40,32 +40,15 @@ export async function GET(request: NextRequest) {
       .select('user_id, balance')
       .in('user_id', userIds);
 
-    // 티어 정보 조회 (최신 랭킹 데이터에서)
-    const { data: rankings } = await supabase
-      .from('seller_rankings')
-      .select('seller_id, tier')
-      .in('seller_id', userIds)
-      .eq('period_type', 'monthly')
-      .order('period_start', { ascending: false });
-
-    // 잔액 및 티어 데이터를 Map으로 변환
+    // 잔액 데이터를 Map으로 변환
     const cashMap = new Map(cashBalances?.map(c => [c.user_id, c.balance]) || []);
     const creditMap = new Map(creditBalances?.map(c => [c.user_id, c.balance]) || []);
 
-    // 각 seller_id의 최신 tier만 저장 (첫 번째 항목이 최신)
-    const tierMap = new Map<string, string>();
-    rankings?.forEach(r => {
-      if (!tierMap.has(r.seller_id)) {
-        tierMap.set(r.seller_id, r.tier);
-      }
-    });
-
-    // 회원 정보에 잔액 및 티어 병합
+    // 회원 정보에 잔액 병합 (tier와 manual_tier는 users 테이블에 이미 있음)
     const processedMembers = members.map(member => ({
       ...member,
       cash_balance: cashMap.get(member.id) || 0,
       credit_balance: creditMap.get(member.id) || 0,
-      tier: tierMap.get(member.id) || null
     }));
 
     return NextResponse.json({ success: true, members: processedMembers });

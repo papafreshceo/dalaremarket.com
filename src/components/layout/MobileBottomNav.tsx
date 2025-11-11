@@ -35,6 +35,10 @@ export default function MobileBottomNav() {
       label: '업무도구'
     },
     {
+      path: '/platform/organization',
+      label: '조직관리'
+    },
+    {
       path: '/platform/seller-feed',
       label: '셀러피드'
     },

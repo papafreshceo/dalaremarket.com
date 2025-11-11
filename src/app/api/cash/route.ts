@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getUserPrimaryOrganization } from '@/lib/organization-utils';
 
 /**
  * GET /api/cash
- * 사용자의 캐시 잔액 조회
+ * 조직의 캐시 잔액 조회 (organization_id 기준)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -36,11 +37,37 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 사용자 캐시 잔액 조회
+    // 사용자의 조직 정보 가져오기
+    let organization = await getUserPrimaryOrganization(effectiveUserId);
+
+    // 조직이 없으면 자동 생성
+    if (!organization) {
+      const { autoCreateOrganizationFromUser } = await import('@/lib/auto-create-organization');
+      const result = await autoCreateOrganizationFromUser(effectiveUserId);
+
+      if (!result.success) {
+        return NextResponse.json(
+          { success: false, error: result.error || '조직 생성에 실패했습니다.' },
+          { status: 500 }
+        );
+      }
+
+      // 다시 조직 정보 조회
+      organization = await getUserPrimaryOrganization(effectiveUserId);
+
+      if (!organization) {
+        return NextResponse.json(
+          { success: false, error: '조직 생성 후에도 조직을 찾을 수 없습니다.' },
+          { status: 500 }
+        );
+      }
+    }
+
+    // 조직 캐시 잔액 조회 (organization_id 기준)
     const { data: userCash, error: cashError } = await dbClient
       .from('user_cash')
       .select('*')
-      .eq('user_id', effectiveUserId)
+      .eq('organization_id', organization.id)
       .single();
 
     // 캐시 잔액이 없으면 0 반환 (impersonate 모드에서는 생성하지 않음)
@@ -50,6 +77,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           success: true,
           balance: 0,
+          organization_id: organization.id,
           user_id: effectiveUserId,
           isImpersonate: true
         });
@@ -57,11 +85,33 @@ export async function GET(request: NextRequest) {
 
       const { data: newCash, error: insertError } = await dbClient
         .from('user_cash')
-        .insert({ user_id: effectiveUserId, balance: 0 })
+        .insert({
+          user_id: effectiveUserId,
+          organization_id: organization.id,
+          balance: 0
+        })
         .select()
         .single();
 
       if (insertError) {
+        // 중복 키 오류 (23505) - 이미 존재하는 경우 다시 조회
+        if (insertError.code === '23505') {
+          const { data: existingCash } = await dbClient
+            .from('user_cash')
+            .select('*')
+            .eq('organization_id', organization.id)
+            .single();
+
+          if (existingCash) {
+            return NextResponse.json({
+              success: true,
+              balance: existingCash.balance,
+              organization_id: organization.id,
+              user_id: effectiveUserId
+            });
+          }
+        }
+
         console.error('[GET /api/cash] 캐시 생성 오류:', insertError);
         return NextResponse.json(
           { success: false, error: '캐시 정보를 생성할 수 없습니다.' },
@@ -72,6 +122,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         balance: 0,
+        organization_id: organization.id,
         user_id: effectiveUserId
       });
     }
@@ -87,6 +138,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       balance: userCash.balance,
+      organization_id: organization.id,
       user_id: effectiveUserId
     });
 

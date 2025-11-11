@@ -32,6 +32,8 @@ export async function PUT(request: Request) {
     const {
       loginPointsPerDay,
       pointsPerDay,
+      postPoints,
+      commentPoints,
       milestones,
       consecutiveBonuses,
       monthlyBonuses,
@@ -43,6 +45,8 @@ export async function PUT(request: Request) {
     if (
       typeof loginPointsPerDay !== 'number' ||
       typeof pointsPerDay !== 'number' ||
+      typeof postPoints !== 'number' ||
+      typeof commentPoints !== 'number' ||
       !Array.isArray(milestones) ||
       !Array.isArray(consecutiveBonuses) ||
       !Array.isArray(monthlyBonuses) ||
@@ -58,6 +62,8 @@ export async function PUT(request: Request) {
       .update({
         login_points_per_day: loginPointsPerDay,
         points_per_day: pointsPerDay,
+        post_points: postPoints,
+        comment_points: commentPoints,
         milestones,
         consecutive_bonuses: consecutiveBonuses,
         monthly_bonuses: monthlyBonuses,

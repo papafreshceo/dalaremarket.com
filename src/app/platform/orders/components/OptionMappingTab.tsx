@@ -61,10 +61,23 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
         return;
       }
 
+      // 🔒 사용자의 조직 정보 가져오기
+      const { data: userData } = await supabase
+        .from('users')
+        .select('primary_organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.primary_organization_id) {
+        toast.error('조직 정보를 찾을 수 없습니다.');
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('option_name_mappings')
         .select('*')
-        .eq('seller_id', user.id)
+        .eq('organization_id', userData.primary_organization_id)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -105,10 +118,22 @@ export default function OptionMappingTab({ isMobile }: OptionMappingTabProps) {
         return;
       }
 
+      // 🔒 사용자의 조직 정보 가져오기
+      const { data: userData } = await supabase
+        .from('users')
+        .select('primary_organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.primary_organization_id) {
+        toast.error('조직 정보를 찾을 수 없습니다.');
+        return;
+      }
+
       const { error } = await supabase
         .from('option_name_mappings')
         .insert({
-          seller_id: user.id,
+          organization_id: userData.primary_organization_id,
           user_option_name: newMapping.user_option_name.trim(),
           site_option_name: newMapping.site_option_name.trim()
         });

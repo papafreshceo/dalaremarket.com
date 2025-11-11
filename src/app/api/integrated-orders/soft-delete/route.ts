@@ -2,10 +2,12 @@ import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireStaff } from '@/lib/api-security';
 import { canDeleteServer } from '@/lib/permissions-server';
+import { getOrganizationDataFilter } from '@/lib/organization-utils';
 
 /**
  * POST /api/integrated-orders/soft-delete
  * 주문 소프트 삭제 (is_deleted = true)
+ * Security: 조직 단위 필터링 적용
  */
 export async function POST(request: NextRequest) {
   // 🔒 보안: 직원 이상 접근 가능
@@ -32,8 +34,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 소프트 삭제 업데이트
-    const { data, error } = await supabase
+    // 🔒 조직 필터: 같은 조직의 주문만 삭제 가능 (관리자 제외)
+    let query = supabase
       .from('integrated_orders')
       .update({
         is_deleted: true,
@@ -41,8 +43,19 @@ export async function POST(request: NextRequest) {
         deleted_by: auth.user?.id || null,
       })
       .in('id', ids)
-      .eq('is_deleted', false) // 이미 삭제된 건은 제외
-      .select();
+      .eq('is_deleted', false); // 이미 삭제된 건은 제외
+
+    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin') {
+      const organizationId = await getOrganizationDataFilter(auth.user.id);
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      } else {
+        // 조직이 없으면 본인이 등록한 주문만 삭제 가능
+        query = query.eq('seller_id', auth.user.id);
+      }
+    }
+
+    const { data, error } = await query.select();
 
     if (error) {
       console.error('소프트 삭제 실패:', error);

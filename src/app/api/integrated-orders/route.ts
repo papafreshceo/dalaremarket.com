@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
 import { requireAuth, requireStaff, auditLog } from '@/lib/api-security';
 import { canCreateServer, canUpdateServer, canDeleteServer } from '@/lib/permissions-server';
+import { getOrganizationDataFilter } from '@/lib/organization-utils';
 
 /**
  * GET /api/integrated-orders
@@ -39,6 +40,17 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact' })
       .eq('is_deleted', false);
 
+    // 🔒 조직 필터: 같은 조직의 주문만 조회 (관리자 제외)
+    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin') {
+      const organizationId = await getOrganizationDataFilter(auth.user.id);
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      } else {
+        // 조직이 없으면 본인이 등록한 주문만 조회
+        query = query.eq('seller_id', auth.user.id);
+      }
+    }
+
     // seller_id가 있는 주문만 필터링
     if (onlyWithSeller) {
       query = query.not('seller_id', 'is', null);
@@ -65,10 +77,10 @@ export async function GET(request: NextRequest) {
       query = query.eq('vendor_name', vendorName);
     }
 
-    // 검색어 (주문번호, 수취인명, 옵션상품)
+    // 검색어 (주문번호, 수취인명, 옵션상품, 주문자명, 주문자 전화번호, 수령인 전화번호, 수령인 주소, 송장번호, 연번)
     if (searchKeyword) {
       query = query.or(
-        `order_number.ilike.%${searchKeyword}%,recipient_name.ilike.%${searchKeyword}%,option_name.ilike.%${searchKeyword}%`
+        `order_number.ilike.%${searchKeyword}%,recipient_name.ilike.%${searchKeyword}%,option_name.ilike.%${searchKeyword}%,buyer_name.ilike.%${searchKeyword}%,buyer_phone.ilike.%${searchKeyword}%,recipient_phone.ilike.%${searchKeyword}%,recipient_address.ilike.%${searchKeyword}%,tracking_number.ilike.%${searchKeyword}%,sequence_number.ilike.%${searchKeyword}%`
       );
     }
 
@@ -196,6 +208,12 @@ export async function POST(request: NextRequest) {
       body.sheet_date = new Date().toISOString().split('T')[0];
     }
 
+    // 🔒 조직 ID 자동 설정
+    const organizationId = await getOrganizationDataFilter(auth.user.id);
+    if (organizationId) {
+      body.organization_id = organizationId;
+    }
+
     // 옵션 상품 정보 자동 매핑 (option_products 테이블)
     const enrichedOrders = await enrichOrdersWithOptionInfo([body]);
     const orderDataWithInfo = enrichedOrders[0];
@@ -212,6 +230,17 @@ export async function POST(request: NextRequest) {
         { success: false, error: error.message },
         { status: 500 }
       );
+    }
+
+    // 발주일 점수 추가 (하루 1회)
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.rpc('add_order_points', { p_user_id: user.id });
+      }
+    } catch (pointsError) {
+      console.error('Order points error:', pointsError);
+      // 점수 추가 실패해도 주문은 성공으로 처리
     }
 
     return NextResponse.json({ success: true, data });

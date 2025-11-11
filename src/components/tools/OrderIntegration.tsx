@@ -204,17 +204,24 @@ export default function OrderIntegration() {
             type: 'array',
             cellDates: true,
             cellNF: false,
-            cellText: false
+            cellText: false,
+            WTF: false  // XLSX 라이브러리 경고 메시지 억제
           });
 
           const firstSheetName = workbook.SheetNames[0];
           const firstSheet = workbook.Sheets[firstSheetName];
 
+          // 엑셀 시트의 실제 범위 확인
+          const range = XLSX.utils.decode_range(firstSheet['!ref'] || 'A1');
+          const sheetStartRow = range.s.r; // 0-based
+          const sheetEndRow = range.e.r; // 0-based
+
           // SheetJS로 JSON 변환 (헤더 포함)
           const jsonData = XLSX.utils.sheet_to_json(firstSheet, {
             header: 1,
             defval: '',
-            raw: false
+            raw: false,
+            blankrows: true
           });
 
           if (!jsonData || jsonData.length === 0) {
@@ -235,9 +242,10 @@ export default function OrderIntegration() {
           const template = detectMarketTemplate(file.name, headerObj, templates);
           const marketName = template?.market_name || '알 수 없음';
 
-          // 주문 건수 계산 (헤더 제외)
-          const headerRowIndex = (template?.header_row || 1);
-          const orderCount = jsonData.length - headerRowIndex;
+          // 주문 건수 계산
+          // 엑셀 실제 행 번호로 계산: (마지막행 - 헤더행)
+          const headerRowIndex = (template?.header_row || 1); // 1-based
+          const orderCount = sheetEndRow - (headerRowIndex - 1);
 
           // 파일이 오늘 수정되었는지 확인
           const today = new Date();
@@ -406,7 +414,7 @@ export default function OrderIntegration() {
       // 각 파일의 데이터 읽어서 추가
       for (const filePreview of uploadedFiles) {
         const arrayBuffer = await filePreview.file.arrayBuffer();
-        const sourceWorkbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const sourceWorkbook = XLSX.read(arrayBuffer, { type: 'array', WTF: false });
         const firstSheetName = sourceWorkbook.SheetNames[0];
         const sourceSheet = sourceWorkbook.Sheets[firstSheetName];
 
@@ -419,22 +427,27 @@ export default function OrderIntegration() {
         const marketMapping = fieldMappings.get(template.market_name.toLowerCase());
         if (!marketMapping) continue;
 
+        // 엑셀 시트의 실제 시작 행 번호 확인
+        const range = XLSX.utils.decode_range(sourceSheet['!ref'] || 'A1');
+        const sheetStartRow = range.s.r; // 0-based
+
         // SheetJS로 JSON 변환
         const allData = XLSX.utils.sheet_to_json(sourceSheet, {
           header: 1,
           defval: '',
-          raw: false
+          raw: false,
+          blankrows: true
         }) as any[][];
 
         if (!allData || allData.length === 0) continue;
 
-        // 올바른 헤더 행 사용 (headerRowIndex는 1-based이므로 -1)
-        const actualHeaderRowIndex = Math.max(0, headerRowIndex - 1);
+        // 엑셀 실제 행 번호를 배열 인덱스로 변환
+        const actualHeaderRowIndex = Math.max(0, headerRowIndex - sheetStartRow - 1);
         const actualHeaderRow = allData[actualHeaderRowIndex];
 
         // 헤더 이후의 데이터만 처리
-
-        for (let i = headerRowIndex; i < allData.length; i++) {
+        const dataStartIndex = actualHeaderRowIndex + 1;
+        for (let i = dataStartIndex; i < allData.length; i++) {
           const rowArray = allData[i];
           const rowData: any = {};
 
@@ -465,9 +478,93 @@ export default function OrderIntegration() {
             return '';
           };
 
-          // 필드 매핑 적용 (field_4 = 주문번호, field_5 = 주문자 등)
+          // 날짜 형식 통일 함수
+          const formatDate = (dateStr: string): string => {
+            if (!dateStr) return '';
+
+            // 다양한 날짜 형식 파싱
+            let parsedDate: Date | null = null;
+
+            // 1. YYYY-MM-DD HH:mm 형식 (시간 포함)
+            if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(dateStr)) {
+              parsedDate = new Date(dateStr);
+            }
+            // 2. YYYY-MM-DD 형식 (시간 없음)
+            else if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+              parsedDate = new Date(dateStr);
+            }
+            // 3. YYYY.MM.DD HH:mm 형식 (시간 포함)
+            else if (/^\d{4}\.\d{2}\.\d{2}\s+\d{2}:\d{2}/.test(dateStr)) {
+              parsedDate = new Date(dateStr.replace(/\./g, '-'));
+            }
+            // 4. YYYY.MM.DD 형식 (시간 없음)
+            else if (/^\d{4}\.\d{2}\.\d{2}/.test(dateStr)) {
+              parsedDate = new Date(dateStr.replace(/\./g, '-'));
+            }
+            // 5. YYYY/MM/DD HH:mm 형식 (시간 포함)
+            else if (/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(dateStr)) {
+              parsedDate = new Date(dateStr);
+            }
+            // 6. YYYY/MM/DD 형식 (시간 없음)
+            else if (/^\d{4}\/\d{2}\/\d{2}/.test(dateStr)) {
+              parsedDate = new Date(dateStr);
+            }
+            // 7. MM-DD-YYYY HH:mm 형식 (시간 포함)
+            else if (/^\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}/.test(dateStr)) {
+              const match = dateStr.match(/^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}:\d{2})/);
+              if (match) {
+                parsedDate = new Date(`${match[3]}-${match[1]}-${match[2]} ${match[4]}`);
+              }
+            }
+            // 8. MM-DD-YYYY 형식 (시간 없음)
+            else if (/^\d{2}-\d{2}-\d{4}/.test(dateStr)) {
+              const parts = dateStr.split('-');
+              parsedDate = new Date(`${parts[2]}-${parts[0]}-${parts[1]}`);
+            }
+            // 9. 엑셀 시리얼 날짜 (숫자) - 시간 포함
+            else if (/^\d{5}\.\d+$/.test(dateStr)) {
+              const excelEpoch = new Date(1899, 11, 30);
+              const daysSinceEpoch = parseFloat(dateStr);
+              parsedDate = new Date(excelEpoch.getTime() + daysSinceEpoch * 86400000);
+            }
+            // 10. 엑셀 시리얼 날짜 (숫자) - 시간 없음
+            else if (/^\d{5}$/.test(dateStr)) {
+              const excelEpoch = new Date(1899, 11, 30);
+              parsedDate = new Date(excelEpoch.getTime() + parseInt(dateStr) * 86400000);
+            }
+            // 11. 한글 포함 날짜 (예: 2024년 01월 15일 14:30)
+            else if (/\d{4}년\s*\d{1,2}월\s*\d{1,2}일/.test(dateStr)) {
+              const match = dateStr.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일(?:\s+(\d{1,2}):(\d{2}))?/);
+              if (match) {
+                const [, year, month, day, hour, minute] = match;
+                const timeStr = hour && minute ? ` ${hour.padStart(2, '0')}:${minute}` : '';
+                parsedDate = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}${timeStr}`);
+              }
+            }
+
+            // 유효한 날짜인지 확인하고 YYYY-MM-DD HH:mm 형식으로 반환
+            if (parsedDate && !isNaN(parsedDate.getTime())) {
+              const year = parsedDate.getFullYear();
+              const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+              const day = String(parsedDate.getDate()).padStart(2, '0');
+              const hours = String(parsedDate.getHours()).padStart(2, '0');
+              const minutes = String(parsedDate.getMinutes()).padStart(2, '0');
+
+              // 시간이 00:00이 아닌 경우에만 시간 포함
+              if (hours !== '00' || minutes !== '00') {
+                return `${year}-${month}-${day} ${hours}:${minutes}`;
+              }
+              return `${year}-${month}-${day}`;
+            }
+
+            // 파싱 실패 시 원본 반환
+            return dateStr;
+          };
+
+          // 필드 매핑 적용 (field_3 = 결제일, field_4 = 주문번호, field_5 = 주문자 등)
           const mappedData: any = {
             마켓명: template.market_name,
+            결제일: formatDate(getFieldValue(marketMapping.field_3)),
             주문번호: getFieldValue(marketMapping.field_4),
             주문자: getFieldValue(marketMapping.field_5),
             주문자전화번호: getFieldValue(marketMapping.field_6),
@@ -651,16 +748,18 @@ export default function OrderIntegration() {
                 zIndex: 10
               }}>
                 <tr>
+                  <th style={{ padding: '8px', textAlign: 'center', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa', width: '50px' }}>연번</th>
                   <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>마켓명</th>
+                  <th style={{ padding: '8px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa', width: '150px' }}>결제일</th>
                   <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>주문번호</th>
-                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>주문자</th>
+                  <th style={{ padding: '8px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa', width: '60px' }}>주문자</th>
                   <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>주문자전화번호</th>
-                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>수령인</th>
+                  <th style={{ padding: '8px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa', width: '60px' }}>수령인</th>
                   <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>수령인전화번호</th>
-                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', minWidth: '200px', background: '#f8f9fa' }}>주소</th>
-                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>배송메시지</th>
-                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>옵션상품</th>
-                  <th style={{ padding: '12px 12px 11px 12px', textAlign: 'center', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa' }}>수량</th>
+                  <th style={{ padding: '8px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa', width: '180px' }}>주소</th>
+                  <th style={{ padding: '8px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa', width: '100px' }}>배송메시지</th>
+                  <th style={{ padding: '8px', textAlign: 'left', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa', width: '150px' }}>옵션상품</th>
+                  <th style={{ padding: '8px', textAlign: 'center', borderTop: '2px solid #dee2e6', borderBottom: '2px solid #dee2e6', fontWeight: '600', background: '#f8f9fa', width: '50px' }}>수량</th>
                 </tr>
               </thead>
               <tbody>
@@ -668,16 +767,23 @@ export default function OrderIntegration() {
                   <tr key={index} style={{
                     borderBottom: index < integratedOrders.length - 1 ? '1px solid #f0f0f0' : 'none'
                   }}>
+                    <td style={{ padding: '8px', textAlign: 'center', fontWeight: '500', color: '#6b7280' }}>{index + 1}</td>
                     <td style={{ padding: '12px' }}>{order.마켓명}</td>
-                    <td style={{ padding: '12px' }}>{order.주문번호}</td>
-                    <td style={{ padding: '12px' }}>{order.주문자}</td>
-                    <td style={{ padding: '12px' }}>{order.주문자전화번호}</td>
-                    <td style={{ padding: '12px' }}>{order.수령인}</td>
-                    <td style={{ padding: '12px' }}>{order.수령인전화번호}</td>
-                    <td style={{ padding: '12px', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.주소}</td>
-                    <td style={{ padding: '12px' }}>{order.배송메시지}</td>
-                    <td style={{ padding: '12px' }}>{order.옵션상품}</td>
-                    <td style={{ padding: '12px', textAlign: 'center' }}>{order.수량}</td>
+                    <td style={{ padding: '8px', fontSize: '12px', color: '#6b7280', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.5px' }}>{order.결제일 || '-'}</td>
+                    <td style={{ padding: '12px', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.5px' }}>{order.주문번호}</td>
+                    <td style={{ padding: '8px', maxWidth: '60px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.주문자}</td>
+                    <td style={{ padding: '12px', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.5px' }}>{order.주문자전화번호}</td>
+                    <td style={{ padding: '8px', maxWidth: '60px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.수령인}</td>
+                    <td style={{ padding: '12px', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.5px' }}>{order.수령인전화번호}</td>
+                    <td style={{ padding: '8px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.주소}</td>
+                    <td style={{ padding: '8px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.배송메시지}</td>
+                    <td style={{ padding: '8px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.옵션상품}</td>
+                    <td style={{
+                      padding: '8px',
+                      textAlign: 'center',
+                      fontWeight: parseInt(order.수량) >= 2 ? '700' : 'normal',
+                      color: parseInt(order.수량) >= 2 ? '#dc2626' : 'inherit'
+                    }}>{order.수량}</td>
                   </tr>
                 ))}
               </tbody>

@@ -97,6 +97,8 @@ export default function TierCriteriaPage() {
   const [simulationCriteria, setSimulationCriteria] = useState<SimulationCriteria[]>([]);
   const [loginPointsPerDay, setLoginPointsPerDay] = useState(1);
   const [pointsPerDay, setPointsPerDay] = useState(10);
+  const [postPoints, setPostPoints] = useState(5);
+  const [commentPoints, setCommentPoints] = useState(2);
   const [milestones, setMilestones] = useState<Milestone[]>([
     { days: 30, bonus: 100, enabled: true },
     { days: 90, bonus: 300, enabled: true },
@@ -188,6 +190,8 @@ export default function TierCriteriaPage() {
 
         if (settings.login_points_per_day !== undefined) setLoginPointsPerDay(settings.login_points_per_day);
         if (settings.points_per_day) setPointsPerDay(settings.points_per_day);
+        if (settings.post_points !== undefined) setPostPoints(settings.post_points);
+        if (settings.comment_points !== undefined) setCommentPoints(settings.comment_points);
         if (settings.milestones) setMilestones(settings.milestones);
         if (settings.consecutive_bonuses) setConsecutiveBonuses(settings.consecutive_bonuses);
         if (settings.monthly_bonuses) setMonthlyBonuses(settings.monthly_bonuses);
@@ -211,6 +215,8 @@ export default function TierCriteriaPage() {
       const payload = {
         loginPointsPerDay,
         pointsPerDay,
+        postPoints,
+        commentPoints,
         milestones,
         consecutiveBonuses,
         monthlyBonuses,
@@ -462,7 +468,7 @@ export default function TierCriteriaPage() {
       let newTier = currentTier;
       let upgradedBy: 'existing' | 'points' | null = null;
 
-      // 활동점수방식: 매일 체크
+      // 기여점수방식: 매일 체크
       const tierByPoints = checkTierByPoints(pointsData.total);
       if (tierByPoints && tierOrder.indexOf(tierByPoints) > tierOrder.indexOf(currentTier)) {
         newTier = tierByPoints;
@@ -639,7 +645,7 @@ export default function TierCriteriaPage() {
           티어 등급 설정 & 시뮬레이션
         </h1>
         <p style={{ fontSize: '13px', color: '#6b7280' }}>
-          실적방식(건수/금액)과 활동점수방식(누적 발주일수) 기반 등급 판정 시스템
+          실적방식(건수/금액)과 기여점수방식(누적 발주일수) 기반 등급 판정 시스템
         </p>
       </div>
 
@@ -709,19 +715,50 @@ export default function TierCriteriaPage() {
                     return (
                       <tr key={item.tier} style={{ borderBottom: '1px solid #dee2e6' }}>
                         <td style={{ padding: '6px 12px', textAlign: 'center' }}>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '4px 10px',
-                        background: tierColor.bg,
-                        color: tierColor.text,
-                        border: `2px solid ${tierColor.border}`,
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        fontWeight: '700',
-                        letterSpacing: '0.05em'
-                      }}>
-                        {getTierName(item.tier)}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        {/* 아이콘 */}
+                        <div style={{ width: '20px', height: '20px', color: tierColor.text }}>
+                          {item.tier.toLowerCase() === 'light' && (
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+                            </svg>
+                          )}
+                          {item.tier.toLowerCase() === 'standard' && (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                          )}
+                          {item.tier.toLowerCase() === 'advance' && (
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 18.5c-4.28-1.12-7.5-5.3-7.5-9.5V8.3l7.5-3.65 7.5 3.65v2.7c0 4.2-3.22 8.38-7.5 9.5z"/>
+                            </svg>
+                          )}
+                          {item.tier.toLowerCase() === 'elite' && (
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                            </svg>
+                          )}
+                          {item.tier.toLowerCase() === 'legend' && (
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                          )}
+                        </div>
+                        {/* 등급명 */}
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '4px 10px',
+                          background: tierColor.bg,
+                          color: tierColor.text,
+                          border: `2px solid ${tierColor.border}`,
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          letterSpacing: '0.05em'
+                        }}>
+                          {getTierName(item.tier)}
+                        </span>
+                      </div>
                     </td>
                     <td style={{ padding: '6px 12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -848,10 +885,10 @@ export default function TierCriteriaPage() {
             </div>
           )}
 
-          {/* 활동점수방식 설정 저장 버튼 */}
+          {/* 기여점수방식 설정 저장 버튼 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', marginTop: '32px' }}>
             <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1f2937' }}>
-              활동점수방식 설정
+              기여점수방식 설정
             </h2>
             <button
               onClick={savePointSettings}
@@ -870,11 +907,11 @@ export default function TierCriteriaPage() {
                 transition: 'all 0.2s'
               }}
             >
-              {savingPointSettings ? '저장 중...' : '활동점수방식 설정 저장'}
+              {savingPointSettings ? '저장 중...' : '기여점수방식 설정 저장'}
             </button>
           </div>
 
-          {/* 활동점수방식 설정 */}
+          {/* 기여점수방식 설정 */}
           <div style={{ background: 'white', borderRadius: '16px', padding: '24px', border: '1px solid #dee2e6' }}>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '20px' }}>
@@ -895,7 +932,7 @@ export default function TierCriteriaPage() {
               />
               <span style={{ fontSize: '12px', color: '#6b7280' }}>점</span>
             </div>
-            <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <label style={{ fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap' }}>
                 발주 1일당 점수
               </label>
@@ -907,6 +944,32 @@ export default function TierCriteriaPage() {
               />
               <span style={{ fontSize: '12px', color: '#6b7280' }}>점</span>
             </div>
+
+            <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                게시글 작성 점수
+              </label>
+              <input
+                type="text"
+                value={postPoints.toLocaleString()}
+                onChange={(e) => setPostPoints(parseInt(e.target.value.replace(/,/g, '')) || 0)}
+                style={{ width: '80px', padding: '6px 10px', border: '1px solid #dee2e6', borderRadius: '8px', fontSize: '13px', textAlign: 'center' }}
+              />
+              <span style={{ fontSize: '12px', color: '#6b7280' }}>점</span>
+            </div>
+            <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                댓글 작성 점수
+              </label>
+              <input
+                type="text"
+                value={commentPoints.toLocaleString()}
+                onChange={(e) => setCommentPoints(parseInt(e.target.value.replace(/,/g, '')) || 0)}
+                style={{ width: '80px', padding: '6px 10px', border: '1px solid #dee2e6', borderRadius: '8px', fontSize: '13px', textAlign: 'center' }}
+              />
+              <span style={{ fontSize: '12px', color: '#6b7280' }}>점</span>
+            </div>
+
 
             <div>
               <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px' }}>
@@ -1240,7 +1303,7 @@ export default function TierCriteriaPage() {
                             {getTierName(upgrade.tier)}
                           </div>
                           <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                            {displayTime}<br/>({upgrade.method === 'existing' ? '실적방식' : '활동점수방식'})
+                            {displayTime}<br/>({upgrade.method === 'existing' ? '실적방식' : '기여점수방식'})
                           </div>
                         </div>
                       );
@@ -1330,7 +1393,7 @@ export default function TierCriteriaPage() {
                                 </td>
                                 <td style={{ padding: '8px', textAlign: 'center', fontSize: '12px', fontWeight: '600' }}>
                                   {result.upgradedBy === 'existing' && <span style={{ color: '#3b82f6' }}>실적방식</span>}
-                                  {result.upgradedBy === 'points' && <span style={{ color: '#8b5cf6' }}>활동점수방식</span>}
+                                  {result.upgradedBy === 'points' && <span style={{ color: '#8b5cf6' }}>기여점수방식</span>}
                                   {!result.upgradedBy && <span style={{ color: '#d1d5db' }}>-</span>}
                                 </td>
                               </tr>

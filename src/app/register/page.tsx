@@ -15,12 +15,7 @@ function RegisterContent() {
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [sendingSms, setSendingSms] = useState(false)
-  const [verifyingSms, setVerifyingSms] = useState(false)
-  const [smsCode, setSmsCode] = useState('')
-  const [smsSent, setSmsSent] = useState(false)
-  const [smsVerified, setSmsVerified] = useState(false)
-  const [smsCountdown, setSmsCountdown] = useState(0)
+  // SMS 인증 기능 제거됨
   const [agreeTerms, setAgreeTerms] = useState(false)
   const [agreePrivacy, setAgreePrivacy] = useState(false)
   const [agreeMarketing, setAgreeMarketing] = useState(false)
@@ -53,18 +48,9 @@ function RegisterContent() {
       setEmail(naverData.email)
       setName(naverData.name)
       setPhone(naverData.phone)
-      // 네이버 사용자는 전화번호 인증 불필요
-      setSmsVerified(true)
     }
   }, [searchParams])
 
-  // SMS 카운트다운 타이머
-  useEffect(() => {
-    if (smsCountdown > 0) {
-      const timer = setTimeout(() => setSmsCountdown(smsCountdown - 1), 1000)
-      return () => clearTimeout(timer)
-    }
-  }, [smsCountdown])
 
   const handleNaverLogin = () => {
     const state = Math.random().toString(36).substring(7)
@@ -90,11 +76,6 @@ function RegisterContent() {
         setError('비밀번호는 최소 6자 이상이어야 합니다.')
         return
       }
-    }
-
-    if (!smsVerified) {
-      setError('전화번호 인증을 완료해주세요.')
-      return
     }
 
     if (!agreeTerms || !agreePrivacy) {
@@ -149,6 +130,14 @@ function RegisterContent() {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            name,
+            phone,
+            role: 'seller',
+            approved: true,
+          },
+        },
       })
 
       if (authError) {
@@ -158,21 +147,20 @@ function RegisterContent() {
       }
 
       if (authData.user) {
-        const { error: profileError } = await supabase
+        // users 테이블은 Supabase Auth 트리거로 자동 생성됨
+        // 추가 정보 업데이트
+        const { error: updateError } = await supabase
           .from('users')
-          .insert({
-            id: authData.user.id,
-            email,
+          .update({
             name,
             phone,
             role: 'seller',
             approved: true,
           })
+          .eq('id', authData.user.id)
 
-        if (profileError) {
-          setError('프로필 생성 중 오류가 발생했습니다.')
-          setLoading(false)
-          return
+        if (updateError) {
+          console.error('프로필 업데이트 오류:', updateError)
         }
 
         showToast('회원가입이 완료되었습니다. 로그인해주세요.', 'success')
@@ -232,88 +220,6 @@ function RegisterContent() {
       setPhone(`${numbers.slice(0, 3)}-${numbers.slice(3)}`)
     } else {
       setPhone(`${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`)
-    }
-
-    // 전화번호 변경 시 인증 상태 초기화
-    setSmsSent(false)
-    setSmsVerified(false)
-    setSmsCode('')
-  }
-
-  // SMS 인증번호 발송
-  const handleSendSms = async () => {
-    if (!phone.trim()) {
-      setError('전화번호를 입력해주세요.')
-      return
-    }
-
-    const phoneNumbers = phone.replace(/[^\d]/g, '')
-    if (phoneNumbers.length !== 11) {
-      setError('올바른 전화번호를 입력해주세요.')
-      return
-    }
-
-    setSendingSms(true)
-    setError(null)
-
-    try {
-      const response = await fetch('/api/sms/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.error || 'SMS 발송에 실패했습니다.')
-        setSendingSms(false)
-        return
-      }
-
-      setSmsSent(true)
-      setSmsCountdown(180) // 3분
-      showToast('인증번호가 발송되었습니다.', 'success')
-      setSendingSms(false)
-    } catch (err) {
-      console.error('SMS send error:', err)
-      setError('SMS 발송 중 오류가 발생했습니다.')
-      setSendingSms(false)
-    }
-  }
-
-  // SMS 인증번호 확인
-  const handleVerifySms = async () => {
-    if (!smsCode.trim()) {
-      setError('인증번호를 입력해주세요.')
-      return
-    }
-
-    setVerifyingSms(true)
-    setError(null)
-
-    try {
-      const response = await fetch('/api/sms/send', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, code: smsCode }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.error || '인증번호가 일치하지 않습니다.')
-        setVerifyingSms(false)
-        return
-      }
-
-      setSmsVerified(true)
-      showToast('전화번호 인증이 완료되었습니다.', 'success')
-      setVerifyingSms(false)
-    } catch (err) {
-      console.error('SMS verify error:', err)
-      setError('인증번호 확인 중 오류가 발생했습니다.')
-      setVerifyingSms(false)
     }
   }
 
@@ -452,124 +358,39 @@ function RegisterContent() {
               }}
             />
 
-            <div style={{ flex: 1.2, display: 'flex', gap: '6px' }}>
-              <input
-                type="tel"
-                placeholder="* 010-1234-5678"
-                value={phone}
-                onChange={(e) => handlePhoneChange(e.target.value)}
-                required
-                disabled={smsVerified || !!naverInfo.naver_id}
-                style={{
-                  flex: 1,
-                  padding: '10px 12px',
-                  border: '1px solid transparent',
-                  background:
-                    smsVerified || naverInfo.naver_id ? '#e5e7eb' : '#f8f9fa',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  outline: 'none',
-                  transition: 'all 0.3s',
-                  cursor:
-                    smsVerified || naverInfo.naver_id ? 'not-allowed' : 'text',
-                }}
-                onFocus={(e) => {
-                  if (!smsVerified && !naverInfo.naver_id) {
-                    e.currentTarget.style.borderColor = '#2563eb'
-                    e.currentTarget.style.background = '#ffffff'
-                  }
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'transparent'
-                  e.currentTarget.style.background =
-                    smsVerified || naverInfo.naver_id ? '#e5e7eb' : '#f8f9fa'
-                }}
-              />
-              {!naverInfo.naver_id && (
-                <button
-                  type="button"
-                  onClick={handleSendSms}
-                  disabled={sendingSms || smsVerified || smsCountdown > 0}
-                  style={{
-                    padding: '10px 16px',
-                    background: smsVerified
-                      ? '#10b981'
-                      : sendingSms || smsCountdown > 0
-                      ? '#9ca3af'
-                      : '#2563eb',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    cursor:
-                      sendingSms || smsVerified || smsCountdown > 0
-                        ? 'not-allowed'
-                        : 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.3s',
-                  }}
-                >
-                  {smsVerified
-                    ? '인증완료'
-                    : smsCountdown > 0
-                    ? `${Math.floor(smsCountdown / 60)}:${(smsCountdown % 60).toString().padStart(2, '0')}`
-                    : sendingSms
-                    ? '발송중...'
-                    : '인증'}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {smsSent && !smsVerified && !naverInfo.naver_id && (
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', maxWidth: '700px' }}>
-              <input
-                type="text"
-                placeholder="인증번호 6자리"
-                value={smsCode}
-                onChange={(e) => setSmsCode(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
-                maxLength={6}
-                style={{
-                  flex: 1,
-                  padding: '10px 12px',
-                  border: '1px solid transparent',
-                  background: '#f8f9fa',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  outline: 'none',
-                  transition: 'all 0.3s'
-                }}
-                onFocus={(e) => {
+            <input
+              type="tel"
+              placeholder="* 010-1234-5678"
+              value={phone}
+              onChange={(e) => handlePhoneChange(e.target.value)}
+              required
+              disabled={!!naverInfo.naver_id}
+              style={{
+                flex: 1.2,
+                padding: '10px 12px',
+                border: '1px solid transparent',
+                background: naverInfo.naver_id ? '#e5e7eb' : '#f8f9fa',
+                borderRadius: '8px',
+                fontSize: '14px',
+                outline: 'none',
+                transition: 'all 0.3s',
+                cursor: naverInfo.naver_id ? 'not-allowed' : 'text',
+              }}
+              onFocus={(e) => {
+                if (!naverInfo.naver_id) {
                   e.currentTarget.style.borderColor = '#2563eb'
                   e.currentTarget.style.background = '#ffffff'
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'transparent'
-                  e.currentTarget.style.background = '#f8f9fa'
-                }}
-              />
-              <button
-                type="button"
-                onClick={handleVerifySms}
-                disabled={verifyingSms}
-                style={{
-                  padding: '10px 16px',
-                  background: verifyingSms ? '#9ca3af' : '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  cursor: verifyingSms ? 'not-allowed' : 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.3s'
-                }}
-              >
-                {verifyingSms ? '확인중...' : '확인'}
-              </button>
-            </div>
-          )}
+                }
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'transparent'
+                e.currentTarget.style.background = naverInfo.naver_id
+                  ? '#e5e7eb'
+                  : '#f8f9fa'
+              }}
+            />
+          </div>
+
 
           {/* 비밀번호, 비밀번호 확인 가로 배치 - 네이버 사용자에게는 숨김 */}
           {!naverInfo.naver_id && (

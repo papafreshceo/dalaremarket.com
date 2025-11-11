@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
 import { applyOptionMappingToOrdersServer } from '@/lib/option-mapping-utils';
 import { generateSampleOrders, convertSampleOrdersToDBFormat } from '@/lib/sample-data';
+import { getOrganizationDataFilter } from '@/lib/organization-utils';
 
 /**
  * GET /api/platform-orders
@@ -116,12 +117,21 @@ export async function GET(request: NextRequest) {
       endDate
     });
 
+    // 🔒 조직 필터 적용
+    const organizationId = await getOrganizationDataFilter(effectiveUserId);
+
     // 쿼리 빌더
     let query = dbClient
       .from('integrated_orders')
       .select('*')
-      .eq('seller_id', effectiveUserId)
       .eq('is_deleted', false);
+
+    // 조직이 있으면 조직 주문, 없으면 본인 주문만 조회
+    if (organizationId) {
+      query = query.eq('organization_id', organizationId);
+    } else {
+      query = query.eq('seller_id', effectiveUserId);
+    }
 
     // 날짜 필터 적용
     if (startDate) {
@@ -265,9 +275,17 @@ export async function POST(request: NextRequest) {
       // 1단계: 옵션상품 매핑 적용 (사용자 설정 기준)
       orders = await applyOptionMappingToOrdersServer(orders, user.id);
 
+      // 🔒 조직 ID 자동 설정
+      const organizationId = await getOrganizationDataFilter(user.id);
+      if (organizationId) {
+        orders = orders.map((order: any) => ({
+          ...order,
+          organization_id: organizationId,
+        }));
+      }
+
       // 2단계: 옵션 상품 정보 자동 매핑 (공급단가, 발송정보 등)
       const ordersWithInfo = await enrichOrdersWithOptionInfo(orders);
-
 
       // DB에 일괄 저장
       const { data, error } = await supabase
@@ -289,6 +307,13 @@ export async function POST(request: NextRequest) {
         .update({ show_sample_data: false })
         .eq('id', user.id);
 
+      // 발주일 점수 추가 (하루 1회)
+      try {
+        await supabase.rpc('add_order_points', { p_user_id: user.id });
+      } catch (pointsError) {
+        console.error('Order points error:', pointsError);
+        // 점수 추가 실패해도 주문은 성공으로 처리
+      }
 
       return NextResponse.json({
         success: true,
@@ -311,6 +336,12 @@ export async function POST(request: NextRequest) {
       // seller_id 자동 설정
       if (!orderData.seller_id) {
         orderData.seller_id = user.id;
+      }
+
+      // 🔒 조직 ID 자동 설정
+      const organizationId = await getOrganizationDataFilter(user.id);
+      if (organizationId) {
+        orderData.organization_id = organizationId;
       }
 
       // 옵션 상품 정보 자동 매핑 (단건용)
@@ -338,6 +369,13 @@ export async function POST(request: NextRequest) {
         .update({ show_sample_data: false })
         .eq('id', user.id);
 
+      // 발주일 점수 추가 (하루 1회)
+      try {
+        await supabase.rpc('add_order_points', { p_user_id: user.id });
+      } catch (pointsError) {
+        console.error('Order points error:', pointsError);
+        // 점수 추가 실패해도 주문은 성공으로 처리
+      }
 
       return NextResponse.json({
         success: true,
