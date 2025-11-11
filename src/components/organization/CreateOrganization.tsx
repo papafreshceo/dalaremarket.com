@@ -9,7 +9,7 @@ export default function CreateOrganization() {
   const [loading, setLoading] = useState(false)
 
   const handleAutoCreate = async () => {
-    if (!confirm('현재 사용자 정보를 기반으로 조직을 생성하시겠습니까?')) {
+    if (!confirm('현재 사용자 정보를 기반으로 셀러계정을 생성하시겠습니까?')) {
       return
     }
 
@@ -21,14 +21,14 @@ export default function CreateOrganization() {
 
       const data = await response.json()
       if (data.success) {
-        alert('조직이 생성되었습니다')
+        alert('셀러계정이 생성되었습니다')
         router.refresh()
       } else {
-        alert(data.error || '조직 생성에 실패했습니다')
+        alert(data.error || '셀러계정 생성에 실패했습니다')
       }
     } catch (error) {
-      console.error('조직 생성 오류:', error)
-      alert('조직 생성 중 오류가 발생했습니다')
+      console.error('셀러계정 생성 오류:', error)
+      alert('셀러계정 생성 중 오류가 발생했습니다')
     } finally {
       setLoading(false)
     }
@@ -55,14 +55,14 @@ export default function CreateOrganization() {
           </div>
           <div className="ml-3 flex-1">
             <h3 className="text-lg font-semibold text-yellow-900 mb-2">
-              조직 정보를 불러올 수 없습니다
+              셀러계정 정보를 불러올 수 없습니다
             </h3>
             <div className="text-sm text-yellow-800 space-y-2 mb-4">
               <p>
-                일시적인 오류로 조직 정보를 불러오지 못했습니다.
+                일시적인 오류로 셀러계정 정보를 불러오지 못했습니다.
               </p>
               <p className="font-semibold">
-                회원가입 시 자동으로 조직이 생성되므로, 이 화면이 보이는 것은 비정상입니다.
+                회원가입 시 자동으로 셀러계정이 생성되므로, 이 화면이 보이는 것은 비정상입니다.
               </p>
             </div>
 
@@ -72,9 +72,9 @@ export default function CreateOrganization() {
               </h4>
               <ul className="text-sm text-gray-600 space-y-2">
                 <li>
-                  <strong>1. "지금 조직 생성하기" 버튼 클릭</strong>
+                  <strong>1. "지금 셀러계정 생성하기" 버튼 클릭</strong>
                   <p className="text-xs text-gray-500 ml-4">
-                    현재 사용자 정보를 기반으로 조직을 수동으로 생성합니다.
+                    현재 사용자 정보를 기반으로 셀러계정을 수동으로 생성합니다.
                   </p>
                 </li>
                 <li>
@@ -86,7 +86,7 @@ export default function CreateOrganization() {
                 <li>
                   <strong>3. 로그아웃 후 다시 로그인</strong>
                   <p className="text-xs text-gray-500 ml-4">
-                    로그인 시 조직이 없으면 자동으로 생성됩니다.
+                    로그인 시 셀러계정이 없으면 자동으로 생성됩니다.
                   </p>
                 </li>
               </ul>
@@ -98,7 +98,7 @@ export default function CreateOrganization() {
                 disabled={loading}
                 className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:bg-gray-400 flex-1 sm:flex-none font-semibold"
               >
-                {loading ? '생성 중...' : '🔄 지금 조직 생성하기'}
+                {loading ? '생성 중...' : '🔄 지금 셀러계정 생성하기'}
               </button>
               <button
                 onClick={() => window.location.reload()}
@@ -109,11 +109,11 @@ export default function CreateOrganization() {
             </div>
 
             <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
-              <strong>💡 조직 시스템이란?</strong>
+              <strong>💡 셀러계정 시스템이란?</strong>
               <p className="mt-1">
-                회원가입 시 자동으로 생성되는 기본 조직입니다.
-                회사의 대표와 직원들이 같은 조직에 속하여 주문, 발주서 등의 데이터를 공유할 수 있습니다.
-                마이페이지에서 회사 정보를 입력하면 조직명이 변경되고, 직원을 초대할 수 있습니다.
+                회원가입 시 자동으로 생성되는 기본 셀러계정입니다.
+                회사의 대표와 직원들이 같은 셀러계정에 속하여 주문, 발주서 등의 데이터를 공유할 수 있습니다.
+                마이페이지에서 회사 정보를 입력하면 계정명이 변경되고, 직원을 초대할 수 있습니다.
               </p>
             </div>
           </div>

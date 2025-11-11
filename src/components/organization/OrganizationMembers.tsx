@@ -74,7 +74,7 @@ export default function OrganizationMembers({
   }
 
   const handleRemoveMember = async (memberId: string, userName: string) => {
-    if (!confirm(`${userName}님을 조직에서 제거하시겠습니까?`)) {
+    if (!confirm(`${userName}님을 셀러계정에서 제거하시겠습니까?`)) {
       return
     }
 
@@ -104,7 +104,7 @@ export default function OrganizationMembers({
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">조직 멤버 ({members.length}명)</h3>
+        <h3 className="text-lg font-semibold">셀러계정 멤버 ({members.length}명)</h3>
       </div>
 
       <div className="overflow-x-auto">

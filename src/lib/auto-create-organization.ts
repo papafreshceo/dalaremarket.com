@@ -37,14 +37,14 @@ export async function autoCreateOrganizationFromUser(userId: string) {
     }
   }
 
-  // 3. 조직명 결정
+  // 3. 셀러계정명 결정
   // 우선순위: company_name > profile_name > name > email
   const organizationName =
     user.company_name ||
-    (user.profile_name ? `${user.profile_name}의 조직` : null) ||
-    (user.name ? `${user.name}의 조직` : null) ||
-    `${user.email?.split('@')[0]}의 조직` ||
-    '내 조직'
+    (user.profile_name ? `${user.profile_name}의 셀러계정` : null) ||
+    (user.name ? `${user.name}의 셀러계정` : null) ||
+    `${user.email?.split('@')[0]}의 셀러계정` ||
+    '내 셀러계정'
 
   // 4. 조직 생성 (RLS 우회를 위해 raw SQL 사용)
 
@@ -76,12 +76,12 @@ export async function autoCreateOrganizationFromUser(userId: string) {
   })
 
   if (orgError) {
-    console.error('조직 생성 실패:', orgError)
-    return { success: false, error: '조직 생성에 실패했습니다' }
+    console.error('셀러계정 생성 실패:', orgError)
+    return { success: false, error: '셀러계정 생성에 실패했습니다' }
   }
 
-  // 생성된 조직 ID 조회
-  const { data: newOrg, error: fetchError } = await supabase
+  // 생성된 셀러계정 ID 조회
+  const { data: newOrg, error: fetchError} = await supabase
     .from('organizations')
     .select('id, name')
     .eq('owner_id', userId)
@@ -90,8 +90,8 @@ export async function autoCreateOrganizationFromUser(userId: string) {
     .single()
 
   if (fetchError || !newOrg) {
-    console.error('생성된 조직 조회 실패:', fetchError)
-    return { success: false, error: '조직을 생성했지만 조회에 실패했습니다' }
+    console.error('생성된 셀러계정 조회 실패:', fetchError)
+    return { success: false, error: '셀러계정을 생성했지만 조회에 실패했습니다' }
   }
 
   const organization = newOrg
@@ -116,9 +116,9 @@ export async function autoCreateOrganizationFromUser(userId: string) {
 
   if (memberError) {
     console.error('멤버 추가 실패:', memberError)
-    // 조직 삭제 (롤백)
+    // 셀러계정 삭제 (롤백)
     await supabase.from('organizations').delete().eq('id', organization.id)
-    return { success: false, error: '조직 멤버 추가에 실패했습니다' }
+    return { success: false, error: '셀러계정 멤버 추가에 실패했습니다' }
   }
 
   // 6. 사용자의 primary_organization_id 업데이트 (Service Role로 RLS 우회)
@@ -127,10 +127,10 @@ export async function autoCreateOrganizationFromUser(userId: string) {
   })
 
   if (updateError) {
-    console.error('사용자 조직 ID 업데이트 실패:', updateError)
+    console.error('사용자 셀러계정 ID 업데이트 실패:', updateError)
   }
 
-  // 7. 기존 주문에 조직 ID 매핑 (Service Role로 RLS 우회)
+  // 7. 기존 주문에 셀러계정 ID 매핑 (Service Role로 RLS 우회)
   await supabase.rpc('exec_sql', {
     sql: `
       UPDATE integrated_orders
@@ -160,12 +160,12 @@ export async function syncOrganizationFromUser(userId: string) {
     .single()
 
   if (!user || !user.primary_organization_id) {
-    return { success: false, error: '조직 정보가 없습니다' }
+    return { success: false, error: '셀러계정 정보가 없습니다' }
   }
 
-  // 2. 조직 정보 업데이트
+  // 2. 셀러계정 정보 업데이트
   const organizationName =
-    user.company_name || user.profile_name || user.email?.split('@')[0] || '내 조직'
+    user.company_name || user.profile_name || user.email?.split('@')[0] || '내 셀러계정'
 
   const { error: updateError } = await supabase
     .from('organizations')
@@ -187,8 +187,8 @@ export async function syncOrganizationFromUser(userId: string) {
     .eq('owner_id', userId) // 소유자만 업데이트 가능
 
   if (updateError) {
-    console.error('조직 정보 동기화 실패:', updateError)
-    return { success: false, error: '조직 정보 동기화에 실패했습니다' }
+    console.error('셀러계정 정보 동기화 실패:', updateError)
+    return { success: false, error: '셀러계정 정보 동기화에 실패했습니다' }
   }
 
   return { success: true }
