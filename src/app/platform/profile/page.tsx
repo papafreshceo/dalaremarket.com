@@ -670,7 +670,7 @@ export default function ProfilePage() {
 
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
+                gridTemplateColumns: '1fr 1fr 2fr',
                 gap: '24px'
               }}>
                 {/* 사업자 정보 */}
@@ -1052,120 +1052,6 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* 송장 출력 정보 - 전체 너비 */}
-              <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid #e9ecef' }}>
-                <h3 style={{
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  color: '#343a40',
-                  marginBottom: '16px',
-                  paddingBottom: '8px',
-                  borderBottom: '2px solid #e9ecef'
-                }}>송장 출력 정보</h3>
-
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr 1fr',
-                  gap: '16px'
-                }}>
-                  <div>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      marginBottom: '6px'
-                    }}>
-                      <label style={{
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: '#495057'
-                      }}>업체명</label>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        <input
-                          type="checkbox"
-                          id="sameAsBusinessName"
-                          checked={isSameAsBusinessName}
-                          onChange={(e) => {
-                            setIsSameAsBusinessName(e.target.checked);
-                            if (e.target.checked && sellerInfo.business_name) {
-                              setSellerInfo(prev => ({ ...prev, store_name: prev.business_name }));
-                            }
-                          }}
-                          style={{
-                            width: '14px',
-                            height: '14px',
-                            cursor: 'pointer'
-                          }}
-                        />
-                        <label
-                          htmlFor="sameAsBusinessName"
-                          style={{
-                            fontSize: '11px',
-                            color: '#6c757d',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          사업자명과 동일
-                        </label>
-                      </div>
-                    </div>
-                    <input
-                      type="text"
-                      value={sellerInfo.store_name || ''}
-                      onChange={(e) => handleChange('store_name', e.target.value)}
-                      disabled={isSameAsBusinessName}
-                      placeholder="업체명"
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        outline: 'none',
-                        background: isSameAsBusinessName ? '#f8f9fa' : 'white',
-                        color: isSameAsBusinessName ? '#6c757d' : '#212529',
-                        cursor: isSameAsBusinessName ? 'not-allowed' : 'text',
-                        transition: 'border 0.2s'
-                      }}
-                      onFocus={(e) => !isSameAsBusinessName && (e.target.style.borderColor = '#3b82f6')}
-                      onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: '#495057',
-                      marginBottom: '6px'
-                    }}>전화번호</label>
-                    <input
-                      type="tel"
-                      value={sellerInfo.store_phone || ''}
-                      onChange={(e) => handleChange('store_phone', e.target.value)}
-                      placeholder="010-0000-0000"
-                      maxLength={13}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        outline: 'none',
-                        transition: 'border 0.2s'
-                      }}
-                      onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                      onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
-                    />
-                  </div>
-                </div>
 
                 {/* 셀러계정 관리 */}
                 {organization && user && (
@@ -1304,6 +1190,120 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* 송장 출력 정보 - 전체 너비 */}
+              <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid #e9ecef' }}>
+                <h3 style={{
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: '#343a40',
+                  marginBottom: '16px',
+                  paddingBottom: '8px',
+                  borderBottom: '2px solid #e9ecef'
+                }}>송장 출력 정보</h3>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr 1fr',
+                  gap: '16px'
+                }}>
+                  <div>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '6px'
+                    }}>
+                      <label style={{
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: '#495057'
+                      }}>업체명</label>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <input
+                          type="checkbox"
+                          id="sameAsBusinessName"
+                          checked={isSameAsBusinessName}
+                          onChange={(e) => {
+                            setIsSameAsBusinessName(e.target.checked);
+                            if (e.target.checked && sellerInfo.business_name) {
+                              setSellerInfo(prev => ({ ...prev, store_name: prev.business_name }));
+                            }
+                          }}
+                          style={{
+                            width: '14px',
+                            height: '14px',
+                            cursor: 'pointer'
+                          }}
+                        />
+                        <label
+                          htmlFor="sameAsBusinessName"
+                          style={{
+                            fontSize: '11px',
+                            color: '#6c757d',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          사업자명과 동일
+                        </label>
+                      </div>
+                    </div>
+                    <input
+                      type="text"
+                      value={sellerInfo.store_name || ''}
+                      onChange={(e) => handleChange('store_name', e.target.value)}
+                      disabled={isSameAsBusinessName}
+                      placeholder="업체명"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        outline: 'none',
+                        background: isSameAsBusinessName ? '#f8f9fa' : 'white',
+                        color: isSameAsBusinessName ? '#6c757d' : '#212529',
+                        cursor: isSameAsBusinessName ? 'not-allowed' : 'text',
+                        transition: 'border 0.2s'
+                      }}
+                      onFocus={(e) => !isSameAsBusinessName && (e.target.style.borderColor = '#3b82f6')}
+                      onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: '#495057',
+                      marginBottom: '6px'
+                    }}>전화번호</label>
+                    <input
+                      type="tel"
+                      value={sellerInfo.store_phone || ''}
+                      onChange={(e) => handleChange('store_phone', e.target.value)}
+                      placeholder="010-0000-0000"
+                      maxLength={13}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        outline: 'none',
+                        transition: 'border 0.2s'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                      onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
