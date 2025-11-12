@@ -369,7 +369,7 @@ export default function ProfilePage() {
               fontSize: '14px',
               color: '#6c757d',
               margin: 0
-            }}>프로필 이름 및 판매자 정보를 관리하세요</p>
+            }}>기본정보 및 판매자 정보를 관리하세요</p>
           </div>
 
           {/* 저장 버튼 */}
@@ -447,11 +447,11 @@ export default function ProfilePage() {
                 fontWeight: '700',
                 marginBottom: '24px',
                 color: '#212529'
-              }}>프로필 이름 설정</h2>
+              }}>기본정보</h2>
 
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
+                gridTemplateColumns: 'repeat(4, 1fr)',
                 gap: '20px'
               }}>
                 {/* 이메일 */}
@@ -476,6 +476,62 @@ export default function ProfilePage() {
                       background: '#f8f9fa',
                       color: '#6c757d'
                     }}
+                  />
+                </div>
+
+                {/* 이름 */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#495057',
+                    marginBottom: '8px'
+                  }}>이름</label>
+                  <input
+                    type="text"
+                    value={sellerInfo.name}
+                    onChange={(e) => handleChange('name', e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'border 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                    onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+                  />
+                </div>
+
+                {/* 전화번호 */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#495057',
+                    marginBottom: '8px'
+                  }}>전화번호</label>
+                  <input
+                    type="tel"
+                    value={sellerInfo.phone}
+                    onChange={(e) => handleChange('phone', e.target.value)}
+                    placeholder="010-0000-0000"
+                    maxLength={13}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'border 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                    onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
                   />
                 </div>
 
@@ -614,77 +670,9 @@ export default function ProfilePage() {
 
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
+                gridTemplateColumns: 'repeat(2, 1fr)',
                 gap: '24px'
               }}>
-                {/* 기본 정보 */}
-                <div>
-                  <h3 style={{
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: '#343a40',
-                    marginBottom: '16px',
-                    paddingBottom: '8px',
-                    borderBottom: '2px solid #e9ecef'
-                  }}>기본 정보</h3>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div>
-                      <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: '#495057',
-                        marginBottom: '6px'
-                      }}>이름</label>
-                      <input
-                        type="text"
-                        value={sellerInfo.name}
-                        onChange={(e) => handleChange('name', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          outline: 'none',
-                          transition: 'border 0.2s'
-                        }}
-                        onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                        onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: '#495057',
-                        marginBottom: '6px'
-                      }}>전화번호</label>
-                      <input
-                        type="tel"
-                        value={sellerInfo.phone}
-                        onChange={(e) => handleChange('phone', e.target.value)}
-                        placeholder="010-0000-0000"
-                        maxLength={13}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          outline: 'none',
-                          transition: 'border 0.2s'
-                        }}
-                        onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                        onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
-                      />
-                    </div>
-                  </div>
-                </div>
-
                 {/* 사업자 정보 */}
                 <div>
                   <h3 style={{
