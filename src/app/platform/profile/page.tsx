@@ -1053,7 +1053,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* 셀러계정 관리 */}
+                {/* 멤버 관리 */}
                 {organization && user && (
                   <div>
                     <h3 style={{
@@ -1063,7 +1063,7 @@ export default function ProfilePage() {
                       marginBottom: '16px',
                       paddingBottom: '8px',
                       borderBottom: '2px solid #e9ecef'
-                    }}>셀러계정 관리</h3>
+                    }}>멤버 관리</h3>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       {/* 셀러계정 정보 */}
@@ -1074,13 +1074,31 @@ export default function ProfilePage() {
                         color: 'white'
                       }}>
                         <div style={{
-                          fontSize: '15px',
-                          fontWeight: '600',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
                           marginBottom: '8px'
                         }}>
-                          {organization.name?.includes('의 조직')
-                            ? organization.name.replace('의 조직', '님의 셀러계정')
-                            : organization.name}
+                          <div style={{
+                            fontSize: '15px',
+                            fontWeight: '600'
+                          }}>
+                            {organization.name?.includes('의 조직')
+                              ? organization.name.replace('의 조직', '님의 셀러계정')
+                              : organization.name}
+                          </div>
+                          {sellerInfo.business_name && (
+                            <div style={{
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              opacity: 0.95,
+                              background: 'rgba(255, 255, 255, 0.2)',
+                              padding: '4px 10px',
+                              borderRadius: '6px'
+                            }}>
+                              {sellerInfo.business_name}
+                            </div>
+                          )}
                         </div>
                         <div style={{
                           fontSize: '11px',
