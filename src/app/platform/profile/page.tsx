@@ -1075,8 +1075,8 @@ export default function ProfilePage() {
                       }}>
                         <div style={{
                           display: 'flex',
-                          justifyContent: 'space-between',
                           alignItems: 'center',
+                          gap: '8px',
                           marginBottom: '8px'
                         }}>
                           <div style={{
