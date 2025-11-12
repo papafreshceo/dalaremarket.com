@@ -1215,7 +1215,11 @@ export default function ProfilePage() {
                         fontSize: '22px',
                         fontWeight: '700',
                         marginBottom: '12px'
-                      }}>{organization.name}</h3>
+                      }}>
+                        {organization.name?.includes('의 조직')
+                          ? organization.name.replace('의 조직', '님의 셀러계정')
+                          : organization.name}
+                      </h3>
                       <div style={{
                         fontSize: '13px',
                         opacity: 0.9,
