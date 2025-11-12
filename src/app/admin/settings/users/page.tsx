@@ -175,20 +175,33 @@ export default function UsersPage() {
       return
     }
 
+    // 일반 회원 → 관리자 그룹으로 변경 시 셀러계정 연결 해제
+    const isBecomingStaff = ['admin', 'super_admin', 'employee'].includes(newRole) &&
+                            !['admin', 'super_admin', 'employee'].includes(oldRole)
+
+    const updateData: any = { role: newRole }
+    if (isBecomingStaff) {
+      updateData.primary_organization_id = null
+    }
+
     const { data, error } = await supabase
       .from('users')
-      .update({ role: newRole })
+      .update(updateData)
       .eq('id', userId)
       .select()
 
-    console.log('역할 변경 결과:', { data, error })
+    console.log('역할 변경 결과:', { data, error, isBecomingStaff })
 
     if (error) {
       showToast(`역할 변경에 실패했습니다: ${error.message}`, 'error')
       console.error(error)
       fetchUsers() // 오류 시 롤백
     } else {
-      showToast('역할이 변경되었습니다.', 'success')
+      if (isBecomingStaff) {
+        showToast('역할이 변경되었습니다. 셀러계정 연결이 해제되었습니다.', 'success')
+      } else {
+        showToast('역할이 변경되었습니다.', 'success')
+      }
       fetchUsers()
     }
   }
