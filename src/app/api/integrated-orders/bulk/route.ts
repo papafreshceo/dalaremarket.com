@@ -34,8 +34,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 🔒 조직 ID 자동 설정
-    const organizationId = await getOrganizationDataFilter(auth.user.id);
+    // 🔒 조직 ID 자동 설정 (관리자 제외)
+    let organizationId = null;
+    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin') {
+      organizationId = await getOrganizationDataFilter(auth.user.id);
+    }
 
     // sheet_date 기본값 및 조직 ID 설정
     const ordersWithDate = orders.map((order) => {

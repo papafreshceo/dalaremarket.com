@@ -208,10 +208,12 @@ export async function POST(request: NextRequest) {
       body.sheet_date = new Date().toISOString().split('T')[0];
     }
 
-    // 🔒 조직 ID 자동 설정
-    const organizationId = await getOrganizationDataFilter(auth.user.id);
-    if (organizationId) {
-      body.organization_id = organizationId;
+    // 🔒 조직 ID 자동 설정 (관리자 제외)
+    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin') {
+      const organizationId = await getOrganizationDataFilter(auth.user.id);
+      if (organizationId) {
+        body.organization_id = organizationId;
+      }
     }
 
     // 옵션 상품 정보 자동 매핑 (option_products 테이블)

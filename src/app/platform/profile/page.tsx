@@ -151,12 +151,17 @@ export default function ProfilePage() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) return;
 
-      // 사용자의 organization 정보 가져오기
+      // 사용자 role 확인
       const { data: userData } = await supabase
         .from('users')
-        .select('primary_organization_id')
+        .select('primary_organization_id, role')
         .eq('id', authUser.id)
         .single();
+
+      // 관리자는 셀러계정 시스템 적용 안 함
+      if (userData?.role === 'admin' || userData?.role === 'super_admin') {
+        return;
+      }
 
       if (!userData?.primary_organization_id) return;
 
