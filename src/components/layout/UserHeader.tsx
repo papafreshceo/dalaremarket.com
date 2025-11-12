@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { useToast } from '@/components/ui/Toast';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
 import TierBadge from '@/components/TierBadge';
 import { useUserBalance } from '@/contexts/UserBalanceContext';
+import NotificationBell from '@/components/notifications/NotificationBell';
 
 interface NavItem {
   path: string;
@@ -45,17 +46,23 @@ export default function UserHeader() {
   const [showCreditTooltip, setShowCreditTooltip] = useState(false);
   const [contributionPoints, setContributionPoints] = useState(0);
   const [showContributionTooltip, setShowContributionTooltip] = useState(false);
+  const [organizationName, setOrganizationName] = useState<string>('');
+  const [sellerCode, setSellerCode] = useState<string>('');
+
+  // 활동 추적 콜백 (useCallback으로 안정화)
+  const handleRewardClaimed = useCallback((amount: number, newBalance: number) => {
+    setCashBalance(newBalance);
+  }, [setCashBalance]);
+
+  const handleLimitReached = useCallback(() => {
+    // 한도 도달 시 아무것도 하지 않음
+  }, []);
 
   // 활동 시간 추적 (로그인 시에만)
   useActivityTracker({
     enabled: !!user,
-    onRewardClaimed: (amount, newBalance) => {
-      setCashBalance(newBalance);
-      showToast(`활동 보상 ${amount}캐시가 지급되었습니다!`, 'success');
-    },
-    onLimitReached: () => {
-      showToast('오늘 활동 보상 한도에 도달했습니다.', 'info');
-    }
+    onRewardClaimed: handleRewardClaimed,
+    onLimitReached: handleLimitReached
   });
 
   // 발주관리 열기 함수
@@ -171,21 +178,40 @@ export default function UserHeader() {
       if (user) {
         const { data: userData } = await supabase
           .from('users')
-          .select('role, tier, accumulated_points')
+          .select('role, primary_organization_id, seller_code')
           .eq('id', user.id)
           .single();
 
         setUserRole(userData?.role || null);
-        setContributionPoints(userData?.accumulated_points || 0);
+        setSellerCode(userData?.seller_code || '');
 
-        // tier 설정 (NULL 허용)
-        const validTiers = ['light', 'standard', 'advance', 'elite', 'legend'];
-        const tier = userData?.tier?.toLowerCase();
-        setUserTier(tier && validTiers.includes(tier) ? tier : null);
+        // 조직의 기여점수, 티어, 셀러계정명 조회
+        if (userData?.primary_organization_id) {
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('accumulated_points, tier, business_name')
+            .eq('id', userData.primary_organization_id)
+            .single();
+
+          setContributionPoints(orgData?.accumulated_points || 0);
+          setOrganizationName(orgData?.business_name || '');
+
+          // tier 설정 (조직 기준, NULL 허용)
+          const validTiers = ['light', 'standard', 'advance', 'elite', 'legend'];
+          const tier = orgData?.tier?.toLowerCase();
+          setUserTier(tier && validTiers.includes(tier) ? tier : null);
+        } else {
+          setContributionPoints(0);
+          setOrganizationName('');
+          setSellerCode('');
+          setUserTier(null);
+        }
       } else {
         setUserRole(null);
         setUserTier(null);
         setContributionPoints(0);
+        setOrganizationName('');
+        setSellerCode('');
       }
     };
 
@@ -199,6 +225,8 @@ export default function UserHeader() {
         setUserRole(null);
         setUserTier(null);
         setContributionPoints(0);
+        setOrganizationName('');
+        setSellerCode('');
       }
     });
 
@@ -214,10 +242,21 @@ export default function UserHeader() {
     }
 
     let isFirstLoad = true;
-    let loginRewardClaimed = false;
 
     const fetchBalances = async () => {
       try {
+        // 오늘 날짜 (KST)
+        const now = new Date();
+        const kstOffset = 9 * 60 * 60 * 1000;
+        const kstDate = new Date(now.getTime() + kstOffset);
+        const today = kstDate.toISOString().split('T')[0]; // YYYY-MM-DD
+
+        // localStorage에서 오늘 로그인 보상 청구 여부 확인
+        const loginRewardKey = `login_reward_claimed_${today}`;
+        const alreadyClaimed = localStorage.getItem(loginRewardKey) === 'true';
+
+        console.log('[fetchBalances] isFirstLoad:', isFirstLoad, 'alreadyClaimed:', alreadyClaimed, 'will call login API:', isFirstLoad && !alreadyClaimed);
+
         // 병렬로 API 호출하여 성능 개선
         const [cashRes, creditRes, loginRes] = await Promise.all([
           fetch('/api/cash'),
@@ -225,8 +264,8 @@ export default function UserHeader() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
           }),
-          // 로그인 보상은 첫 로드 시에만 시도
-          isFirstLoad && !loginRewardClaimed
+          // 로그인 보상은 첫 로드 시이고 오늘 아직 청구하지 않았을 때만 시도
+          isFirstLoad && !alreadyClaimed
             ? fetch('/api/cash/claim-login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
@@ -252,12 +291,13 @@ export default function UserHeader() {
         }
 
         // 로그인 보상 처리 (첫 로드 시에만)
-        if (loginRes && !loginRewardClaimed) {
+        if (loginRes) {
           const loginData = await loginRes.json();
           if (loginData.success) {
             setCashBalance(loginData.newBalance);
             showToast(`일일 로그인 보상 ${loginData.amount}캐시가 지급되었습니다!`, 'success');
-            loginRewardClaimed = true;
+            // localStorage에 오늘 청구했음을 기록
+            localStorage.setItem(loginRewardKey, 'true');
           }
         }
 
@@ -288,32 +328,9 @@ export default function UserHeader() {
         { path: '/gallery', text: '이미지다운로드' }
       ]
     },
-    {
-      path: '/platform/tools',
-      text: '업무도구',
-      hasSubmenu: true,
-      submenu: [
-        { path: '/platform/tools/margin-calculator', text: '마진계산기' },
-        { path: '/platform/tools/price-simulator', text: '판매가 시뮬레이터' },
-        { path: '/platform/tools/order-integration', text: '주문통합 (Excel)' },
-        { path: '/platform/tools/option-pricing', text: '옵션가 세팅' },
-        { path: '/platform/tools/inventory-tracker', text: '재고 추적기' },
-        { path: '/platform/tools/discount-calculator', text: '할인율 계산기' },
-        { path: '/platform/tools/sales-analytics', text: '매출 분석' },
-        { path: '/platform/tools/customer-message', text: '고객 메시지' },
-        { path: '/platform/tools/barcode-generator', text: '바코드 생성기' },
-        { path: '/platform/tools/transaction-statement', text: '거래명세서 즉시 발급' },
-        { path: '/platform/tools/trend-analysis', text: '트렌드 분석' },
-        { path: '/platform/tools/competitor-monitor', text: '경쟁사 모니터링' },
-        { path: '/platform/tools/product-name-optimizer', text: '상품명 최적화 도구' },
-        { path: '/platform/tools/review-analyzer', text: '리뷰 분석' },
-        { path: '/platform/tools/price-recommender', text: '판매가/할인가 추천기' },
-        { path: '/platform/tools/category-rank-checker', text: '카테고리 순위 확인' }
-      ]
-    },
+    { path: '/platform/tools', text: '업무도구' },
     { path: '/platform/pricing', text: '요금제' },
     { path: '/platform/ranking', text: '🏆 셀러랭킹' },
-    { path: '/platform/organization', text: '👥 조직관리' },
     { path: '/platform/winwin', text: 'Win-Win', special: true },
     { path: '/platform/notice', text: '공지사항' },
     {
@@ -856,8 +873,25 @@ export default function UserHeader() {
                   )}
                 </div>
 
+                {/* 알림 아이콘 */}
+                <NotificationBell />
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {userTier && <TierBadge tier={userTier as 'light' | 'standard' | 'advance' | 'elite' | 'legend'} iconOnly glow={0} />}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {organizationName && (
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: '#212529' }}>
+                        {organizationName}
+                      </div>
+                    )}
+                    {sellerCode && (
+                      <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                        {sellerCode}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '14px', color: '#495057' }}>
                     {user.email}
                   </span>
@@ -886,7 +920,7 @@ export default function UserHeader() {
                 </div>
                 {(userRole === 'admin' || userRole === 'employee' || userRole === 'super_admin') && (
                   <button
-                    onClick={() => router.push('/admin/dashboard')}
+                    onClick={() => router.push('/admin')}
                     style={{
                       padding: '6px 12px',
                       background: '#10b981',
@@ -1155,13 +1189,29 @@ export default function UserHeader() {
                     </div>
                   </div>
 
-                  <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {userTier && <TierBadge tier={userTier as 'light' | 'standard' | 'advance' | 'elite' | 'legend'} iconOnly glow={0} />}
-                    {user.email}
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      {userTier && <TierBadge tier={userTier as 'light' | 'standard' | 'advance' | 'elite' | 'legend'} iconOnly glow={0} />}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        {organizationName && (
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: '#212529' }}>
+                            {organizationName}
+                          </div>
+                        )}
+                        {sellerCode && (
+                          <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                            {sellerCode}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                      {user.email}
+                    </div>
                   </div>
                   {(userRole === 'admin' || userRole === 'employee' || userRole === 'super_admin') && (
                     <div
-                      onClick={() => { router.push('/admin/dashboard'); setMobileMenuOpen(false); }}
+                      onClick={() => { router.push('/admin'); setMobileMenuOpen(false); }}
                       style={{
                         padding: '8px 0',
                         fontSize: '15px',

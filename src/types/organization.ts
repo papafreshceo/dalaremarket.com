@@ -1,7 +1,7 @@
 // 조직 시스템 타입 정의
 
 // 조직 역할
-export type OrganizationRole = 'owner' | 'admin' | 'member'
+export type OrganizationRole = 'owner' | 'member'
 
 // 멤버 상태
 export type MemberStatus = 'active' | 'invited' | 'suspended'
@@ -174,12 +174,6 @@ export const ROLE_PERMISSIONS: Record<OrganizationRole, {
     can_manage_members: true,
     can_view_financials: true,
   },
-  admin: {
-    can_manage_orders: true,
-    can_manage_products: true,
-    can_manage_members: true,
-    can_view_financials: true,
-  },
   member: {
     can_manage_orders: true,
     can_manage_products: true,
@@ -191,8 +185,7 @@ export const ROLE_PERMISSIONS: Record<OrganizationRole, {
 // 역할 표시명
 export const ROLE_LABELS: Record<OrganizationRole, string> = {
   owner: '소유자',
-  admin: '관리자',
-  member: '일반 멤버',
+  member: '담당자',
 }
 
 // 상태 표시명

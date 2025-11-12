@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getUserPrimaryOrganization } from '@/lib/organization-utils';
 
 /**
  * POST /api/cash/claim-activity
- * 활동 시간 보상 지급 (1분당 1캐시, 하루 최대 50캐시)
+ * 활동 시간 보상 지급 (1분당 1캐시, 하루 최대 50캐시) - 조직 단위
  */
 export async function POST(request: NextRequest) {
   try {
+    // 인증용 클라이언트
     const supabase = await createClient();
 
     // 현재 로그인한 사용자 확인
@@ -17,6 +19,32 @@ export async function POST(request: NextRequest) {
         { success: false, error: '인증이 필요합니다.' },
         { status: 401 }
       );
+    }
+
+    // 사용자의 조직 정보 가져오기
+    let organization = await getUserPrimaryOrganization(user.id);
+
+    // 조직이 없으면 자동 생성
+    if (!organization) {
+      const { autoCreateOrganizationFromUser } = await import('@/lib/auto-create-organization');
+      const result = await autoCreateOrganizationFromUser(user.id);
+
+      if (!result.success) {
+        return NextResponse.json(
+          { success: false, error: result.error || '조직 생성에 실패했습니다.' },
+          { status: 500 }
+        );
+      }
+
+      // 다시 조직 정보 조회
+      organization = await getUserPrimaryOrganization(user.id);
+
+      if (!organization) {
+        return NextResponse.json(
+          { success: false, error: '조직 생성 후에도 조직을 찾을 수 없습니다.' },
+          { status: 500 }
+        );
+      }
     }
 
     // 요청 본문 파싱
@@ -54,20 +82,24 @@ export async function POST(request: NextRequest) {
     const rewardPerMinute = settings.activity_reward_per_minute;
     const dailyLimit = settings.daily_activity_limit;
 
+    // Service Role 클라이언트 (RLS 우회)
+    const { createAdminClient } = await import('@/lib/supabase/server');
+    const adminSupabase = createAdminClient();
+
     // 오늘의 활동 보상 기록 조회
-    let { data: dailyReward } = await supabase
-      .from('user_daily_rewards')
+    let { data: dailyReward } = await adminSupabase
+      .from('organization_daily_rewards')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('organization_id', organization.id)
       .eq('reward_date', today)
       .single();
 
     // 기록이 없으면 생성
     if (!dailyReward) {
-      const { data: newDaily, error: insertError } = await supabase
-        .from('user_daily_rewards')
+      const { data: newDaily, error: insertError } = await adminSupabase
+        .from('organization_daily_rewards')
         .insert({
-          user_id: user.id,
+          organization_id: organization.id,
           reward_date: today,
           login_reward_claimed: false,
           activity_minutes_rewarded: 0,
@@ -106,38 +138,63 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 사용자 캐시 잔액 조회
-    let { data: userCash } = await supabase
-      .from('user_cash')
+    // 조직 캐시 잔액 조회 (organization_id 기준)
+    let { data: userCash } = await adminSupabase
+      .from('organization_cash')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('organization_id', organization.id)
       .single();
 
     // 캐시 계정이 없으면 생성
     if (!userCash) {
-      const { data: newCash, error: insertError } = await supabase
-        .from('user_cash')
-        .insert({ user_id: user.id, balance: 0 })
+      console.log('[POST /api/cash/claim-activity] 캐시 계정 생성 시도:', { user_id: user.id, organization_id: organization.id });
+      const { data: newCash, error: insertError } = await adminSupabase
+        .from('organization_cash')
+        .insert({
+          user_id: user.id,
+          organization_id: organization.id,
+          balance: 0
+        })
         .select()
         .single();
 
       if (insertError) {
-        console.error('[POST /api/cash/claim-activity] 캐시 생성 오류:', insertError);
-        return NextResponse.json(
-          { success: false, error: '캐시 정보를 생성할 수 없습니다.' },
-          { status: 500 }
-        );
+        // 중복 키 오류 - 다시 조회
+        if (insertError.code === '23505') {
+          const { data: existingCash } = await adminSupabase
+            .from('organization_cash')
+            .select('*')
+            .eq('organization_id', organization.id)
+            .single();
+
+          if (existingCash) {
+            userCash = existingCash;
+          } else {
+            console.error('[POST /api/cash/claim-activity] 캐시 생성 오류:', insertError);
+            return NextResponse.json(
+              { success: false, error: '캐시 정보를 생성할 수 없습니다.' },
+              { status: 500 }
+            );
+          }
+        } else {
+          console.error('[POST /api/cash/claim-activity] 캐시 생성 오류:', insertError);
+          return NextResponse.json(
+            { success: false, error: '캐시 정보를 생성할 수 없습니다.' },
+            { status: 500 }
+          );
+        }
+      } else {
+        userCash = newCash;
       }
-      userCash = newCash;
     }
 
     const newBalance = userCash.balance + pointsToGive;
 
-    // 캐시 잔액 업데이트
-    const { error: updateError } = await supabase
-      .from('user_cash')
+    // 캐시 잔액 업데이트 (organization_id 기준)
+    const { error: updateError } = await adminSupabase
+      .from('organization_cash')
       .update({ balance: newBalance })
-      .eq('user_id', user.id);
+      .eq('organization_id', organization.id);
 
     if (updateError) {
       console.error('[POST /api/cash/claim-activity] 잔액 업데이트 오류:', updateError);
@@ -148,10 +205,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 거래 이력 추가
-    const { error: transactionError } = await supabase
-      .from('user_cash_transactions')
+    console.log('[POST /api/cash/claim-activity] 거래 이력 추가 시도:', { user_id: user.id, organization_id: organization.id, type: 'activity', amount: pointsToGive });
+    const { error: transactionError } = await adminSupabase
+      .from('organization_cash_transactions')
       .insert({
         user_id: user.id,
+        organization_id: organization.id,
         type: 'activity',
         amount: pointsToGive,
         balance_after: newBalance,
@@ -167,13 +226,13 @@ export async function POST(request: NextRequest) {
     const newMinutesRewarded = dailyReward.activity_minutes_rewarded + Math.floor(minutes);
     const newPointsEarned = dailyReward.activity_points_earned + pointsToGive;
 
-    await supabase
-      .from('user_daily_rewards')
+    await adminSupabase
+      .from('organization_daily_rewards')
       .update({
         activity_minutes_rewarded: newMinutesRewarded,
         activity_points_earned: newPointsEarned
       })
-      .eq('user_id', user.id)
+      .eq('organization_id', organization.id)
       .eq('reward_date', today);
 
     return NextResponse.json({

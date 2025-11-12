@@ -37,7 +37,7 @@ export async function GET(
 
     // 크레딧 내역 조회 (최근 순으로)
     const { data: history, error } = await supabase
-      .from('user_credits_history')
+      .from('organization_credits_history')
       .select(`
         *,
         admin:admin_id(email)

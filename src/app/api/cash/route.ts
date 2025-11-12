@@ -26,16 +26,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // impersonate 모드인 경우 Service Role 사용 (RLS 우회)
-    let dbClient = supabase;
-
-    if (impersonateUserId) {
-      const { createClient: createServiceClient } = await import('@supabase/supabase-js');
-      dbClient = createServiceClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
-    }
+    // Service Role 클라이언트 사용 (RLS 우회 - 캐시 생성/업데이트 위해 필요)
+    const { createAdminClient } = await import('@/lib/supabase/server');
+    const dbClient = createAdminClient();
 
     // 사용자의 조직 정보 가져오기
     let organization = await getUserPrimaryOrganization(effectiveUserId);
@@ -65,7 +58,7 @@ export async function GET(request: NextRequest) {
 
     // 조직 캐시 잔액 조회 (organization_id 기준)
     const { data: userCash, error: cashError } = await dbClient
-      .from('user_cash')
+      .from('organization_cash')
       .select('*')
       .eq('organization_id', organization.id)
       .single();
@@ -84,7 +77,7 @@ export async function GET(request: NextRequest) {
       }
 
       const { data: newCash, error: insertError } = await dbClient
-        .from('user_cash')
+        .from('organization_cash')
         .insert({
           user_id: effectiveUserId,
           organization_id: organization.id,
@@ -97,7 +90,7 @@ export async function GET(request: NextRequest) {
         // 중복 키 오류 (23505) - 이미 존재하는 경우 다시 조회
         if (insertError.code === '23505') {
           const { data: existingCash } = await dbClient
-            .from('user_cash')
+            .from('organization_cash')
             .select('*')
             .eq('organization_id', organization.id)
             .single();

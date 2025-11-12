@@ -30,13 +30,13 @@ export async function GET(request: NextRequest) {
 
     // 캐시 잔액 조회
     const { data: cashBalances } = await supabase
-      .from('user_cash')
+      .from('organization_cash')
       .select('user_id, balance')
       .in('user_id', userIds);
 
     // 크레딧 잔액 조회
     const { data: creditBalances } = await supabase
-      .from('user_credits')
+      .from('organization_credits')
       .select('user_id, balance')
       .in('user_id', userIds);
 

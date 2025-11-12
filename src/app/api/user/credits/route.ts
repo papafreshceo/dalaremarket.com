@@ -15,7 +15,7 @@ export async function GET() {
 
     // 사용자 크레딧 조회 (기존 user_credits 테이블)
     const { data, error } = await supabase
-      .from('user_credits')
+      .from('organization_credits')
       .select('balance')
       .eq('user_id', user.id)
       .single();

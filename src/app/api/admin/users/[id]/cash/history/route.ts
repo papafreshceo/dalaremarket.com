@@ -37,7 +37,7 @@ export async function GET(
 
     // 캐시 내역 조회 (최근 순으로)
     const { data: history, error } = await supabase
-      .from('user_cash_history')
+      .from('organization_cash_history')
       .select(`
         *,
         admin:admin_id(email)

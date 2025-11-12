@@ -93,38 +93,120 @@ export async function POST(request: NextRequest) {
     const role = body.role || 'member'
     const expiresAt = getInvitationExpiryDate(7)
 
-    const { data: invitation, error: inviteError } = await supabase
-      .from('organization_invitations')
-      .insert({
-        organization_id: organizationId,
-        inviter_id: auth.user.id,
-        email: body.email,
-        role,
-        token,
-        status: 'pending',
-        expires_at: expiresAt,
-        message: body.message,
-      })
-      .select()
+    // 조직 정보 조회
+    const { data: organization } = await supabase
+      .from('organizations')
+      .select('name')
+      .eq('id', organizationId)
       .single()
 
-    if (inviteError) {
-      console.error('초대 생성 실패:', inviteError)
-      return NextResponse.json(
-        { error: '초대 생성에 실패했습니다' },
-        { status: 500 }
-      )
+    // 초대한 사람 정보 조회
+    const { data: inviter } = await supabase
+      .from('users')
+      .select('profile_name, company_name, email')
+      .eq('id', auth.user.id)
+      .single()
+
+    const inviterName = inviter?.profile_name || inviter?.company_name || inviter?.email || '관리자'
+    const orgName = organization?.name || '셀러계정'
+
+    // 초대받은 사용자 조회 (이미 가입된 경우만 알림 생성)
+    if (existingUser) {
+      // 1. 먼저 초대 생성 (invitation_id를 먼저 얻어야 알림에 포함 가능)
+      const { data: invitation, error: inviteError } = await supabase
+        .from('organization_invitations')
+        .insert({
+          organization_id: organizationId,
+          inviter_id: auth.user.id,
+          email: body.email,
+          role,
+          token,
+          status: 'pending',
+          expires_at: expiresAt,
+          message: body.message,
+        })
+        .select()
+        .single()
+
+      if (inviteError) {
+        console.error('초대 생성 실패:', inviteError)
+        return NextResponse.json(
+          { error: '초대 생성에 실패했습니다' },
+          { status: 500 }
+        )
+      }
+
+      // 2. 알림 생성 (invitation_id 포함)
+      const { data: notification, error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: existingUser.id,
+          type: 'organization_invitation',
+          title: '셀러계정 초대',
+          message: `${orgName}에서 멤버로 초대했습니다`,
+          data: {
+            invitation_id: invitation.id,  // ⭐ CRITICAL: invitation_id 추가
+            organization_id: organizationId,
+            organization_name: orgName,
+            inviter_id: auth.user.id,
+            inviter_name: inviterName,
+            role,
+            custom_message: body.message,
+          },
+          read: false,
+        })
+        .select()
+        .single()
+
+      if (notificationError) {
+        console.error('알림 생성 실패:', notificationError)
+      }
+
+      // 3. 초대에 notification_id 업데이트
+      if (notification) {
+        await supabase
+          .from('organization_invitations')
+          .update({ notification_id: notification.id })
+          .eq('id', invitation.id)
+      }
+
+      return NextResponse.json({
+        success: true,
+        invitation,
+        notification_created: true,
+      })
+    } else {
+      // 미가입자인 경우 초대만 생성 (알림 없음)
+      const { data: invitation, error: inviteError } = await supabase
+        .from('organization_invitations')
+        .insert({
+          organization_id: organizationId,
+          inviter_id: auth.user.id,
+          email: body.email,
+          role,
+          token,
+          status: 'pending',
+          expires_at: expiresAt,
+          message: body.message,
+        })
+        .select()
+        .single()
+
+      if (inviteError) {
+        console.error('초대 생성 실패:', inviteError)
+        return NextResponse.json(
+          { error: '초대 생성에 실패했습니다' },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({
+        success: true,
+        invitation,
+        notification_created: false,
+        message: '해당 이메일은 미가입자입니다. 가입 후 초대를 수락할 수 있습니다.',
+      })
     }
-
-    // TODO: 이메일 발송 (초대 링크 포함)
-    // const inviteLink = `${process.env.NEXT_PUBLIC_SITE_URL}/join?token=${token}`
-    // await sendInvitationEmail(body.email, inviteLink, body.message)
-
-    return NextResponse.json({
-      success: true,
-      invitation,
-      // invite_link: inviteLink, // 개발 중에는 링크 반환
-    })
   } catch (error) {
     console.error('초대 생성 오류:', error)
     return NextResponse.json(
@@ -167,7 +249,7 @@ export async function GET(request: NextRequest) {
       .from('organization_invitations')
       .select(`
         *,
-        inviter:users!inviter_id(
+        inviter:users!organization_invitations_inviter_id_fkey(
           id,
           email,
           profile_name,
@@ -243,10 +325,20 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    // 초대 정보 다시 조회 (notification_id 포함)
+    const { data: fullInvitation } = await supabase
+      .from('organization_invitations')
+      .select('*')
+      .eq('id', invitationId)
+      .single()
+
     // 초대 취소
     const { error: cancelError } = await supabase
       .from('organization_invitations')
-      .update({ status: 'cancelled' })
+      .update({
+        status: 'cancelled',
+        updated_at: new Date().toISOString()
+      })
       .eq('id', invitationId)
 
     if (cancelError) {
@@ -255,6 +347,21 @@ export async function DELETE(request: NextRequest) {
         { error: '초대 취소에 실패했습니다' },
         { status: 500 }
       )
+    }
+
+    // 연결된 알림도 업데이트 (있는 경우)
+    if (fullInvitation?.notification_id) {
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .update({
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', fullInvitation.notification_id)
+
+      if (notificationError) {
+        console.error('알림 업데이트 실패:', notificationError)
+        // 알림 업데이트 실패는 무시 (초대 취소는 성공했으므로)
+      }
     }
 
     return NextResponse.json({

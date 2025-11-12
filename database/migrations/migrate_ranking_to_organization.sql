@@ -276,10 +276,13 @@ BEGIN
 END $$;
 
 -- 8. RLS 정책 업데이트 (조직 기반)
--- 기존 정책 삭제
+-- 기존 정책 삭제 (개인 + 조직 모두)
 DROP POLICY IF EXISTS "Sellers can view their own performance" ON seller_performance_daily;
 DROP POLICY IF EXISTS "Sellers can view their own rankings" ON seller_rankings;
 DROP POLICY IF EXISTS "Sellers can view their own badges" ON seller_badges;
+DROP POLICY IF EXISTS "Organization members can view organization performance" ON seller_performance_daily;
+DROP POLICY IF EXISTS "Organization members can view organization rankings" ON seller_rankings;
+DROP POLICY IF EXISTS "Organization members can view organization badges" ON seller_badges;
 
 -- 새로운 정책: 조직 멤버는 조직 성과/랭킹 조회 가능
 CREATE POLICY "Organization members can view organization performance"

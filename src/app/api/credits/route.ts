@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     // 조직 크레딧 잔액 조회 (organization_id 기준)
     let { data: userCredit, error: creditError } = await supabase
-      .from('user_credits')
+      .from('organization_credits')
       .select('balance')
       .eq('organization_id', organization.id)
       .single();
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     // 크레딧 계정이 없으면 생성
     if (creditError || !userCredit) {
       const { data: newCredit, error: insertError } = await supabase
-        .from('user_credits')
+        .from('organization_credits')
         .insert({
           user_id: user.id,
           organization_id: organization.id,

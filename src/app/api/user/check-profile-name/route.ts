@@ -30,6 +30,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 금지된 키워드 확인
+    const forbiddenKeywords = [
+      // 관리/운영 관련
+      '관리자', '관리', 'admin', 'administrator', 'manager',
+      '운영자', '운영', 'operator', 'moderator', 'mod',
+
+      // 소유/오너 관련
+      '소유자', '소유', '오너', 'owner', 'master',
+
+      // 직책/권한 관련 (일부만)
+      'director', 'supervisor', '감독',
+
+      // 시스템/공식 관련
+      '시스템', 'system', 'official', '공식',
+      '본사', 'headquarters', 'hq',
+
+      // 지원/서비스 관련
+      'support', '고객센터', 'service',
+      'help', 'helper', 'staff', '직원',
+
+      // 기타 권한 관련
+      'root', 'super', 'supreme',
+      'god', 'bot', '봇', 'team', '팀',
+
+      // 브랜드명
+      '달래마켓', '달래', 'dalrae', 'dalraemarket',
+      '파파프레시', '파파', 'papa', 'papafresh'
+    ];
+    const lowerProfileName = profile_name.trim().toLowerCase();
+
+    for (const keyword of forbiddenKeywords) {
+      if (lowerProfileName.includes(keyword.toLowerCase())) {
+        return NextResponse.json({
+          success: false,
+          available: false,
+          message: `'${keyword}' 키워드는 프로필 이름에 사용할 수 없습니다.`,
+        });
+      }
+    }
+
     // 1. 다른 사용자의 프로필 이름과 중복 확인
     const { data: existingUser } = await supabase
       .from('users')

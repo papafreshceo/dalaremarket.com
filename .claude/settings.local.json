@@ -1,7 +1,34 @@
 {
   "permissions": {
     "allow": [
-      "Bash(for file in *.sql)"
+      "Bash(if exist apply-seller-partner-codes.js del /f apply-seller-partner-codes.js)",
+      "Bash(if not exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\apply-notifications-migration\" mkdir \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\apply-notifications-migration\")",
+      "Bash(if not exist \"src\\app\\api\\apply-notifications-migration\" mkdir \"src\\app\\api\\apply-notifications-migration\")",
+      "Bash(if exist fix-notification-invitation-ids.js del /f fix-notification-invitation-ids.js)",
+      "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\check-user-status\" rmdir /s /q \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\check-user-status\")",
+      "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\run-cash-migration\" rmdir /s /q \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\run-cash-migration\")",
+      "Bash(if exist check-contribution-points.js del /f check-contribution-points.js)",
+      "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\check-contribution\" rmdir /s /q \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\check-contribution\")",
+      "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\check-contribution-points.js\" del /f \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\check-contribution-points.js\")",
+      "Bash(if exist check-duplicate-owners.js del /f check-duplicate-owners.js)",
+      "Bash(powershell:Remove-Item -Force check-my-organizations.js,delete-duplicate-subs.js,find-user-by-org.js,check-all-orgs.js -ErrorAction SilentlyContinue)",
+      "Bash(taskkill:*)",
+      "Bash(nul)",
+      "Bash(psql:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(node check-user-data.js:*)",
+      "Bash(node check-organization-data.js:*)",
+      "Bash(tasklist:*)",
+      "Bash(node fix-reward-data.js:*)",
+      "Bash(node test-login-points.js:*)",
+      "Bash(del /f check-all-orgs.js check-contribution-points.js check-duplicate-owners.js check-my-organizations.js check-organization-data.js check-schema.js check-user-data.js delete-duplicate-subs.js find-user-by-org.js force-delete-subs.js fix-reward-data.js test-api-endpoints.js test-login-points.js 2)",
+      "Bash(if exist check-all-orgs.js del /f check-all-orgs.js)",
+      "Bash(find:*)",
+      "Bash(if exist layout.tsx ren layout.tsx admin-client-layout.tsx)",
+      "Bash(set:*)",
+      "Bash(curl:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

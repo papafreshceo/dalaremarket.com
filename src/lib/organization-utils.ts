@@ -133,7 +133,7 @@ export async function getUserOrganizationContext(
     organization,
     member,
     is_owner: member.role === 'owner',
-    is_admin: member.role === 'admin' || member.role === 'owner',
+    is_admin: member.role === 'owner',
     can_manage_members: member.can_manage_members,
   }
 }
@@ -161,14 +161,14 @@ export async function isOrganizationOwner(
 }
 
 /**
- * 사용자가 조직 관리자인지 확인 (소유자 + 관리자)
+ * 사용자가 조직 관리자인지 확인 (소유자만)
  */
 export async function isOrganizationAdmin(
   organizationId: string,
   userId: string
 ): Promise<boolean> {
   const member = await getOrganizationMember(organizationId, userId)
-  return member?.role === 'owner' || member?.role === 'admin'
+  return member?.role === 'owner'
 }
 
 /**
@@ -221,19 +221,12 @@ export async function canViewFinancials(
 export async function getOrganizationMembers(organizationId: string) {
   const supabase = await createServerClient()
 
+  console.log('조직 멤버 조회 시작:', organizationId)
+
+  // 먼저 멤버 목록 조회
   const { data: members, error } = await supabase
     .from('organization_members')
-    .select(`
-      *,
-      user:users(
-        id,
-        email,
-        profile_name,
-        company_name,
-        manager_name,
-        manager_phone
-      )
-    `)
+    .select('*')
     .eq('organization_id', organizationId)
     .order('created_at', { ascending: true })
 
@@ -242,7 +235,35 @@ export async function getOrganizationMembers(organizationId: string) {
     return []
   }
 
-  return members
+  if (!members || members.length === 0) {
+    console.log('멤버 없음')
+    return []
+  }
+
+  // 각 멤버의 사용자 정보 조회
+  const membersWithUser = await Promise.all(
+    members.map(async (member) => {
+      const { data: user } = await supabase
+        .from('users')
+        .select('id, email, profile_name, name, phone')
+        .eq('id', member.user_id)
+        .single()
+
+      return {
+        ...member,
+        user: user || {
+          id: member.user_id,
+          email: '',
+          profile_name: null,
+          name: null,
+          phone: null
+        }
+      }
+    })
+  )
+
+  console.log('조회된 멤버:', membersWithUser)
+  return membersWithUser
 }
 
 /**
@@ -272,11 +293,11 @@ export async function getInvitationByToken(token: string) {
     .select(`
       *,
       organization:organizations(*),
-      inviter:users!inviter_id(
+      inviter:users(
         id,
         email,
         profile_name,
-        company_name
+        name
       )
     `)
     .eq('token', token)

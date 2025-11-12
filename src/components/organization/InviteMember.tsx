@@ -62,25 +62,25 @@ export default function InviteMember({ organizationId, onInvited }: InviteMember
       {!showForm ? (
         <button
           onClick={() => setShowForm(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg font-semibold"
         >
           멤버 초대
         </button>
       ) : (
-        <div className="border border-gray-300 rounded-lg p-6 bg-white">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">멤버 초대</h3>
+        <div className="border-2 border-gray-300 rounded-xl p-8 bg-white shadow-lg">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-2xl font-bold">멤버 초대</h3>
             <button
               onClick={() => setShowForm(false)}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-400 hover:text-gray-600 text-2xl"
             >
               ✕
             </button>
           </div>
 
-          <form onSubmit={handleInvite} className="space-y-4">
+          <form onSubmit={handleInvite} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-base font-semibold text-gray-700 mb-2">
                 이메일 <span className="text-red-500">*</span>
               </label>
               <input
@@ -88,58 +88,51 @@ export default function InviteMember({ organizationId, onInvited }: InviteMember
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="example@company.com"
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-sm text-gray-500 mt-2">
                 초대할 직원의 이메일 주소를 입력하세요
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-base font-semibold text-gray-700 mb-2">
                 역할
               </label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as OrganizationRole)}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="member">{ROLE_LABELS.member}</option>
-                <option value="admin">{ROLE_LABELS.admin}</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                {role === 'admin'
-                  ? '관리자는 멤버 관리 및 모든 데이터에 접근할 수 있습니다'
-                  : '일반 멤버는 기본 기능을 사용할 수 있습니다'}
+              <div className="px-4 py-3 border border-gray-200 rounded-lg bg-gray-50">
+                <span className="text-base font-medium text-gray-900">{ROLE_LABELS.member}</span>
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                담당자는 주문 및 상품 관리 등 기본 기능을 사용할 수 있습니다
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-base font-semibold text-gray-700 mb-2">
                 초대 메시지 (선택)
               </label>
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="환영 메시지를 입력하세요"
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={4}
+                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
-            <div className="flex justify-end space-x-2">
+            <div className="flex justify-end space-x-3 pt-4">
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+                className="px-6 py-3 text-base font-medium border border-gray-300 rounded-lg hover:bg-gray-50"
                 disabled={loading}
               >
                 취소
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+                className="px-6 py-3 text-base font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
                 disabled={loading}
               >
                 {loading ? '발송 중...' : '초대 발송'}

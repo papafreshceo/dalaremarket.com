@@ -1,9 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import UserHeader from '@/components/layout/UserHeader'
-import MobileBottomNav from '@/components/layout/MobileBottomNav'
-import PlatformFooter from '@/components/PlatformFooter'
 import { NoticePopup } from '@/components/NoticePopup'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -105,175 +102,182 @@ export default function PlatformHome() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <UserHeader />
       <NoticePopup />
       <main className="flex-1">
+        {/* 전체 페이지를 좌우 50:50으로 분할 */}
         <div style={{
-          position: 'relative',
-          width: '100%',
-          paddingTop: '70px',
-          paddingLeft: isMobile ? '20px' : '40px',
-          paddingRight: isMobile ? '20px' : '40px',
-          paddingBottom: isMobile ? '80px' : '40px',
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
           minHeight: '100vh',
-          overflow: 'hidden'
+          position: 'relative'
         }}>
-        {/* 메인 파란색 그라데이션 */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'linear-gradient(180deg, #3b82f6 0%, #60a5fa 300px, #93c5fd 600px, #bfdbfe 900px, #dbeafe 1200px, #f0f9ff 1500px, #ffffff 1800px, #ffffff 100%)',
-          zIndex: -3
-        }} />
-
-        {/* 왼쪽 연두색 */}
-        <div style={{
-          position: 'absolute',
-          top: '400px',
-          left: 0,
-          width: '600px',
-          height: '400px',
-          background: 'radial-gradient(ellipse at 0% 50%, rgba(187, 247, 208, 0.4) 0%, transparent 60%)',
-          zIndex: -2
-        }} />
-
-        {/* 우측 상단 보라색 */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          right: 0,
-          width: '1600px',
-          height: '1200px',
-          background: 'radial-gradient(ellipse at 100% 0%, rgba(139, 92, 246, 0.5) 0%, transparent 60%)',
-          zIndex: -1
-        }} />
-
-        <div style={{
-          maxWidth: '1400px',
-          margin: '0 auto'
-        }}>
-          {/* 히어로 섹션 - 텍스트와 이미지 */}
+          {/* 왼쪽 절반 - 로그인/시작하기 영역 */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : '2fr 3fr',
-            gap: '40px',
-            marginBottom: '48px',
-            alignItems: 'center'
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: isMobile ? '60px 30px' : '80px 60px',
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 50%, #e9ecef 100%)',
+            overflow: 'hidden'
           }}>
-            {/* 첫 번째 칼럼 - 텍스트 */}
+            {/* 왼쪽 배경 장식 */}
             <div style={{
-              order: isMobile ? 2 : 1,
-              paddingLeft: '40px',
-              paddingRight: '40px'
-            }}>
+              position: 'absolute',
+              top: '-10%',
+              left: '-10%',
+              width: '300px',
+              height: '300px',
+              background: 'radial-gradient(circle, rgba(200,200,200,0.15) 0%, transparent 70%)',
+              borderRadius: '50%'
+            }} />
+            <div style={{
+              position: 'absolute',
+              bottom: '-20%',
+              right: '-10%',
+              width: '400px',
+              height: '400px',
+              background: 'radial-gradient(circle, rgba(180,180,180,0.1) 0%, transparent 70%)',
+              borderRadius: '50%'
+            }} />
+
+            <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
               <h1 style={{
-                fontSize: isMobile ? '32px' : '48px',
+                fontSize: isMobile ? '36px' : '56px',
                 fontWeight: '700',
-                color: '#ffffff',
-                marginBottom: '20px',
+                color: '#1f2937',
+                marginBottom: '24px',
                 lineHeight: '1.2'
               }}>
                 신선한 농산물을<br />
                 합리적인 가격으로
               </h1>
               <p style={{
-                fontSize: isMobile ? '16px' : '18px',
-                color: 'rgba(255, 255, 255, 0.9)',
-                marginBottom: '32px',
-                lineHeight: '1.6'
+                fontSize: isMobile ? '16px' : '20px',
+                color: '#4b5563',
+                marginBottom: '48px',
+                lineHeight: '1.6',
+                maxWidth: '500px',
+                margin: '0 auto 48px'
               }}>
                 달래마켓은 농가와 소비자를 직접 연결하여<br />
                 더 신선하고 더 저렴한 농산물을 제공합니다
               </p>
               <Link href="/auth/register">
                 <button style={{
-                  padding: '14px 32px',
-                  background: '#ffffff',
-                  color: '#3b82f6',
+                  padding: '18px 56px',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                  color: '#ffffff',
                   border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  fontWeight: '600',
+                  borderRadius: '12px',
+                  fontSize: '20px',
+                  fontWeight: '700',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
+                  boxShadow: '0 8px 24px rgba(59, 130, 246, 0.3)',
                   transition: 'all 0.3s'
                 }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.15)'
+                    e.currentTarget.style.transform = 'translateY(-4px)'
+                    e.currentTarget.style.boxShadow = '0 12px 32px rgba(59, 130, 246, 0.4)'
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.1)'
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.3)'
                   }}>
                   지금 시작하기
                 </button>
               </Link>
             </div>
+          </div>
 
-            {/* 두 번째 칼럼 - 히어로 이미지 */}
+          {/* 오른쪽 절반 - 모든 콘텐츠 영역 */}
+          <div style={{
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: isMobile ? '60px 20px' : '80px 40px',
+            background: 'linear-gradient(180deg, #3b82f6 0%, #60a5fa 300px, #93c5fd 600px, #bfdbfe 900px, #dbeafe 1200px, #f0f9ff 1500px, #ffffff 1800px, #ffffff 100%)',
+            overflow: 'auto',
+            maxHeight: '100vh'
+          }}>
+            {/* 왼쪽 연두색 */}
             <div style={{
-              order: isMobile ? 1 : 2,
-              paddingRight: '40px',
-              position: 'relative'
-            }}>
-              <div
-                onClick={() => {
-                  if (heroImage?.link_url) {
-                    window.open(heroImage.link_url, '_blank')
-                  }
-                }}
-                style={{
-                  height: isMobile ? '250px' : '400px',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  borderRadius: '20px',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: heroImage?.link_url ? 'pointer' : 'default',
-                  position: 'relative'
-                }}
-              >
-                {heroImage?.image?.secure_url ? (
-                  <Image
-                    src={heroImage.image.secure_url}
-                    alt={heroImage.title || '히어로 이미지'}
-                    fill
-                    style={{ objectFit: 'cover' }}
-                    sizes="(max-width: 768px) 100vw, 60vw"
-                  />
-                ) : (
-                  <div style={{
-                    width: '100%',
-                    height: '100%',
-                    background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%)',
+              position: 'absolute',
+              top: '400px',
+              left: 0,
+              width: '600px',
+              height: '400px',
+              background: 'radial-gradient(ellipse at 0% 50%, rgba(187, 247, 208, 0.4) 0%, transparent 60%)',
+              zIndex: 0
+            }} />
+
+            {/* 우측 상단 보라색 */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: '800px',
+              height: '600px',
+              background: 'radial-gradient(ellipse at 100% 0%, rgba(139, 92, 246, 0.5) 0%, transparent 60%)',
+              zIndex: 0
+            }} />
+
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              {/* 히어로 이미지 */}
+              <div style={{ marginBottom: '48px' }}>
+                <div
+                  onClick={() => {
+                    if (heroImage?.link_url) {
+                      window.open(heroImage.link_url, '_blank')
+                    }
+                  }}
+                  style={{
+                    height: isMobile ? '250px' : '400px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    borderRadius: '20px',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    overflow: 'hidden',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '18px',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    fontWeight: '500'
-                  }}>
-                    이미지 영역
-                  </div>
-                )}
+                    cursor: heroImage?.link_url ? 'pointer' : 'default',
+                    position: 'relative'
+                  }}
+                >
+                  {heroImage?.image?.secure_url ? (
+                    <Image
+                      src={heroImage.image.secure_url}
+                      alt={heroImage.title || '히어로 이미지'}
+                      fill
+                      style={{ objectFit: 'cover' }}
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                    />
+                  ) : (
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '18px',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      fontWeight: '500'
+                    }}>
+                      이미지 영역
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* 탭 네비게이션 */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            marginTop: '200px',
-            marginBottom: '70px'
-          }}>
+              {/* 탭 네비게이션 */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                marginBottom: '70px'
+              }}>
             <div style={{
               background: 'rgba(255, 255, 255, 0.95)',
               borderRadius: '24px',
@@ -753,11 +757,10 @@ export default function PlatformHome() {
               </ul>
             </div>
           </div>
+            </div>
+          </div>
         </div>
-      </div>
       </main>
-      <PlatformFooter />
-      <MobileBottomNav />
     </div>
   )
 }

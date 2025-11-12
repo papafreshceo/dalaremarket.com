@@ -27,16 +27,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // impersonate 모드인 경우 Service Role 사용 (RLS 우회)
-    let dbClient = supabase;
-
-    if (impersonateUserId) {
-      const { createClient: createServiceClient } = await import('@supabase/supabase-js');
-      dbClient = createServiceClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
-    }
+    // Service Role 클라이언트 사용 (RLS 우회 - 크레딧 생성/업데이트 위해 필요)
+    const { createAdminClient } = await import('@/lib/supabase/server');
+    const dbClient = createAdminClient();
 
     // 사용자의 조직 정보 가져오기
     let organization = await getUserPrimaryOrganization(effectiveUserId);
@@ -64,9 +57,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 오늘 날짜 (KST)
+    // 오늘 날짜 (KST) - UTC+9
     const now = new Date();
-    const kstOffset = 9 * 60 * 60 * 60 * 1000;
+    const kstOffset = 9 * 60 * 60 * 1000; // 9시간을 밀리초로
     const kstDate = new Date(now.getTime() + kstOffset);
     const today = kstDate.toISOString().split('T')[0]; // YYYY-MM-DD
 
@@ -74,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     // 조직 크레딧 계정 조회 (organization_id 기준)
     let { data: userCredit, error: creditError } = await dbClient
-      .from('user_credits')
+      .from('organization_credits')
       .select('*')
       .eq('organization_id', organization.id)
       .single();
@@ -103,7 +96,7 @@ export async function POST(request: NextRequest) {
     // 크레딧 계정이 없으면 생성 (일반 모드에만)
     if (creditError || !userCredit) {
       const { data: newCredit, error: insertError } = await dbClient
-        .from('user_credits')
+        .from('organization_credits')
         .insert({
           user_id: effectiveUserId,
           organization_id: organization.id,
@@ -117,7 +110,7 @@ export async function POST(request: NextRequest) {
         // 중복 키 오류 (23505) - 이미 존재하는 경우 다시 조회
         if (insertError.code === '23505') {
           const { data: existingCredit } = await dbClient
-            .from('user_credits')
+            .from('organization_credits')
             .select('*')
             .eq('organization_id', organization.id)
             .single();
@@ -142,7 +135,7 @@ export async function POST(request: NextRequest) {
       } else {
         // 신규 생성 성공 - 거래 이력 추가
         await dbClient
-          .from('user_credit_transactions')
+          .from('organization_credit_transactions')
           .insert({
             user_id: effectiveUserId,
             organization_id: organization.id,
@@ -176,7 +169,7 @@ export async function POST(request: NextRequest) {
     if (lastRefillDate !== today) {
       // 날짜가 바뀌었으면 100으로 리필
       const { error: updateError } = await dbClient
-        .from('user_credits')
+        .from('organization_credits')
         .update({
           balance: DAILY_CREDIT_LIMIT,
           last_refill_date: today
@@ -193,7 +186,7 @@ export async function POST(request: NextRequest) {
 
       // 거래 이력 추가
       await dbClient
-        .from('user_credit_transactions')
+        .from('organization_credit_transactions')
         .insert({
           user_id: effectiveUserId,
           organization_id: organization.id,

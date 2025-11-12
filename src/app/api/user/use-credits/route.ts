@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getUserPrimaryOrganization } from '@/lib/organization-utils';
 
-// POST: 크레딧 사용 (도구 실행)
+// POST: 크레딧 사용 (도구 실행) - 조직 단위
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -11,6 +12,32 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 사용자의 조직 정보 가져오기
+    let organization = await getUserPrimaryOrganization(user.id);
+
+    // 조직이 없으면 자동 생성
+    if (!organization) {
+      const { autoCreateOrganizationFromUser } = await import('@/lib/auto-create-organization');
+      const result = await autoCreateOrganizationFromUser(user.id);
+
+      if (!result.success) {
+        return NextResponse.json(
+          { success: false, error: result.error || '조직 생성에 실패했습니다.' },
+          { status: 500 }
+        );
+      }
+
+      // 다시 조직 정보 조회
+      organization = await getUserPrimaryOrganization(user.id);
+
+      if (!organization) {
+        return NextResponse.json(
+          { success: false, error: '조직 생성 후에도 조직을 찾을 수 없습니다.' },
+          { status: 500 }
+        );
+      }
     }
 
     const { toolId, buttonId } = await request.json();
@@ -63,11 +90,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 현재 크레딧 잔액 조회 (기존 user_credits 테이블 사용)
+    // 조직 크레딧 잔액 조회 (organization_id 기준)
     const { data: userCredit, error: creditError } = await supabase
-      .from('user_credits')
+      .from('organization_credits')
       .select('balance')
-      .eq('user_id', user.id)
+      .eq('organization_id', organization.id)
       .single();
 
     if (creditError && creditError.code !== 'PGRST116') { // PGRST116 = not found
@@ -89,21 +116,21 @@ export async function POST(request: NextRequest) {
 
     const newBalance = currentBalance - creditsToCharge;
 
-    // 크레딧 차감 (기존 user_credits 테이블 업데이트)
+    // 크레딧 차감 (organization_id 기준)
     const { error: updateError } = await supabase
-      .from('user_credits')
+      .from('organization_credits')
       .update({
         balance: newBalance,
         updated_at: new Date().toISOString()
       })
-      .eq('user_id', user.id);
+      .eq('organization_id', organization.id);
 
     if (updateError) {
       console.error('Error updating credits:', updateError);
       return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
     }
 
-    // 거래 이력 기록 (기존 user_credit_transactions 테이블 사용)
+    // 거래 이력 기록 (organization_id 포함)
     const transactionMetadata: any = {
       tool_id: toolId,
       tool_name: tool.name
@@ -114,9 +141,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { error: transactionError } = await supabase
-      .from('user_credit_transactions')
+      .from('organization_credit_transactions')
       .insert({
         user_id: user.id,
+        organization_id: organization.id,
         type: 'used',
         amount: -creditsToCharge,
         balance_after: newBalance,

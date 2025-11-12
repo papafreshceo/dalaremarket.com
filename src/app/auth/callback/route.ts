@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { autoCreateOrganizationFromUser } from '@/lib/auto-create-organization'
+import { generateSellerCode } from '@/lib/user-codes'
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
@@ -30,6 +31,15 @@ export async function GET(request: NextRequest) {
 
       // 사용자가 없으면 생성 (소셜 로그인은 자동 승인)
       if (!existingUser) {
+        // 셀러 코드 생성
+        let sellerCode: string | undefined
+        try {
+          sellerCode = await generateSellerCode()
+        } catch (error) {
+          console.error('Failed to generate seller code:', error)
+          // 코드 생성 실패해도 사용자 생성은 진행
+        }
+
         const { error: insertError } = await supabase
           .from('users')
           .insert({
@@ -40,6 +50,7 @@ export async function GET(request: NextRequest) {
             role: 'seller',
             approved: true,
             last_login_provider: provider,
+            seller_code: sellerCode,
           })
 
         if (insertError) {
@@ -92,14 +103,20 @@ export async function GET(request: NextRequest) {
 
       // 로그인 점수 추가 (하루 1회)
       try {
-        await supabase.rpc('add_login_points', { p_user_id: session.user.id })
+        console.log('🎯 로그인 점수 추가 시도:', session.user.id)
+        const { data: pointsResult, error: pointsError } = await supabase.rpc('add_login_points', { p_user_id: session.user.id })
+        if (pointsError) {
+          console.error('❌ 로그인 점수 오류:', pointsError)
+        } else {
+          console.log('✅ 로그인 점수 결과:', pointsResult)
+        }
       } catch (error) {
-        console.error('Login points error:', error)
+        console.error('❌ Login points error:', error)
         // 점수 추가 실패해도 로그인은 진행
       }
 
-      // 로그인 성공 - 메인 페이지로 리다이렉트
-      return NextResponse.redirect(new URL('/', requestUrl.origin))
+      // 로그인 성공 - 공급상품 페이지로 리다이렉트
+      return NextResponse.redirect(new URL('/platform/products', requestUrl.origin))
     }
   }
 

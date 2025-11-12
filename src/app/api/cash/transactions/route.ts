@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     // 거래 이력 조회
     const { data: transactions, error: transactionsError, count } = await supabase
-      .from('user_cash_transactions')
+      .from('organization_cash_transactions')
       .select('*', { count: 'exact' })
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })

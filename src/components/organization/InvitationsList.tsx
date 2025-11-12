@@ -31,7 +31,12 @@ export default function InvitationsList({
       )
       const data = await response.json()
       if (data.success) {
-        setInvitations(data.invitations)
+        // 취소된 초대와 수락된 초대는 목록에서 제외
+        const activeInvitations = data.invitations.filter(
+          (inv: OrganizationInvitation) =>
+            inv.status !== 'cancelled' && inv.status !== 'accepted'
+        )
+        setInvitations(activeInvitations)
       }
     } catch (error) {
       console.error('초대 목록 조회 실패:', error)

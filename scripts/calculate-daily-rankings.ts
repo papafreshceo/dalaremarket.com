@@ -164,12 +164,13 @@ async function generateRankings(
     periodEnd = today;
   }
 
-  // 기간 내 성과 데이터 집계
+  // 기간 내 성과 데이터 집계 (조직 단위)
   const { data: performances, error } = await supabase
     .from('seller_performance_daily')
-    .select('*')
+    .select('*, organizations!seller_performance_daily_organization_id_fkey(id, owner_id)')
     .gte('date', periodStart)
-    .lte('date', periodEnd);
+    .lte('date', periodEnd)
+    .not('organization_id', 'is', null);
 
   if (error) {
     console.error(`   ❌ ${periodType} 성과 데이터 조회 실패:`, error);
@@ -181,27 +182,31 @@ async function generateRankings(
     return { success: true, count: 0 };
   }
 
-  // 셀러별 집계
-  const sellerMap = new Map<string, SellerPerformanceData>();
+  // 조직별 집계 (organization_id 기준)
+  const orgMap = new Map<string, SellerPerformanceData & { organization_id: string }>();
 
   performances.forEach((p: any) => {
-    if (!sellerMap.has(p.seller_id)) {
-      sellerMap.set(p.seller_id, {
-        seller_id: p.seller_id,
+    const orgId = p.organization_id;
+    if (!orgId) return;
+
+    if (!orgMap.has(orgId)) {
+      orgMap.set(orgId, {
+        seller_id: p.seller_id, // owner_id (랭킹 테이블 호환)
+        organization_id: orgId,
         total_sales: 0,
         order_count: 0,
         activity_score: 0
       });
     }
 
-    const seller = sellerMap.get(p.seller_id)!;
-    seller.total_sales += p.total_sales || 0;
-    seller.order_count += p.order_count || 0;
-    seller.activity_score = (seller.activity_score || 0) + (p.activity_score || 0);
+    const org = orgMap.get(orgId)!;
+    org.total_sales += p.total_sales || 0;
+    org.order_count += p.order_count || 0;
+    org.activity_score = (org.activity_score || 0) + (p.activity_score || 0);
   });
 
   // 점수 계산 및 순위 부여 (설정값 전달)
-  const rankingScores = calculateRankings(Array.from(sellerMap.values()), salesPerPoint, ordersPerPoint);
+  const rankingScores = calculateRankings(Array.from(orgMap.values()), salesPerPoint, ordersPerPoint);
 
   // 보상 설정 조회 (주간/월간만)
   let rewardsMap = new Map<number, number>();
@@ -216,13 +221,16 @@ async function generateRankings(
     }
   }
 
-  // seller_rankings에 저장
+  // seller_rankings에 저장 (조직 단위)
   for (const score of rankingScores) {
-    // 이전 랭킹 조회 (순위 변동 계산용)
+    const orgData = Array.from(orgMap.values()).find(o => o.seller_id === score.seller_id);
+    if (!orgData) continue;
+
+    // 이전 랭킹 조회 (순위 변동 계산용) - organization_id 기준
     const { data: prevRanking } = await supabase
       .from('seller_rankings')
       .select('rank, total_score')
-      .eq('seller_id', score.seller_id)
+      .eq('organization_id', orgData.organization_id)
       .eq('period_type', periodType)
       .order('period_start', { ascending: false })
       .limit(1)
@@ -231,19 +239,18 @@ async function generateRankings(
     const rankChange = prevRanking ? prevRanking.rank - (score.rank || 0) : 0;
     const scoreChange = prevRanking ? score.total_score - prevRanking.total_score : 0;
 
-    const seller = sellerMap.get(score.seller_id)!;
-
     // 보상 캐시 계산
     const rewardCash = finalize && rewardsMap.has(score.rank || 0) ? rewardsMap.get(score.rank || 0) || 0 : 0;
 
     // Upsert (있으면 업데이트, 없으면 삽입)
     const rankingData: any = {
       seller_id: score.seller_id,
+      organization_id: orgData.organization_id,
       period_type: periodType,
       period_start: periodStart,
       period_end: periodEnd,
-      total_sales: seller.total_sales,
-      order_count: seller.order_count,
+      total_sales: orgData.total_sales,
+      order_count: orgData.order_count,
       activity_score: score.activity_score,
       sales_score: score.sales_score,
       order_count_score: score.order_count_score,
@@ -260,17 +267,17 @@ async function generateRankings(
 
     if (finalize && rewardCash > 0) {
       rankingData.rewarded_at = new Date().toISOString();
-      console.log(`   💰 ${score.rank}위 (${score.seller_id}): ${rewardCash.toLocaleString()}원 보상`);
+      console.log(`   💰 ${score.rank}위 (조직 ${orgData.organization_id}): ${rewardCash.toLocaleString()}원 보상`);
     }
 
     const { error: upsertError } = await supabase
       .from('seller_rankings')
       .upsert(rankingData, {
-        onConflict: 'seller_id,period_type,period_start'
+        onConflict: 'organization_id,period_type,period_start'
       });
 
     if (upsertError) {
-      console.error(`   ❌ ${score.seller_id} 랭킹 저장 실패:`, upsertError);
+      console.error(`   ❌ 조직 ${orgData.organization_id} 랭킹 저장 실패:`, upsertError);
     }
   }
 
@@ -286,12 +293,13 @@ async function awardBadges() {
 
   const thisMonth = getThisMonthStart();
 
-  // 이번 달 랭킹 조회
+  // 이번 달 랭킹 조회 (조직 단위)
   const { data: rankings, error } = await supabase
     .from('seller_rankings')
     .select('*')
     .eq('period_type', 'monthly')
-    .eq('period_start', thisMonth);
+    .eq('period_start', thisMonth)
+    .not('organization_id', 'is', null);
 
   if (error || !rankings || rankings.length === 0) {
     console.log('   ⚠️  이번 달 랭킹 데이터가 없습니다.');
@@ -323,12 +331,13 @@ async function awardBadges() {
       badges.push('perfect_data');
     }
 
-    // 배지 저장
+    // 배지 저장 (조직 단위)
     for (const badgeId of badges) {
       const { error: badgeError } = await supabase
         .from('seller_badges')
         .upsert({
           seller_id: ranking.seller_id,
+          organization_id: ranking.organization_id,
           badge_id: badgeId,
           period_month: thisMonth,
           metadata: {
@@ -337,7 +346,7 @@ async function awardBadges() {
             tier: ranking.tier
           }
         }, {
-          onConflict: 'seller_id,badge_id,period_month'
+          onConflict: 'organization_id,badge_id,period_month'
         });
 
       if (!badgeError) {

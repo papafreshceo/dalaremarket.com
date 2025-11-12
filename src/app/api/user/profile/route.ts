@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 사용자 정보 조회 (모든 판매자 정보 포함)
+    // 사용자 기본 정보 조회
     const { data: userData, error } = await supabase
       .from('users')
       .select('*')
@@ -27,6 +27,56 @@ export async function GET(request: NextRequest) {
         { success: false, error: '사용자 정보를 불러올 수 없습니다.' },
         { status: 500 }
       );
+    }
+
+    // 조직 정보 추가 (티어 + 셀러계정 정보)
+    if (userData.primary_organization_id) {
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select(`
+          tier,
+          tier_updated_at,
+          is_manual_tier,
+          business_name,
+          business_address,
+          business_number,
+          business_email,
+          representative_name,
+          representative_phone,
+          manager_name,
+          manager_phone,
+          bank_account,
+          bank_name,
+          account_holder,
+          depositor_name,
+          store_name,
+          store_phone
+        `)
+        .eq('id', userData.primary_organization_id)
+        .single();
+
+      if (orgData) {
+        // 티어 정보
+        userData.tier = orgData.tier;
+        userData.tier_updated_at = orgData.tier_updated_at;
+        userData.is_manual_tier = orgData.is_manual_tier;
+
+        // 셀러계정 정보
+        userData.business_name = orgData.business_name;
+        userData.business_address = orgData.business_address;
+        userData.business_number = orgData.business_number;
+        userData.business_email = orgData.business_email;
+        userData.representative_name = orgData.representative_name;
+        userData.representative_phone = orgData.representative_phone;
+        userData.manager_name = orgData.manager_name;
+        userData.manager_phone = orgData.manager_phone;
+        userData.bank_account = orgData.bank_account;
+        userData.bank_name = orgData.bank_name;
+        userData.account_holder = orgData.account_holder;
+        userData.depositor_name = orgData.depositor_name;
+        userData.store_name = orgData.store_name;
+        userData.store_phone = orgData.store_phone;
+      }
     }
 
     return NextResponse.json({
@@ -116,68 +166,111 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // 업데이트할 데이터 준비
-    const updateData: any = {
+    // 사용자 기본 정보 조회
+    const { data: userData } = await supabase
+      .from('users')
+      .select('primary_organization_id')
+      .eq('id', user.id)
+      .single();
+
+    if (!userData) {
+      return NextResponse.json(
+        { success: false, error: '사용자 정보를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    // 1. users 테이블 업데이트 (개인 정보만)
+    const userUpdateData: any = {
       profile_name: profile_name?.trim() || null,
       name: name || null,
       phone: phone || null,
-      business_name: business_name || null,
-      business_address: business_address || null,
-      business_number: business_number || null,
-      business_email: business_email || null,
-      representative_name: representative_name || null,
-      representative_phone: representative_phone || null,
-      manager_name: manager_name || null,
-      manager_phone: manager_phone || null,
-      bank_account: bank_account || null,
-      bank_name: bank_name || null,
-      account_holder: account_holder || null,
-      depositor_name: depositor_name || null,
-      store_name: store_name || null,
-      store_phone: store_phone || null,
     };
 
-    // 프로필 업데이트
-    const { error: updateError } = await supabase
+    const { error: userUpdateError } = await supabase
       .from('users')
-      .update(updateData)
+      .update(userUpdateData)
       .eq('id', user.id);
 
-    if (updateError) {
-      console.error('프로필 업데이트 오류:', updateError);
-
+    if (userUpdateError) {
+      console.error('사용자 정보 업데이트 오류:', userUpdateError);
       return NextResponse.json(
-        { success: false, error: '프로필 업데이트에 실패했습니다.', details: updateError.message },
+        { success: false, error: '프로필 업데이트에 실패했습니다.', details: userUpdateError.message },
         { status: 500 }
       );
     }
 
-    // 🆕 사업자 정보가 입력되었으면 조직 자동 생성/업데이트
+    // 2. 셀러계정 정보가 있으면 organizations 테이블 업데이트
     const hasBusinessInfo =
       business_name ||
       business_number ||
       representative_name ||
-      business_address;
+      business_address ||
+      business_email ||
+      manager_name ||
+      manager_phone ||
+      bank_account ||
+      bank_name ||
+      account_holder ||
+      depositor_name ||
+      store_name ||
+      store_phone;
 
     if (hasBusinessInfo) {
-      try {
-        // 조직이 이미 있는지 확인
-        const { data: userData } = await supabase
-          .from('users')
-          .select('primary_organization_id')
-          .eq('id', user.id)
-          .single();
-
-        if (userData?.primary_organization_id) {
-          // 조직이 있으면 동기화
-          await syncOrganizationFromUser(user.id);
-        } else {
-          // 조직이 없으면 생성
+      // 조직이 없으면 생성
+      if (!userData.primary_organization_id) {
+        try {
           await autoCreateOrganizationFromUser(user.id);
+          // 생성 후 다시 조회
+          const { data: newUserData } = await supabase
+            .from('users')
+            .select('primary_organization_id')
+            .eq('id', user.id)
+            .single();
+
+          if (newUserData?.primary_organization_id) {
+            userData.primary_organization_id = newUserData.primary_organization_id;
+          }
+        } catch (error) {
+          console.error('조직 자동 생성 오류:', error);
+          return NextResponse.json(
+            { success: false, error: '조직 생성에 실패했습니다.' },
+            { status: 500 }
+          );
         }
-      } catch (error) {
-        console.error('조직 자동 생성/동기화 오류:', error);
-        // 조직 생성/동기화 실패해도 프로필 업데이트는 성공으로 처리
+      }
+
+      // 조직 정보 업데이트
+      if (userData.primary_organization_id) {
+        const orgUpdateData: any = {
+          business_name: business_name || null,
+          business_address: business_address || null,
+          business_number: business_number || null,
+          business_email: business_email || null,
+          representative_name: representative_name || null,
+          representative_phone: representative_phone || null,
+          manager_name: manager_name || null,
+          manager_phone: manager_phone || null,
+          bank_account: bank_account || null,
+          bank_name: bank_name || null,
+          account_holder: account_holder || null,
+          depositor_name: depositor_name || null,
+          store_name: store_name || null,
+          store_phone: store_phone || null,
+        };
+
+        const { error: orgUpdateError } = await supabase
+          .from('organizations')
+          .update(orgUpdateData)
+          .eq('id', userData.primary_organization_id);
+
+        if (orgUpdateError) {
+          console.error('조직 정보 업데이트 오류:', orgUpdateError);
+          return NextResponse.json(
+            { success: false, error: '셀러계정 정보 업데이트에 실패했습니다.', details: orgUpdateError.message },
+            { status: 500 }
+          );
+        }
       }
     }
 

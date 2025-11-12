@@ -37,7 +37,29 @@ export async function autoCreateOrganizationFromUser(userId: string) {
     }
   }
 
-  // 3. 셀러계정명 결정
+  // 3. owner_id로 조직이 있는지 확인 (primary_organization_id가 없는 경우)
+  const { data: orgByOwner } = await supabase
+    .from('organizations')
+    .select('id, name')
+    .eq('owner_id', userId)
+    .single()
+
+  if (orgByOwner) {
+    // 조직이 있는데 primary_organization_id가 설정되지 않은 경우 업데이트
+    if (!user.primary_organization_id) {
+      await supabase.rpc('exec_sql', {
+        sql: `UPDATE users SET primary_organization_id = '${orgByOwner.id}' WHERE id = '${userId}'`
+      })
+    }
+    return {
+      success: true,
+      organization_id: orgByOwner.id,
+      organization_name: orgByOwner.name,
+      already_exists: true
+    }
+  }
+
+  // 4. 셀러계정명 결정
   // 우선순위: company_name > profile_name > name > email
   const organizationName =
     user.company_name ||
@@ -46,7 +68,7 @@ export async function autoCreateOrganizationFromUser(userId: string) {
     `${user.email?.split('@')[0]}님의 셀러계정` ||
     '내 셀러계정'
 
-  // 4. 조직 생성 (RLS 우회를 위해 raw SQL 사용)
+  // 5. 조직 생성 (RLS 우회를 위해 raw SQL 사용)
 
   const { error: orgError } = await supabase.rpc('exec_sql', {
     sql: `
@@ -96,7 +118,7 @@ export async function autoCreateOrganizationFromUser(userId: string) {
 
   const organization = newOrg
 
-  // 5. 소유자를 조직 멤버로 추가 (Service Role로 RLS 우회)
+  // 6. 소유자를 조직 멤버로 추가 (Service Role로 RLS 우회)
   const ownerPermissions = getDefaultPermissions('owner')
 
   // ✅ RLS 우회를 위해 raw SQL 사용 (ON CONFLICT로 중복 방지)
@@ -121,7 +143,7 @@ export async function autoCreateOrganizationFromUser(userId: string) {
     return { success: false, error: '셀러계정 멤버 추가에 실패했습니다' }
   }
 
-  // 6. 사용자의 primary_organization_id 업데이트 (Service Role로 RLS 우회)
+  // 7. 사용자의 primary_organization_id 업데이트 (Service Role로 RLS 우회)
   const { error: updateError } = await supabase.rpc('exec_sql', {
     sql: `UPDATE users SET primary_organization_id = '${organization.id}' WHERE id = '${userId}'`
   })
@@ -130,7 +152,7 @@ export async function autoCreateOrganizationFromUser(userId: string) {
     console.error('사용자 셀러계정 ID 업데이트 실패:', updateError)
   }
 
-  // 7. 기존 주문에 셀러계정 ID 매핑 (Service Role로 RLS 우회)
+  // 8. 기존 주문에 셀러계정 ID 매핑 (Service Role로 RLS 우회)
   await supabase.rpc('exec_sql', {
     sql: `
       UPDATE integrated_orders

@@ -10,19 +10,24 @@ import {
 
 interface OrganizationMembersProps {
   organizationId: string
-  currentUserId: string
-  canManageMembers: boolean
+  currentUserId?: string
+  canManageMembers?: boolean
+  canManage?: boolean
+  isOwner?: boolean
+  inviteButton?: React.ReactNode
 }
 
 export default function OrganizationMembers({
   organizationId,
   currentUserId,
   canManageMembers,
+  canManage,
+  isOwner,
+  inviteButton,
 }: OrganizationMembersProps) {
+  const hasManagePermission = canManageMembers || canManage || isOwner
   const [members, setMembers] = useState<OrganizationMemberWithUser[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedMember, setSelectedMember] = useState<OrganizationMemberWithUser | null>(null)
-  const [showRoleModal, setShowRoleModal] = useState(false)
 
   useEffect(() => {
     fetchMembers()
@@ -31,12 +36,18 @@ export default function OrganizationMembers({
   const fetchMembers = async () => {
     try {
       setLoading(true)
+      console.log('멤버 조회 시작, organizationId:', organizationId)
       const response = await fetch(
         `/api/organizations/members?organization_id=${organizationId}`
       )
+      console.log('API 응답 상태:', response.status)
       const data = await response.json()
+      console.log('API 응답 데이터:', data)
       if (data.success) {
         setMembers(data.members)
+        console.log('멤버 설정 완료:', data.members)
+      } else {
+        console.error('API 에러:', data.error)
       }
     } catch (error) {
       console.error('멤버 조회 실패:', error)
@@ -45,36 +56,8 @@ export default function OrganizationMembers({
     }
   }
 
-  const handleChangeRole = async (memberId: string, newRole: OrganizationRole) => {
-    try {
-      const response = await fetch(
-        `/api/organizations/members?organization_id=${organizationId}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            member_id: memberId,
-            role: newRole,
-          }),
-        }
-      )
-
-      const data = await response.json()
-      if (data.success) {
-        alert('역할이 변경되었습니다')
-        fetchMembers()
-        setShowRoleModal(false)
-      } else {
-        alert(data.error || '역할 변경에 실패했습니다')
-      }
-    } catch (error) {
-      console.error('역할 변경 실패:', error)
-      alert('역할 변경 중 오류가 발생했습니다')
-    }
-  }
-
   const handleRemoveMember = async (memberId: string, userName: string) => {
-    if (!confirm(`${userName}님을 셀러계정에서 제거하시겠습니까?`)) {
+    if (!confirm(`${userName}님을 셀러계정에서 삭제하시겠습니까?`)) {
       return
     }
 
@@ -86,14 +69,14 @@ export default function OrganizationMembers({
 
       const data = await response.json()
       if (data.success) {
-        alert('멤버가 제거되었습니다')
+        alert('멤버가 삭제되었습니다')
         fetchMembers()
       } else {
-        alert(data.error || '멤버 제거에 실패했습니다')
+        alert(data.error || '멤버 삭제에 실패했습니다')
       }
     } catch (error) {
-      console.error('멤버 제거 실패:', error)
-      alert('멤버 제거 중 오류가 발생했습니다')
+      console.error('멤버 삭제 실패:', error)
+      alert('멤버 삭제 중 오류가 발생했습니다')
     }
   }
 
@@ -111,24 +94,24 @@ export default function OrganizationMembers({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                 이름
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                 이메일
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                 역할
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                 상태
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                 가입일
               </th>
-              {canManageMembers && (
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  관리
+              {hasManagePermission && (
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  작업
                 </th>
               )}
             </tr>
@@ -137,7 +120,7 @@ export default function OrganizationMembers({
             {members.map((member) => (
               <tr key={member.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {member.user.profile_name || member.user.company_name || '-'}
+                  {member.user.name || ''}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {member.user.email}
@@ -163,83 +146,35 @@ export default function OrganizationMembers({
                     ? new Date(member.joined_at).toLocaleDateString('ko-KR')
                     : '-'}
                 </td>
-                {canManageMembers && (
+                {hasManagePermission && (
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {member.role !== 'owner' && member.user_id !== currentUserId && (
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => {
-                            setSelectedMember(member)
-                            setShowRoleModal(true)
-                          }}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          역할 변경
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleRemoveMember(
-                              member.id,
-                              member.user.profile_name || member.user.email
-                            )
-                          }
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          제거
-                        </button>
-                      </div>
+                      <button
+                        onClick={() =>
+                          handleRemoveMember(
+                            member.id,
+                            member.user.profile_name || member.user.email
+                          )
+                        }
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        삭제
+                      </button>
                     )}
                   </td>
                 )}
               </tr>
             ))}
+            {inviteButton && (
+              <tr>
+                <td colSpan={hasManagePermission ? 6 : 5} className="px-6 py-4">
+                  {inviteButton}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
-
-      {/* 역할 변경 모달 */}
-      {showRoleModal && selectedMember && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">역할 변경</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              {selectedMember.user.profile_name || selectedMember.user.email}님의 역할을
-              변경합니다.
-            </p>
-            <div className="space-y-2 mb-6">
-              {(['admin', 'member'] as OrganizationRole[]).map((role) => (
-                <button
-                  key={role}
-                  onClick={() => handleChangeRole(selectedMember.id, role)}
-                  className={`w-full text-left px-4 py-2 rounded border ${
-                    selectedMember.role === role
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="font-medium">{ROLE_LABELS[role]}</div>
-                  <div className="text-xs text-gray-500">
-                    {role === 'admin'
-                      ? '멤버 관리 및 모든 데이터 접근 가능'
-                      : '기본 기능 사용 가능'}
-                  </div>
-                </button>
-              ))}
-            </div>
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => {
-                  setShowRoleModal(false)
-                  setSelectedMember(null)
-                }}
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-              >
-                취소
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

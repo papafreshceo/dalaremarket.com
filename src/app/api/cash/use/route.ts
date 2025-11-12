@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // 사용자 캐시 잔액 조회
     const { data: userCash, error: cashError } = await supabase
-      .from('user_cash')
+      .from('organization_cash')
       .select('*')
       .eq('user_id', user.id)
       .single();
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     // 캐시 잔액 업데이트
     const { error: updateError } = await supabase
-      .from('user_cash')
+      .from('organization_cash')
       .update({ balance: newBalance })
       .eq('user_id', user.id);
 
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     // 거래 이력 추가
     const { error: transactionError } = await supabase
-      .from('user_cash_transactions')
+      .from('organization_cash_transactions')
       .insert({
         user_id: user.id,
         type: 'usage',

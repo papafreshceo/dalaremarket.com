@@ -14,6 +14,8 @@ interface User {
   role: string
   approved: boolean
   created_at: string
+  seller_code?: string
+  partner_code?: string
 }
 
 export default function UsersPage() {
@@ -174,34 +176,32 @@ export default function UsersPage() {
       return
     }
 
-    // 일반 회원 → 관리자 그룹으로 변경 시 셀러계정 연결 해제
-    const isBecomingStaff = ['admin', 'super_admin', 'employee'].includes(newRole) &&
-                            !['admin', 'super_admin', 'employee'].includes(oldRole)
+    // API를 통한 역할 변경
+    try {
+      const response = await fetch('/api/admin/users/update-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, newRole, oldRole })
+      })
 
-    const updateData: any = { role: newRole }
-    if (isBecomingStaff) {
-      updateData.primary_organization_id = null
-    }
+      const result = await response.json()
 
-    const { data, error } = await supabase
-      .from('users')
-      .update(updateData)
-      .eq('id', userId)
-      .select()
+      if (!result.success) {
+        showToast(`역할 변경에 실패했습니다: ${result.error}`, 'error')
+        fetchUsers() // 오류 시 롤백
+        return
+      }
 
-    console.log('역할 변경 결과:', { data, error, isBecomingStaff })
-
-    if (error) {
-      showToast(`역할 변경에 실패했습니다: ${error.message}`, 'error')
-      console.error(error)
-      fetchUsers() // 오류 시 롤백
-    } else {
-      if (isBecomingStaff) {
+      if (result.isBecomingStaff) {
         showToast('역할이 변경되었습니다. 셀러계정 연결이 해제되었습니다.', 'success')
       } else {
         showToast('역할이 변경되었습니다.', 'success')
       }
       fetchUsers()
+    } catch (error: any) {
+      showToast(`역할 변경에 실패했습니다: ${error.message}`, 'error')
+      console.error(error)
+      fetchUsers() // 오류 시 롤백
     }
   }
 
@@ -278,6 +278,7 @@ export default function UsersPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">이메일</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">전화번호</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">회사명</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">코드</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">역할</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">가입일</th>
@@ -293,6 +294,19 @@ export default function UsersPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.phone || '-'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.company_name || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {user.seller_code && (
+                      <span className="px-2 py-1 text-xs font-mono bg-blue-50 text-blue-700 rounded">
+                        {user.seller_code}
+                      </span>
+                    )}
+                    {user.partner_code && (
+                      <span className="px-2 py-1 text-xs font-mono bg-purple-50 text-purple-700 rounded">
+                        {user.partner_code}
+                      </span>
+                    )}
+                    {!user.seller_code && !user.partner_code && '-'}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <select
                       value={user.role}
