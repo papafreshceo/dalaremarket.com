@@ -57,7 +57,7 @@ export default function UsersPage() {
     if (filter === 'staff') {
       query = query.in('role', ['employee', 'admin', 'super_admin'])
     } else if (filter === 'customers') {
-      query = query.in('role', ['customer', 'vip_customer', 'partner'])
+      query = query.in('role', ['seller', 'partner'])
     } else if (filter === 'pending') {
       query = query.eq('approved', false)
     } else if (filter === 'approved') {
@@ -154,8 +154,7 @@ export default function UsersPage() {
 
     // 역할 변경 확인
     const roleNames: Record<string, string> = {
-      customer: '일반고객',
-      vip_customer: 'VIP고객',
+      seller: '셀러',
       partner: '파트너',
       employee: '직원',
       admin: '관리자',
@@ -301,8 +300,7 @@ export default function UsersPage() {
                       className="text-xs border border-gray-300 rounded px-2 py-1"
                       disabled={user.id === currentUserId}
                     >
-                      <option value="customer">일반고객</option>
-                      <option value="vip_customer">VIP고객</option>
+                      <option value="seller">셀러</option>
                       <option value="partner">파트너</option>
                       <option value="employee">직원</option>
                       <option value="admin">관리자</option>
