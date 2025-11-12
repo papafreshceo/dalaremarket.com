@@ -369,7 +369,7 @@ export default function ProfilePage() {
               fontSize: '14px',
               color: '#6c757d',
               margin: 0
-            }}>기본정보 및 판매자 정보를 관리하세요</p>
+            }}>기본정보 및 셀러계정 설정을 관리하세요</p>
           </div>
 
           {/* 저장 버튼 */}
@@ -666,7 +666,7 @@ export default function ProfilePage() {
                 fontWeight: '700',
                 marginBottom: '24px',
                 color: '#212529'
-              }}>판매자 정보</h2>
+              }}>셀러계정 설정</h2>
 
               <div style={{
                 display: 'grid',
