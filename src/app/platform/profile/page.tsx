@@ -670,7 +670,7 @@ export default function ProfilePage() {
 
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
+                gridTemplateColumns: 'repeat(3, 1fr)',
                 gap: '24px'
               }}>
                 {/* 사업자 정보 */}
@@ -1166,10 +1166,148 @@ export default function ProfilePage() {
                     />
                   </div>
                 </div>
+
+                {/* 셀러계정 관리 */}
+                {organization && user && (
+                  <div>
+                    <h3 style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: '#343a40',
+                      marginBottom: '16px',
+                      paddingBottom: '8px',
+                      borderBottom: '2px solid #e9ecef'
+                    }}>셀러계정 관리</h3>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {/* 셀러계정 정보 */}
+                      <div style={{
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        color: 'white'
+                      }}>
+                        <div style={{
+                          fontSize: '15px',
+                          fontWeight: '600',
+                          marginBottom: '8px'
+                        }}>
+                          {organization.name?.includes('의 조직')
+                            ? organization.name.replace('의 조직', '님의 셀러계정')
+                            : organization.name}
+                        </div>
+                        <div style={{
+                          fontSize: '11px',
+                          opacity: 0.9,
+                          lineHeight: '1.5'
+                        }}>
+                          {organization.business_number && (
+                            <div>사업자: {organization.business_number}</div>
+                          )}
+                          {organization.representative_name && (
+                            <div>대표: {organization.representative_name}</div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 내 역할 */}
+                      {member && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          borderRadius: '8px',
+                          padding: '12px'
+                        }}>
+                          <div style={{
+                            fontSize: '11px',
+                            color: '#6c757d',
+                            marginBottom: '4px'
+                          }}>내 역할</div>
+                          <div style={{
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            color: '#212529',
+                            marginBottom: '8px'
+                          }}>
+                            {member.role === 'owner'
+                              ? '소유자'
+                              : member.role === 'admin'
+                              ? '관리자'
+                              : '일반 멤버'}
+                          </div>
+                          <div style={{
+                            display: 'flex',
+                            gap: '4px',
+                            flexWrap: 'wrap'
+                          }}>
+                            {member.can_manage_orders && (
+                              <span style={{
+                                background: '#d1f2eb',
+                                color: '#0c5132',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: '500'
+                              }}>주문</span>
+                            )}
+                            {member.can_manage_products && (
+                              <span style={{
+                                background: '#d1f2eb',
+                                color: '#0c5132',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: '500'
+                              }}>상품</span>
+                            )}
+                            {member.can_manage_members && (
+                              <span style={{
+                                background: '#e0cffc',
+                                color: '#6f42c1',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: '500'
+                              }}>멤버</span>
+                            )}
+                            {member.can_view_financials && (
+                              <span style={{
+                                background: '#cfe2ff',
+                                color: '#084298',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: '500'
+                              }}>재무</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 멤버 초대 */}
+                      {canManageMembers && (
+                        <div>
+                          <InviteMember organizationId={organization.id} />
+                        </div>
+                      )}
+
+                      {/* 간단한 안내 */}
+                      <div style={{
+                        background: '#f8f9fa',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        fontSize: '11px',
+                        color: '#6c757d',
+                        lineHeight: '1.6'
+                      }}>
+                        같은 셀러계정의 멤버는 주문·상품 등 데이터를 공유합니다. 자세한 내용은 하단 안내를 확인하세요.
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* 셀러계정 관리 섹션 */}
+            {/* 셀러계정 멤버 목록 & 시스템 안내 */}
             {organization && user && (
               <div style={{
                 background: 'white',
@@ -1178,177 +1316,6 @@ export default function ProfilePage() {
                 marginTop: '24px',
                 boxShadow: '0 2px 20px rgba(0, 0, 0, 0.05)'
               }}>
-                <h2 style={{
-                  fontSize: '20px',
-                  fontWeight: '700',
-                  marginBottom: '24px',
-                  color: '#212529'
-                }}>셀러계정 관리</h2>
-
-                {/* 셀러계정 정보 헤더 */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  borderRadius: '16px',
-                  padding: '24px',
-                  marginBottom: '24px',
-                  color: 'white'
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'start'
-                  }}>
-                    <div>
-                      <h3 style={{
-                        fontSize: '22px',
-                        fontWeight: '700',
-                        marginBottom: '12px'
-                      }}>
-                        {organization.name?.includes('의 조직')
-                          ? organization.name.replace('의 조직', '님의 셀러계정')
-                          : organization.name}
-                      </h3>
-                      <div style={{
-                        fontSize: '13px',
-                        opacity: 0.9,
-                        lineHeight: '1.6'
-                      }}>
-                        {organization.business_number && (
-                          <p>사업자번호: {organization.business_number}</p>
-                        )}
-                        {organization.representative_name && (
-                          <p>대표자: {organization.representative_name}</p>
-                        )}
-                        {organization.address && <p>주소: {organization.address}</p>}
-                        {organization.phone && <p>전화: {organization.phone}</p>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 내 정보 */}
-                {member && (
-                  <div style={{
-                    background: '#f8f9fa',
-                    borderRadius: '12px',
-                    padding: '20px',
-                    marginBottom: '24px'
-                  }}>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(4, 1fr)',
-                      gap: '20px'
-                    }}>
-                      <div>
-                        <p style={{
-                          fontSize: '13px',
-                          color: '#6c757d',
-                          marginBottom: '6px'
-                        }}>내 역할</p>
-                        <p style={{
-                          fontSize: '15px',
-                          fontWeight: '600',
-                          color: '#212529'
-                        }}>
-                          {member.role === 'owner'
-                            ? '소유자'
-                            : member.role === 'admin'
-                            ? '관리자'
-                            : '일반 멤버'}
-                        </p>
-                      </div>
-                      <div>
-                        <p style={{
-                          fontSize: '13px',
-                          color: '#6c757d',
-                          marginBottom: '6px'
-                        }}>가입일</p>
-                        <p style={{
-                          fontSize: '15px',
-                          fontWeight: '600',
-                          color: '#212529'
-                        }}>
-                          {member.joined_at
-                            ? new Date(member.joined_at).toLocaleDateString('ko-KR')
-                            : '-'}
-                        </p>
-                      </div>
-                      <div style={{ gridColumn: 'span 2' }}>
-                        <p style={{
-                          fontSize: '13px',
-                          color: '#6c757d',
-                          marginBottom: '8px'
-                        }}>권한</p>
-                        <div style={{
-                          display: 'flex',
-                          gap: '6px',
-                          flexWrap: 'wrap'
-                        }}>
-                          {member.can_manage_orders && (
-                            <span style={{
-                              display: 'inline-block',
-                              background: '#d1f2eb',
-                              color: '#0c5132',
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              fontWeight: '500'
-                            }}>
-                              주문관리
-                            </span>
-                          )}
-                          {member.can_manage_products && (
-                            <span style={{
-                              display: 'inline-block',
-                              background: '#d1f2eb',
-                              color: '#0c5132',
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              fontWeight: '500'
-                            }}>
-                              상품관리
-                            </span>
-                          )}
-                          {member.can_manage_members && (
-                            <span style={{
-                              display: 'inline-block',
-                              background: '#e0cffc',
-                              color: '#6f42c1',
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              fontWeight: '500'
-                            }}>
-                              멤버관리
-                            </span>
-                          )}
-                          {member.can_view_financials && (
-                            <span style={{
-                              display: 'inline-block',
-                              background: '#cfe2ff',
-                              color: '#084298',
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              fontWeight: '500'
-                            }}>
-                              재무조회
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 멤버 초대 */}
-                {canManageMembers && (
-                  <div style={{ marginBottom: '24px' }}>
-                    <InviteMember organizationId={organization.id} />
-                  </div>
-                )}
-
                 {/* 셀러계정 멤버 목록 */}
                 <div style={{
                   background: '#f8f9fa',
