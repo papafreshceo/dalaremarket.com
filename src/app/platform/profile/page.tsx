@@ -73,12 +73,12 @@ export default function ProfilePage() {
 
   // 티어별 최대 계정 수 계산
   const getMaxAccountsByTier = (tier: string | null | undefined) => {
-    if (!tier) return 1; // 티어 없으면 1개만 (기본)
+    if (!tier) return 2; // 티어 없으면 2개
 
     const lowerTier = tier.toLowerCase();
     switch (lowerTier) {
       case 'light':
-        return 1; // 라이트: 1개만
+        return 2; // 라이트: 2개
       case 'standard':
         return 2; // 스탠다드: 2개
       case 'advance':
@@ -86,7 +86,7 @@ export default function ProfilePage() {
       case 'legend':
         return 3; // 어드밴스, 엘리트, 레전드: 3개
       default:
-        return 1;
+        return 2;
     }
   };
 
@@ -880,14 +880,9 @@ export default function ProfilePage() {
                         business_number: `${100 + sampleNumber}-${10 + sampleNumber}-${10000 + sampleNumber}`,
                         business_email: `test${sampleNumber}@example.com`,
                         representative_name: `대표자${sampleNumber}`,
-                        representative_phone: `010-${1000 + sampleNumber}-${2000 + sampleNumber}`,
-                        manager_name: `담당자${sampleNumber}`,
-                        manager_phone: `010-${3000 + sampleNumber}-${4000 + sampleNumber}`,
                         bank_account: `${1000000 + sampleNumber * 1111}`,
                         bank_name: '국민은행',
                         account_holder: `예금주${sampleNumber}`,
-                        store_name: `스토어${sampleNumber}`,
-                        store_phone: `02-${1000 + sampleNumber}-${2000 + sampleNumber}`,
                       }]);
                     }}
                     style={{
@@ -911,7 +906,7 @@ export default function ProfilePage() {
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
-                    계정추가 ({currentAccountCount}/{maxAccounts})
+                    서브계정추가 (가능 {maxAccounts - currentAccountCount})
                   </button>
                 ) : isOwner && currentAccountCount >= maxAccounts ? (
                   <div style={{
@@ -1602,13 +1597,8 @@ export default function ProfilePage() {
                   </button>
                 </div>
 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr 2fr',
-                  gap: '24px'
-                }}>
-                  {/* 사업자 정보 */}
-                  <div>
+                {/* 사업자 정보 */}
+                <div>
                     <h3 style={{
                       fontSize: '16px',
                       fontWeight: '600',
@@ -1618,7 +1608,7 @@ export default function ProfilePage() {
                       borderBottom: '2px solid #e9ecef'
                     }}>사업자 정보</h3>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr 0.7fr 1fr 0.7fr', gap: '16px' }}>
                       <div>
                         <label style={{
                           display: 'block',
@@ -1788,148 +1778,23 @@ export default function ProfilePage() {
                           onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
                         />
                       </div>
-
-                      <div>
-                        <label style={{
-                          display: 'block',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          color: '#495057',
-                          marginBottom: '6px'
-                        }}>대표자 연락처</label>
-                        <input
-                          type="tel"
-                          value={account.representative_phone || ''}
-                          onChange={(e) => {
-                            const numbers = e.target.value.replace(/[^\d]/g, '');
-                            let formatted = numbers;
-                            if (numbers.length <= 3) {
-                              formatted = numbers;
-                            } else if (numbers.length <= 7) {
-                              formatted = `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
-                            } else {
-                              formatted = `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
-                            }
-                            const updated = additionalAccounts.map(acc =>
-                              acc.id === account.id ? { ...acc, representative_phone: formatted } : acc
-                            );
-                            setAdditionalAccounts(updated);
-                          }}
-                          placeholder="010-0000-0000"
-                          maxLength={13}
-                          style={{
-                            width: '100%',
-                            padding: '10px 12px',
-                            border: '1px solid #dee2e6',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            outline: 'none',
-                            transition: 'border 0.2s'
-                          }}
-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
-                        />
-                      </div>
                     </div>
                   </div>
 
-                  {/* 담당자 및 정산 정보 */}
-                  <div>
-                    <h3 style={{
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: '#343a40',
-                      marginBottom: '16px',
-                      paddingBottom: '8px',
-                      borderBottom: '2px solid #e9ecef'
-                    }}>담당자 정보</h3>
+                  {/* 정산 정보 및 송장 출력 정보 */}
+                  <div style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                    {/* 정산 계좌 */}
+                    <div>
+                      <h3 style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        color: '#343a40',
+                        marginBottom: '16px',
+                        paddingBottom: '8px',
+                        borderBottom: '2px solid #e9ecef'
+                      }}>정산 계좌</h3>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
-                      <div>
-                        <label style={{
-                          display: 'block',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          color: '#495057',
-                          marginBottom: '6px'
-                        }}>이름</label>
-                        <input
-                          type="text"
-                          value={account.manager_name || ''}
-                          onChange={(e) => {
-                            const updated = additionalAccounts.map(acc =>
-                              acc.id === account.id ? { ...acc, manager_name: e.target.value } : acc
-                            );
-                            setAdditionalAccounts(updated);
-                          }}
-                          placeholder="담당자 이름"
-                          style={{
-                            width: '100%',
-                            padding: '10px 12px',
-                            border: '1px solid #dee2e6',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            outline: 'none',
-                            transition: 'border 0.2s'
-                          }}
-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{
-                          display: 'block',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          color: '#495057',
-                          marginBottom: '6px'
-                        }}>연락처</label>
-                        <input
-                          type="tel"
-                          value={account.manager_phone || ''}
-                          onChange={(e) => {
-                            const numbers = e.target.value.replace(/[^\d]/g, '');
-                            let formatted = numbers;
-                            if (numbers.length <= 3) {
-                              formatted = numbers;
-                            } else if (numbers.length <= 7) {
-                              formatted = `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
-                            } else {
-                              formatted = `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
-                            }
-                            const updated = additionalAccounts.map(acc =>
-                              acc.id === account.id ? { ...acc, manager_phone: formatted } : acc
-                            );
-                            setAdditionalAccounts(updated);
-                          }}
-                          placeholder="010-0000-0000"
-                          maxLength={13}
-                          style={{
-                            width: '100%',
-                            padding: '10px 12px',
-                            border: '1px solid #dee2e6',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            outline: 'none',
-                            transition: 'border 0.2s'
-                          }}
-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
-                        />
-                      </div>
-                    </div>
-
-                    <h3 style={{
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: '#343a40',
-                      marginBottom: '16px',
-                      paddingBottom: '8px',
-                      borderBottom: '2px solid #e9ecef'
-                    }}>정산 계좌</h3>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       <div>
                         <label style={{
                           display: 'block',
@@ -2026,47 +1891,20 @@ export default function ProfilePage() {
                         />
                       </div>
                     </div>
-                  </div>
-
-                  {/* 플레이스홀더 (멤버 관리 없음) */}
-                  <div>
-                    <h3 style={{
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: '#343a40',
-                      marginBottom: '16px',
-                      paddingBottom: '8px',
-                      borderBottom: '2px solid #e9ecef'
-                    }}>셀러계정 생성 후</h3>
-                    <div style={{
-                      background: '#f8f9fa',
-                      borderRadius: '8px',
-                      padding: '16px',
-                      fontSize: '13px',
-                      color: '#6c757d',
-                      lineHeight: '1.6'
-                    }}>
-                      저장하기를 누르면 새로운 셀러계정이 생성되며, 멤버 관리 기능을 사용할 수 있습니다.
                     </div>
-                  </div>
-                </div>
 
-                {/* 송장 출력 정보 */}
-                <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid #e9ecef' }}>
-                  <h3 style={{
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: '#343a40',
-                    marginBottom: '16px',
-                    paddingBottom: '8px',
-                    borderBottom: '2px solid #e9ecef'
-                  }}>송장 출력 정보</h3>
+                    {/* 송장 출력 정보 */}
+                    <div>
+                      <h3 style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        color: '#343a40',
+                        marginBottom: '16px',
+                        paddingBottom: '8px',
+                        borderBottom: '2px solid #e9ecef'
+                      }}>송장 출력 정보</h3>
 
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr 1fr',
-                    gap: '16px'
-                  }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <div>
                       <label style={{
                         display: 'block',
@@ -2142,6 +1980,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 </div>
+              </div>
               </div>
             ))}
 
