@@ -25,7 +25,8 @@ export default function OrganizationMembers({
   isOwner,
   inviteButton,
 }: OrganizationMembersProps) {
-  const hasManagePermission = canManageMembers || canManage || isOwner
+  // 소유자와 담당자 모두 동일한 권한 (테이블은 모두 동일하게 보임)
+  const hasManagePermission = true
   const [members, setMembers] = useState<OrganizationMemberWithUser[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -69,7 +70,8 @@ export default function OrganizationMembers({
 
       const data = await response.json()
       if (data.success) {
-        alert('멤버가 삭제되었습니다')
+        alert('멤버가 삭제되었습니다.')
+        // 멤버 목록 새로고침
         fetchMembers()
       } else {
         alert(data.error || '멤버 삭제에 실패했습니다')
@@ -77,6 +79,33 @@ export default function OrganizationMembers({
     } catch (error) {
       console.error('멤버 삭제 실패:', error)
       alert('멤버 삭제 중 오류가 발생했습니다')
+    }
+  }
+
+  const handleLeaveOrganization = async () => {
+    if (!confirm('셀러계정에서 탈퇴하시겠습니까?')) {
+      return
+    }
+
+    try {
+      const response = await fetch('/api/organizations/leave', {
+        method: 'POST',
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        alert('셀러계정에서 탈퇴했습니다.')
+        // 탈퇴 후 완전히 새로고침 (캐시 무시)
+        // setTimeout으로 약간의 지연을 주어 서버 업데이트가 완료되도록 함
+        setTimeout(() => {
+          window.location.reload()
+        }, 500)
+      } else {
+        alert(data.error || '셀러계정 탈퇴에 실패했습니다')
+      }
+    } catch (error) {
+      console.error('셀러계정 탈퇴 실패:', error)
+      alert('셀러계정 탈퇴 중 오류가 발생했습니다')
     }
   }
 
@@ -101,7 +130,7 @@ export default function OrganizationMembers({
                 이메일
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                역할
+                구분
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                 상태
@@ -120,23 +149,20 @@ export default function OrganizationMembers({
             {members.map((member) => (
               <tr key={member.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {member.user.name || ''}
+                  <div className="flex items-center gap-2">
+                    <span>{member.user.name || ''}</span>
+                    {member.user_id === currentUserId && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold">
+                        본인
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {member.user.email}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      member.role === 'owner'
-                        ? 'bg-purple-100 text-purple-800'
-                        : member.role === 'admin'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {ROLE_LABELS[member.role]}
-                  </span>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                  {ROLE_LABELS[member.role]}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {STATUS_LABELS[member.status]}
@@ -148,7 +174,8 @@ export default function OrganizationMembers({
                 </td>
                 {hasManagePermission && (
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {member.role !== 'owner' && member.user_id !== currentUserId && (
+                    {/* 소유자: 다른 멤버 삭제 가능 */}
+                    {isOwner && member.role !== 'owner' && member.user_id !== currentUserId && (
                       <button
                         onClick={() =>
                           handleRemoveMember(
@@ -159,6 +186,15 @@ export default function OrganizationMembers({
                         className="text-red-600 hover:text-red-900"
                       >
                         삭제
+                      </button>
+                    )}
+                    {/* 담당자: 본인만 탈퇴 가능 */}
+                    {!isOwner && member.user_id === currentUserId && member.role !== 'owner' && (
+                      <button
+                        onClick={handleLeaveOrganization}
+                        className="text-orange-600 hover:text-orange-900 font-medium"
+                      >
+                        셀러계정 탈퇴
                       </button>
                     )}
                   </td>
