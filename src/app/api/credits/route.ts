@@ -42,7 +42,6 @@ export async function GET(request: NextRequest) {
       const { data: newCredit, error: insertError } = await supabase
         .from('organization_credits')
         .insert({
-          user_id: user.id,
           organization_id: organization.id,
           balance: 0
         })

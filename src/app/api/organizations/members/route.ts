@@ -23,33 +23,39 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = await createClientForRouteHandler()
+    // userData에서 role 확인
+    console.log('User role:', auth.userData?.role)
+    const isAdmin = auth.userData && ['super_admin', 'admin', 'employee'].includes(auth.userData.role)
 
-    // 권한 확인: 해당 조직의 멤버 또는 소유자만 조회 가능
-    // 1. 조직 소유자인지 확인
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('owner_id')
-      .eq('id', organizationId)
-      .single()
+    if (!isAdmin) {
+      // 관리자가 아닌 경우, 조직 멤버/소유자 확인
+      const supabase = await createClientForRouteHandler()
 
-    const isOwner = org?.owner_id === auth.user.id
+      // 1. 조직 소유자인지 확인
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('owner_id')
+        .eq('id', organizationId)
+        .single()
 
-    // 2. 멤버인지 확인
-    const { data: myMember } = await supabase
-      .from('organization_members')
-      .select('id')
-      .eq('organization_id', organizationId)
-      .eq('user_id', auth.user.id)
-      .eq('status', 'active')
-      .maybeSingle()
+      const isOwner = org?.owner_id === auth.user.id
 
-    // 소유자도 아니고 멤버도 아니면 권한 없음
-    if (!isOwner && !myMember) {
-      return NextResponse.json(
-        { error: '조직 멤버 정보를 조회할 권한이 없습니다' },
-        { status: 403 }
-      )
+      // 2. 멤버인지 확인
+      const { data: myMember } = await supabase
+        .from('organization_members')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('user_id', auth.user.id)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      // 소유자도 아니고 멤버도 아니면 권한 없음
+      if (!isOwner && !myMember) {
+        return NextResponse.json(
+          { error: '조직 멤버 정보를 조회할 권한이 없습니다' },
+          { status: 403 }
+        )
+      }
     }
 
     // 멤버 목록 조회

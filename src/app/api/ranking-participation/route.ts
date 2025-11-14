@@ -16,11 +16,22 @@ export async function GET(request: NextRequest) {
     const supabase = await createClientForRouteHandler();
     const userId = auth.userData.id;
 
-    // 참여 설정 조회
+    // 사용자의 primary organization 조회
+    const { getUserPrimaryOrganization } = await import('@/lib/organization-utils');
+    const organization = await getUserPrimaryOrganization(userId);
+
+    if (!organization) {
+      return NextResponse.json(
+        { success: false, error: '조직 정보를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    // 참여 설정 조회 (organization_id 기준)
     const { data, error } = await supabase
       .from('ranking_participation')
       .select('*')
-      .eq('user_id', userId)
+      .eq('organization_id', organization.id)
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
@@ -36,7 +47,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: {
-          user_id: userId,
+          organization_id: organization.id,
           is_participating: false,
           show_score: false,
           show_sales_performance: false
@@ -68,6 +79,18 @@ export async function PUT(request: NextRequest) {
 
     const supabase = await createClientForRouteHandler();
     const userId = auth.userData.id;
+
+    // 사용자의 primary organization 조회
+    const { getUserPrimaryOrganization } = await import('@/lib/organization-utils');
+    const organization = await getUserPrimaryOrganization(userId);
+
+    if (!organization) {
+      return NextResponse.json(
+        { success: false, error: '조직 정보를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
     const body = await request.json();
 
     // 필드 검증
@@ -92,11 +115,11 @@ export async function PUT(request: NextRequest) {
     const { data, error } = await supabase
       .from('ranking_participation')
       .upsert({
-        user_id: userId,
+        organization_id: organization.id,
         ...updates,
         updated_at: new Date().toISOString()
       }, {
-        onConflict: 'user_id'
+        onConflict: 'organization_id'
       })
       .select()
       .single();

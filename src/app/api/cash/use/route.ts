@@ -30,11 +30,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 사용자 캐시 잔액 조회
+    // 사용자의 primary organization 조회
+    const { getUserPrimaryOrganization } = await import('@/lib/organization-utils');
+    const organization = await getUserPrimaryOrganization(user.id);
+
+    if (!organization) {
+      return NextResponse.json(
+        { success: false, error: '조직 정보를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    // 조직 캐시 잔액 조회
     const { data: userCash, error: cashError } = await supabase
       .from('organization_cash')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('organization_id', organization.id)
       .single();
 
     if (cashError || !userCash) {
@@ -59,7 +70,7 @@ export async function POST(request: NextRequest) {
     const { error: updateError } = await supabase
       .from('organization_cash')
       .update({ balance: newBalance })
-      .eq('user_id', user.id);
+      .eq('organization_id', organization.id);
 
     if (updateError) {
       console.error('[POST /api/cash/use] 잔액 업데이트 오류:', updateError);
@@ -73,7 +84,8 @@ export async function POST(request: NextRequest) {
     const { error: transactionError } = await supabase
       .from('organization_cash_transactions')
       .insert({
-        user_id: user.id,
+        organization_id: organization.id,
+        used_by_user_id: user.id,
         type: 'usage',
         amount: -amount, // 음수로 저장
         balance_after: newBalance,

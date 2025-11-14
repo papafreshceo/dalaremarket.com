@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import OrganizationMembers from '@/components/organization/OrganizationMembers';
 import InviteMember from '@/components/organization/InviteMember';
 import InvitationsList from '@/components/organization/InvitationsList';
@@ -31,7 +31,6 @@ interface SellerInfo {
   bank_account?: string;
   bank_name?: string;
   account_holder?: string;
-  depositor_name?: string;
 
   // 송장출력 정보
   store_name?: string;
@@ -54,7 +53,6 @@ export default function ProfilePage() {
     phone: '',
   });
   const [isSameAsBusinessName, setIsSameAsBusinessName] = useState(true);
-  const [isSameAsEmail, setIsSameAsEmail] = useState(true);
   const [checkingProfileName, setCheckingProfileName] = useState(false);
   const [profileNameCheckResult, setProfileNameCheckResult] = useState<{
     checked: boolean;
@@ -117,13 +115,6 @@ export default function ProfilePage() {
       setSellerInfo(prev => ({ ...prev, store_name: prev.business_name }));
     }
   }, [isSameAsBusinessName, sellerInfo.business_name]);
-
-  // 기본 이메일과 동일 체크박스가 체크되어 있으면 기본 이메일을 사업자 이메일에 자동 반영
-  useEffect(() => {
-    if (isSameAsEmail && sellerInfo.email) {
-      setSellerInfo(prev => ({ ...prev, business_email: prev.email }));
-    }
-  }, [isSameAsEmail, sellerInfo.email]);
 
   const loadUserProfile = async () => {
     try {
@@ -209,7 +200,8 @@ export default function ProfilePage() {
           manager_name,
           manager_phone,
           bank_account,
-          depositor_name,
+          bank_name,
+          account_holder,
           store_name,
           store_phone,
           tier,
@@ -246,34 +238,31 @@ export default function ProfilePage() {
         setOrganization(orgWithOwner);
         setIsOwner(orgData.owner_id === authUser.id);
 
-        // 셀러계정 정보 업데이트 (소유자만)
-        if (orgData.owner_id === authUser.id) {
-          console.log('📝 셀러계정 정보 로드:', {
-            business_name: orgData.business_name
-          });
+        // 셀러계정 정보 업데이트 (모든 조직 멤버가 조회 가능)
+        console.log('📝 셀러계정 정보 로드:', {
+          business_name: orgData.business_name,
+          is_owner: orgData.owner_id === authUser.id
+        });
 
-          setSellerInfo(prev => ({
-            ...prev,
-            business_name: orgData.business_name || '',
-            business_address: orgData.business_address || '',
-            business_number: orgData.business_number || '',
-            business_email: orgData.business_email || prev.email || '',
-            representative_name: orgData.representative_name || '',
-            representative_phone: orgData.representative_phone || '',
-            manager_name: orgData.manager_name || '',
-            manager_phone: orgData.manager_phone || '',
-            bank_account: orgData.bank_account || '',
-            bank_name: orgData.bank_name || '',
-            account_holder: orgData.account_holder || '',
-            depositor_name: orgData.depositor_name || '',
-            store_name: orgData.store_name || '',
-            store_phone: orgData.store_phone || '',
-          }));
+        setSellerInfo(prev => ({
+          ...prev,
+          business_name: orgData.business_name || '',
+          business_address: orgData.business_address || '',
+          business_number: orgData.business_number || '',
+          business_email: orgData.business_email || '',
+          representative_name: orgData.representative_name || '',
+          representative_phone: orgData.representative_phone || '',
+          manager_name: orgData.manager_name || '',
+          manager_phone: orgData.manager_phone || '',
+          bank_account: orgData.bank_account || '',
+          bank_name: orgData.bank_name || '',
+          account_holder: orgData.account_holder || '',
+          store_name: orgData.store_name || '',
+          store_phone: orgData.store_phone || '',
+        }));
 
-          // 체크박스 상태 설정
-          setIsSameAsBusinessName(!orgData.store_name || orgData.store_name === orgData.business_name);
-          setIsSameAsEmail(!orgData.business_email || orgData.business_email === prev.email);
-        }
+        // 체크박스 상태 설정
+        setIsSameAsBusinessName(!orgData.store_name || orgData.store_name === orgData.business_name);
       } else {
         console.warn('Organization 데이터가 없습니다');
       }
@@ -343,9 +332,13 @@ export default function ProfilePage() {
   };
 
   const handleChange = (field: keyof SellerInfo, value: string) => {
+    console.log('📝 handleChange 호출:', { field, value, currentValue: sellerInfo[field] });
+
     // 전화번호 필드인 경우 포맷팅 적용 (010-0000-0000)
     if (field === 'phone' || field === 'representative_phone' || field === 'manager_phone' || field === 'store_phone') {
-      const numbers = value.replace(/[^\d]/g, ''); // 숫자만 추출
+      // 전각 숫자를 반각 숫자로 변환 후 숫자만 추출
+      const halfWidth = value.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+      const numbers = halfWidth.replace(/[^\d]/g, '');
       let formatted = numbers;
 
       if (numbers.length <= 3) {
@@ -356,11 +349,18 @@ export default function ProfilePage() {
         formatted = `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
       }
 
-      setSellerInfo(prev => ({ ...prev, [field]: formatted }));
+      console.log('📞 전화번호 포맷팅:', { numbers, formatted, currentValue: sellerInfo[field] });
+
+      // 값이 실제로 변경되었을 때만 업데이트
+      if (formatted !== sellerInfo[field]) {
+        setSellerInfo(prev => ({ ...prev, [field]: formatted }));
+      }
     }
     // 사업자등록번호 필드인 경우 포맷팅 적용 (000-00-00000)
     else if (field === 'business_number') {
-      const numbers = value.replace(/[^\d]/g, ''); // 숫자만 추출
+      // 전각 숫자를 반각 숫자로 변환 후 숫자만 추출
+      const halfWidth = value.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+      const numbers = halfWidth.replace(/[^\d]/g, '');
       let formatted = numbers;
 
       if (numbers.length <= 3) {
@@ -430,6 +430,12 @@ export default function ProfilePage() {
     try {
       setSavingSellerAccount(true);
 
+      console.log('💾 셀러계정 정보 저장 시도:', {
+        business_name: sellerInfo.business_name,
+        business_address: sellerInfo.business_address,
+        business_number: sellerInfo.business_number,
+      });
+
       const response = await fetch('/api/user/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -445,7 +451,6 @@ export default function ProfilePage() {
           bank_account: sellerInfo.bank_account,
           bank_name: sellerInfo.bank_name,
           account_holder: sellerInfo.account_holder,
-          depositor_name: sellerInfo.depositor_name,
           store_name: sellerInfo.store_name,
           store_phone: sellerInfo.store_phone,
         }),
@@ -453,8 +458,12 @@ export default function ProfilePage() {
 
       const data = await response.json();
 
+      console.log('💾 저장 응답:', data);
+
       if (data.success) {
         toast.success('셀러계정 정보가 저장되었습니다.');
+        // 저장 후 조직 정보 다시 로드
+        await loadOrganizationInfo();
       } else {
         toast.error(data.error || '저장에 실패했습니다.');
       }
@@ -607,6 +616,7 @@ export default function ProfilePage() {
       background: 'linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%)',
       paddingTop: '70px'
     }}>
+      <Toaster position="top-center" />
       <div style={{
         maxWidth: '1200px',
         margin: '0 auto',
@@ -630,7 +640,7 @@ export default function ProfilePage() {
             fontSize: '14px',
             color: '#6c757d',
             margin: 0
-          }}>기본정보 및 셀러계정 설정을 관리하세요</p>
+          }}>기본정보 및 셀러계정 정보를 관리하세요</p>
         </div>
 
         {loading ? (
@@ -784,8 +794,17 @@ export default function ProfilePage() {
                   }}>전화번호</label>
                   <input
                     type="tel"
-                    value={sellerInfo.phone}
-                    onChange={(e) => handleChange('phone', e.target.value)}
+                    value={sellerInfo.phone || ''}
+                    onChange={(e) => {
+                      // IME 조합 중이 아닐 때만 처리
+                      if (!(e.nativeEvent as any).isComposing) {
+                        handleChange('phone', e.target.value);
+                      }
+                    }}
+                    onCompositionEnd={(e) => {
+                      // IME 입력 완료 시 처리
+                      handleChange('phone', (e.target as HTMLInputElement).value);
+                    }}
                     placeholder="010-0000-0000"
                     maxLength={13}
                     style={{
@@ -939,7 +958,7 @@ export default function ProfilePage() {
                   fontWeight: '700',
                   color: '#212529',
                   margin: 0
-                }}>셀러계정 설정</h2>
+                }}>셀러계정 정보</h2>
 
                 {/* 셀러계정명 배지 */}
                 {(() => {
@@ -1187,55 +1206,17 @@ export default function ProfilePage() {
                     </div>
 
                     <div>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
+                      <label style={{
+                        display: 'block',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: '#495057',
                         marginBottom: '6px'
-                      }}>
-                        <label style={{
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          color: '#495057'
-                        }}>이메일 (계산서)</label>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
-                          <input
-                            type="checkbox"
-                            id="sameAsEmail"
-                            checked={isSameAsEmail}
-                            onChange={(e) => {
-                              setIsSameAsEmail(e.target.checked);
-                              if (e.target.checked && sellerInfo.email) {
-                                setSellerInfo(prev => ({ ...prev, business_email: prev.email }));
-                              }
-                            }}
-                            style={{
-                              width: '14px',
-                              height: '14px',
-                              cursor: 'pointer'
-                            }}
-                          />
-                          <label
-                            htmlFor="sameAsEmail"
-                            style={{
-                              fontSize: '11px',
-                              color: '#6c757d',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            기본 이메일과 동일
-                          </label>
-                        </div>
-                      </div>
+                      }}>이메일 (계산서)</label>
                       <input
                         type="email"
                         value={sellerInfo.business_email || ''}
                         onChange={(e) => handleChange('business_email', e.target.value)}
-                        disabled={isSameAsEmail}
                         placeholder="example@company.com"
                         style={{
                           width: '100%',
@@ -1244,12 +1225,12 @@ export default function ProfilePage() {
                           borderRadius: '8px',
                           fontSize: '13px',
                           outline: 'none',
-                          background: isSameAsEmail ? '#f8f9fa' : 'white',
-                          color: isSameAsEmail ? '#6c757d' : '#212529',
-                          cursor: isSameAsEmail ? 'not-allowed' : 'text',
+                          background: 'white',
+                          color: '#212529',
+                          cursor: 'text',
                           transition: 'border 0.2s'
                         }}
-                        onFocus={(e) => !isSameAsEmail && (e.target.style.borderColor = '#3b82f6')}
+                        onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
                         onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
                       />
                     </div>
@@ -1396,7 +1377,7 @@ export default function ProfilePage() {
                         fontWeight: '500',
                         color: '#495057',
                         marginBottom: '6px'
-                      }}>은행명</label>
+                      }}>은행명 <span style={{ color: '#ef4444' }}>*</span></label>
                       <input
                         type="text"
                         value={sellerInfo.bank_name || ''}
@@ -1423,7 +1404,7 @@ export default function ProfilePage() {
                         fontWeight: '500',
                         color: '#495057',
                         marginBottom: '6px'
-                      }}>계좌번호</label>
+                      }}>계좌번호 <span style={{ color: '#ef4444' }}>*</span></label>
                       <input
                         type="text"
                         value={sellerInfo.bank_account || ''}
@@ -1450,7 +1431,7 @@ export default function ProfilePage() {
                         fontWeight: '500',
                         color: '#495057',
                         marginBottom: '6px'
-                      }}>예금주</label>
+                      }}>예금주 <span style={{ color: '#ef4444' }}>*</span></label>
                       <input
                         type="text"
                         value={sellerInfo.account_holder || ''}

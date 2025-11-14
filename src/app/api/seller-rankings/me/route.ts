@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
         *,
         organizations!seller_rankings_organization_id_fkey (
           id,
-          name,
+          business_name,
           business_number
         )
       `)

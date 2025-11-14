@@ -66,7 +66,7 @@ export default function ProductsPage() {
   const [stats, setStats] = useState<Stat[]>([]);
   const [shippingMonth, setShippingMonth] = useState(new Date());
   const [productMonth, setProductMonth] = useState(new Date());
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]); // 차트 컴포넌트용 빈 배열
 
   useEffect(() => {
     setIsMounted(true);
@@ -242,38 +242,6 @@ export default function ProductsPage() {
     fetchOrganizationInfo();
   }, []);
 
-  // 주문 데이터 가져오기
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const supabase = createClient();
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) return;
-
-        const { data: userData } = await supabase
-          .from('users')
-          .select('primary_organization_id')
-          .eq('id', user.id)
-          .single();
-
-        if (!userData?.primary_organization_id) return;
-
-        const { data: ordersData, error: ordersError } = await supabase
-          .from('orders')
-          .select('*')
-          .eq('organization_id', userData.primary_organization_id)
-          .order('created_at', { ascending: false });
-
-        if (!ordersError && ordersData) {
-          setOrders(ordersData);
-        }
-      } catch (error) {
-        console.error('주문 데이터 로드 실패:', error);
-      }
-    };
-
-    fetchOrders();
-  }, []);
 
   // 시세정보 데이터
   const marketPrices: MarketPrice[] = [

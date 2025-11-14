@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // 🔒 조직 ID 자동 설정 (관리자 제외)
     let organizationId = null;
-    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin') {
+    if (auth.userData!.role !== 'super_admin' && auth.userData!.role !== 'admin') {
       organizationId = await getOrganizationDataFilter(auth.user.id);
     }
 
@@ -308,7 +308,7 @@ export async function PUT(request: NextRequest) {
 
     // 🔒 조직 필터: 일반 사용자는 자신의 조직 주문만 수정 가능
     let organizationId = null;
-    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin' && auth.user.role !== 'employee') {
+    if (auth.userData!.role !== 'super_admin' && auth.userData!.role !== 'admin' && auth.userData!.role !== 'employee') {
       organizationId = await getOrganizationDataFilter(auth.user.id);
 
       // 모든 주문이 현재 사용자의 조직에 속하는지 확인
@@ -433,7 +433,7 @@ export async function DELETE(request: NextRequest) {
 
     // 🔒 조직 필터: 일반 사용자는 자신의 조직 주문만 삭제 가능
     let organizationId = null;
-    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin' && auth.user.role !== 'employee') {
+    if (auth.userData!.role !== 'super_admin' && auth.userData!.role !== 'admin' && auth.userData!.role !== 'employee') {
       organizationId = await getOrganizationDataFilter(auth.user.id);
 
       // 모든 주문이 현재 사용자의 조직에 속하는지 확인

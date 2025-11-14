@@ -147,11 +147,10 @@ export async function POST(request: NextRequest) {
 
     // 캐시 계정이 없으면 생성
     if (!userCash) {
-      console.log('[POST /api/cash/claim-activity] 캐시 계정 생성 시도:', { user_id: user.id, organization_id: organization.id });
+      console.log('[POST /api/cash/claim-activity] 캐시 계정 생성 시도:', { organization_id: organization.id });
       const { data: newCash, error: insertError } = await adminSupabase
         .from('organization_cash')
         .insert({
-          user_id: user.id,
           organization_id: organization.id,
           balance: 0
         })
@@ -205,12 +204,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 거래 이력 추가
-    console.log('[POST /api/cash/claim-activity] 거래 이력 추가 시도:', { user_id: user.id, organization_id: organization.id, type: 'activity', amount: pointsToGive });
+    console.log('[POST /api/cash/claim-activity] 거래 이력 추가 시도:', { organization_id: organization.id, type: 'activity', amount: pointsToGive });
     const { error: transactionError } = await adminSupabase
       .from('organization_cash_transactions')
       .insert({
-        user_id: user.id,
         organization_id: organization.id,
+        used_by_user_id: user.id,
         type: 'activity',
         amount: pointsToGive,
         balance_after: newBalance,

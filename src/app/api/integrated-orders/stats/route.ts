@@ -36,7 +36,9 @@ export async function GET(request: NextRequest) {
 
     // 🔒 조직 필터: 같은 조직의 통계만 조회 (관리자는 전체 조회)
     let organizationId: string | null = null;
-    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin') {
+    const userRole = auth.userData?.role || 'seller';
+
+    if (userRole !== 'super_admin' && userRole !== 'admin' && userRole !== 'employee') {
       organizationId = await getOrganizationDataFilter(auth.user.id);
     }
 
@@ -49,6 +51,7 @@ export async function GET(request: NextRequest) {
       vendorName,
       searchKeyword,
       organizationId,
+      userRole,
     });
 
     // ⚡ PostgreSQL RPC 함수 호출 (단일 쿼리로 모든 통계 계산)
@@ -83,6 +86,23 @@ export async function GET(request: NextRequest) {
     const sellerStats = data?.seller_stats || [];
     const optionStats = data?.option_stats || [];
 
+    // 🔍 조직별 사업자명 조회 (organizations 테이블에서)
+    const organizationIds = sellerStats.map((s: any) => s.organization_id).filter(Boolean);
+    let organizationNames: Record<string, string> = {};
+
+    if (organizationIds.length > 0) {
+      const { data: orgs } = await supabase
+        .from('organizations')
+        .select('id, business_name')
+        .in('id', organizationIds);
+
+      if (orgs) {
+        organizationNames = Object.fromEntries(
+          orgs.map(org => [org.id, org.business_name || '미지정'])
+        );
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -113,10 +133,10 @@ export async function GET(request: NextRequest) {
           취소완료_건수: v['취소완료_건수'] || 0,
           취소완료_수량: v['취소완료_수량'] || 0,
         })),
-        // 셀러별 통계
+        // 조직별 통계 (seller_name을 API에서 조회)
         sellerStats: sellerStats.map((s: any) => ({
-          seller_id: s.seller_id,
-          seller_name: s.seller_name,
+          organization_id: s.organization_id,
+          seller_name: organizationNames[s.organization_id] || '미지정',
           총금액: s['총금액'] || 0,
           입금확인: s['입금확인'] || false,
           접수_건수: s['접수_건수'] || 0,

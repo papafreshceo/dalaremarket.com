@@ -19,6 +19,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // 사용자의 primary organization 조회
+    const { getUserPrimaryOrganization } = await import('@/lib/organization-utils');
+    const organization = await getUserPrimaryOrganization(user.id);
+
+    if (!organization) {
+      return NextResponse.json(
+        { success: false, error: '조직 정보를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
     // URL 파라미터 파싱
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -28,7 +39,7 @@ export async function GET(request: NextRequest) {
     const { data: transactions, error: transactionsError, count } = await supabase
       .from('organization_credit_transactions')
       .select('*', { count: 'exact' })
-      .eq('user_id', user.id)
+      .eq('organization_id', organization.id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 

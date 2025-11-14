@@ -86,7 +86,6 @@ export async function PUT(request: NextRequest) {
       bank_account,
       bank_name,
       account_holder,
-      depositor_name,
       store_name,
       store_phone,
     } = body;
@@ -177,7 +176,6 @@ export async function PUT(request: NextRequest) {
       bank_account ||
       bank_name ||
       account_holder ||
-      depositor_name ||
       store_name ||
       store_phone;
 
@@ -219,7 +217,6 @@ export async function PUT(request: NextRequest) {
           bank_account: bank_account || null,
           bank_name: bank_name || null,
           account_holder: account_holder || null,
-          depositor_name: depositor_name || null,
           store_name: store_name || null,
           store_phone: store_phone || null,
         };

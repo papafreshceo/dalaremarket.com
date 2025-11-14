@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
           balance: DAILY_CREDIT_LIMIT,
           last_refill_date: today
         })
-        .eq('user_id', effectiveUserId);
+        .eq('organization_id', organization.id);
 
       if (updateError) {
         console.error('[POST /api/credits/daily-refill] 크레딧 리필 오류:', updateError);

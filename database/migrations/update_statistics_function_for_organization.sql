@@ -30,13 +30,15 @@ BEGIN
       o.seller_supply_price,
       o.vendor_name,
       o.seller_id,
-      -- ✅ seller_name은 users 테이블에서 조인
-      COALESCE(u.company_name, u.name, u.email) as seller_name,
+      o.organization_id,
+      -- ✅ seller_name은 organizations 테이블에서 조인 (조직 기반)
+      COALESCE(org.name, u.name, u.email) as seller_name,
       o.option_name,
       o.payment_confirmed_at,
       o.refund_processed_at
     FROM integrated_orders o
     LEFT JOIN users u ON o.seller_id = u.id
+    LEFT JOIN organizations org ON o.organization_id = org.id
     WHERE o.is_deleted = false
       -- 🆕 조직 필터 (NULL이면 전체 조회)
       AND (p_organization_id IS NULL OR o.organization_id = p_organization_id)
@@ -98,7 +100,7 @@ BEGIN
   ),
   seller_stats AS (
     SELECT
-      seller_id,
+      organization_id,
       COALESCE(seller_name, '미지정') as seller_name,
       SUM(COALESCE(seller_supply_price::numeric, 0)) FILTER (WHERE shipping_status = '접수') as "총금액",
       bool_or(payment_confirmed_at IS NOT NULL) as "입금확인",
@@ -117,7 +119,7 @@ BEGIN
       COUNT(*) FILTER (WHERE shipping_status = '취소완료') as "취소완료_건수",
       SUM(COALESCE(quantity::integer, 0)) FILTER (WHERE shipping_status = '취소완료') as "취소완료_수량"
     FROM filtered_orders
-    GROUP BY seller_id, seller_name
+    GROUP BY organization_id, seller_name
     ORDER BY COUNT(*) DESC
   ),
   option_stats AS (

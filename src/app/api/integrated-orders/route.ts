@@ -41,14 +41,15 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact' })
       .eq('is_deleted', false);
 
-    // 🔒 조직 필터: 같은 조직의 주문만 조회 (관리자 제외)
-    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin' && auth.user.role !== 'employee') {
+    // 🔒 조직 필터: 관리자가 아니면 자신의 조직 주문만 조회
+    if (auth.userData.role !== 'super_admin' && auth.userData.role !== 'admin' && auth.userData.role !== 'employee') {
       const organizationId = await getOrganizationDataFilter(auth.user.id);
       if (organizationId) {
+        // 조직이 있으면 해당 조직의 주문만 조회
         query = query.eq('organization_id', organizationId);
       } else {
-        // 조직이 없으면 본인이 등록한 주문만 조회
-        query = query.eq('seller_id', auth.user.id);
+        // 조직이 없으면 빈 결과 반환 (조직 단위로만 관리)
+        query = query.eq('organization_id', '00000000-0000-0000-0000-000000000000'); // 존재하지 않는 UUID
       }
     }
 
@@ -95,6 +96,21 @@ export async function GET(request: NextRequest) {
 
     const { data, error, count } = await query;
 
+    console.log('🔍 [GET /api/integrated-orders] 주문 조회 결과');
+    console.log('  - User Role:', auth.userData?.role);
+    console.log('  - onlyWithOrganization:', onlyWithOrganization);
+    console.log('  - 날짜 필터:', { startDate, endDate });
+    console.log('  - 조회된 주문수:', data?.length || 0);
+    console.log('  - 전체 카운트:', count);
+    console.log('  - 에러:', error?.message || 'none');
+
+    if (data && data.length > 0) {
+      console.log('  - 샘플 주문 3개:');
+      data.slice(0, 3).forEach((o: any, idx: number) => {
+        console.log(`    ${idx + 1}. ID: ${o.id}, org: ${o.organization_id?.substring(0, 8)}, status: ${o.shipping_status}, created: ${o.created_at}`);
+      });
+    }
+
     if (data) {
       const marketNames = [...new Set(data.map((o: any) => o.market_name))];
     }
@@ -130,27 +146,42 @@ export async function GET(request: NextRequest) {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
-    // seller_id로 users 정보 가져오기
-    const sellerIds = [...new Set(sortedData.map(order => order.seller_id).filter(Boolean))];
-    const sellersMap = new Map<string, string>();
+    // organization_id로 organizations 정보 가져오기 (사업자명)
+    const organizationIds = [...new Set(sortedData.map(order => order.organization_id).filter(Boolean))];
+    const organizationsMap = new Map<string, string>();
 
-    if (sellerIds.length > 0) {
-      const { data: sellers } = await supabase
-        .from('users')
-        .select('id, company_name, name, email')
-        .in('id', sellerIds);
+    if (organizationIds.length > 0) {
+      const { data: organizations } = await supabase
+        .from('organizations')
+        .select('id, business_name')
+        .in('id', organizationIds);
 
-      (sellers || []).forEach((seller) => {
-        // company_name이 없으면 name, 그것도 없으면 email 사용
-        const displayName = seller.company_name || seller.name || seller.email || '미지정';
-        sellersMap.set(seller.id, displayName);
+      (organizations || []).forEach((org) => {
+        organizationsMap.set(org.id, org.business_name || '미지정');
       });
     }
 
-    // seller_id를 통해 company_name을 seller_name에 매핑
+    // sub_account_id로 sub_accounts 정보 가져오기 (서브계정명)
+    const subAccountIds = [...new Set(sortedData.map(order => order.sub_account_id).filter(Boolean))];
+    const subAccountsMap = new Map<string, string>();
+
+    if (subAccountIds.length > 0) {
+      const { data: subAccounts } = await supabase
+        .from('sub_accounts')
+        .select('id, business_name')
+        .in('id', subAccountIds);
+
+      (subAccounts || []).forEach((sub) => {
+        subAccountsMap.set(sub.id, sub.business_name || '');
+      });
+    }
+
+    // organization_id, sub_account_id, final_deposit_amount 매핑
     const normalizedData = sortedData.map(order => ({
       ...order,
-      seller_name: order.seller_id ? sellersMap.get(order.seller_id) || null : null
+      seller_name: order.organization_id ? organizationsMap.get(order.organization_id) || null : null,
+      field_46: order.sub_account_id ? subAccountsMap.get(order.sub_account_id) || '' : '', // 서브계정명
+      field_47: order.final_deposit_amount || 0 // 최종입금액
     }));
 
     // 페이지네이션 적용 (limit이 0이면 전체 데이터 반환)
@@ -218,7 +249,7 @@ export async function POST(request: NextRequest) {
     body.created_by = auth.user.id;
 
     // 🔒 조직 ID 자동 설정 (관리자 제외)
-    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin') {
+    if (auth.userData.role !== 'super_admin' && auth.userData.role !== 'admin') {
       const organizationId = await getOrganizationDataFilter(auth.user.id);
       if (organizationId) {
         body.organization_id = organizationId;

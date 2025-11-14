@@ -97,7 +97,6 @@ export async function POST(request: NextRequest) {
       const { data: newCash, error: insertError } = await supabase
         .from('organization_cash')
         .insert({
-          user_id: user.id,
           organization_id: organization.id,
           balance: 0
         })
@@ -154,8 +153,8 @@ export async function POST(request: NextRequest) {
     const { error: transactionError } = await supabase
       .from('organization_cash_transactions')
       .insert({
-        user_id: user.id,
         organization_id: organization.id,
+        used_by_user_id: user.id,
         type: 'login',
         amount: loginReward,
         balance_after: newBalance,

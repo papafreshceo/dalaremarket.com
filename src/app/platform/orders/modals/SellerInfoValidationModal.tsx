@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -10,13 +9,13 @@ interface SellerInfoValidationModalProps {
   onClose: () => void;
   onConfirm: () => void;
   userId: string;
+  organizationId?: string;
 }
 
-interface UserInfo {
+interface OrgInfo {
   bank_account?: string;
   bank_name?: string;
   account_holder?: string;
-  depositor_name?: string;
   representative_name?: string;
   representative_phone?: string;
   manager_name?: string;
@@ -27,129 +26,90 @@ export default function SellerInfoValidationModal({
   isOpen,
   onClose,
   onConfirm,
-  userId
+  userId,
+  organizationId
 }: SellerInfoValidationModalProps) {
-  const [userInfo, setUserInfo] = useState<UserInfo>({});
+  const [orgInfo, setOrgInfo] = useState<OrgInfo>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [hasAllRequiredInfo, setHasAllRequiredInfo] = useState(false);
 
   useEffect(() => {
-    if (isOpen && userId) {
-      loadUserInfo();
+    if (isOpen && organizationId) {
+      loadOrgInfo();
     }
-  }, [isOpen, userId]);
+  }, [isOpen, organizationId]);
 
-  const loadUserInfo = async () => {
+  const loadOrgInfo = async () => {
     try {
       setLoading(true);
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('users')
-        .select('bank_account, bank_name, account_holder, representative_name, representative_phone, manager_name, manager_phone')
-        .eq('id', userId)
-        .single();
 
-      if (error) throw error;
-
-      // depositor_name은 선택적으로 추가 조회 (칼럼이 없을 수도 있음)
-      let depositorName = '';
-      try {
-        const { data: extraData } = await supabase
-          .from('users')
-          .select('depositor_name')
-          .eq('id', userId)
-          .single();
-        depositorName = extraData?.depositor_name || '';
-      } catch (e) {
-        // depositor_name 칼럼이 없으면 빈 값으로 처리
+      if (!organizationId) {
+        throw new Error('조직 ID가 없습니다');
       }
 
-      const loadedInfo = {
-        bank_account: data?.bank_account || '',
-        bank_name: data?.bank_name || '',
-        account_holder: data?.account_holder || '',
-        depositor_name: depositorName,
-        representative_name: data?.representative_name || '',
-        representative_phone: data?.representative_phone || '',
-        manager_name: data?.manager_name || '',
-        manager_phone: data?.manager_phone || '',
-      };
+      // 직접 supabase로 조직 정보 조회
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
 
-      setUserInfo(loadedInfo);
+      const { data: orgData, error: orgError } = await supabase
+        .from('organizations')
+        .select('bank_account, bank_name, account_holder, representative_name, representative_phone, manager_name, manager_phone')
+        .eq('id', organizationId)
+        .single();
 
-      // 필수 정보가 모두 입력되어 있는지 확인 (입금자명 제외)
-      const allRequired =
-        loadedInfo.bank_account?.trim() &&
-        loadedInfo.bank_name?.trim() &&
-        loadedInfo.account_holder?.trim() &&
-        loadedInfo.representative_name?.trim() &&
-        loadedInfo.representative_phone?.trim() &&
-        loadedInfo.manager_name?.trim() &&
-        loadedInfo.manager_phone?.trim();
+      if (orgError || !orgData) {
+        throw new Error('조직 정보 조회 실패');
+      }
 
-      setHasAllRequiredInfo(!!allRequired);
+      setOrgInfo(orgData || {});
     } catch (error) {
-      console.error('사용자 정보 로드 실패:', error);
-      toast.error('사용자 정보를 불러오는데 실패했습니다');
+      console.error('조직 정보 로드 실패:', error);
+      toast.error('조직 정보를 불러오는데 실패했습니다');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (field: keyof UserInfo, value: string) => {
+  const handleChange = (field: keyof OrgInfo, value: string) => {
     // 전화번호 필드인 경우 포맷팅 적용 (3-4-4)
     if (field === 'representative_phone' || field === 'manager_phone') {
+      // 숫자만 추출
       const numbers = value.replace(/[^0-9]/g, '');
-      let formatted = numbers;
 
-      if (numbers.length <= 3) {
-        formatted = numbers;
-      } else if (numbers.length <= 7) {
-        formatted = numbers.slice(0, 3) + '-' + numbers.slice(3);
-      } else {
-        formatted = numbers.slice(0, 3) + '-' + numbers.slice(3, 7) + '-' + numbers.slice(7, 11);
+      // 최대 11자리까지만
+      const limitedNumbers = numbers.slice(0, 11);
+
+      // 포맷팅
+      let formatted = limitedNumbers;
+      if (limitedNumbers.length > 3 && limitedNumbers.length <= 7) {
+        formatted = limitedNumbers.slice(0, 3) + '-' + limitedNumbers.slice(3);
+      } else if (limitedNumbers.length > 7) {
+        formatted = limitedNumbers.slice(0, 3) + '-' + limitedNumbers.slice(3, 7) + '-' + limitedNumbers.slice(7);
       }
 
-      setUserInfo(prev => ({ ...prev, [field]: formatted }));
-    } else {
-      setUserInfo(prev => ({ ...prev, [field]: value }));
+      setOrgInfo(prev => ({ ...prev, [field]: formatted }));
+    }
+    // 계좌번호 필드인 경우 숫자만 허용
+    else if (field === 'bank_account') {
+      const numbers = value.replace(/[^0-9]/g, '');
+      setOrgInfo(prev => ({ ...prev, [field]: numbers }));
+    }
+    // 그 외 필드
+    else {
+      setOrgInfo(prev => ({ ...prev, [field]: value }));
     }
   };
-
-  // 각 섹션별 입력 여부 확인
-  const hasDepositorName = !!userInfo.depositor_name?.trim();
-  const hasAccountInfo = !!(userInfo.bank_account?.trim() && userInfo.bank_name?.trim() && userInfo.account_holder?.trim());
-  const hasRepresentativeInfo = !!(userInfo.representative_name?.trim() && userInfo.representative_phone?.trim());
-  const hasManagerInfo = !!(userInfo.manager_name?.trim() && userInfo.manager_phone?.trim());
 
   const validateInfo = () => {
     const errors: string[] = [];
 
-    if (!userInfo.bank_account || !userInfo.bank_account.trim()) {
-      errors.push('정산 계좌번호');
-    }
-    if (!userInfo.bank_name || !userInfo.bank_name.trim()) {
-      errors.push('은행명');
-    }
-    if (!userInfo.account_holder || !userInfo.account_holder.trim()) {
-      errors.push('예금주');
-    }
-    if (!userInfo.depositor_name || !userInfo.depositor_name.trim()) {
-      errors.push('입금자명');
-    }
-    if (!userInfo.representative_name || !userInfo.representative_name.trim()) {
-      errors.push('대표자명');
-    }
-    if (!userInfo.representative_phone || !userInfo.representative_phone.trim()) {
-      errors.push('대표자 연락처');
-    }
-    if (!userInfo.manager_name || !userInfo.manager_name.trim()) {
-      errors.push('담당자명');
-    }
-    if (!userInfo.manager_phone || !userInfo.manager_phone.trim()) {
-      errors.push('담당자 연락처');
-    }
+    if (!orgInfo.bank_account?.trim()) errors.push('정산 계좌번호');
+    if (!orgInfo.bank_name?.trim()) errors.push('은행명');
+    if (!orgInfo.account_holder?.trim()) errors.push('예금주');
+    if (!orgInfo.representative_name?.trim()) errors.push('대표자명');
+    if (!orgInfo.representative_phone?.trim()) errors.push('대표자 연락처');
+    if (!orgInfo.manager_name?.trim()) errors.push('담당자명');
+    if (!orgInfo.manager_phone?.trim()) errors.push('담당자 연락처');
 
     if (errors.length > 0) {
       toast.error(`다음 정보를 입력해주세요: ${errors.join(', ')}`);
@@ -164,35 +124,33 @@ export default function SellerInfoValidationModal({
       return;
     }
 
+    if (!organizationId) {
+      toast.error('조직 ID가 없습니다');
+      return;
+    }
+
     try {
       setSaving(true);
+
+      // 직접 supabase로 조직 정보 업데이트
+      const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
 
-      // 기본 정보 업데이트
-      const { error } = await supabase
-        .from('users')
+      const { error: updateError } = await supabase
+        .from('organizations')
         .update({
-          bank_account: userInfo.bank_account,
-          bank_name: userInfo.bank_name,
-          account_holder: userInfo.account_holder,
-          representative_name: userInfo.representative_name,
-          representative_phone: userInfo.representative_phone,
-          manager_name: userInfo.manager_name,
-          manager_phone: userInfo.manager_phone,
+          bank_account: orgInfo.bank_account,
+          bank_name: orgInfo.bank_name,
+          account_holder: orgInfo.account_holder,
+          representative_name: orgInfo.representative_name,
+          representative_phone: orgInfo.representative_phone,
+          manager_name: orgInfo.manager_name,
+          manager_phone: orgInfo.manager_phone,
         })
-        .eq('id', userId);
+        .eq('id', organizationId);
 
-      if (error) throw error;
-
-      // depositor_name은 별도로 업데이트 시도 (칼럼이 없을 수도 있음)
-      if (userInfo.depositor_name) {
-        try {
-          await supabase
-            .from('users')
-            .update({ depositor_name: userInfo.depositor_name })
-            .eq('id', userId);
-        } catch (e) {
-        }
+      if (updateError) {
+        throw new Error('정보 저장 실패');
       }
 
       toast.success('정보가 저장되었습니다');
@@ -206,6 +164,11 @@ export default function SellerInfoValidationModal({
   };
 
   if (!isOpen) return null;
+
+  // 각 섹션별 입력 여부 확인
+  const hasAccountInfo = !!(orgInfo.bank_account?.trim() && orgInfo.bank_name?.trim() && orgInfo.account_holder?.trim());
+  const hasRepresentativeInfo = !!(orgInfo.representative_name?.trim() && orgInfo.representative_phone?.trim());
+  const hasManagerInfo = !!(orgInfo.manager_name?.trim() && orgInfo.manager_phone?.trim());
 
   return (
     <div
@@ -254,7 +217,7 @@ export default function SellerInfoValidationModal({
             color: 'var(--color-text)',
             margin: 0
           }}>
-            판매자 정보 확인
+            셀러계정 정보 확인
           </h2>
           <button
             onClick={onClose}
@@ -295,54 +258,7 @@ export default function SellerInfoValidationModal({
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {/* 입금자명 - 입력되지 않은 경우만 표시 */}
-                {!hasDepositorName && (
-                  <div style={{
-                    padding: '16px',
-                    background: '#fef3c7',
-                    borderRadius: '8px',
-                    border: '2px solid #fbbf24'
-                  }}>
-                    <h3 style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#92400e',
-                      marginBottom: '12px'
-                    }}>
-                      입금 정보
-                    </h3>
-                    <div>
-                      <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: '#92400e',
-                        marginBottom: '6px'
-                      }}>
-                        입금자명 <span style={{ color: '#ef4444' }}>*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={userInfo.depositor_name || ''}
-                        onChange={(e) => handleChange('depositor_name', e.target.value)}
-                        disabled={saving}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          background: '#ffffff',
-                          border: `2px solid ${!userInfo.depositor_name?.trim() ? '#ef4444' : '#fbbf24'}`,
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          color: '#000',
-                          cursor: saving ? 'not-allowed' : 'text'
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* 정산 계좌 정보 - 입력되지 않은 경우만 표시 */}
-                {!hasAccountInfo && (
+                {/* 정산 계좌 정보 */}
                 <div style={{
                   padding: '16px',
                   background: 'var(--color-background-secondary)',
@@ -370,7 +286,7 @@ export default function SellerInfoValidationModal({
                       </label>
                       <input
                         type="text"
-                        value={userInfo.bank_name || ''}
+                        value={orgInfo.bank_name || ''}
                         onChange={(e) => handleChange('bank_name', e.target.value)}
                         placeholder="은행명"
                         disabled={saving}
@@ -378,7 +294,7 @@ export default function SellerInfoValidationModal({
                           width: '100%',
                           padding: '8px 12px',
                           background: 'var(--color-surface)',
-                          border: `1px solid ${!userInfo.bank_name?.trim() ? '#ef4444' : 'var(--color-border)'}`,
+                          border: `1px solid ${!orgInfo.bank_name?.trim() ? '#ef4444' : 'var(--color-border)'}`,
                           borderRadius: '6px',
                           fontSize: '13px',
                           color: 'var(--color-text)',
@@ -398,20 +314,22 @@ export default function SellerInfoValidationModal({
                       </label>
                       <input
                         type="text"
-                        value={userInfo.bank_account || ''}
+                        inputMode="numeric"
+                        value={orgInfo.bank_account || ''}
                         onChange={(e) => handleChange('bank_account', e.target.value)}
-                        placeholder="'-' 없이 입력"
+                        placeholder="'-' 없이 숫자만 입력"
                         disabled={saving}
                         style={{
                           width: '100%',
                           padding: '8px 12px',
                           background: 'var(--color-surface)',
-                          border: `1px solid ${!userInfo.bank_account?.trim() ? '#ef4444' : 'var(--color-border)'}`,
+                          border: `1px solid ${!orgInfo.bank_account?.trim() ? '#ef4444' : 'var(--color-border)'}`,
                           borderRadius: '6px',
                           fontSize: '13px',
                           color: 'var(--color-text)',
-                          cursor: saving ? 'not-allowed' : 'text'
-                        }}
+                          cursor: saving ? 'not-allowed' : 'text',
+                          imeMode: 'disabled'
+                        } as React.CSSProperties}
                       />
                     </div>
                     <div>
@@ -426,7 +344,7 @@ export default function SellerInfoValidationModal({
                       </label>
                       <input
                         type="text"
-                        value={userInfo.account_holder || ''}
+                        value={orgInfo.account_holder || ''}
                         onChange={(e) => handleChange('account_holder', e.target.value)}
                         placeholder="예금주명"
                         disabled={saving}
@@ -434,7 +352,7 @@ export default function SellerInfoValidationModal({
                           width: '100%',
                           padding: '8px 12px',
                           background: 'var(--color-surface)',
-                          border: `1px solid ${!userInfo.account_holder?.trim() ? '#ef4444' : 'var(--color-border)'}`,
+                          border: `1px solid ${!orgInfo.account_holder?.trim() ? '#ef4444' : 'var(--color-border)'}`,
                           borderRadius: '6px',
                           fontSize: '13px',
                           color: 'var(--color-text)',
@@ -444,10 +362,8 @@ export default function SellerInfoValidationModal({
                     </div>
                   </div>
                 </div>
-                )}
 
-                {/* 대표자 정보 - 입력되지 않은 경우만 표시 */}
-                {!hasRepresentativeInfo && (
+                {/* 대표자 정보 */}
                 <div style={{
                   padding: '16px',
                   background: 'var(--color-background-secondary)',
@@ -475,7 +391,7 @@ export default function SellerInfoValidationModal({
                       </label>
                       <input
                         type="text"
-                        value={userInfo.representative_name || ''}
+                        value={orgInfo.representative_name || ''}
                         onChange={(e) => handleChange('representative_name', e.target.value)}
                         placeholder="대표자명"
                         disabled={saving}
@@ -483,7 +399,7 @@ export default function SellerInfoValidationModal({
                           width: '100%',
                           padding: '8px 12px',
                           background: 'var(--color-surface)',
-                          border: `1px solid ${!userInfo.representative_name?.trim() ? '#ef4444' : 'var(--color-border)'}`,
+                          border: `1px solid ${!orgInfo.representative_name?.trim() ? '#ef4444' : 'var(--color-border)'}`,
                           borderRadius: '6px',
                           fontSize: '13px',
                           color: 'var(--color-text)',
@@ -502,8 +418,8 @@ export default function SellerInfoValidationModal({
                         대표자 연락처 <span style={{ color: '#ef4444' }}>*</span>
                       </label>
                       <input
-                        type="text"
-                        value={userInfo.representative_phone || ''}
+                        type="tel"
+                        value={orgInfo.representative_phone || ''}
                         onChange={(e) => handleChange('representative_phone', e.target.value)}
                         placeholder="010-0000-0000"
                         maxLength={13}
@@ -512,20 +428,19 @@ export default function SellerInfoValidationModal({
                           width: '100%',
                           padding: '8px 12px',
                           background: 'var(--color-surface)',
-                          border: `1px solid ${!userInfo.representative_phone?.trim() ? '#ef4444' : 'var(--color-border)'}`,
+                          border: `1px solid ${!orgInfo.representative_phone?.trim() ? '#ef4444' : 'var(--color-border)'}`,
                           borderRadius: '6px',
                           fontSize: '13px',
                           color: 'var(--color-text)',
-                          cursor: saving ? 'not-allowed' : 'text'
-                        }}
+                          cursor: saving ? 'not-allowed' : 'text',
+                          imeMode: 'disabled'
+                        } as React.CSSProperties}
                       />
                     </div>
                   </div>
                 </div>
-                )}
 
-                {/* 담당자 정보 - 입력되지 않은 경우만 표시 */}
-                {!hasManagerInfo && (
+                {/* 담당자 정보 */}
                 <div style={{
                   padding: '16px',
                   background: 'var(--color-background-secondary)',
@@ -553,7 +468,7 @@ export default function SellerInfoValidationModal({
                       </label>
                       <input
                         type="text"
-                        value={userInfo.manager_name || ''}
+                        value={orgInfo.manager_name || ''}
                         onChange={(e) => handleChange('manager_name', e.target.value)}
                         placeholder="담당자명"
                         disabled={saving}
@@ -561,7 +476,7 @@ export default function SellerInfoValidationModal({
                           width: '100%',
                           padding: '8px 12px',
                           background: 'var(--color-surface)',
-                          border: `1px solid ${!userInfo.manager_name?.trim() ? '#ef4444' : 'var(--color-border)'}`,
+                          border: `1px solid ${!orgInfo.manager_name?.trim() ? '#ef4444' : 'var(--color-border)'}`,
                           borderRadius: '6px',
                           fontSize: '13px',
                           color: 'var(--color-text)',
@@ -580,8 +495,8 @@ export default function SellerInfoValidationModal({
                         담당자 연락처 <span style={{ color: '#ef4444' }}>*</span>
                       </label>
                       <input
-                        type="text"
-                        value={userInfo.manager_phone || ''}
+                        type="tel"
+                        value={orgInfo.manager_phone || ''}
                         onChange={(e) => handleChange('manager_phone', e.target.value)}
                         placeholder="010-0000-0000"
                         maxLength={13}
@@ -590,17 +505,17 @@ export default function SellerInfoValidationModal({
                           width: '100%',
                           padding: '8px 12px',
                           background: 'var(--color-surface)',
-                          border: `1px solid ${!userInfo.manager_phone?.trim() ? '#ef4444' : 'var(--color-border)'}`,
+                          border: `1px solid ${!orgInfo.manager_phone?.trim() ? '#ef4444' : 'var(--color-border)'}`,
                           borderRadius: '6px',
                           fontSize: '13px',
                           color: 'var(--color-text)',
-                          cursor: saving ? 'not-allowed' : 'text'
-                        }}
+                          cursor: saving ? 'not-allowed' : 'text',
+                          imeMode: 'disabled'
+                        } as React.CSSProperties}
                       />
                     </div>
                   </div>
                 </div>
-                )}
               </div>
             </>
           )}

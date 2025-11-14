@@ -36,11 +36,14 @@ interface OrderRegistrationTabProps {
   setEndDate: (date: Date | null) => void;
   onRefresh?: () => void;
   userEmail: string;
+  organizationId: string;
+  isSampleMode?: boolean;
 }
 
 export default function OrderRegistrationTab({
   isMobile,
   orders,
+  isSampleMode = false,
   statsData,
   statusConfig,
   filterStatus,
@@ -60,12 +63,13 @@ export default function OrderRegistrationTab({
   endDate,
   setEndDate,
   onRefresh,
-  userEmail
+  userEmail,
+  organizationId: propOrganizationId
 }: OrderRegistrationTabProps) {
 
   // 사용자 정보 (내부에서 조회)
   const [userId, setUserId] = useState<string>('');
-  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [organizationId, setOrganizationId] = useState<string>(propOrganizationId);
 
   // 툴팁 상태 관리 (최상단에 배치)
   const [hoveredStatus, setHoveredStatus] = useState<Order['status'] | null>(null);
@@ -90,6 +94,11 @@ export default function OrderRegistrationTab({
   // 판매자 정보 검증 모달 상태
   const [showSellerInfoValidationModal, setShowSellerInfoValidationModal] = useState(false);
 
+  // 입금자명 입력 모달 상태
+  const [showDepositorNameModal, setShowDepositorNameModal] = useState(false);
+  const [depositorNameInput, setDepositorNameInput] = useState('');
+  const [defaultDepositorName, setDefaultDepositorName] = useState('');
+
   // 캐시 관련 state
   const [cashBalance, setCashBalance] = useState<number>(0);
   const [cashToUse, setCashToUse] = useState<number>(0);
@@ -99,7 +108,14 @@ export default function OrderRegistrationTab({
   const [isPriceUpdated, setIsPriceUpdated] = useState<boolean>(false);
   const [isUpdatingPrice, setIsUpdatingPrice] = useState<boolean>(false);
 
-  // 사용자 정보 조회 (userId, organizationId)
+  // organizationId prop 변경 시 state 업데이트
+  useEffect(() => {
+    if (propOrganizationId) {
+      setOrganizationId(propOrganizationId);
+    }
+  }, [propOrganizationId]);
+
+  // 사용자 정보 및 조직 정보 조회
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
@@ -110,29 +126,29 @@ export default function OrderRegistrationTab({
         if (user) {
           setUserId(user.id);
 
-          // 사용자의 primary_organization_id 조회
-          const { data: userData } = await supabase
-            .from('users')
-            .select('primary_organization_id')
-            .eq('id', user.id)
-            .single();
+          // props로 organizationId를 받지 못한 경우에만 직접 조회
+          if (!propOrganizationId) {
+            const { data: userData } = await supabase
+              .from('users')
+              .select('primary_organization_id')
+              .eq('id', user.id)
+              .single();
 
-          if (userData?.primary_organization_id) {
-            setOrganizationId(userData.primary_organization_id);
+            if (userData?.primary_organization_id) {
+              setOrganizationId(userData.primary_organization_id);
+            }
           }
         } else {
           setUserId('guest');
-          setOrganizationId(null);
         }
       } catch (error) {
         console.error('사용자 정보 조회 실패:', error);
         setUserId('guest');
-        setOrganizationId(null);
       }
     };
 
     fetchUserInfo();
-  }, []);
+  }, [propOrganizationId]);
 
   // 필터 상태 변경 시 공급가 갱신 상태 확인
   useEffect(() => {
@@ -252,6 +268,12 @@ export default function OrderRegistrationTab({
         const quantity = Number(order.quantity) || 1;
         const newSupplyPrice = newUnitPrice * quantity;
 
+        // 🔒 샘플 모드일 때는 DB 업데이트 건너뛰기
+        if (isSampleMode) {
+          updatedCount++;
+          continue;
+        }
+
         // DB 업데이트 (price_updated_at 필드에 갱신 일시 저장)
         const { error: updateError } = await supabase
           .from('integrated_orders')
@@ -297,129 +319,265 @@ export default function OrderRegistrationTab({
       return;
     }
 
-    // 1단계: 판매자 정보 검증
+    let finalDepositorName = '';
+
+    // 1단계: 셀러계정(조직) 정보 검증
     try {
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('bank_account, bank_name, account_holder, representative_name, representative_phone, manager_name, manager_phone')
-        .eq('id', userId)
-        .single();
-
-      if (userError) {
-        console.error('사용자 정보 조회 실패:', userError);
-        showModal('alert', '오류', '사용자 정보를 불러오는데 실패했습니다.');
+      if (!organizationId) {
+        showModal('alert', '오류', '셀러계정 정보가 없습니다.');
         return;
       }
 
-      // depositor_name은 선택적으로 추가 조회 (칼럼이 없을 수도 있음)
-      let depositorName = '';
-      try {
-        const { data: extraData } = await supabase
-          .from('users')
-          .select('depositor_name')
-          .eq('id', userId)
-          .single();
-        depositorName = extraData?.depositor_name || '';
-      } catch (e) {
-        // depositor_name 칼럼이 없으면 무시
+      // 직접 supabase로 조직 정보 조회 (profile 페이지와 동일한 방식)
+      console.log('🔍 셀러계정 정보 조회 시작:', { organizationId });
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+
+      const { data: orgData, error: orgError } = await supabase
+        .from('organizations')
+        .select('bank_account, bank_name, account_holder, representative_name, representative_phone')
+        .eq('id', organizationId)
+        .single();
+
+      console.log('🔍 조회 결과:', { orgData, orgError });
+
+      if (orgError || !orgData) {
+        console.error('셀러계정 정보 조회 실패:', orgError);
+        showModal('alert', '오류', '셀러계정 정보를 불러오는데 실패했습니다.');
+        return;
       }
 
-      // 필수 정보 확인
+      // 필수 정보 확인 (정산계좌정보, 대표자명, 대표자 연락처)
       const missingFields = [];
-      if (!userData?.bank_account?.trim()) missingFields.push('정산계좌번호');
-      if (!userData?.bank_name?.trim()) missingFields.push('은행명');
-      if (!userData?.account_holder?.trim()) missingFields.push('예금주');
-      if (!depositorName?.trim()) missingFields.push('입금자명');
-      if (!userData?.representative_name?.trim()) missingFields.push('대표자명');
-      if (!userData?.representative_phone?.trim()) missingFields.push('대표자 연락처');
-      if (!userData?.manager_name?.trim()) missingFields.push('담당자명');
-      if (!userData?.manager_phone?.trim()) missingFields.push('담당자 연락처');
+      if (!orgData?.bank_account?.trim()) missingFields.push('정산계좌번호');
+      if (!orgData?.bank_name?.trim()) missingFields.push('은행명');
+      if (!orgData?.account_holder?.trim()) missingFields.push('예금주');
+      if (!orgData?.representative_name?.trim()) missingFields.push('대표자명');
+      if (!orgData?.representative_phone?.trim()) missingFields.push('대표자 연락처');
 
       if (missingFields.length > 0) {
         // 판매자 정보가 불완전하면 검증 모달 표시
         setShowSellerInfoValidationModal(true);
         return;
       }
+
+      // 입금자명 입력 모달 표시
+      setDefaultDepositorName(orgData?.account_holder || '');
+      setDepositorNameInput(orgData?.account_holder || '');
+      setShowDepositorNameModal(true);
+
     } catch (error) {
       console.error('판매자 정보 검증 오류:', error);
       showModal('alert', '오류', '판매자 정보 검증 중 오류가 발생했습니다.');
       return;
     }
+  };
 
-    // 2단계: 옵션상품 검증 시작
+  // 입금자명 확인 후 발주확정 진행
+  const proceedWithPaymentConfirmation = async () => {
+    if (!depositorNameInput?.trim()) {
+      showModal('alert', '알림', '입금자명을 입력해주세요.');
+      return;
+    }
+
+    const finalDepositorName = depositorNameInput.trim();
+    setShowDepositorNameModal(false);
+
+    // 발주확정 직접 처리 (옵션상품 검증 없이)
     try {
       const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
 
-      // 모든 옵션상품 수집 (중복 제거)
-      const uniqueOptionNames = [...new Set(filteredOrders.map(order => order.products).filter(Boolean))];
+      // 각 주문에 발주번호 생성 및 업데이트
+      const now = getCurrentTimeUTC();
 
+      // DB에서 최신 settlement_amount 조회 (공급가 갱신 후 값)
+      const orderIds = filteredOrders.map(o => o.id);
+      const { data: latestOrders, error: fetchError } = await supabase
+        .from('integrated_orders')
+        .select('id, settlement_amount')
+        .in('id', orderIds);
 
-      // option_products에서 공급단가 조회
-      const { data: optionProducts, error: optionError} = await supabase
-        .from('option_products')
-        .select('option_name, option_code, seller_supply_price')
-        .in('option_name', uniqueOptionNames);
-
-      if (optionError) {
-        console.error('❌ 옵션상품 조회 오류:', optionError);
-      } else {
+      if (fetchError) {
+        console.error('❌ 주문 정보 조회 오류:', fetchError);
+        showModal('alert', '오류', '주문 정보를 불러오는 중 오류가 발생했습니다.');
+        return;
       }
 
-
-      // 옵션상품 Map 저장 (옵션상품 소문자 키로 저장)
-      const productMap = new Map<string, any>();
-      (optionProducts || []).forEach((product: any) => {
-        if (product.option_name) {
-          const key = product.option_name.trim().toLowerCase();
-          productMap.set(key, product);
-        }
+      // settlement_amount 맵 생성
+      const settlementMap = new Map<number, number>();
+      (latestOrders || []).forEach((order: any) => {
+        settlementMap.set(order.id, Number(order.settlement_amount) || 0);
       });
-      setOptionProductsMap(productMap);
 
-      // 검증 모달용 주문 데이터 준비
-      const utcTime = getCurrentTimeUTC();
-      const ordersForValidation = filteredOrders.map((order, index) => ({
-        index,
-        orderNumber: order.orderNumber || '',
-        orderer: order.orderer || '',
-        ordererPhone: order.ordererPhone || '',
-        recipient: order.recipient || '',
-        recipientPhone: order.recipientPhone || '',
-        address: order.address || '',
-        deliveryMessage: order.deliveryMessage || '',
-        optionName: order.products || '',
-        optionCode: '',
-        quantity: String(order.quantity || 1),
-        specialRequest: order.specialRequest || '',
-        // DB 저장용 메타데이터 (검증 후 사용)
-        _metadata: {
-          id: order.id, // 기존 주문 ID (업데이트용)
-          sheet_date: order.date?.split('T')[0] || utcTime.split('T')[0],
-          organization_id: organizationId,
-          created_by: userId,
-          market_name: order.marketName || '플랫폼',
-          payment_date: utcTime,
-          buyer_name: order.orderer || '',
-          buyer_phone: order.ordererPhone || '',
-          recipient_name: order.recipient || '',
-          recipient_phone: order.recipientPhone || '',
-          recipient_address: order.address || '',
-          delivery_message: order.deliveryMessage || '',
-          special_request: order.specialRequest || '',
-          quantity: order.quantity || 1,
-          order_number: order.orderNumber || '',
-          status: 'payment_confirmed' as const,
-          option_name: order.products || '',
+      // 총 공급가 계산 (DB에서 가져온 최신 settlement_amount 사용)
+      const totalSupplyPrice = filteredOrders.reduce((sum, order) => {
+        const settlementAmount = settlementMap.get(order.id) || 0;
+        return sum + settlementAmount;
+      }, 0);
+
+      console.log('💰 총 공급가 계산:', {
+        filteredOrders: filteredOrders.length,
+        totalSupplyPrice,
+        sampleSettlement: latestOrders?.[0]
+      });
+
+      // 주문당 캐시 차감액 계산
+      const cashPerOrder = cashToUse / filteredOrders.length;
+
+      // 캐시를 원 단위로 분산하여 각 주문에 할당
+      let remainingCash = cashToUse;
+      const cashPerOrderList: number[] = [];
+
+      for (let i = 0; i < filteredOrders.length; i++) {
+        const order = filteredOrders[i];
+        const supplyPrice = settlementMap.get(order.id) || 0;
+
+        // 주문별 캐시 사용액 계산 (비율 분배, 원 단위로 반올림)
+        let orderCashUsed = 0;
+        if (totalSupplyPrice > 0) {
+          if (i === filteredOrders.length - 1) {
+            // 마지막 주문은 남은 캐시 전부 사용 (반올림 오차 보정)
+            orderCashUsed = remainingCash;
+          } else {
+            orderCashUsed = Math.round((supplyPrice / totalSupplyPrice) * cashToUse);
+            remainingCash -= orderCashUsed;
+          }
         }
-      }));
+        cashPerOrderList.push(orderCashUsed);
+      }
 
+      console.log('💳 주문별 캐시 사용액 및 최종 입금액 계산:', {
+        totalSupplyPrice,
+        cashToUse,
+        orderCount: filteredOrders.length,
+        cashPerOrderList
+      });
 
-      setValidatedOrders(ordersForValidation);
-      setShowOptionValidationModal(true);
+      for (let i = 0; i < filteredOrders.length; i++) {
+        const order = filteredOrders[i];
+        const orderNo = generateOrderNumber(userEmail, i + 1);
+        const supplyPrice = settlementMap.get(order.id) || 0;
+        const orderCashUsed = cashPerOrderList[i];
+        const finalPaymentAmount = supplyPrice - orderCashUsed;
+
+        console.log(`📝 주문 ${i + 1} 업데이트:`, {
+          orderId: order.id,
+          supplyPrice,
+          orderCashUsed,
+          finalDepositAmount: Math.round(finalPaymentAmount)
+        });
+
+        const { error } = await supabase
+          .from('integrated_orders')
+          .update({
+            shipping_status: '발주서확정',
+            order_number: orderNo,
+            confirmed_at: now,
+            organization_id: organizationId, // 조직 ID 저장
+            created_by: userId, // 등록자 ID 저장
+            final_deposit_amount: Math.round(finalPaymentAmount), // 최종입금액 저장 (settlement_amount - cash_used)
+            cash_used: orderCashUsed, // 주문별 캐시 사용액 저장
+            depositor_name: finalDepositorName, // 입금자명 저장 (배치별)
+          })
+          .eq('id', order.id);
+
+        if (error) {
+          console.error('❌ 발주확정 오류:', error);
+          showModal('alert', '오류', `발주 확정 중 오류가 발생했습니다: ${error.message}`);
+          return;
+        }
+      }
+
+      console.log('✅ 모든 주문 업데이트 완료');
+
+      // 배치 정보 저장
+      const finalPaymentAmountTotal = totalSupplyPrice - cashToUse;
+      console.log('📦 배치 정보 저장 시작:', {
+        organization_id: organizationId,
+        confirmed_at: now,
+        total_amount: totalSupplyPrice,
+        cash_used: cashToUse,
+        final_payment_amount: finalPaymentAmountTotal,
+        order_count: filteredOrders.length,
+        depositor_name: finalDepositorName,
+        executor_id: userId
+      });
+
+      try {
+        const { data: batchData, error: batchError } = await supabase
+          .from('order_batches')
+          .upsert({
+            organization_id: organizationId,
+            confirmed_at: now,
+            total_amount: totalSupplyPrice,
+            cash_used: cashToUse,
+            final_payment_amount: finalPaymentAmountTotal,
+            order_count: filteredOrders.length,
+            depositor_name: finalDepositorName,
+            executor_id: userId,
+            payment_confirmed: false
+          }, {
+            onConflict: 'organization_id,confirmed_at'
+          })
+          .select();
+
+        if (batchError) {
+          console.error('❌ 배치 정보 저장 오류:', batchError);
+        } else {
+          console.log('✅ 배치 정보 저장 성공:', batchData);
+        }
+      } catch (batchSaveError) {
+        console.error('❌ 배치 저장 실패:', batchSaveError);
+      }
+
+      // 캐시 차감 처리
+      if (cashToUse > 0) {
+        try {
+          const cashResponse = await fetch('/api/cash/use', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amount: cashToUse,
+              description: `발주서 확정 (${filteredOrders.length}건)`,
+              metadata: {
+                orderCount: filteredOrders.length,
+                totalSupplyPrice: totalSupplyPrice,
+                cashUsed: cashToUse
+              }
+            })
+          });
+
+          const cashData = await cashResponse.json();
+
+          if (!cashData.success) {
+            console.error('캐시 차감 실패:', cashData);
+            showModal('alert', '경고', `주문은 확정되었으나 캐시 차감에 실패했습니다. 관리자에게 문의해주세요.`);
+          } else {
+            // 캐시 잔액 업데이트
+            setCashBalance(cashData.newBalance);
+            toast.success(`${cashToUse.toLocaleString()}캐시가 차감되었습니다!`);
+          }
+        } catch (cashError) {
+          console.error('캐시 차감 오류:', cashError);
+          showModal('alert', '경고', `주문은 확정되었으나 캐시 처리 중 오류가 발생했습니다.`);
+        }
+      }
+
+      // 캐시 사용 금액 초기화
+      setCashToUse(0);
+
+      // 토스트로 완료 메시지 표시
+      const message = cashToUse > 0
+        ? `${filteredOrders.length}건의 주문이 발주 확정되었습니다! (${cashToUse.toLocaleString()}캐시 차감)`
+        : `${filteredOrders.length}건의 주문이 발주 확정되었습니다!`;
+
+      toast.success(message);
+
+      // 주문 목록 새로고침
+      if (onRefresh) {
+        onRefresh();
+      }
     } catch (error) {
       console.error('발주확정 처리 오류:', error);
       showModal('alert', '오류', '발주확정 처리 중 오류가 발생했습니다.');
@@ -2497,7 +2655,7 @@ export default function OrderRegistrationTab({
                   </button>
                   <input
                     type="number"
-                    value={cashToUse}
+                    value={cashToUse || ''}
                     onChange={(e) => {
                       const value = parseInt(e.target.value) || 0;
                       const maxCash = Math.min(cashBalance, orderSummary.totalSupplyPrice);
@@ -2505,7 +2663,7 @@ export default function OrderRegistrationTab({
                     }}
                     min={0}
                     max={Math.min(cashBalance, orderSummary.totalSupplyPrice)}
-                    placeholder="0"
+                    placeholder="캐시 입력"
                     style={{
                       width: '100px',
                       height: '26px',
@@ -3200,6 +3358,71 @@ export default function OrderRegistrationTab({
         optionProducts={optionProductsMap}
       />
 
+      {/* 입금자명 입력 모달 */}
+      {showDepositorNameModal && (
+        <Modal
+          isOpen={showDepositorNameModal}
+          onClose={() => setShowDepositorNameModal(false)}
+          title="입금자명 입력"
+        >
+          <div style={{ padding: '20px' }}>
+            <p style={{ marginBottom: '16px', color: '#666' }}>
+              이 배치의 입금자명을 입력해주세요.
+            </p>
+            <input
+              type="text"
+              value={depositorNameInput}
+              onChange={(e) => setDepositorNameInput(e.target.value)}
+              placeholder="입금자명을 입력하세요"
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '14px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                marginBottom: '20px'
+              }}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  proceedWithPaymentConfirmation();
+                }
+              }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowDepositorNameModal(false)}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  background: '#fff',
+                  cursor: 'pointer'
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={proceedWithPaymentConfirmation}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  border: 'none',
+                  borderRadius: '4px',
+                  background: '#10b981',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {/* 판매자 정보 검증 모달 */}
       <SellerInfoValidationModal
         isOpen={showSellerInfoValidationModal}
@@ -3212,6 +3435,7 @@ export default function OrderRegistrationTab({
           }, 100);
         }}
         userId={userId}
+        organizationId={organizationId}
       />
     </div>
   );

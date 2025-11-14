@@ -36,9 +36,11 @@ export async function PUT(
     const { id: userId } = await params;
     const { tier } = await request.json();
 
-    // tier 값 검증
-    const validTiers = ['light', 'standard', 'advance', 'elite', 'legend', null];
-    if (!validTiers.includes(tier)) {
+    // tier 값 검증 (대문자로 통일)
+    const validTiers = ['LIGHT', 'STANDARD', 'ADVANCE', 'ELITE', 'LEGEND', null];
+    const upperTier = tier ? tier.toUpperCase() : null;
+
+    if (!validTiers.includes(upperTier)) {
       return NextResponse.json(
         { success: false, error: '유효하지 않은 등급입니다.' },
         { status: 400 }
@@ -48,7 +50,7 @@ export async function PUT(
     // 수동 등급 설정 함수 호출
     const { data: result, error } = await supabase.rpc('set_manual_tier', {
       p_user_id: userId,
-      p_tier: tier,
+      p_tier: upperTier,
       p_admin_id: adminUser.id
     });
 
@@ -78,7 +80,7 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      message: tier ? '등급이 수동으로 설정되었습니다.' : '자동 등급 계산으로 전환되었습니다.',
+      message: upperTier ? '등급이 수동으로 설정되었습니다.' : '자동 등급 계산으로 전환되었습니다.',
       data: result
     });
 

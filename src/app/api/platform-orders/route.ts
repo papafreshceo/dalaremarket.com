@@ -37,49 +37,14 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 비로그인 사용자이고 impersonate도 아닌 경우 샘플 데이터 반환
+    // 비로그인 사용자는 빈 배열 반환
     if (!effectiveUserId) {
-
-      // 실제 option_products 조회 (service role 사용으로 RLS 우회)
-      const { createClient: createServiceClient } = await import('@supabase/supabase-js');
-      const supabaseAdmin = createServiceClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
-
-      const { data: optionProducts, error: opError } = await supabaseAdmin
-        .from('option_products')
-        .select('id, option_name, seller_supply_price')
-        .eq('is_active', true);
-
-      if (opError || !optionProducts || optionProducts.length === 0) {
-        return NextResponse.json({
-          success: true,
-          data: [],
-          isSample: true,
-          isGuest: true,
-          message: '샘플 데이터를 불러올 수 없습니다.',
-        });
-      }
-
-      // 동적으로 1년치 샘플 데이터 생성 (오늘 기준)
-      const sampleOrdersData = generateSampleOrders(
-        optionProducts.map(op => ({
-          id: op.id,
-          option_name: op.option_name,
-          seller_supply_price: op.seller_supply_price,
-        }))
-      );
-
-      // DB 포맷으로 변환
-      const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, 'guest');
-
-
       return NextResponse.json({
         success: true,
-        data: sampleOrders,
-        isSample: true,
+        data: [],
+        isSample: false,
         isGuest: true,
+        message: '로그인이 필요합니다.',
       });
     }
 
@@ -117,8 +82,13 @@ export async function GET(request: NextRequest) {
       endDate
     });
 
-    // 🔒 조직 필터 적용 (모든 사용자는 기본 조직을 가짐)
+    // 🔒 조직 필터 적용 (항상 필요)
     const organizationId = await getOrganizationDataFilter(effectiveUserId);
+
+    console.log('[GET platform-orders] 조직 필터:', {
+      effectiveUserId,
+      organizationId
+    });
 
     if (!organizationId) {
       return NextResponse.json(
@@ -127,12 +97,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 쿼리 빌더
+    // 쿼리 빌더 (조직의 주문만 조회)
+    // organization_id가 NULL인 주문은 절대 조회하지 않음
     let query = dbClient
       .from('integrated_orders')
       .select('*')
       .eq('is_deleted', false)
-      .eq('organization_id', organizationId);
+      .eq('organization_id', organizationId)
+      .not('organization_id', 'is', null);
 
     // 날짜 필터 적용
     if (startDate) {
@@ -197,17 +169,21 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // 동적으로 1년치 샘플 데이터 생성 (오늘 기준)
+      // 🔑 organization_id를 시드값으로 사용하여 조직별로 다른 샘플 데이터 생성
       const sampleOrdersData = generateSampleOrders(
         optionProducts.map(op => ({
           id: op.id,
           option_name: op.option_name,
           seller_supply_price: op.seller_supply_price,
-        }))
+        })),
+        organizationId // 조직 ID를 시드로 전달
       );
 
-      // DB 포맷으로 변환
-      const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, effectiveUserId);
+      // DB 포맷으로 변환 (조직 ID 추가)
+      const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, effectiveUserId).map(order => ({
+        ...order,
+        organization_id: organizationId
+      }));
 
 
       return NextResponse.json({

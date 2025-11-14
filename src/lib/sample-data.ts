@@ -112,8 +112,10 @@ function isKoreanHoliday(date: Date): boolean {
 /**
  * 1년치 샘플 주문 데이터 생성
  * 한국 시간(KST, UTC+9) 기준으로 날짜 생성
+ * @param optionProducts - 옵션 상품 목록
+ * @param organizationId - 조직 ID (시드값으로 사용하여 조직별로 다른 샘플 데이터 생성)
  */
-export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrder[] {
+export function generateSampleOrders(optionProducts: OptionProduct[], organizationId?: string): SampleOrder[] {
   const orders: SampleOrder[] = [];
 
   // 한국 시간(KST) 기준 오늘 날짜
@@ -131,6 +133,11 @@ export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrd
   if (optionProducts.length === 0) {
     return [];
   }
+
+  // 🔑 organizationId를 숫자 시드로 변환 (UUID의 첫 8자리 해시)
+  const orgSeed = organizationId
+    ? parseInt(organizationId.replace(/-/g, '').substring(0, 8), 16)
+    : 12345;
 
   // 1년치 날짜 순회
   for (let d = new Date(oneYearAgo); d <= today; d.setDate(d.getDate() + 1)) {
@@ -152,9 +159,10 @@ export function generateSampleOrders(optionProducts: OptionProduct[]): SampleOrd
       continue;
     }
 
-    // 날짜를 시드로 사용 (YYYYMMDD 형식의 숫자)
+    // 🔑 날짜와 조직 ID를 조합하여 시드 생성 (조직별로 다른 데이터)
     const dateSeed = year * 10000 + (currentDate.getMonth() + 1) * 100 + currentDate.getDate();
-    const rng = new SeededRandom(dateSeed);
+    const combinedSeed = dateSeed + orgSeed; // 조직별로 고유한 시드
+    const rng = new SeededRandom(combinedSeed);
 
     // 날짜별 주문 건수: 1~20건 (시드 기반)
     const daysDiff = Math.floor((today.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));

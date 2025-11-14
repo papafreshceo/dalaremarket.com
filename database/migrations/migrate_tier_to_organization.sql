@@ -333,7 +333,7 @@ BEGIN
   RAISE NOTICE '조직 티어 초기 계산 시작...';
 
   FOR v_org_record IN
-    SELECT id, name FROM organizations
+    SELECT id, business_name as name FROM organizations
   LOOP
     v_result := calculate_and_update_organization_tier(v_org_record.id);
 

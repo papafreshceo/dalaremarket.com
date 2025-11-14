@@ -161,25 +161,43 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
         });
       }
 
-      // 2. 로그인한 사용자 정보 로드
+      // 2. 로그인한 사용자의 조직 정보 로드
       try {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
-          const { data: userData, error: userError } = await supabase
+          // 사용자의 primary_organization_id 조회
+          const { data: userData } = await supabase
             .from('users')
-            .select('name, email, business_number, company_address, representative_name, representative_phone')
+            .select('primary_organization_id')
             .eq('id', user.id)
             .single();
 
-          if (userError) {
-            console.error('사용자 정보 로드 오류:', userError);
-          } else if (userData) {
-            setUserInfo(userData);
+          if (userData?.primary_organization_id) {
+            // 조직 정보 조회
+            const { data: orgData, error: orgError } = await supabase
+              .from('organizations')
+              .select('business_name, business_number, address, representative_name, phone, email')
+              .eq('id', userData.primary_organization_id)
+              .single();
+
+            if (orgError) {
+              console.error('조직 정보 로드 오류:', orgError);
+            } else if (orgData) {
+              // organizations 테이블의 필드를 userInfo 형식에 맞게 변환
+              setUserInfo({
+                name: orgData.business_name,
+                email: orgData.email,
+                business_number: orgData.business_number,
+                company_address: orgData.address,
+                representative_name: orgData.representative_name,
+                representative_phone: orgData.phone
+              });
+            }
           }
         }
       } catch (error) {
-        console.error('사용자 정보 로드 실패:', error);
+        console.error('조직 정보 로드 실패:', error);
       }
     };
 

@@ -40,11 +40,11 @@ export async function GET(request: NextRequest) {
       }, { status: 404 });
     }
 
-    // 🔒 2. 본인 조직의 참여 설정 확인 (owner 기준)
+    // 🔒 2. 본인 조직의 참여 설정 확인 (organization_id 기준)
     const { data: myParticipation } = await supabase
       .from('ranking_participation')
       .select('*')
-      .eq('user_id', organization.owner_id)
+      .eq('organization_id', organization.id)
       .single();
 
     // 참여하지 않으면 빈 배열 반환
@@ -57,10 +57,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 🔒 3. 참여 중인 조직들의 ID 조회
+    // 🔒 3. 참여 중인 조직들의 organization_id 조회
     const { data: participants } = await supabase
       .from('ranking_participation')
-      .select('user_id')
+      .select('organization_id')
       .eq('is_participating', true);
 
     if (!participants || participants.length === 0) {
@@ -71,32 +71,16 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const participantUserIds = participants.map(p => p.user_id);
+    const participantOrgIds = participants.map(p => p.organization_id);
 
-    // 참여자들의 조직 ID 조회
-    const { data: participantOrgs } = await supabase
-      .from('organizations')
-      .select('id')
-      .in('owner_id', participantUserIds);
-
-    if (!participantOrgs || participantOrgs.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: [],
-        message: '참여 중인 조직이 없습니다.'
-      });
-    }
-
-    const participantOrgIds = participantOrgs.map(o => o.id);
-
-    // 4. 참여 조직들의 랭킹만 조회 (organization_id 기준)
+    // 4. 참여 조직들의 랭킹만 조회
     let query = supabase
       .from('seller_rankings')
       .select(`
         *,
         organizations!seller_rankings_organization_id_fkey (
           id,
-          name,
+          business_name,
           business_number
         )
       `)

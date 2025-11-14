@@ -74,6 +74,8 @@ interface Order {
   invoice_registered?: boolean;
   payment_confirmed_at?: string;
   refund_processed_at?: string;
+  field_46?: string;  // 서브계정명
+  field_47?: string;  // 최종입금액
 }
 
 interface VendorStats {
@@ -93,7 +95,7 @@ interface VendorStats {
 }
 
 interface SellerStats {
-  seller_id: string;
+  organization_id: string;
   seller_name: string;
   총금액: number;
   입금확인: boolean;
@@ -2922,28 +2924,28 @@ export default function SearchTab() {
     }
   };
 
-  // 셀러별 입금확인 토글 핸들러
-  const handlePaymentCheckToggle = async (sellerId: string) => {
-    const currentStat = sellerStats.find(s => s.seller_id === sellerId);
+  // 조직별 입금확인 토글 핸들러
+  const handlePaymentCheckToggle = async (organizationId: string) => {
+    const currentStat = sellerStats.find(s => s.organization_id === organizationId);
     if (!currentStat) return;
 
     const newCheckState = !currentStat.입금확인;
 
     // ON으로 전환할 때만 주문 상태 변경
     if (newCheckState) {
-      // 해당 셀러의 접수 상태 주문들을 필터링
-      const sellerOrders = orders.filter(order => {
-        const orderSellerId = order.seller_id || '미지정';
+      // 해당 조직의 접수 상태 주문들을 필터링
+      const organizationOrders = orders.filter(order => {
+        const orderOrgId = order.organization_id || '미지정';
         const status = order.shipping_status || '결제완료';
-        return orderSellerId === sellerId && status === '접수';
+        return orderOrgId === organizationId && status === '접수';
       });
 
-      if (sellerOrders.length === 0) {
-        alert('해당 셀러의 접수 상태 주문이 없습니다.');
+      if (organizationOrders.length === 0) {
+        alert('해당 조직의 접수 상태 주문이 없습니다.');
         return;
       }
 
-      if (!confirm(`${sellerId}의 접수 상태 주문 ${sellerOrders.length}건을 결제완료로 변경하시겠습니까?`)) {
+      if (!confirm(`${currentStat.seller_name}의 접수 상태 주문 ${organizationOrders.length}건을 결제완료로 변경하시겠습니까?`)) {
         return;
       }
 
@@ -2952,7 +2954,7 @@ export default function SearchTab() {
         const now = new Date().toISOString();
 
         // 상태를 결제완료로 변경하고 payment_confirmed_at 타임스탬프 저장
-        const updatedOrders = sellerOrders.map(order => ({
+        const updatedOrders = organizationOrders.map(order => ({
           ...order,
           shipping_status: '결제완료',
           payment_confirmed_at: now
@@ -2970,7 +2972,7 @@ export default function SearchTab() {
           // 토글 상태 변경
           setSellerStats(prev =>
             prev.map(stat =>
-              stat.seller_id === sellerId
+              stat.organization_id === organizationId
                 ? { ...stat, 입금확인: true }
                 : stat
             )
@@ -2986,24 +2988,24 @@ export default function SearchTab() {
       }
     } else {
       // ON -> OFF: 결제완료 상태 주문들을 접수로 되돌림
-      const sellerOrders = orders.filter(order => {
-        const orderSellerId = order.seller_id || '미지정';
+      const organizationOrders = orders.filter(order => {
+        const orderOrgId = order.organization_id || '미지정';
         const status = order.shipping_status || '결제완료';
-        return orderSellerId === sellerId && status === '결제완료';
+        return orderOrgId === organizationId && status === '결제완료';
       });
 
-      if (sellerOrders.length === 0) {
-        alert('해당 셀러의 결제완료 상태 주문이 없습니다.');
+      if (organizationOrders.length === 0) {
+        alert('해당 조직의 결제완료 상태 주문이 없습니다.');
         return;
       }
 
-      if (!confirm(`${sellerId}의 결제완료 상태 주문 ${sellerOrders.length}건을 접수로 되돌리시겠습니까?`)) {
+      if (!confirm(`${currentStat.seller_name}의 결제완료 상태 주문 ${organizationOrders.length}건을 접수로 되돌리시겠습니까?`)) {
         return;
       }
 
       try {
         // 상태를 접수로 변경하고 payment_confirmed_at 타임스탬프 제거
-        const updatedOrders = sellerOrders.map(order => ({
+        const updatedOrders = organizationOrders.map(order => ({
           ...order,
           shipping_status: '접수',
           payment_confirmed_at: null
@@ -3021,7 +3023,7 @@ export default function SearchTab() {
           // 토글 상태 변경
           setSellerStats(prev =>
             prev.map(stat =>
-              stat.seller_id === sellerId
+              stat.organization_id === organizationId
                 ? { ...stat, 입금확인: false }
                 : stat
             )
@@ -3039,20 +3041,22 @@ export default function SearchTab() {
   };
 
   // 환불완료 버튼 클릭 핸들러
-  const handleRefundComplete = async (sellerId: string) => {
-    // 해당 셀러의 취소요청 상태 주문들 필터링
-    const sellerRefundOrders = orders.filter(order => {
-      const orderSellerId = order.seller_id || '미지정';
+  const handleRefundComplete = async (organizationId: string) => {
+    // 해당 조직의 취소요청 상태 주문들 필터링
+    const organizationRefundOrders = orders.filter(order => {
+      const orderOrgId = order.organization_id || '미지정';
       const status = order.shipping_status || '결제완료';
-      return orderSellerId === sellerId && status === '취소요청';
+      return orderOrgId === organizationId && status === '취소요청';
     });
 
-    if (sellerRefundOrders.length === 0) {
-      alert('해당 셀러의 취소요청 상태 주문이 없습니다.');
+    const currentStat = sellerStats.find(s => s.organization_id === organizationId);
+
+    if (organizationRefundOrders.length === 0) {
+      alert('해당 조직의 취소요청 상태 주문이 없습니다.');
       return;
     }
 
-    if (!confirm(`${sellerId}의 취소요청 주문 ${sellerRefundOrders.length}건에 대해 환불처리를 완료하시겠습니까?`)) {
+    if (!confirm(`${currentStat?.seller_name}의 취소요청 주문 ${organizationRefundOrders.length}건에 대해 환불처리를 완료하시겠습니까?`)) {
       return;
     }
 
@@ -3064,7 +3068,7 @@ export default function SearchTab() {
       const formattedDateTime = koreaTimeISO.slice(0, 16).replace('T', ' ');
 
       // refund_processed_at 타임스탬프 저장
-      const updatedOrders = sellerRefundOrders.map(order => ({
+      const updatedOrders = organizationRefundOrders.map(order => ({
         ...order,
         refund_processed_at: koreaTimeISO
       }));
@@ -3081,7 +3085,7 @@ export default function SearchTab() {
         // UI 상태 업데이트
         setSellerStats(prev =>
           prev.map(stat =>
-            stat.seller_id === sellerId
+            stat.organization_id === organizationId
               ? { ...stat, 환불처리일시: formattedDateTime }
               : stat
           )

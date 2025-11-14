@@ -20,7 +20,7 @@ interface VendorStats {
 }
 
 interface SellerStats {
-  seller_id: string;
+  organization_id: string;
   seller_name: string;
   접수_건수: number;
   총금액: number;
@@ -38,8 +38,8 @@ interface VendorSellerStatsProps {
   vendorStats: VendorStats[];
   sellerStats: SellerStats[];
   onVendorExcelDownload: (vendorName: string) => void;
-  onPaymentCheckToggle: (sellerId: string) => void;
-  onRefundComplete: (sellerId: string) => void;
+  onPaymentCheckToggle: (organizationId: string) => void;
+  onRefundComplete: (organizationId: string) => void;
 }
 
 export default function VendorSellerStats({
@@ -157,13 +157,13 @@ export default function VendorSellerStats({
             </thead>
             <tbody>
               {sellerStats.map((stat, idx) => (
-                <tr key={stat.seller_id} style={{ borderTop: idx === 0 ? 'none' : '1px solid #E5E7EB' }} className="hover:bg-gray-50">
+                <tr key={stat.organization_id} style={{ borderTop: idx === 0 ? 'none' : '1px solid #E5E7EB' }} className="hover:bg-gray-50">
                   <td style={{ fontSize: '16px', padding: '6px 16px', fontWeight: 500, color: '#111827' }}>{stat.seller_name}</td>
                   <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#7E22CE', fontWeight: 600 }}>{(stat.접수_건수 || 0) > 0 ? stat.접수_건수.toLocaleString() : ''}</td>
                   <td style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'right', color: '#047857', fontWeight: 600 }}>{stat.총금액 > 0 ? stat.총금액.toLocaleString() : ''}</td>
                   <td style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'center' }}>
                     <div
-                      onClick={() => onPaymentCheckToggle(stat.seller_id)}
+                      onClick={() => onPaymentCheckToggle(stat.organization_id)}
                       style={{
                         width: '44px',
                         height: '24px',
@@ -200,7 +200,7 @@ export default function VendorSellerStats({
                       <span style={{ color: '#059669', fontWeight: 500 }}>{stat.환불처리일시}</span>
                     ) : (
                       <button
-                        onClick={() => onRefundComplete(stat.seller_id)}
+                        onClick={() => onRefundComplete(stat.organization_id)}
                         style={{
                           fontSize: '14px',
                           padding: '4px 12px',

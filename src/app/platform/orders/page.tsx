@@ -38,9 +38,15 @@ function OrdersPageContent() {
   const [userId, setUserId] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
   const [userTier, setUserTier] = useState<'light' | 'standard' | 'advance' | 'elite' | 'legend'>('light');
+  const [organizationId, setOrganizationId] = useState<string>('');
+  const [organizationName, setOrganizationName] = useState<string>('');
+  const [sellerCode, setSellerCode] = useState<string>('');
+  const [userRole, setUserRole] = useState<string>('');
+  const [memberRole, setMemberRole] = useState<string>(''); // 조직 내 역할
   const [orders, setOrders] = useState<Order[]>([]);
   const [cashBalance, setCashBalance] = useState<number>(0);
   const [creditBalance, setCreditBalance] = useState<number>(0);
+  const [contributionPoints, setContributionPoints] = useState<number>(0);
   const [showCashTooltip, setShowCashTooltip] = useState(false);
   const [showCreditTooltip, setShowCreditTooltip] = useState(false);
 
@@ -249,31 +255,126 @@ function OrdersPageContent() {
         return;
       }
 
-      // 일반 사용자
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      // 일반 사용자 - API를 통해 정보 가져오기
+      try {
+        const response = await fetch('/api/user/profile');
+        const data = await response.json();
 
-      if (user) {
-        setUserId(user.id);
-        if (user.email) {
-          setUserEmail(user.email);
+        if (data.success && data.user) {
+          const { user: profileUser } = data;
+
+          setUserId(profileUser.id);
+          setUserEmail(profileUser.email || '');
+
+          const validTiers = ['light', 'standard', 'advance', 'elite', 'legend'];
+          const tier = profileUser.tier;
+          setUserTier(validTiers.includes(tier) ? tier : 'light');
+          setUserRole(profileUser.role || '');
+
+          console.log('👤 사용자 정보:', {
+            tier: profileUser.tier,
+            role: profileUser.role,
+            primary_organization_id: profileUser.primary_organization_id
+          });
+
+          // 조직 정보 가져오기 (profile 페이지와 동일한 방식)
+          if (profileUser.primary_organization_id) {
+            const supabase = createClient();
+            const { data: orgData, error: orgError } = await supabase
+              .from('organizations')
+              .select(`
+                id,
+                owner_id,
+                is_active,
+                seller_code,
+                partner_code,
+                business_name,
+                business_number,
+                business_address,
+                business_email,
+                representative_name,
+                representative_phone,
+                manager_name,
+                manager_phone,
+                bank_account,
+                bank_name,
+                account_holder,
+                store_name,
+                store_phone,
+                tier
+              `)
+              .eq('id', profileUser.primary_organization_id)
+              .single();
+
+            if (orgError) {
+              console.error('❌ 조직 정보 로드 오류:', orgError);
+            }
+
+            if (orgData) {
+              console.log('🏢 조직 정보 로드:', {
+                id: orgData.id,
+                business_name: orgData.business_name,
+                seller_code: orgData.seller_code,
+                partner_code: orgData.partner_code,
+                user_role: profileUser.role
+              });
+              setOrganizationId(orgData.id); // organizationId 설정
+              setOrganizationName(orgData.business_name || '');
+              // role에 따라 적절한 코드 표시
+              const code = profileUser.role === 'seller'
+                ? orgData.seller_code
+                : profileUser.role === 'partner'
+                ? orgData.partner_code
+                : '';
+              setSellerCode(code || '');
+              console.log('✅ 조직 정보 설정 완료:', {
+                organizationId: orgData.id,
+                organizationName: orgData.business_name,
+                sellerCode: code
+              });
+            }
+
+            // 조직 내 역할 가져오기
+            const { data: memberData } = await supabase
+              .from('organization_members')
+              .select('role')
+              .eq('organization_id', profileUser.primary_organization_id)
+              .eq('user_id', profileUser.id)
+              .eq('status', 'active')
+              .single();
+
+            if (memberData) {
+              const roleNames: Record<string, string> = {
+                'owner': '대표',
+                'admin': '관리자',
+                'member': '담당자'
+              };
+              const roleName = roleNames[memberData.role] || memberData.role;
+              setMemberRole(roleName);
+              console.log('👤 멤버 역할 설정:', roleName);
+            } else {
+              console.log('⚠️ 멤버 정보 없음 (organization_members에 레코드 없음)');
+            }
+          }
+        } else {
+          // 비회원 사용자
+          setUserId('guest');
+          setUserEmail('');
+          setUserTier('light');
+          setOrganizationName('');
+          setSellerCode('');
+          setUserRole('');
+          setMemberRole('');
         }
-
-        // tier 정보 가져오기
-        const { data: userData } = await supabase
-          .from('users')
-          .select('tier')
-          .eq('id', user.id)
-          .single();
-
-        const validTiers = ['light', 'standard', 'advance', 'elite', 'legend'];
-        const tier = userData?.tier;
-        setUserTier(validTiers.includes(tier) ? tier : 'light');
-      } else {
-        // 비회원 사용자
+      } catch (error) {
+        console.error('❌ 사용자 정보 로드 실패:', error);
         setUserId('guest');
         setUserEmail('');
         setUserTier('light');
+        setOrganizationName('');
+        setSellerCode('');
+        setUserRole('');
+        setMemberRole('');
       }
     };
 
@@ -349,6 +450,32 @@ function OrdersPageContent() {
             position: 'top-center',
             duration: 3000
           });
+        }
+      }
+
+      // 기여점수 조회 (organizations.accumulated_points)
+      const supabase = createClient();
+      const effectiveUserId = impersonateUser?.userId || userId;
+
+      if (effectiveUserId) {
+        // 사용자의 primary_organization_id 조회
+        const { data: userData } = await supabase
+          .from('users')
+          .select('primary_organization_id')
+          .eq('id', effectiveUserId)
+          .single();
+
+        if (userData?.primary_organization_id) {
+          // 조직의 accumulated_points 조회
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('accumulated_points')
+            .eq('id', userData.primary_organization_id)
+            .single();
+
+          if (orgData) {
+            setContributionPoints(orgData.accumulated_points || 0);
+          }
         }
       }
     } catch (error) {
@@ -1257,14 +1384,70 @@ function OrdersPageContent() {
             )}
           </button>
 
-          {/* 티어 배지 & 로그인 정보 */}
+          {/* 로그인 정보 */}
           {!isMobile && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px'
             }}>
-              <TierBadge tier={userTier} iconOnly glow={0} />
+              {/* 셀러계정 정보 (등급 배지, 캐시, 크레딧, 기여점수 포함) */}
+              {organizationName && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '4px 10px',
+                  background: 'var(--color-primary-alpha)',
+                  border: '1px solid var(--color-primary)',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: 'var(--color-primary)'
+                }}>
+                  {/* 등급 배지 */}
+                  <div style={{ transform: 'scale(0.8)', display: 'flex', alignItems: 'center' }}>
+                    <TierBadge tier={userTier} iconOnly glow={0} />
+                  </div>
+
+                  {/* 셀러계정명 + 코드 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>{organizationName}</span>
+                    {sellerCode && (
+                      <>
+                        <span style={{ opacity: 0.5 }}>·</span>
+                        <span style={{ fontFamily: 'monospace' }}>{sellerCode}</span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* 구분선 */}
+                  {userId && userId !== 'guest' && (
+                    <div style={{
+                      width: '1px',
+                      height: '16px',
+                      background: 'currentColor',
+                      opacity: 0.3
+                    }} />
+                  )}
+
+                  {/* 캐시 */}
+                  {userId && userId !== 'guest' && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '12px',
+                      fontFamily: 'Oxanium, monospace'
+                    }}>
+                      <span style={{ opacity: 0.7 }}>캐시</span>
+                      <span>{cashBalance.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 사용자 이메일 */}
               <div style={{
                 fontSize: '14px',
                 color: 'var(--color-text)',
@@ -1272,138 +1455,28 @@ function OrdersPageContent() {
               }}>
                 {userEmail || '로그인 정보 없음'}
               </div>
+
+              {/* 조직 내 역할 */}
+              {memberRole && (
+                <div style={{
+                  padding: '2px 8px',
+                  background: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  color: 'var(--color-text-secondary)'
+                }}>
+                  {memberRole}
+                </div>
+              )}
             </div>
           )}
 
-          {/* 캐시 & 크레딧 배지 (로그인 정보 바로 옆) */}
-          {!isMobile && userId && userId !== 'guest' && (
-            <>
-              <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&display=swap" rel="stylesheet" />
-
-              {/* 캐시 배지 */}
-              <div
-                style={{
-                  position: 'relative',
-                  display: 'inline-block'
-                }}
-                onMouseEnter={() => setShowCashTooltip(true)}
-                onMouseLeave={() => setShowCashTooltip(false)}
-              >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '24px',
-                  padding: '0px 6px',
-                  border: '1.5px solid #10b981',
-                  borderRadius: '6px',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}>
-                  <span style={{
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: '#10b981',
-                    fontFamily: 'Oxanium, monospace',
-                    letterSpacing: '0.5px',
-                    lineHeight: '1'
-                  }}>
-                    {cashBalance.toLocaleString()}
-                  </span>
-                </div>
-                {showCashTooltip && (
-                  <div style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 8px)',
-                    right: '0',
-                    padding: '8px 12px',
-                    background: 'rgba(0, 0, 0, 0.9)',
-                    color: 'white',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    whiteSpace: 'nowrap',
-                    zIndex: 10000
-                  }}>
-                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>달래캐시</div>
-                    <div style={{ fontSize: '11px', opacity: 0.9 }}>활동/로그인 보상으로 획득</div>
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '100%',
-                      right: '8px',
-                      width: 0,
-                      height: 0,
-                      borderLeft: '5px solid transparent',
-                      borderRight: '5px solid transparent',
-                      borderBottom: '5px solid rgba(0, 0, 0, 0.9)'
-                    }}></div>
-                  </div>
-                )}
-              </div>
-
-              {/* 크레딧 배지 */}
-              <div
-                style={{
-                  position: 'relative',
-                  display: 'inline-block'
-                }}
-                onMouseEnter={() => setShowCreditTooltip(true)}
-                onMouseLeave={() => setShowCreditTooltip(false)}
-              >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '24px',
-                  padding: '0px 6px',
-                  border: '1.5px solid #7c3aed',
-                  borderRadius: '6px',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}>
-                  <span style={{
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: '#7c3aed',
-                    fontFamily: 'Oxanium, monospace',
-                    letterSpacing: '0.5px',
-                    lineHeight: '1'
-                  }}>
-                    {creditBalance.toLocaleString()}
-                  </span>
-                </div>
-                {showCreditTooltip && (
-                  <div style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 8px)',
-                    right: '0',
-                    padding: '8px 12px',
-                    background: 'rgba(0, 0, 0, 0.9)',
-                    color: 'white',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    whiteSpace: 'nowrap',
-                    zIndex: 10000
-                  }}>
-                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>크레딧</div>
-                    <div style={{ fontSize: '11px', opacity: 0.9 }}>업무도구 사용 포인트 (매일 1,000 리필)</div>
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '100%',
-                      right: '8px',
-                      width: 0,
-                      height: 0,
-                      borderLeft: '5px solid transparent',
-                      borderRight: '5px solid transparent',
-                      borderBottom: '5px solid rgba(0, 0, 0, 0.9)'
-                    }}></div>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
         </div>
+
+        {/* Oxanium 폰트 로드 */}
+        <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&display=swap" rel="stylesheet" />
 
         {/* 오른쪽: 새로고침 인디케이터 + 다크모드 토글 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '0 0 auto' }}>
@@ -1829,6 +1902,8 @@ function OrdersPageContent() {
               setEndDate={setEndDate}
               onRefresh={fetchOrders}
               userEmail={userEmail}
+              organizationId={organizationId}
+              isSampleMode={isSampleMode}
             />
           </div>
         )}

@@ -79,7 +79,6 @@ export async function GET(request: NextRequest) {
       const { data: newCash, error: insertError } = await dbClient
         .from('organization_cash')
         .insert({
-          user_id: effectiveUserId,
           organization_id: organization.id,
           balance: 0
         })

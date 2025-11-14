@@ -431,7 +431,9 @@ export async function assignOrderToOrganization(
  * 조직 데이터 조회 필터 (같은 조직 데이터만 조회)
  */
 export async function getOrganizationDataFilter(userId: string) {
-  const supabase = await createServerClient()
+  // Service Role 클라이언트 사용 (RLS 우회)
+  const { createAdminClient } = await import('@/lib/supabase/server')
+  const supabase = createAdminClient()
 
   const { data: user } = await supabase
     .from('users')

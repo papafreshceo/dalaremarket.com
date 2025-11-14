@@ -17,7 +17,6 @@ interface Organization {
   bank_name: string | null;
   bank_account: string | null;
   account_holder: string | null;
-  depositor_name: string | null;
   store_name: string | null;
   store_phone: string | null;
   tier: string | null;
@@ -26,6 +25,9 @@ interface Organization {
   created_at: string;
   updated_at: string;
   owner_id: string | null;
+  cash_balance?: number; // organization_cash 테이블에서 조회
+  credit_balance?: number; // organization_credits 테이블에서 조회
+  accumulated_points?: number; // 누적 기여점수
 }
 
 interface SubAccount {
@@ -67,6 +69,18 @@ export default function SellerAccountsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // 캐시/크레딧 모달 상태
+  const [showCashModal, setShowCashModal] = useState(false);
+  const [showCreditModal, setShowCreditModal] = useState(false);
+  const [cashAmount, setCashAmount] = useState('');
+  const [creditAmount, setCreditAmount] = useState('');
+  const [cashDescription, setCashDescription] = useState('');
+  const [creditDescription, setCreditDescription] = useState('');
+  const [cashLoading, setCashLoading] = useState(false);
+  const [creditLoading, setCreditLoading] = useState(false);
+  const [cashHistory, setCashHistory] = useState<any[]>([]);
+  const [creditHistory, setCreditHistory] = useState<any[]>([]);
+
   useEffect(() => {
     loadOrganizations();
   }, []);
@@ -81,22 +95,70 @@ export default function SellerAccountsPage() {
   async function loadOrganizations() {
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from('organizations')
-        .select('*')
-        .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('조직 로드 오류:', error);
+      // 1. 조직 정보 조회 (accumulated_points 포함)
+      const { data: orgsData, error: orgsError } = await supabase
+        .from('organizations')
+        .select('*, accumulated_points')
+        .order('created_at', { ascending: false});
+
+      if (orgsError) {
+        console.error('조직 로드 오류:', orgsError);
+        alert('조직 데이터를 불러오는데 실패했습니다: ' + orgsError.message);
+        setOrganizations([]);
+        setLoading(false);
         return;
       }
 
-      setOrganizations(data || []);
-      if (data && data.length > 0 && !selectedOrg) {
-        setSelectedOrg(data[0]);
+      if (!orgsData || orgsData.length === 0) {
+        setOrganizations([]);
+        setLoading(false);
+        return;
+      }
+
+      const orgIds = orgsData.map(o => o.id);
+
+      // 2. 각 조직의 캐시 정보 조회
+      const { data: cashData, error: cashError } = await supabase
+        .from('organization_cash')
+        .select('organization_id, balance')
+        .in('organization_id', orgIds);
+
+      if (cashError) {
+        console.error('캐시 데이터 조회 오류:', cashError);
+      }
+
+      // 3. 각 조직의 크레딧 정보 조회
+      const { data: creditsData, error: creditsError } = await supabase
+        .from('organization_credits')
+        .select('organization_id, balance')
+        .in('organization_id', orgIds);
+
+      if (creditsError) {
+        console.error('크레딧 데이터 조회 오류:', creditsError);
+      }
+
+      // 4. 조직에 캐시/크레딧 정보 병합
+      const orgsWithBalance = orgsData.map(org => {
+        const cash = cashData?.find(c => c.organization_id === org.id);
+        const credit = creditsData?.find(c => c.organization_id === org.id);
+
+        return {
+          ...org,
+          cash_balance: cash?.balance || 0,
+          credit_balance: credit?.balance || 0
+        };
+      });
+
+      console.log('로드된 조직 수:', orgsWithBalance.length);
+      setOrganizations(orgsWithBalance);
+      if (orgsWithBalance.length > 0 && !selectedOrg) {
+        setSelectedOrg(orgsWithBalance[0]);
       }
     } catch (error) {
       console.error('조직 로드 실패:', error);
+      alert('조직 데이터 로드 중 오류 발생: ' + error);
+      setOrganizations([]);
     } finally {
       setLoading(false);
     }
@@ -126,36 +188,226 @@ export default function SellerAccountsPage() {
 
   async function loadMembers(orgId: string) {
     try {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('organization_members')
-        .select(`
-          id,
-          user_id,
-          role,
-          users (
-            id,
-            name,
-            email,
-            phone,
-            profile_name
-          )
-        `)
-        .eq('organization_id', orgId)
-        .order('created_at', { ascending: false });
+      // API 라우트를 통해 서버사이드에서 멤버 정보 조회
+      const response = await fetch(`/api/organizations/members?organization_id=${orgId}`);
+      const data = await response.json();
 
-      if (error) {
-        console.error('멤버 로드 오류:', error);
+      if (!response.ok) {
+        console.error('멤버 조회 오류:', data.error);
         setMembers([]);
         return;
       }
 
-      setMembers(data || []);
+      if (!data.members || data.members.length === 0) {
+        console.log('멤버가 없습니다.');
+        setMembers([]);
+        return;
+      }
+
+      // API 응답 데이터 변환 (user 객체를 users로 변경)
+      const formattedMembers = data.members.map((member: any) => ({
+        id: member.id,
+        user_id: member.user_id,
+        role: member.role,
+        created_at: member.created_at,
+        users: member.user ? {
+          id: member.user.id,
+          name: member.user.name,
+          email: member.user.email,
+          phone: member.user.phone,
+          profile_name: member.user.profile_name
+        } : null
+      }));
+
+      console.log('로드된 멤버 수:', formattedMembers.length);
+      setMembers(formattedMembers);
     } catch (error) {
       console.error('멤버 로드 실패:', error);
       setMembers([]);
     }
   }
+
+  const handleGrantCash = async () => {
+    if (!selectedOrg || !cashAmount) {
+      alert('캐시 금액을 입력해주세요.');
+      return;
+    }
+
+    if (!cashDescription || cashDescription.trim() === '') {
+      alert('지급 사유를 입력해주세요.');
+      return;
+    }
+
+    const amount = parseInt(cashAmount);
+    if (isNaN(amount) || amount === 0) {
+      alert('유효한 캐시 금액을 입력해주세요.');
+      return;
+    }
+
+    try {
+      setCashLoading(true);
+
+      // 조직 캐시 API 호출 (organization_id 기준)
+      const response = await fetch(`/api/admin/organizations/${selectedOrg.id}/cash`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cash: amount,
+          description: cashDescription || '관리자 지급'
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(data.message);
+        setCashAmount('');
+        setCashDescription('');
+
+        // 조직 목록 새로고침 후 selectedOrg 업데이트
+        await loadOrganizations();
+
+        // selectedOrg 업데이트
+        if (selectedOrg) {
+          const supabase = createClient();
+          const { data: cashData } = await supabase
+            .from('organization_cash')
+            .select('balance')
+            .eq('organization_id', selectedOrg.id)
+            .single();
+
+          setSelectedOrg({
+            ...selectedOrg,
+            cash_balance: cashData?.balance || 0
+          });
+        }
+
+        // 내역 새로고침
+        await loadCashHistory();
+      } else {
+        alert(data.error || '캐시 지급에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('캐시 지급 오류:', error);
+      alert('캐시 지급 중 오류가 발생했습니다.');
+    } finally {
+      setCashLoading(false);
+    }
+  };
+
+  const loadCashHistory = async () => {
+    if (!selectedOrg) return;
+
+    try {
+      const response = await fetch(`/api/admin/organizations/${selectedOrg.id}/cash/history`);
+      const data = await response.json();
+
+      console.log('캐시 내역 API 응답:', data);
+
+      if (data.success) {
+        setCashHistory(data.history || []);
+      } else {
+        console.error('캐시 내역 조회 실패:', data.error);
+        setCashHistory([]);
+      }
+    } catch (error) {
+      console.error('캐시 내역 조회 오류:', error);
+      setCashHistory([]);
+    }
+  };
+
+  const loadCreditHistory = async () => {
+    if (!selectedOrg) return;
+
+    try {
+      const response = await fetch(`/api/admin/organizations/${selectedOrg.id}/credits/history`);
+      const data = await response.json();
+
+      console.log('크레딧 내역 API 응답:', data);
+
+      if (data.success) {
+        setCreditHistory(data.history || []);
+      } else {
+        console.error('크레딧 내역 조회 실패:', data.error);
+        setCreditHistory([]);
+      }
+    } catch (error) {
+      console.error('크레딧 내역 조회 오류:', error);
+      setCreditHistory([]);
+    }
+  };
+
+  const handleGrantCredit = async () => {
+    if (!selectedOrg || !creditAmount) {
+      alert('크레딧 금액을 입력해주세요.');
+      return;
+    }
+
+    if (!creditDescription || creditDescription.trim() === '') {
+      alert('지급 사유를 입력해주세요.');
+      return;
+    }
+
+    const amount = parseInt(creditAmount);
+    if (isNaN(amount) || amount === 0) {
+      alert('유효한 크레딧 금액을 입력해주세요.');
+      return;
+    }
+
+    try {
+      setCreditLoading(true);
+
+      // 조직 크레딧 API 호출 (organization_id 기준)
+      const response = await fetch(`/api/admin/organizations/${selectedOrg.id}/credits`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          credits: amount,
+          description: creditDescription || '관리자 지급'
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(data.message);
+        setCreditAmount('');
+        setCreditDescription('');
+
+        // 조직 목록 새로고침 후 selectedOrg 업데이트
+        await loadOrganizations();
+
+        // selectedOrg 업데이트
+        if (selectedOrg) {
+          const supabase = createClient();
+          const { data: creditsData } = await supabase
+            .from('organization_credits')
+            .select('balance')
+            .eq('organization_id', selectedOrg.id)
+            .single();
+
+          setSelectedOrg({
+            ...selectedOrg,
+            credit_balance: creditsData?.balance || 0
+          });
+        }
+
+        // 내역 새로고침
+        await loadCreditHistory();
+      } else {
+        alert(data.error || '크레딧 지급에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('크레딧 지급 오류:', error);
+      alert('크레딧 지급 중 오류가 발생했습니다.');
+    } finally {
+      setCreditLoading(false);
+    }
+  };
 
   const filteredOrganizations = organizations.filter(org => {
     const searchLower = searchTerm.toLowerCase();
@@ -348,7 +600,7 @@ export default function SellerAccountsPage() {
             </div>
 
             {/* 상세 정보 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 4fr 2fr', gap: '24px' }}>
               {/* 사업자 정보 */}
               <div>
                 <h3 style={{
@@ -406,30 +658,68 @@ export default function SellerAccountsPage() {
                   overflowY: 'auto'
                 }}>
                   {members.length > 0 ? (
-                    members.map((member) => (
-                      <div
-                        key={member.id}
-                        style={{
-                          padding: '12px',
-                          background: '#f9fafb',
-                          borderRadius: '6px',
-                          border: '1px solid #e5e7eb'
-                        }}
-                      >
-                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#333', marginBottom: '6px' }}>
-                          {member.users?.name || '-'}
+                    members.map((member) => {
+                      const isOwner = member.role === 'owner';
+                      const isMember = member.role === 'member';
+
+                      return (
+                        <div
+                          key={member.id}
+                          style={{
+                            padding: '8px 12px',
+                            background: '#f9fafb',
+                            borderRadius: '6px',
+                            border: '1px solid #e5e7eb',
+                            fontSize: '13px',
+                            color: '#333',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            flexWrap: 'wrap'
+                          }}
+                        >
+                          {isOwner && (
+                            <span style={{
+                              fontSize: '11px',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: '#dbeafe',
+                              color: '#1e40af',
+                              fontWeight: '600'
+                            }}>
+                              소유자
+                            </span>
+                          )}
+                          {isMember && (
+                            <span style={{
+                              fontSize: '11px',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: '#fef3c7',
+                              color: '#92400e',
+                              fontWeight: '600'
+                            }}>
+                              담당자
+                            </span>
+                          )}
+                          <span style={{ fontWeight: '600' }}>
+                            {member.users?.name || '-'}
+                          </span>
+                          <span style={{ color: '#999' }}>·</span>
+                          <span style={{ color: '#666', fontSize: '12px' }}>
+                            {member.users?.email || '-'}
+                          </span>
+                          <span style={{ color: '#999' }}>·</span>
+                          <span style={{ color: '#666', fontSize: '12px' }}>
+                            {member.users?.phone || '-'}
+                          </span>
+                          <span style={{ color: '#999' }}>·</span>
+                          <span style={{ color: '#666', fontSize: '12px' }}>
+                            {member.users?.profile_name || '-'}
+                          </span>
                         </div>
-                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '2px' }}>
-                          {member.users?.email || '-'}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '2px' }}>
-                          {member.users?.phone || '-'}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#666' }}>
-                          프로필명: {member.users?.profile_name || '-'}
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div style={{
                       padding: '16px',
@@ -442,6 +732,95 @@ export default function SellerAccountsPage() {
                       등록된 멤버가 없습니다
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* 캐시/크레딧 관리 */}
+              <div>
+                <h3 style={{
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  marginBottom: '16px',
+                  color: '#333',
+                  borderBottom: '1px solid #e0e0e0',
+                  paddingBottom: '8px'
+                }}>
+                  캐시/크레딧 관리
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* 조직 캐시/크레딧 잔액 표시 */}
+                  <div style={{
+                    padding: '16px',
+                    background: '#f9fafb',
+                    borderRadius: '8px',
+                    border: '1px solid #e5e7eb'
+                  }}>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#333', marginBottom: '12px' }}>
+                      조직 잔액
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ fontSize: '13px', color: '#666', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>캐시</span>
+                        <span style={{ fontWeight: '700', fontSize: '16px', color: '#059669' }}>
+                          {selectedOrg.cash_balance?.toLocaleString() || 0}원
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#666', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>크레딧</span>
+                        <span style={{ fontWeight: '700', fontSize: '16px', color: '#2563eb' }}>
+                          {selectedOrg.credit_balance?.toLocaleString() || 0}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#666', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>기여점수</span>
+                        <span style={{ fontWeight: '700', fontSize: '16px', color: '#dc2626' }}>
+                          {selectedOrg.accumulated_points?.toLocaleString() || 0}점
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 관리 버튼 */}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => {
+                        loadCashHistory();
+                        setShowCashModal(true);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '10px 16px',
+                        fontSize: '14px',
+                        background: '#059669',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '600'
+                      }}
+                    >
+                      캐시 관리
+                    </button>
+                    <button
+                      onClick={() => {
+                        loadCreditHistory();
+                        setShowCreditModal(true);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '10px 16px',
+                        fontSize: '14px',
+                        background: '#2563eb',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '600'
+                      }}
+                    >
+                      크레딧 관리
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -479,7 +858,6 @@ export default function SellerAccountsPage() {
                   <InfoRow label="은행명" value={selectedOrg.bank_name} />
                   <InfoRow label="계좌번호" value={selectedOrg.bank_account} />
                   <InfoRow label="예금주" value={selectedOrg.account_holder} />
-                  <InfoRow label="입금자명" value={selectedOrg.depositor_name} />
                 </div>
               </div>
 
@@ -644,6 +1022,312 @@ export default function SellerAccountsPage() {
           </div>
         )}
       </div>
+
+      {/* 캐시 지급/회수 모달 */}
+      {showCashModal && selectedOrg && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            padding: '24px',
+            borderRadius: '12px',
+            width: '700px',
+            maxWidth: '90%',
+            maxHeight: '80vh',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px' }}>
+              캐시 관리 - {selectedOrg.business_name}
+            </h3>
+
+            {/* 지급/회수 폼 */}
+            <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
+                  금액 (음수 입력 시 회수)
+                </label>
+                <input
+                  type="number"
+                  value={cashAmount}
+                  onChange={(e) => setCashAmount(e.target.value)}
+                  placeholder="예: 10000 (지급) 또는 -5000 (회수)"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
+                  사유
+                </label>
+                <input
+                  type="text"
+                  value={cashDescription}
+                  onChange={(e) => setCashDescription(e.target.value)}
+                  placeholder="지급/회수 사유"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    setShowCashModal(false);
+                    setCashAmount('');
+                    setCashDescription('');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#e5e7eb',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  닫기
+                </button>
+                <button
+                  onClick={handleGrantCash}
+                  disabled={cashLoading}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#059669',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: cashLoading ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    opacity: cashLoading ? 0.7 : 1
+                  }}
+                >
+                  {cashLoading ? '처리 중...' : '지급/회수'}
+                </button>
+              </div>
+            </div>
+
+            {/* 내역 */}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>
+                캐시 지급/회수 내역 (최근 50건)
+              </h4>
+              {cashHistory.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {cashHistory.map((item, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        padding: '12px',
+                        background: '#f9fafb',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb',
+                        fontSize: '13px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: '600', color: item.amount > 0 ? '#059669' : '#dc2626' }}>
+                          {item.amount > 0 ? '+' : ''}{item.amount?.toLocaleString()}원
+                        </span>
+                        <span style={{ fontSize: '12px', color: '#666' }}>
+                          {new Date(item.created_at).toLocaleString('ko-KR')}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '2px' }}>
+                        {item.description || '-'}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#999' }}>
+                        잔액: {item.balance_before?.toLocaleString()} → {item.balance_after?.toLocaleString()}원
+                      </div>
+                      {item.admin && (
+                        <div style={{ fontSize: '11px', color: '#999' }}>
+                          지급한 관리자: {item.admin.name || item.admin.email}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '32px', color: '#999' }}>
+                  내역이 없습니다
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 크레딧 지급/회수 모달 */}
+      {showCreditModal && selectedOrg && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            padding: '24px',
+            borderRadius: '12px',
+            width: '700px',
+            maxWidth: '90%',
+            maxHeight: '80vh',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px' }}>
+              크레딧 관리 - {selectedOrg.business_name}
+            </h3>
+
+            {/* 지급/회수 폼 */}
+            <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
+                  크레딧 (음수 입력 시 회수)
+                </label>
+                <input
+                  type="number"
+                  value={creditAmount}
+                  onChange={(e) => setCreditAmount(e.target.value)}
+                  placeholder="예: 100 (지급) 또는 -50 (회수)"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
+                  사유
+                </label>
+                <input
+                  type="text"
+                  value={creditDescription}
+                  onChange={(e) => setCreditDescription(e.target.value)}
+                  placeholder="지급/회수 사유"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    setShowCreditModal(false);
+                    setCreditAmount('');
+                    setCreditDescription('');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#e5e7eb',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  닫기
+                </button>
+                <button
+                  onClick={handleGrantCredit}
+                  disabled={creditLoading}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: creditLoading ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    opacity: creditLoading ? 0.7 : 1
+                  }}
+                >
+                  {creditLoading ? '처리 중...' : '지급/회수'}
+                </button>
+              </div>
+            </div>
+
+            {/* 내역 */}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>
+                크레딧 지급/회수 내역 (최근 50건)
+              </h4>
+              {creditHistory.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {creditHistory.map((item, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        padding: '12px',
+                        background: '#f9fafb',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb',
+                        fontSize: '13px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: '600', color: item.amount > 0 ? '#2563eb' : '#dc2626' }}>
+                          {item.amount > 0 ? '+' : ''}{item.amount?.toLocaleString()}
+                        </span>
+                        <span style={{ fontSize: '12px', color: '#666' }}>
+                          {new Date(item.created_at).toLocaleString('ko-KR')}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '2px' }}>
+                        {item.description || '-'}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#999' }}>
+                        잔액: {item.balance_before?.toLocaleString()} → {item.balance_after?.toLocaleString()}
+                      </div>
+                      {item.admin && (
+                        <div style={{ fontSize: '11px', color: '#999' }}>
+                          지급한 관리자: {item.admin.name || item.admin.email}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '32px', color: '#999' }}>
+                  내역이 없습니다
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
