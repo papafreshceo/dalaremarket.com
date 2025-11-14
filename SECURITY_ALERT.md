@@ -191,15 +191,21 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL // ✅
 
 작업을 완료한 후 체크:
 
-- [ ] Supabase 서비스 키 재생성 완료
-- [ ] .env.local 파일 생성 및 새 키 입력
-- [ ] Vercel 환경 변수 업데이트
-- [ ] dotenv 패키지 설치
-- [ ] 스크립트 테스트 완료
+- [x] Supabase 서비스 키 재생성 완료 (새 키: sb_secret_MQ4Dx-m8WlNc-vI-IavhCw_70nyqgCL)
+- [x] .env.local 파일 생성 및 새 키 입력
+- [ ] **Vercel 환경 변수 업데이트** ⚠️ 아직 안함! 배포 시 필수!
+- [x] dotenv 패키지 설치 (v17.2.3)
+- [x] 스크립트 테스트 완료 (환경 변수 24개 로드 확인)
 - [ ] GitGuardian 알림 해결
 - [ ] (선택) Git 히스토리 정리
 - [ ] (선택) Pre-commit hook 설정
 
+### 🔴 남은 작업
+
+1. **Vercel 환경 변수 업데이트** - 배포하기 전에 반드시 필요!
+2. GitGuardian 알림 해결
+
+위 2개만 완료하면 모든 보안 조치가 완료됩니다.
 모든 체크가 완료되면 이 파일을 삭제해도 됩니다.
 
 ---
