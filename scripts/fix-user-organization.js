@@ -1,34 +1,29 @@
 /**
- * test2 계정에 개인 셀러계정 생성
+ * 사용자 개인 셀러계정 생성 스크립트
  *
- * 문제: test1이 조직을 삭제했을 때, test2의 개인 셀러계정이 자동 생성되지 않음
- * 해결: test2에게 개인 셀러계정을 수동으로 생성
+ * 사용법: node scripts/fix-user-organization.js <email>
+ * 예: node scripts/fix-user-organization.js test2@test.com
  */
 
-const { createClient } = require('@supabase/supabase-js')
+const { supabase } = require('./supabase-config')
 
-const supabaseUrl = 'https://ufuahbppuftwkluodvkf.supabase.co'
-const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmdWFoYnBwdWZ0d2tsdW9kdmtmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyODY1NTM1NSwiZXhwIjoyMDQ0MjMxMzU1fQ.YbkISty_MO7P8dm1YTEJyKLEqMXkPBW-_-Sih5Jic1k'
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-async function fixTest2Account() {
+async function fixUserOrganization(userEmail) {
   try {
-    console.log('🔍 test2 계정 조회 중...')
+    console.log(`🔍 ${userEmail} 계정 조회 중...`)
 
-    // test2 사용자 조회
+    // 사용자 조회
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('*')
-      .eq('email', 'test2@test.com')
+      .eq('email', userEmail)
       .single()
 
     if (userError || !user) {
-      console.error('❌ test2 사용자를 찾을 수 없습니다:', userError)
+      console.error('❌ 사용자를 찾을 수 없습니다:', userError)
       return
     }
 
-    console.log('✅ test2 사용자 발견:', {
+    console.log('✅ 사용자 발견:', {
       id: user.id,
       email: user.email,
       name: user.name,
@@ -134,17 +129,25 @@ async function fixTest2Account() {
 
     console.log('✅ primary_organization_id 업데이트 완료')
 
-    console.log('\n🎉 test2 계정 복구 완료!')
+    console.log('\n🎉 계정 복구 완료!')
     console.log('='.repeat(50))
     console.log('새 조직 정보:')
     console.log('  - ID:', newOrg.id)
     console.log('  - 이름:', newOrg.business_name)
     console.log('  - 티어:', newOrg.tier)
     console.log('='.repeat(50))
-    console.log('\n👉 이제 test2로 로그인해서 확인하세요!')
   } catch (error) {
     console.error('❌ 오류 발생:', error)
   }
 }
 
-fixTest2Account()
+// 명령줄 인자 확인
+const userEmail = process.argv[2]
+
+if (!userEmail) {
+  console.error('❌ 사용법: node scripts/fix-user-organization.js <email>')
+  console.error('예: node scripts/fix-user-organization.js test2@test.com')
+  process.exit(1)
+}
+
+fixUserOrganization(userEmail)

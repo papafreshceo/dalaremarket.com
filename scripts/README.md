@@ -2,6 +2,54 @@
 
 데이터베이스 구조를 분석하고 관리하는 스크립트 모음
 
+## 🔐 보안 주의사항
+
+**절대로 Supabase 서비스 키를 스크립트 파일에 직접 작성하지 마세요!**
+
+모든 관리 스크립트는 환경 변수를 사용하도록 설계되었습니다.
+
+### 사용 전 준비
+
+1. 루트 디렉토리에 `.env.local` 파일 생성:
+   ```bash
+   cp .env.local.example .env.local
+   ```
+
+2. `.env.local` 파일에 실제 값 입력:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   ```
+
+3. `dotenv` 패키지 설치 (아직 설치하지 않았다면):
+   ```bash
+   npm install dotenv
+   ```
+
+### 관리 스크립트
+
+#### supabase-config.js
+모든 스크립트에서 사용하는 공통 Supabase 설정 파일입니다.
+
+#### fix-user-organization.js
+사용자에게 개인 셀러계정을 생성합니다.
+```bash
+node scripts/fix-user-organization.js <email>
+```
+
+#### update-organization-rls.js
+관리자가 모든 조직을 볼 수 있도록 RLS 정책을 업데이트합니다.
+```bash
+node scripts/update-organization-rls.js
+```
+
+#### setup-user-delete-trigger.js
+사용자 삭제 시 관련 데이터를 자동으로 삭제하는 트리거를 설정합니다.
+```bash
+node scripts/setup-user-delete-trigger.js
+```
+
 ## 📊 DB Schema Analyzer
 
 데이터베이스 스키마를 쉽게 탐색할 수 있는 CLI 도구

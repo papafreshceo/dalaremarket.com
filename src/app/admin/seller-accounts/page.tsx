@@ -46,10 +46,24 @@ interface SubAccount {
   created_at: string;
 }
 
+interface OrganizationMember {
+  id: string;
+  user_id: string;
+  role: string;
+  users: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    phone: string | null;
+    profile_name: string | null;
+  } | null;
+}
+
 export default function SellerAccountsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [subAccounts, setSubAccounts] = useState<SubAccount[]>([]);
+  const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -60,6 +74,7 @@ export default function SellerAccountsPage() {
   useEffect(() => {
     if (selectedOrg) {
       loadSubAccounts(selectedOrg.id);
+      loadMembers(selectedOrg.id);
     }
   }, [selectedOrg]);
 
@@ -106,6 +121,39 @@ export default function SellerAccountsPage() {
     } catch (error) {
       console.error('서브계정 로드 실패:', error);
       setSubAccounts([]);
+    }
+  }
+
+  async function loadMembers(orgId: string) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('organization_members')
+        .select(`
+          id,
+          user_id,
+          role,
+          users (
+            id,
+            name,
+            email,
+            phone,
+            profile_name
+          )
+        `)
+        .eq('organization_id', orgId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('멤버 로드 오류:', error);
+        setMembers([]);
+        return;
+      }
+
+      setMembers(data || []);
+    } catch (error) {
+      console.error('멤버 로드 실패:', error);
+      setMembers([]);
     }
   }
 
@@ -300,7 +348,7 @@ export default function SellerAccountsPage() {
             </div>
 
             {/* 상세 정보 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px' }}>
               {/* 사업자 정보 */}
               <div>
                 <h3 style={{
@@ -335,6 +383,65 @@ export default function SellerAccountsPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <InfoRow label="대표자명" value={selectedOrg.representative_name} />
                   <InfoRow label="대표전화" value={selectedOrg.representative_phone} />
+                </div>
+              </div>
+
+              {/* 멤버현황 */}
+              <div>
+                <h3 style={{
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  marginBottom: '16px',
+                  color: '#333',
+                  borderBottom: '1px solid #e0e0e0',
+                  paddingBottom: '8px'
+                }}>
+                  멤버현황 ({members.length}명)
+                </h3>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  maxHeight: '400px',
+                  overflowY: 'auto'
+                }}>
+                  {members.length > 0 ? (
+                    members.map((member) => (
+                      <div
+                        key={member.id}
+                        style={{
+                          padding: '12px',
+                          background: '#f9fafb',
+                          borderRadius: '6px',
+                          border: '1px solid #e5e7eb'
+                        }}
+                      >
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#333', marginBottom: '6px' }}>
+                          {member.users?.name || '-'}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '2px' }}>
+                          {member.users?.email || '-'}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '2px' }}>
+                          {member.users?.phone || '-'}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#666' }}>
+                          프로필명: {member.users?.profile_name || '-'}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{
+                      padding: '16px',
+                      textAlign: 'center',
+                      color: '#999',
+                      fontSize: '13px',
+                      background: '#f9fafb',
+                      borderRadius: '6px'
+                    }}>
+                      등록된 멤버가 없습니다
+                    </div>
+                  )}
                 </div>
               </div>
 
