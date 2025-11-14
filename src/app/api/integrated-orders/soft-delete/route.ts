@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireStaff } from '@/lib/api-security';
 import { canDeleteServer } from '@/lib/permissions-server';
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { ids } = await request.json();
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {

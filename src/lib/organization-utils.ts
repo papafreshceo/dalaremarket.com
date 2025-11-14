@@ -178,6 +178,22 @@ export async function canManageMembers(
   organizationId: string,
   userId: string
 ): Promise<boolean> {
+  // Service Role 클라이언트로 조직 소유자 확인 (RLS 우회)
+  const { createAdminClient } = await import('@/lib/supabase/server')
+  const adminSupabase = createAdminClient()
+
+  const { data: org } = await adminSupabase
+    .from('organizations')
+    .select('owner_id')
+    .eq('id', organizationId)
+    .single()
+
+  // 소유자인 경우 무조건 권한 있음
+  if (org?.owner_id === userId) {
+    return true
+  }
+
+  // 소유자가 아니면 멤버 권한 확인
   const member = await getOrganizationMember(organizationId, userId)
   return member?.can_manage_members === true
 }
@@ -223,11 +239,12 @@ export async function getOrganizationMembers(organizationId: string) {
 
   console.log('조직 멤버 조회 시작:', organizationId)
 
-  // 먼저 멤버 목록 조회
+  // 먼저 멤버 목록 조회 (active 상태만)
   const { data: members, error } = await supabase
     .from('organization_members')
     .select('*')
     .eq('organization_id', organizationId)
+    .eq('status', 'active')
     .order('created_at', { ascending: true })
 
   if (error) {
@@ -354,22 +371,11 @@ export async function getOrganizationMemberCount(
 
 /**
  * 조직의 최대 멤버 수 제한 확인
+ * (max_members 컬럼 삭제됨 - 제한 없음)
  */
 export async function canAddMember(organizationId: string): Promise<boolean> {
-  const supabase = await createServerClient()
-
-  const { data: organization } = await supabase
-    .from('organizations')
-    .select('max_members')
-    .eq('id', organizationId)
-    .single()
-
-  if (!organization) {
-    return false
-  }
-
-  const currentCount = await getOrganizationMemberCount(organizationId)
-  return currentCount < organization.max_members
+  // 멤버 수 제한 없음 - 항상 true 반환
+  return true
 }
 
 /**

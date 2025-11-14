@@ -12,22 +12,25 @@ export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'cancelled'
 // 조직 정보
 export interface Organization {
   id: string
-  name: string
+  business_name?: string  // name → business_name
   business_number?: string
-  address?: string
-  phone?: string
-  fax?: string
-  email?: string
+  business_address?: string  // address → business_address
+  business_email?: string  // email → business_email
   representative_name?: string
-  commission_rate: number
-  settlement_cycle: string
+  representative_phone?: string  // phone → representative_phone
+  manager_name?: string
+  manager_phone?: string
   bank_name?: string
-  account_number?: string
+  bank_account?: string  // account_number → bank_account
   account_holder?: string
-  tax_invoice_email?: string
+  depositor_name?: string
+  store_name?: string
+  store_phone?: string
+  seller_code?: string
+  partner_code?: string
+  tier?: string
   owner_id: string
   is_active: boolean
-  max_members: number
   memo?: string
   created_at: string
   updated_at: string
@@ -75,9 +78,8 @@ export interface OrganizationMemberWithUser extends OrganizationMember {
     id: string
     email: string
     profile_name?: string
-    company_name?: string
-    manager_name?: string
-    manager_phone?: string
+    name?: string
+    phone?: string
   }
 }
 
@@ -87,43 +89,45 @@ export interface OrganizationWithOwner extends Organization {
     id: string
     email: string
     profile_name?: string
-    company_name?: string
   }
   member_count?: number
 }
 
 // 조직 생성 요청
 export interface CreateOrganizationRequest {
-  name: string
+  business_name: string
   business_number?: string
-  address?: string
-  phone?: string
-  email?: string
+  business_address?: string
+  business_email?: string
   representative_name?: string
-  commission_rate?: number
-  settlement_cycle?: string
+  representative_phone?: string
+  manager_name?: string
+  manager_phone?: string
   bank_name?: string
-  account_number?: string
+  bank_account?: string
   account_holder?: string
-  tax_invoice_email?: string
+  depositor_name?: string
+  store_name?: string
+  store_phone?: string
 }
 
 // 조직 업데이트 요청
 export interface UpdateOrganizationRequest {
-  name?: string
+  business_name?: string
   business_number?: string
-  address?: string
-  phone?: string
-  email?: string
+  business_address?: string
+  business_email?: string
   representative_name?: string
-  commission_rate?: number
-  settlement_cycle?: string
+  representative_phone?: string
+  manager_name?: string
+  manager_phone?: string
   bank_name?: string
-  account_number?: string
+  bank_account?: string
   account_holder?: string
-  tax_invoice_email?: string
+  depositor_name?: string
+  store_name?: string
+  store_phone?: string
   is_active?: boolean
-  max_members?: number
   memo?: string
 }
 

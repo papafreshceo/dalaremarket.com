@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ vendor: string }> }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { vendor: vendorParam } = await params;
     const vendor = decodeURIComponent(vendorParam);
 

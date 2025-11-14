@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-security';
 
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.error;
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const searchParams = request.nextUrl.searchParams;
 
     const customerType = searchParams.get('customerType'); // 'regular' | 'marketing'
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.error;
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
 
     const {
@@ -195,7 +195,7 @@ export async function PUT(request: NextRequest) {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.error;
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
 
     const {
@@ -276,7 +276,7 @@ export async function DELETE(request: NextRequest) {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.error;
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
 

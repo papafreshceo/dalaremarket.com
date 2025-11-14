@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-security';
 
@@ -9,7 +9,7 @@ import { requireAdmin } from '@/lib/api-security';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     const { data, error } = await supabase
       .from('promotional_images')
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   if (!auth.authorized) return auth.error;
 
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
 
     // section 필드 추가 (기본값: tab1)
@@ -102,7 +102,7 @@ export async function PUT(request: NextRequest) {
   if (!auth.authorized) return auth.error;
 
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
     const { id, ...updateData } = body;
 
@@ -151,7 +151,7 @@ export async function DELETE(request: NextRequest) {
   if (!auth.authorized) return auth.error;
 
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

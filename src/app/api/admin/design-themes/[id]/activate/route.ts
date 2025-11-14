@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 
 // 테마 활성화
 export async function POST(
@@ -8,7 +8,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 트리거가 자동으로 다른 테마들을 비활성화하지만, 명시적으로 처리
     const { error: deactivateError } = await supabase

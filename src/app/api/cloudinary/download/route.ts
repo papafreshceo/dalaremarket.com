@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 
 /**
  * POST /api/cloudinary/download
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 다운로드 카운트 증가
     const { error: updateError } = await supabase.rpc('increment_download_count', {

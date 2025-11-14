@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClientForRouteHandler } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-security'
 import { getInvitationByToken, getDefaultPermissions } from '@/lib/organization-utils'
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 초대 정보 조회
     const invitation = await getInvitationByToken(token)
@@ -179,21 +180,55 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 조직 멤버로 추가
-    const { data: member, error: memberError } = await supabase
+    // 기존 멤버십 확인 (suspended 포함)
+    const { data: existingSuspendedMember } = await supabase
       .from('organization_members')
-      .insert({
-        organization_id: invitation.organization_id,
-        user_id: auth.user.id,
-        role: invitation.role,
-        status: 'active',
-        invited_by: invitation.inviter_id,
-        invited_at: invitation.created_at,
-        joined_at: new Date().toISOString(),
-        ...permissions,
-      })
-      .select()
+      .select('id, status')
+      .eq('organization_id', invitation.organization_id)
+      .eq('user_id', auth.user.id)
       .single()
+
+    let member
+    let memberError
+
+    if (existingSuspendedMember) {
+      // 기존 멤버십을 active로 변경
+      const result = await supabase
+        .from('organization_members')
+        .update({
+          role: invitation.role,
+          status: 'active',
+          invited_by: invitation.inviter_id,
+          invited_at: invitation.created_at,
+          joined_at: new Date().toISOString(),
+          ...permissions,
+        })
+        .eq('id', existingSuspendedMember.id)
+        .select()
+        .single()
+
+      member = result.data
+      memberError = result.error
+    } else {
+      // 새로운 멤버로 추가
+      const result = await supabase
+        .from('organization_members')
+        .insert({
+          organization_id: invitation.organization_id,
+          user_id: auth.user.id,
+          role: invitation.role,
+          status: 'active',
+          invited_by: invitation.inviter_id,
+          invited_at: invitation.created_at,
+          joined_at: new Date().toISOString(),
+          ...permissions,
+        })
+        .select()
+        .single()
+
+      member = result.data
+      memberError = result.error
+    }
 
     if (memberError) {
       console.error('멤버 추가 실패:', memberError)
@@ -216,7 +251,9 @@ export async function POST(request: NextRequest) {
     // 사용자의 primary_organization_id를 새 조직으로 업데이트
     await supabase
       .from('users')
-      .update({ primary_organization_id: invitation.organization_id })
+      .update({
+        primary_organization_id: invitation.organization_id,
+      })
       .eq('id', auth.user.id)
 
     return NextResponse.json({
@@ -241,7 +278,12 @@ async function handleNotificationBasedInvitation(
   invitationId: string,
   action: 'accept' | 'reject'
 ) {
-  const supabase = await createClient()
+  const supabase = await createClientForRouteHandler()
+
+  // Admin client for RLS bypass (needed for deletion operations)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const adminSupabase = createAdminClient(supabaseUrl, supabaseServiceKey)
 
   // 1. 초대 정보 조회
   const { data: invitation, error: invitationError } = await supabase
@@ -364,7 +406,67 @@ async function handleNotificationBasedInvitation(
       )
     }
 
+    // ⭐ CRITICAL: 검증 전에 먼저 개인 조직 삭제
+    // 이후 검증 로직이 실행될 때는 이미 개인 조직이 삭제된 상태여야 함
+    console.log('🔍 기존 멤버십 확인 및 삭제 시작 (검증 전)')
+
+    // 현재 사용자의 모든 active 멤버십 조회 (organization_id만 가져옴)
+    const { data: membershipsToDelete } = await supabase
+      .from('organization_members')
+      .select('id, organization_id')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+
+    console.log('📋 조회된 멤버십:', membershipsToDelete?.length || 0, membershipsToDelete)
+
+    if (membershipsToDelete && membershipsToDelete.length > 0) {
+      for (const membership of membershipsToDelete) {
+        // 각 organization_id에 대해 조직 정보 조회 (admin client로)
+        const { data: org } = await adminSupabase
+          .from('organizations')
+          .select('id, owner_id, business_name')
+          .eq('id', membership.organization_id)
+          .single()
+
+        console.log('🔎 조직 정보:', org)
+
+        // 본인이 소유자인 개인 조직인 경우만 삭제
+        if (org && org.owner_id === userId) {
+          console.log('🗑️  개인 셀러계정 삭제 시작:', org.business_name, org.id)
+
+          // 멤버십 삭제 (admin client로 RLS 우회)
+          const { error: memberDeleteError } = await adminSupabase
+            .from('organization_members')
+            .delete()
+            .eq('organization_id', org.id)
+
+          if (memberDeleteError) {
+            console.error('❌ 멤버십 삭제 실패:', memberDeleteError)
+          } else {
+            console.log('✅ 멤버십 삭제 완료')
+          }
+
+          // 조직 삭제 (admin client로 RLS 우회)
+          const { error: orgDeleteError } = await adminSupabase
+            .from('organizations')
+            .delete()
+            .eq('id', org.id)
+
+          if (orgDeleteError) {
+            console.error('❌ 조직 삭제 실패:', orgDeleteError)
+          } else {
+            console.log('✅ 조직 삭제 완료:', org.business_name)
+          }
+        } else {
+          console.log('⏭️  스킵: 본인 소유 조직 아님 또는 조직 없음')
+        }
+      }
+    }
+
+    console.log('✅ 기존 멤버십 정리 완료 (검증 전)')
+
     // 이미 다른 사람의 조직 멤버인지 확인 (본인 소유 조직 제외)
+    // ⭐ 이 시점에는 이미 개인 조직이 삭제된 상태
     const { data: existingMemberships } = await supabase
       .from('organization_members')
       .select('organization_id, organizations!inner(owner_id)')
@@ -372,67 +474,73 @@ async function handleNotificationBasedInvitation(
       .eq('status', 'active')
 
     if (existingMemberships && existingMemberships.length > 0) {
+      console.log('⚠️  검증: 남아있는 멤버십 발견:', existingMemberships.length)
+
       // 본인이 소유자가 아닌 조직 중에서, 다른 소유자의 조직 멤버인지 확인
       const otherOwnerMembership = existingMemberships.find(
         (m: any) => m.organizations.owner_id !== userId && m.organizations.owner_id !== invitingOrg.owner_id
       )
 
       if (otherOwnerMembership) {
+        console.error('❌ 다른 소유자의 조직 멤버십 발견')
         return NextResponse.json(
           { error: '이미 다른 사람의 셀러계정 멤버입니다. 한 사람의 셀러계정에만 소속될 수 있습니다.' },
           { status: 400 }
         )
       }
+    } else {
+      console.log('✅ 검증: 기존 멤버십 없음 - 새 조직 가입 가능')
     }
 
-    // 사용자의 개인 조직 확인 및 삭제
-    const { data: currentUser } = await supabase
-      .from('users')
-      .select('primary_organization_id')
-      .eq('id', userId)
+    // 기존 멤버십 확인 (suspended 포함)
+    const { data: existingSuspendedMember } = await supabase
+      .from('organization_members')
+      .select('id, status')
+      .eq('organization_id', invitation.organization_id)
+      .eq('user_id', userId)
       .single()
 
-    if (currentUser?.primary_organization_id) {
-      // 기존 조직 정보 조회
-      const { data: oldOrg } = await supabase
-        .from('organizations')
-        .select('id, owner_id, name')
-        .eq('id', currentUser.primary_organization_id)
+    let member
+    let memberError
+
+    if (existingSuspendedMember) {
+      // 기존 멤버십을 active로 변경
+      const result = await supabase
+        .from('organization_members')
+        .update({
+          role: invitation.role,
+          status: 'active',
+          invited_by: invitation.inviter_id,
+          invited_at: invitation.created_at,
+          joined_at: new Date().toISOString(),
+          ...permissions,
+        })
+        .eq('id', existingSuspendedMember.id)
+        .select()
         .single()
 
-      // 본인이 소유자인 개인 조직인 경우 삭제
-      if (oldOrg && oldOrg.owner_id === userId) {
-        console.log('🗑️  개인 셀러계정 삭제:', oldOrg.name)
+      member = result.data
+      memberError = result.error
+    } else {
+      // 새로운 멤버로 추가
+      const result = await supabase
+        .from('organization_members')
+        .insert({
+          organization_id: invitation.organization_id,
+          user_id: userId,
+          role: invitation.role,
+          status: 'active',
+          invited_by: invitation.inviter_id,
+          invited_at: invitation.created_at,
+          joined_at: new Date().toISOString(),
+          ...permissions,
+        })
+        .select()
+        .single()
 
-        // 기존 조직의 멤버 삭제
-        await supabase
-          .from('organization_members')
-          .delete()
-          .eq('organization_id', oldOrg.id)
-
-        // 기존 조직 삭제
-        await supabase
-          .from('organizations')
-          .delete()
-          .eq('id', oldOrg.id)
-      }
+      member = result.data
+      memberError = result.error
     }
-
-    // 조직 멤버로 추가
-    const { data: member, error: memberError } = await supabase
-      .from('organization_members')
-      .insert({
-        organization_id: invitation.organization_id,
-        user_id: userId,
-        role: invitation.role,
-        status: 'active',
-        invited_by: invitation.inviter_id,
-        invited_at: invitation.created_at,
-        joined_at: new Date().toISOString(),
-        ...permissions,
-      })
-      .select()
-      .single()
 
     if (memberError) {
       console.error('멤버 추가 실패:', memberError)
@@ -466,7 +574,9 @@ async function handleNotificationBasedInvitation(
     // 사용자의 primary_organization_id를 새 조직으로 업데이트
     await supabase
       .from('users')
-      .update({ primary_organization_id: invitation.organization_id })
+      .update({
+        primary_organization_id: invitation.organization_id,
+      })
       .eq('id', userId)
 
     // 조직 정보 조회

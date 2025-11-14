@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import cloudinary from '@/lib/cloudinary/config';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import crypto from 'crypto';
 import { requireAuth } from '@/lib/api-security';
 
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     const fileHash = crypto.createHash('sha256').update(buffer).digest('hex');
 
     // Supabase 클라이언트 생성 (폴더 경로 조회용)
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 1. 해시 기반 중복 체크
     const { data: hashDuplicate } = await supabase

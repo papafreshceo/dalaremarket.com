@@ -1,11 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth-middleware'
 
 // POST: 권한 대량 업데이트 (최고관리자만 가능)
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 🔒 보안: 관리자 이상만 권한 대량 업데이트 가능
     const authResult = await withAuth(request, {

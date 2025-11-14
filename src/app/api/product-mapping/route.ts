@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const searchParams = request.nextUrl.searchParams;
 
     const optionName = searchParams.get('optionName');
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
 
     if (!body.option_name) {
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
 
     if (!body.id) {
@@ -158,7 +158,7 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
 

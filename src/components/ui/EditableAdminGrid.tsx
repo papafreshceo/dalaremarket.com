@@ -143,7 +143,12 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
 
   // ID 기반 선택을 위한 헬퍼 함수
   const getRowId = useCallback((row: T): string => {
-    return String(row.id ?? `temp_${Date.now()}_${Math.random()}`)
+    // id가 있으면 사용, 없으면 데이터의 JSON 문자열을 해시처럼 사용
+    if (row.id !== undefined && row.id !== null) {
+      return String(row.id)
+    }
+    // id가 없으면 row 전체를 문자열로 변환하여 사용 (일관성 보장)
+    return JSON.stringify(row)
   }, [])
 
   // 컬럼 너비 초기화 (컨텐츠 기반 자동 계산)
@@ -2144,11 +2149,14 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
   }
 
   const handleToggleRow = (row: T) => {
+    console.log('🔍 handleToggleRow 호출됨', { row, rowId: getRowId(row) })
     const rowId = getRowId(row)
     const newSelected = new Set(selectedRowIds)
     if (newSelected.has(rowId)) {
+      console.log('✅ 체크 해제:', rowId)
       newSelected.delete(rowId)
     } else {
+      console.log('✅ 체크:', rowId)
       newSelected.add(rowId)
     }
     setSelectedRowIds(newSelected)
@@ -2156,6 +2164,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
     const indices = filteredData
       .map((r, idx) => (newSelected.has(getRowId(r)) ? idx : -1))
       .filter(idx => idx !== -1)
+    console.log('📊 선택된 인덱스:', indices)
     onSelectionChange?.(indices)
   }
 
@@ -2505,11 +2514,22 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                 }}
               >
                 {enableCheckbox && (
-                  <td key="checkbox" className="border border-gray-200 px-2 py-1 text-center align-middle" style={{ backgroundColor: rowBgColor }}>
+                  <td
+                    key="checkbox"
+                    className="border border-gray-200 px-2 py-1 text-center align-middle"
+                    style={{ backgroundColor: rowBgColor }}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
                     <input
                       type="checkbox"
                       checked={selectedRowIds.has(getRowId(row))}
-                      onChange={() => handleToggleRow(row)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        handleToggleRow(row);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
                       className="cursor-pointer align-middle"
                     />
                   </td>

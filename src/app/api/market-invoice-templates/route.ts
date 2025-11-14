@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     const { data, error } = await supabase
       .from('market_invoice_templates')
@@ -40,7 +40,7 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
 
     const { market_name, template_name, columns } = body;
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
 
     const { id, market_name, template_name, sheet_name, columns, is_active } = body;
@@ -140,7 +140,7 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

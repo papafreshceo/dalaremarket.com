@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import crypto from 'crypto';
 
 /**
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     // 삭제 이벤트 처리
     if (notification_type === 'delete' || notification_type === 'destroy') {
-      const supabase = await createClient();
+      const supabase = await createClientForRouteHandler();
 
       // public_id로 DB에서 이미지 찾기
       const { data: image, error: findError } = await supabase

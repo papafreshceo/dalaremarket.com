@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 
 // GET: 즐겨찾기 도구 목록 조회
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 현재 로그인한 사용자 정보 가져오기
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -38,7 +38,7 @@ export async function GET() {
 // POST: 즐겨찾기 도구 업데이트
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 현재 로그인한 사용자 정보 가져오기
     const { data: { user }, error: authError } = await supabase.auth.getUser();

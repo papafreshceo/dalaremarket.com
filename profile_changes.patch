@@ -1,0 +1,1676 @@
+diff --git a/src/app/platform/profile/page.tsx b/src/app/platform/profile/page.tsx
+index 36b77a3..077cba1 100644
+--- a/src/app/platform/profile/page.tsx
++++ b/src/app/platform/profile/page.tsx
+@@ -7,15 +7,16 @@ import toast from 'react-hot-toast';
+ import OrganizationMembers from '@/components/organization/OrganizationMembers';
+ import InviteMember from '@/components/organization/InviteMember';
+ import InvitationsList from '@/components/organization/InvitationsList';
++import SubAccountManagement from '@/components/organization/SubAccountManagement';
+ 
+ interface SellerInfo {
+-  // 기본 정보
++  // 기본 ?�보
+   name: string;
+   email: string;
+   phone: string;
+   profile_name?: string;
+ 
+-  // 사업자 정보
++  // ?�업???�보
+   business_name?: string;
+   business_address?: string;
+   business_number?: string;
+@@ -23,17 +24,17 @@ interface SellerInfo {
+   representative_name?: string;
+   representative_phone?: string;
+ 
+-  // 담당자 정보
++  // ?�당???�보
+   manager_name?: string;
+   manager_phone?: string;
+ 
+-  // 정산 계좌 정보
++  // ?�산 계좌 ?�보
+   bank_account?: string;
+   bank_name?: string;
+   account_holder?: string;
+   depositor_name?: string;
+ 
+-  // 송장출력 정보
++  // ?�장출력 ?�보
+   store_name?: string;
+   store_phone?: string;
+ }
+@@ -46,7 +47,7 @@ export default function ProfilePage() {
+   const [savingSellerAccount, setSavingSellerAccount] = useState(false);
+   const [user, setUser] = useState<any>(null);
+   const [profileName, setProfileName] = useState('');
+-  const [originalProfileName, setOriginalProfileName] = useState(''); // 원래 프로필 이름 저장
++  const [originalProfileName, setOriginalProfileName] = useState(''); // ?�래 ?�로???�름 ?�??
+   const [message, setMessage] = useState('');
+   const [sellerInfo, setSellerInfo] = useState<SellerInfo>({
+     name: '',
+@@ -62,40 +63,43 @@ export default function ProfilePage() {
+     message: string;
+   } | null>(null);
+ 
+-  // 셀러계정 관리 state
++  // ?�?�계??관�?state
+   const [organization, setOrganization] = useState<any>(null);
+   const [member, setMember] = useState<any>(null);
+   const [canManageMembers, setCanManageMembers] = useState(false);
+   const [isOwner, setIsOwner] = useState(false);
+ 
+-  // 추가 셀러계정 state
+-  const [additionalAccounts, setAdditionalAccounts] = useState<any[]>([]);
++  // ?�브계정 state
++  const [subAccounts, setSubAccounts] = useState<any[]>([]);
++  const [loadingSubAccounts, setLoadingSubAccounts] = useState(false);
++  const [showSubAccountForm, setShowSubAccountForm] = useState(false);
++  const [editingSubAccount, setEditingSubAccount] = useState<any>(null);
+ 
+-  // 티어별 최대 계정 수 계산
++  // ?�어�?최�? 계정 ??계산
+   const getMaxAccountsByTier = (tier: string | null | undefined) => {
+-    if (!tier) return 1; // 티어 없으면 1개만 (기본)
++    if (!tier) return 2; // ?�어 ?�으�?2�?(기본 1�?+ ?�브 1�?
+ 
+     const lowerTier = tier.toLowerCase();
+     switch (lowerTier) {
+       case 'light':
+-        return 1; // 라이트: 1개만
++        return 2; // ?�이?? 2�?(기본 1�?+ ?�브 1�?
+       case 'standard':
+-        return 2; // 스탠다드: 2개
++        return 3; // ?�탠?�드: 3�?
+       case 'advance':
+       case 'elite':
+       case 'legend':
+-        return 3; // 어드밴스, 엘리트, 레전드: 3개
++        return 5; // ?�드밴스, ?�리?? ?�전?? 5�?
+       default:
+-        return 1;
++        return 2;
+     }
+   };
+ 
+-  // 현재 보유 가능한 계정 수 (안전하게 계산)
++  // ?�재 보유 가?�한 계정 ??(?�전?�게 계산)
+   const maxAccounts = useMemo(() => {
+-    return user ? getMaxAccountsByTier(user.tier) : 1;
++    return user ? getMaxAccountsByTier(user.tier) : 2;
+   }, [user]);
+ 
+-  const currentAccountCount = 1 + additionalAccounts.length; // 기본 1개 + 추가 계정들
++  const currentAccountCount = 1 + subAccounts.length; // 기본 1�?+ ?�브계정??
+   const canAddAccount = isOwner && currentAccountCount < maxAccounts;
+ 
+   const supabase = createClient();
+@@ -104,16 +108,17 @@ export default function ProfilePage() {
+     setIsMounted(true);
+     loadUserProfile();
+     loadOrganizationInfo();
++    loadSubAccounts();
+   }, []);
+ 
+-  // 사업자명과 동일 체크박스가 체크되어 있으면 사업자명을 스토어명에 자동 반영
++  // ?�업?�명�??�일 체크박스가 체크?�어 ?�으�??�업?�명???�토?�명???�동 반영
+   useEffect(() => {
+     if (isSameAsBusinessName && sellerInfo.business_name) {
+       setSellerInfo(prev => ({ ...prev, store_name: prev.business_name }));
+     }
+   }, [isSameAsBusinessName, sellerInfo.business_name]);
+ 
+-  // 기본 이메일과 동일 체크박스가 체크되어 있으면 기본 이메일을 사업자 이메일에 자동 반영
++  // 기본 ?�메?�과 ?�일 체크박스가 체크?�어 ?�으�?기본 ?�메?�을 ?�업???�메?�에 ?�동 반영
+   useEffect(() => {
+     if (isSameAsEmail && sellerInfo.email) {
+       setSellerInfo(prev => ({ ...prev, business_email: prev.email }));
+@@ -128,12 +133,12 @@ export default function ProfilePage() {
+ 
+       if (data.success) {
+         setUser(data.user);
+-        // 프로필 이름이 없으면 이메일 앞부분을 기본값으로 설정
++        // ?�로???�름???�으�??�메???��?분을 기본값으�??�정
+         const defaultProfileName = data.user.profile_name || data.user.email?.split('@')[0] || '';
+         setProfileName(defaultProfileName);
+-        setOriginalProfileName(data.user.profile_name || ''); // 원래 프로필 이름 저장
++        setOriginalProfileName(data.user.profile_name || ''); // ?�래 ?�로???�름 ?�??
+ 
+-        // 판매자 정보 로드
++        // ?�매???�보 로드
+         const loadedInfo = {
+           name: data.user.name || '',
+           email: data.user.email || '',
+@@ -157,14 +162,14 @@ export default function ProfilePage() {
+ 
+         setSellerInfo(loadedInfo);
+ 
+-        // 스토어명이 사업자명과 같거나 없으면 체크박스를 체크 상태로
++        // ?�토?�명???�업?�명�?같거???�으�?체크박스�?체크 ?�태�?
+         if (!data.user.store_name || data.user.store_name === data.user.business_name) {
+           setIsSameAsBusinessName(true);
+         } else {
+           setIsSameAsBusinessName(false);
+         }
+ 
+-        // 사업자 이메일이 기본 이메일과 같거나 없으면 체크박스를 체크 상태로
++        // ?�업???�메?�이 기본 ?�메?�과 같거???�으�?체크박스�?체크 ?�태�?
+         if (!data.user.business_email || data.user.business_email === data.user.email) {
+           setIsSameAsEmail(true);
+         } else {
+@@ -172,7 +177,7 @@ export default function ProfilePage() {
+         }
+       }
+     } catch (error) {
+-      console.error('프로필 로드 오류:', error);
++      console.error('?�로??로드 ?�류:', error);
+     } finally {
+       setLoading(false);
+     }
+@@ -183,21 +188,21 @@ export default function ProfilePage() {
+       const { data: { user: authUser } } = await supabase.auth.getUser();
+       if (!authUser) return;
+ 
+-      // 사용자 role 확인
++      // ?�용??role ?�인
+       const { data: userData } = await supabase
+         .from('users')
+         .select('primary_organization_id, role')
+         .eq('id', authUser.id)
+         .single();
+ 
+-      // 관리자는 셀러계정 시스템 적용 안 함
++      // 관리자???�?�계???�스???�용 ????
+       if (userData?.role === 'admin' || userData?.role === 'super_admin') {
+         return;
+       }
+ 
+       if (!userData?.primary_organization_id) return;
+ 
+-      // Organization 정보 가져오기
++      // Organization ?�보 가?�오�?
+       const { data: orgData } = await supabase
+         .from('organizations')
+         .select('*')
+@@ -209,7 +214,7 @@ export default function ProfilePage() {
+         setIsOwner(orgData.owner_id === authUser.id);
+       }
+ 
+-      // Member 정보 가져오기
++      // Member ?�보 가?�오�?
+       const { data: memberData } = await supabase
+         .from('organization_members')
+         .select('*')
+@@ -222,18 +227,36 @@ export default function ProfilePage() {
+         setCanManageMembers(memberData.can_manage_members || false);
+       }
+     } catch (error) {
+-      console.error('셀러계정 정보 로드 오류:', error);
++      console.error('?�?�계???�보 로드 ?�류:', error);
++    }
++  };
++
++  const loadSubAccounts = async () => {
++    try {
++      setLoadingSubAccounts(true);
++      const response = await fetch('/api/sub-accounts');
++      const data = await response.json();
++
++      if (data.success) {
++        setSubAccounts(data.subAccounts || []);
++      } else {
++        console.error('?�브계정 조회 ?�류:', data.error);
++      }
++    } catch (error) {
++      console.error('?�브계정 조회 ?�패:', error);
++    } finally {
++      setLoadingSubAccounts(false);
+     }
+   };
+ 
+   const handleCheckProfileName = async () => {
+     if (!profileName.trim()) {
+-      toast.error('프로필 이름을 입력해주세요.');
++      toast.error('?�로???�름???�력?�주?�요.');
+       return;
+     }
+ 
+     if (profileName.length > 10) {
+-      toast.error('프로필 이름은 최대 10자까지 입력 가능합니다.');
++      toast.error('?�로???�름?� 최�? 10?�까지 ?�력 가?�합?�다.');
+       return;
+     }
+ 
+@@ -263,17 +286,17 @@ export default function ProfilePage() {
+         toast.error(data.message || data.error);
+       }
+     } catch (error) {
+-      console.error('프로필 이름 확인 오류:', error);
+-      toast.error('프로필 이름 확인 중 오류가 발생했습니다.');
++      console.error('?�로???�름 ?�인 ?�류:', error);
++      toast.error('?�로???�름 ?�인 �??�류가 발생?�습?�다.');
+     } finally {
+       setCheckingProfileName(false);
+     }
+   };
+ 
+   const handleChange = (field: keyof SellerInfo, value: string) => {
+-    // 전화번호 필드인 경우 포맷팅 적용 (010-0000-0000)
++    // ?�화번호 ?�드??경우 ?�맷???�용 (010-0000-0000)
+     if (field === 'phone' || field === 'representative_phone' || field === 'manager_phone' || field === 'store_phone') {
+-      const numbers = value.replace(/[^\d]/g, ''); // 숫자만 추출
++      const numbers = value.replace(/[^\d]/g, ''); // ?�자�?추출
+       let formatted = numbers;
+ 
+       if (numbers.length <= 3) {
+@@ -286,9 +309,9 @@ export default function ProfilePage() {
+ 
+       setSellerInfo(prev => ({ ...prev, [field]: formatted }));
+     }
+-    // 사업자등록번호 필드인 경우 포맷팅 적용 (000-00-00000)
++    // ?�업?�등록번???�드??경우 ?�맷???�용 (000-00-00000)
+     else if (field === 'business_number') {
+-      const numbers = value.replace(/[^\d]/g, ''); // 숫자만 추출
++      const numbers = value.replace(/[^\d]/g, ''); // ?�자�?추출
+       let formatted = numbers;
+ 
+       if (numbers.length <= 3) {
+@@ -306,20 +329,20 @@ export default function ProfilePage() {
+     }
+   };
+ 
+-  // 기본정보 저장
++  // 기본?�보 ?�??
+   const handleSaveBasicInfo = async () => {
+-    // 프로필 이름이 변경되었는지 확인
++    // ?�로???�름??변경되?�는지 ?�인
+     const profileNameChanged = profileName.trim() !== originalProfileName;
+ 
+-    // 프로필 이름이 변경되었는데 중복 확인을 하지 않은 경우
++    // ?�로???�름??변경되?�는??중복 ?�인???��? ?��? 경우
+     if (profileNameChanged && profileName.trim() && !profileNameCheckResult) {
+-      toast.error('프로필 이름 중복 확인이 필요합니다.');
++      toast.error('?�로???�름 중복 ?�인???�요?�니??');
+       return;
+     }
+ 
+-    // 프로필 이름이 중복 확인 결과 사용 불가능한 경우
++    // ?�로???�름??중복 ?�인 결과 ?�용 불�??�한 경우
+     if (profileNameChanged && profileName.trim() && profileNameCheckResult && !profileNameCheckResult.available) {
+-      toast.error('사용할 수 없는 프로필 이름입니다.');
++      toast.error('?�용?????�는 ?�로???�름?�니??');
+       return;
+     }
+ 
+@@ -339,21 +362,21 @@ export default function ProfilePage() {
+       const data = await response.json();
+ 
+       if (data.success) {
+-        toast.success('기본정보가 저장되었습니다.');
++        toast.success('기본?�보가 ?�?�되?�습?�다.');
+         setOriginalProfileName(profileName.trim());
+         setProfileNameCheckResult(null);
+       } else {
+-        toast.error(data.error || '저장에 실패했습니다.');
++        toast.error(data.error || '?�?�에 ?�패?�습?�다.');
+       }
+     } catch (error) {
+-      console.error('저장 오류:', error);
+-      toast.error('저장 중 오류가 발생했습니다.');
++      console.error('?�???�류:', error);
++      toast.error('?�??�??�류가 발생?�습?�다.');
+     } finally {
+       setSavingBasicInfo(false);
+     }
+   };
+ 
+-  // 셀러계정 정보 저장 (메인 계정)
++  // ?�?�계???�보 ?�??(메인 계정)
+   const handleSaveSellerAccount = async () => {
+     try {
+       setSavingSellerAccount(true);
+@@ -382,31 +405,31 @@ export default function ProfilePage() {
+       const data = await response.json();
+ 
+       if (data.success) {
+-        toast.success('셀러계정 정보가 저장되었습니다.');
++        toast.success('?�?�계???�보가 ?�?�되?�습?�다.');
+       } else {
+-        toast.error(data.error || '저장에 실패했습니다.');
++        toast.error(data.error || '?�?�에 ?�패?�습?�다.');
+       }
+     } catch (error) {
+-      console.error('저장 오류:', error);
+-      toast.error('저장 중 오류가 발생했습니다.');
++      console.error('?�???�류:', error);
++      toast.error('?�??�??�류가 발생?�습?�다.');
+     } finally {
+       setSavingSellerAccount(false);
+     }
+   };
+ 
+-  // 서브 계정 저장
++  // ?�브 계정 ?�??
+   const handleSaveSubAccount = async (account: any) => {
+-    console.log('🔄 서브 계정 저장 시작:', account);
++    console.log('?�� ?�브 계정 ?�???�작:', account);
+ 
+     try {
+-      // 필수 입력 확인
++      // ?�수 ?�력 ?�인
+       if (!account.business_name) {
+-        console.log('❌ 사업자명 없음');
+-        toast.error('사업자명을 입력해주세요.');
++        console.log('???�업?�명 ?�음');
++        toast.error('?�업?�명???�력?�주?�요.');
+         return;
+       }
+ 
+-      console.log('📤 API 요청 전송 중...');
++      console.log('?�� API ?�청 ?�송 �?..');
+       const response = await fetch('/api/organizations/sub', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+@@ -423,28 +446,28 @@ export default function ProfilePage() {
+         }),
+       });
+ 
+-      console.log('📥 API 응답 상태:', response.status);
++      console.log('?�� API ?�답 ?�태:', response.status);
+       const data = await response.json();
+-      console.log('📥 API 응답 데이터:', data);
++      console.log('?�� API ?�답 ?�이??', data);
+ 
+       if (data.success) {
+-        console.log('✅ 저장 성공!');
+-        toast.success('서브 셀러계정이 저장되었습니다.');
++        console.log('???�???�공!');
++        toast.success('?�브 ?�?�계?�이 ?�?�되?�습?�다.');
+ 
+-        // 저장 후 additionalAccounts에서 제거 (저장 완료)
++        // ?�????additionalAccounts?�서 ?�거 (?�???�료)
+         setAdditionalAccounts(prev => prev.filter(acc => acc.id !== account.id));
+ 
+-        // 페이지 새로고침하여 데이터 다시 불러오기
++        // ?�이지 ?�로고침?�여 ?�이???�시 불러?�기
+         setTimeout(() => {
+           window.location.reload();
+         }, 1000);
+       } else {
+-        console.log('❌ 저장 실패:', data.error || data.message);
+-        toast.error(data.message || data.error || '저장에 실패했습니다.');
++        console.log('???�???�패:', data.error || data.message);
++        toast.error(data.message || data.error || '?�?�에 ?�패?�습?�다.');
+       }
+     } catch (error) {
+-      console.error('❌ 서브 계정 저장 오류:', error);
+-      toast.error('저장 중 오류가 발생했습니다.');
++      console.error('???�브 계정 ?�???�류:', error);
++      toast.error('?�??�??�류가 발생?�습?�다.');
+     }
+   };
+ 
+@@ -461,7 +484,7 @@ export default function ProfilePage() {
+         margin: '0 auto',
+         padding: '40px 20px'
+       }}>
+-        {/* 헤더 */}
++        {/* ?�더 */}
+         <div style={{
+           background: 'white',
+           borderRadius: '20px',
+@@ -474,12 +497,12 @@ export default function ProfilePage() {
+             fontWeight: '700',
+             marginBottom: '8px',
+             color: '#212529'
+-          }}>회원정보 설정</h1>
++          }}>?�원?�보 ?�정</h1>
+           <p style={{
+             fontSize: '14px',
+             color: '#6c757d',
+             margin: 0
+-          }}>기본정보 및 셀러계정 설정을 관리하세요</p>
++          }}>기본?�보 �??�?�계???�정??관리하?�요</p>
+         </div>
+ 
+         {loading ? (
+@@ -493,7 +516,7 @@ export default function ProfilePage() {
+             <div style={{
+               fontSize: '16px',
+               color: '#6c757d'
+-            }}>로딩 중...</div>
++            }}>로딩 �?..</div>
+           </div>
+         ) : (
+           <>
+@@ -501,8 +524,8 @@ export default function ProfilePage() {
+             {message && (
+               <div style={{
+                 padding: '12px 16px',
+-                background: message.includes('✅') ? '#d1e7dd' : '#f8d7da',
+-                color: message.includes('✅') ? '#0f5132' : '#842029',
++                background: message.includes('성공') ? '#d1e7dd' : '#f8d7da',
++                color: message.includes('성공') ? '#0f5132' : '#842029',
+                 borderRadius: '12px',
+                 marginBottom: '24px',
+                 fontSize: '14px',
+@@ -512,7 +535,7 @@ export default function ProfilePage() {
+               </div>
+             )}
+ 
+-            {/* 프로필 이름 설정 섹션 */}
++            {/* ?�로???�름 ?�정 ?�션 */}
+             <div style={{
+               background: 'white',
+               borderRadius: '20px',
+@@ -531,7 +554,7 @@ export default function ProfilePage() {
+                   fontWeight: '700',
+                   color: '#212529',
+                   margin: 0
+-                }}>기본정보</h2>
++                }}>기본?�보</h2>
+ 
+                 <button
+                   onClick={handleSaveBasicInfo}
+@@ -561,7 +584,7 @@ export default function ProfilePage() {
+                     e.currentTarget.style.boxShadow = 'none';
+                   }}
+                 >
+-                  {savingBasicInfo ? '저장 중...' : '저장'}
++                  {savingBasicInfo ? '?�??�?..' : '?�??}
+                 </button>
+               </div>
+ 
+@@ -570,7 +593,7 @@ export default function ProfilePage() {
+                 gridTemplateColumns: 'repeat(4, 1fr)',
+                 gap: '20px'
+               }}>
+-                {/* 이메일 */}
++                {/* ?�메??*/}
+                 <div>
+                   <label style={{
+                     display: 'block',
+@@ -578,7 +601,7 @@ export default function ProfilePage() {
+                     fontWeight: '600',
+                     color: '#495057',
+                     marginBottom: '8px'
+-                  }}>이메일</label>
++                  }}>?�메??/label>
+                   <input
+                     type="text"
+                     value={user?.email || ''}
+@@ -595,7 +618,7 @@ export default function ProfilePage() {
+                   />
+                 </div>
+ 
+-                {/* 이름 */}
++                {/* ?�름 */}
+                 <div>
+                   <label style={{
+                     display: 'block',
+@@ -603,7 +626,7 @@ export default function ProfilePage() {
+                     fontWeight: '600',
+                     color: '#495057',
+                     marginBottom: '8px'
+-                  }}>이름</label>
++                  }}>?�름</label>
+                   <input
+                     type="text"
+                     value={sellerInfo.name}
+@@ -622,7 +645,7 @@ export default function ProfilePage() {
+                   />
+                 </div>
+ 
+-                {/* 전화번호 */}
++                {/* ?�화번호 */}
+                 <div>
+                   <label style={{
+                     display: 'block',
+@@ -630,7 +653,7 @@ export default function ProfilePage() {
+                     fontWeight: '600',
+                     color: '#495057',
+                     marginBottom: '8px'
+-                  }}>전화번호</label>
++                  }}>?�화번호</label>
+                   <input
+                     type="tel"
+                     value={sellerInfo.phone}
+@@ -651,7 +674,7 @@ export default function ProfilePage() {
+                   />
+                 </div>
+ 
+-                {/* 프로필 이름 */}
++                {/* ?�로???�름 */}
+                 <div>
+                   <label style={{
+                     display: 'block',
+@@ -659,16 +682,16 @@ export default function ProfilePage() {
+                     fontWeight: '600',
+                     color: '#495057',
+                     marginBottom: '8px'
+-                  }}>프로필 이름</label>
++                  }}>?�로???�름</label>
+                   <div style={{ position: 'relative' }}>
+                     <input
+                       type="text"
+                       value={profileName}
+                       onChange={(e) => {
+                         setProfileName(e.target.value);
+-                        setProfileNameCheckResult(null); // 프로필 이름 변경 시 확인 결과 초기화
++                        setProfileNameCheckResult(null); // ?�로???�름 변�????�인 결과 초기??
+                       }}
+-                      placeholder="프로필 이름을 입력하세요"
++                      placeholder="?�로???�름???�력?�세??
+                       maxLength={10}
+                       style={{
+                         width: '100%',
+@@ -725,7 +748,7 @@ export default function ProfilePage() {
+                         }
+                       }}
+                     >
+-                      {checkingProfileName ? '확인 중...' : '중복확인'}
++                      {checkingProfileName ? '?�인 �?..' : '중복?�인'}
+                     </button>
+                   </div>
+                   <div style={{
+@@ -741,22 +764,22 @@ export default function ProfilePage() {
+                         : '#6c757d'
+                     }}>
+                       {profileNameCheckResult
+-                        ? (profileNameCheckResult.available ? '✓ ' : '✗ ') + profileNameCheckResult.message
++                        ? (profileNameCheckResult.available ? '??' : '??') + profileNameCheckResult.message
+                         : (profileName.trim() !== originalProfileName && profileName.trim()
+-                          ? '프로필 이름 중복 확인이 필요합니다'
++                          ? '?�로???�름 중복 ?�인???�요?�니??
+                           : '')}
+                     </div>
+                     <div style={{
+                       fontSize: '12px',
+                       color: '#6c757d'
+                     }}>
+-                      {profileName.length}/10자
++                      {profileName.length}/10??
+                     </div>
+                   </div>
+                 </div>
+               </div>
+ 
+-              {/* 안내 메시지 */}
++              {/* ?�내 메시지 */}
+               <div style={{
+                 marginTop: '24px',
+                 padding: '16px',
+@@ -766,11 +789,11 @@ export default function ProfilePage() {
+                 color: '#6c757d',
+                 lineHeight: '1.6'
+               }}>
+-                프로필이름은 랭킹 프로필, 셀러피드 게시글과 댓글에 표시됩니다. 기본값으로 이메일 @앞부분이 표시됩니다. 최대 10자까지 설정가능합니다.
++                ?�로?�이름�? ??�� ?�로?? ?�?�피??게시글�??��????�시?�니?? 기본값으�??�메??@?��?분이 ?�시?�니?? 최�? 10?�까지 ?�정가?�합?�다.
+               </div>
+             </div>
+ 
+-            {/* 판매자 정보 섹션 */}
++            {/* ?�매???�보 ?�션 */}
+             <div style={{
+               background: 'white',
+               borderRadius: '20px',
+@@ -788,7 +811,7 @@ export default function ProfilePage() {
+                   fontWeight: '700',
+                   color: '#212529',
+                   margin: 0
+-                }}>셀러계정 설정</h2>
++                }}>?�?�계???�정</h2>
+ 
+                 {sellerInfo.business_name && (
+                   <span style={{
+@@ -835,7 +858,7 @@ export default function ProfilePage() {
+ 
+                 <div style={{ flex: 1 }} />
+ 
+-                {/* 저장 버튼 */}
++                {/* ?�??버튼 */}
+                 <button
+                   onClick={handleSaveSellerAccount}
+                   disabled={savingSellerAccount}
+@@ -866,72 +889,6 @@ export default function ProfilePage() {
+                 >
+                   {savingSellerAccount ? '저장 중...' : '저장'}
+                 </button>
+-
+-                {/* 본인이 소유자이고 계정 추가 가능한 경우만 버튼 표시 */}
+-                {canAddAccount ? (
+-                  <button
+-                    onClick={() => {
+-                      // 새 셀러계정 추가 (테스트용 샘플 데이터)
+-                      const sampleNumber = additionalAccounts.length + 2;
+-                      setAdditionalAccounts([...additionalAccounts, {
+-                        id: Date.now(),
+-                        business_name: `테스트사업자${sampleNumber}`,
+-                        business_address: `서울시 강남구 테헤란로 ${100 + sampleNumber}길`,
+-                        business_number: `${100 + sampleNumber}-${10 + sampleNumber}-${10000 + sampleNumber}`,
+-                        business_email: `test${sampleNumber}@example.com`,
+-                        representative_name: `대표자${sampleNumber}`,
+-                        representative_phone: `010-${1000 + sampleNumber}-${2000 + sampleNumber}`,
+-                        manager_name: `담당자${sampleNumber}`,
+-                        manager_phone: `010-${3000 + sampleNumber}-${4000 + sampleNumber}`,
+-                        bank_account: `${1000000 + sampleNumber * 1111}`,
+-                        bank_name: '국민은행',
+-                        account_holder: `예금주${sampleNumber}`,
+-                        store_name: `스토어${sampleNumber}`,
+-                        store_phone: `02-${1000 + sampleNumber}-${2000 + sampleNumber}`,
+-                      }]);
+-                    }}
+-                    style={{
+-                      padding: '10px 20px',
+-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+-                      color: 'white',
+-                      border: 'none',
+-                      borderRadius: '10px',
+-                      fontSize: '14px',
+-                      fontWeight: '600',
+-                      cursor: 'pointer',
+-                      transition: 'all 0.2s',
+-                      whiteSpace: 'nowrap'
+-                    }}
+-                    onMouseEnter={(e) => {
+-                      e.currentTarget.style.transform = 'translateY(-2px)';
+-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+-                    }}
+-                    onMouseLeave={(e) => {
+-                      e.currentTarget.style.transform = 'translateY(0)';
+-                      e.currentTarget.style.boxShadow = 'none';
+-                    }}
+-                  >
+-                    계정추가 ({currentAccountCount}/{maxAccounts})
+-                  </button>
+-                ) : isOwner && currentAccountCount >= maxAccounts ? (
+-                  <div style={{
+-                    padding: '10px 20px',
+-                    background: '#f1f5f9',
+-                    color: '#64748b',
+-                    border: '1px solid #e2e8f0',
+-                    borderRadius: '10px',
+-                    fontSize: '13px',
+-                    fontWeight: '500',
+-                    whiteSpace: 'nowrap'
+-                  }}>
+-                    계정 한도 ({currentAccountCount}/{maxAccounts})
+-                    {user?.tier && ['light', 'basic'].includes(user.tier.toLowerCase()) && (
+-                      <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
+-                        스탠다드 이상 등급 필요
+-                      </span>
+-                    )}
+-                  </div>
+-                ) : null}
+               </div>
+ 
+               <div style={{
+@@ -939,7 +896,7 @@ export default function ProfilePage() {
+                 gridTemplateColumns: '1fr 1fr 2fr',
+                 gap: '24px'
+               }}>
+-                {/* 사업자 정보 */}
++                {/* ?�업???�보 */}
+                 <div>
+                   <h3 style={{
+                     fontSize: '16px',
+@@ -948,7 +905,7 @@ export default function ProfilePage() {
+                     marginBottom: '16px',
+                     paddingBottom: '8px',
+                     borderBottom: '2px solid #e9ecef'
+-                  }}>사업자 정보</h3>
++                  }}>?�업???�보</h3>
+ 
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                     <div>
+@@ -958,12 +915,12 @@ export default function ProfilePage() {
+                         fontWeight: '500',
+                         color: '#495057',
+                         marginBottom: '6px'
+-                      }}>사업자명</label>
++                      }}>?�업?�명</label>
+                       <input
+                         type="text"
+                         value={sellerInfo.business_name || ''}
+                         onChange={(e) => handleChange('business_name', e.target.value)}
+-                        placeholder="사업자명"
++                        placeholder="?�업?�명"
+                         style={{
+                           width: '100%',
+                           padding: '10px 12px',
+@@ -1012,7 +969,7 @@ export default function ProfilePage() {
+                         fontWeight: '500',
+                         color: '#495057',
+                         marginBottom: '6px'
+-                      }}>사업자등록번호</label>
++                      }}>?�업?�등록번??/label>
+                       <input
+                         type="text"
+                         value={sellerInfo.business_number || ''}
+@@ -1044,7 +1001,7 @@ export default function ProfilePage() {
+                           fontSize: '13px',
+                           fontWeight: '500',
+                           color: '#495057'
+-                        }}>이메일 (계산서)</label>
++                        }}>?�메??(계산??</label>
+                         <div style={{
+                           display: 'flex',
+                           alignItems: 'center',
+@@ -1074,7 +1031,7 @@ export default function ProfilePage() {
+                               cursor: 'pointer'
+                             }}
+                           >
+-                            기본 이메일과 동일
++                            기본 ?�메?�과 ?�일
+                           </label>
+                         </div>
+                       </div>
+@@ -1108,12 +1065,12 @@ export default function ProfilePage() {
+                         fontWeight: '500',
+                         color: '#495057',
+                         marginBottom: '6px'
+-                      }}>대표자명</label>
++                      }}>?�?�자�?/label>
+                       <input
+                         type="text"
+                         value={sellerInfo.representative_name || ''}
+                         onChange={(e) => handleChange('representative_name', e.target.value)}
+-                        placeholder="대표자명"
++                        placeholder="?�?�자�?
+                         style={{
+                           width: '100%',
+                           padding: '10px 12px',
+@@ -1135,7 +1092,7 @@ export default function ProfilePage() {
+                         fontWeight: '500',
+                         color: '#495057',
+                         marginBottom: '6px'
+-                      }}>대표자 연락처</label>
++                      }}>?�?�자 ?�락�?/label>
+                       <input
+                         type="tel"
+                         value={sellerInfo.representative_phone || ''}
+@@ -1158,7 +1115,7 @@ export default function ProfilePage() {
+                   </div>
+                 </div>
+ 
+-                {/* 담당자 및 정산 정보 */}
++                {/* ?�당??�??�산 ?�보 */}
+                 <div>
+                   <h3 style={{
+                     fontSize: '16px',
+@@ -1167,7 +1124,7 @@ export default function ProfilePage() {
+                     marginBottom: '16px',
+                     paddingBottom: '8px',
+                     borderBottom: '2px solid #e9ecef'
+-                  }}>담당자 정보</h3>
++                  }}>?�당???�보</h3>
+ 
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+                     <div>
+@@ -1177,12 +1134,12 @@ export default function ProfilePage() {
+                         fontWeight: '500',
+                         color: '#495057',
+                         marginBottom: '6px'
+-                      }}>이름</label>
++                      }}>?�름</label>
+                       <input
+                         type="text"
+                         value={sellerInfo.manager_name || ''}
+                         onChange={(e) => handleChange('manager_name', e.target.value)}
+-                        placeholder="담당자 이름"
++                        placeholder="?�당???�름"
+                         style={{
+                           width: '100%',
+                           padding: '10px 12px',
+@@ -1204,7 +1161,7 @@ export default function ProfilePage() {
+                         fontWeight: '500',
+                         color: '#495057',
+                         marginBottom: '6px'
+-                      }}>연락처</label>
++                      }}>?�락�?/label>
+                       <input
+                         type="tel"
+                         value={sellerInfo.manager_phone || ''}
+@@ -1233,7 +1190,7 @@ export default function ProfilePage() {
+                     marginBottom: '16px',
+                     paddingBottom: '8px',
+                     borderBottom: '2px solid #e9ecef'
+-                  }}>정산 계좌</h3>
++                  }}>?�산 계좌</h3>
+ 
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                     <div>
+@@ -1243,12 +1200,12 @@ export default function ProfilePage() {
+                         fontWeight: '500',
+                         color: '#495057',
+                         marginBottom: '6px'
+-                      }}>은행명</label>
++                      }}>?�?�명</label>
+                       <input
+                         type="text"
+                         value={sellerInfo.bank_name || ''}
+                         onChange={(e) => handleChange('bank_name', e.target.value)}
+-                        placeholder="예: 국민은행"
++                        placeholder="?? �???�??
+                         style={{
+                           width: '100%',
+                           padding: '10px 12px',
+@@ -1275,7 +1232,7 @@ export default function ProfilePage() {
+                         type="text"
+                         value={sellerInfo.bank_account || ''}
+                         onChange={(e) => handleChange('bank_account', e.target.value)}
+-                        placeholder="'-' 없이 입력"
++                        placeholder="'-' ?�이 ?�력"
+                         style={{
+                           width: '100%',
+                           padding: '10px 12px',
+@@ -1297,12 +1254,12 @@ export default function ProfilePage() {
+                         fontWeight: '500',
+                         color: '#495057',
+                         marginBottom: '6px'
+-                      }}>예금주</label>
++                      }}>?�금�?/label>
+                       <input
+                         type="text"
+                         value={sellerInfo.account_holder || ''}
+                         onChange={(e) => handleChange('account_holder', e.target.value)}
+-                        placeholder="예금주명"
++                        placeholder="?�금주명"
+                         style={{
+                           width: '100%',
+                           padding: '10px 12px',
+@@ -1319,7 +1276,7 @@ export default function ProfilePage() {
+                   </div>
+                 </div>
+ 
+-                {/* 멤버 관리 */}
++                {/* 멤버 관�?*/}
+                 {organization && user && (
+                   <div>
+                     <h3 style={{
+@@ -1329,10 +1286,10 @@ export default function ProfilePage() {
+                       marginBottom: '16px',
+                       paddingBottom: '8px',
+                       borderBottom: '2px solid #e9ecef'
+-                    }}>멤버 관리</h3>
++                    }}>멤버 관�?/h3>
+ 
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+-                      {/* 내 역할 */}
++                      {/* ????�� */}
+                       {member && (
+                         <div style={{
+                           background: '#f8f9fa',
+@@ -1345,13 +1302,13 @@ export default function ProfilePage() {
+                           <div style={{
+                             fontSize: '11px',
+                             color: '#6c757d'
+-                          }}>내 역할</div>
++                          }}>????��</div>
+                           <div style={{
+                             fontSize: '13px',
+                             fontWeight: '600',
+                             color: '#212529'
+                           }}>
+-                            {member.role === 'owner' ? '소유자' : '담당자'}
++                            {member.role === 'owner' ? '?�유?? : '?�당??}
+                           </div>
+                         </div>
+                       )}
+@@ -1384,19 +1341,31 @@ export default function ProfilePage() {
+                         </div>
+                       )}
+ 
+-                      {/* 초대 목록 */}
++                      {/* 초�? 목록 */}
+                       {canManageMembers && organization && (
+                         <div>
+                           <InvitationsList organizationId={organization.id} />
+                         </div>
+                       )}
+ 
++                      {/* ?�브계정 관�?*/}
++                      {organization && (
++                        <SubAccountManagement
++                          isOwner={isOwner}
++                          subAccounts={subAccounts}
++                          loadingSubAccounts={loadingSubAccounts}
++                          maxAccounts={maxAccounts}
++                          currentAccountCount={currentAccountCount}
++                          onRefresh={loadSubAccounts}
++                        />
++                      )}
++
+                     </div>
+                   </div>
+                 )}
+               </div>
+ 
+-              {/* 송장 출력 정보 - 전체 너비 */}
++              {/* ?�장 출력 ?�보 - ?�체 ?�비 */}
+               <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid #e9ecef' }}>
+                 <h3 style={{
+                   fontSize: '16px',
+@@ -1405,7 +1374,7 @@ export default function ProfilePage() {
+                   marginBottom: '16px',
+                   paddingBottom: '8px',
+                   borderBottom: '2px solid #e9ecef'
+-                }}>송장 출력 정보</h3>
++                }}>?�장 출력 ?�보</h3>
+ 
+                 <div style={{
+                   display: 'grid',
+@@ -1423,7 +1392,7 @@ export default function ProfilePage() {
+                         fontSize: '13px',
+                         fontWeight: '500',
+                         color: '#495057'
+-                      }}>업체명</label>
++                      }}>?�체�?/label>
+                       <div style={{
+                         display: 'flex',
+                         alignItems: 'center',
+@@ -1453,7 +1422,7 @@ export default function ProfilePage() {
+                             cursor: 'pointer'
+                           }}
+                         >
+-                          사업자명과 동일
++                          ?�업?�명�??�일
+                         </label>
+                       </div>
+                     </div>
+@@ -1462,7 +1431,7 @@ export default function ProfilePage() {
+                       value={sellerInfo.store_name || ''}
+                       onChange={(e) => handleChange('store_name', e.target.value)}
+                       disabled={isSameAsBusinessName}
+-                      placeholder="업체명"
++                      placeholder="?�체�?
+                       style={{
+                         width: '100%',
+                         padding: '10px 12px',
+@@ -1487,7 +1456,7 @@ export default function ProfilePage() {
+                       fontWeight: '500',
+                       color: '#495057',
+                       marginBottom: '6px'
+-                    }}>전화번호</label>
++                    }}>?�화번호</label>
+                     <input
+                       type="tel"
+                       value={sellerInfo.store_phone || ''}
+@@ -1511,641 +1480,7 @@ export default function ProfilePage() {
+               </div>
+             </div>
+ 
+-            {/* 추가된 셀러계정들 */}
+-            {additionalAccounts.map((account, index) => (
+-              <div key={account.id} style={{
+-                background: 'white',
+-                borderRadius: '20px',
+-                padding: '32px',
+-                marginTop: '24px',
+-                boxShadow: '0 2px 20px rgba(0, 0, 0, 0.05)'
+-              }}>
+-                <div style={{
+-                  display: 'flex',
+-                  alignItems: 'center',
+-                  gap: '12px',
+-                  marginBottom: '24px'
+-                }}>
+-                  <h2 style={{
+-                    fontSize: '20px',
+-                    fontWeight: '700',
+-                    color: '#212529',
+-                    margin: 0
+-                  }}>셀러계정 설정 {index + 2}</h2>
+-
+-                  {account.business_name && (
+-                    <span style={{
+-                      fontSize: '15px',
+-                      fontWeight: '600',
+-                      color: '#212529'
+-                    }}>
+-                      {account.business_name}
+-                    </span>
+-                  )}
+-
+-                  <div style={{ flex: 1 }} />
+-
+-                  {/* 저장 버튼 */}
+-                  <button
+-                    onClick={() => handleSaveSubAccount(account)}
+-                    style={{
+-                      padding: '10px 20px',
+-                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+-                      color: 'white',
+-                      border: 'none',
+-                      borderRadius: '10px',
+-                      fontSize: '14px',
+-                      fontWeight: '600',
+-                      cursor: 'pointer',
+-                      transition: 'all 0.2s',
+-                      whiteSpace: 'nowrap'
+-                    }}
+-                    onMouseEnter={(e) => {
+-                      e.currentTarget.style.transform = 'translateY(-2px)';
+-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+-                    }}
+-                    onMouseLeave={(e) => {
+-                      e.currentTarget.style.transform = 'translateY(0)';
+-                      e.currentTarget.style.boxShadow = 'none';
+-                    }}
+-                  >
+-                    저장
+-                  </button>
+-
+-                  <button
+-                    onClick={() => {
+-                      // 해당 계정 삭제
+-                      setAdditionalAccounts(additionalAccounts.filter(acc => acc.id !== account.id));
+-                    }}
+-                    style={{
+-                      padding: '10px 20px',
+-                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+-                      color: 'white',
+-                      border: 'none',
+-                      borderRadius: '10px',
+-                      fontSize: '14px',
+-                      fontWeight: '600',
+-                      cursor: 'pointer',
+-                      transition: 'all 0.2s',
+-                      whiteSpace: 'nowrap'
+-                    }}
+-                    onMouseEnter={(e) => {
+-                      e.currentTarget.style.transform = 'translateY(-2px)';
+-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
+-                    }}
+-                    onMouseLeave={(e) => {
+-                      e.currentTarget.style.transform = 'translateY(0)';
+-                      e.currentTarget.style.boxShadow = 'none';
+-                    }}
+-                  >
+-                    계정삭제
+-                  </button>
+-                </div>
+-
+-                <div style={{
+-                  display: 'grid',
+-                  gridTemplateColumns: '1fr 1fr 2fr',
+-                  gap: '24px'
+-                }}>
+-                  {/* 사업자 정보 */}
+-                  <div>
+-                    <h3 style={{
+-                      fontSize: '16px',
+-                      fontWeight: '600',
+-                      color: '#343a40',
+-                      marginBottom: '16px',
+-                      paddingBottom: '8px',
+-                      borderBottom: '2px solid #e9ecef'
+-                    }}>사업자 정보</h3>
+-
+-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+-                      <div>
+-                        <label style={{
+-                          display: 'block',
+-                          fontSize: '13px',
+-                          fontWeight: '500',
+-                          color: '#495057',
+-                          marginBottom: '6px'
+-                        }}>사업자명</label>
+-                        <input
+-                          type="text"
+-                          value={account.business_name || ''}
+-                          onChange={(e) => {
+-                            const updated = additionalAccounts.map(acc =>
+-                              acc.id === account.id ? { ...acc, business_name: e.target.value } : acc
+-                            );
+-                            setAdditionalAccounts(updated);
+-                          }}
+-                          placeholder="사업자명"
+-                          style={{
+-                            width: '100%',
+-                            padding: '10px 12px',
+-                            border: '1px solid #dee2e6',
+-                            borderRadius: '8px',
+-                            fontSize: '13px',
+-                            outline: 'none',
+-                            transition: 'border 0.2s'
+-                          }}
+-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+-                        />
+-                      </div>
+-
+-                      <div>
+-                        <label style={{
+-                          display: 'block',
+-                          fontSize: '13px',
+-                          fontWeight: '500',
+-                          color: '#495057',
+-                          marginBottom: '6px'
+-                        }}>주소</label>
+-                        <input
+-                          type="text"
+-                          value={account.business_address || ''}
+-                          onChange={(e) => {
+-                            const updated = additionalAccounts.map(acc =>
+-                              acc.id === account.id ? { ...acc, business_address: e.target.value } : acc
+-                            );
+-                            setAdditionalAccounts(updated);
+-                          }}
+-                          placeholder="주소"
+-                          style={{
+-                            width: '100%',
+-                            padding: '10px 12px',
+-                            border: '1px solid #dee2e6',
+-                            borderRadius: '8px',
+-                            fontSize: '13px',
+-                            outline: 'none',
+-                            transition: 'border 0.2s'
+-                          }}
+-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+-                        />
+-                      </div>
+-
+-                      <div>
+-                        <label style={{
+-                          display: 'block',
+-                          fontSize: '13px',
+-                          fontWeight: '500',
+-                          color: '#495057',
+-                          marginBottom: '6px'
+-                        }}>사업자등록번호</label>
+-                        <input
+-                          type="text"
+-                          value={account.business_number || ''}
+-                          onChange={(e) => {
+-                            const numbers = e.target.value.replace(/[^\d]/g, '');
+-                            let formatted = numbers;
+-                            if (numbers.length <= 3) {
+-                              formatted = numbers;
+-                            } else if (numbers.length <= 5) {
+-                              formatted = `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+-                            } else {
+-                              formatted = `${numbers.slice(0, 3)}-${numbers.slice(3, 5)}-${numbers.slice(5, 10)}`;
+-                            }
+-                            const updated = additionalAccounts.map(acc =>
+-                              acc.id === account.id ? { ...acc, business_number: formatted } : acc
+-                            );
+-                            setAdditionalAccounts(updated);
+-                          }}
+-                          placeholder="000-00-00000"
+-                          maxLength={12}
+-                          style={{
+-                            width: '100%',
+-                            padding: '10px 12px',
+-                            border: '1px solid #dee2e6',
+-                            borderRadius: '8px',
+-                            fontSize: '13px',
+-                            outline: 'none',
+-                            transition: 'border 0.2s'
+-                          }}
+-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+-                        />
+-                      </div>
+-
+-                      <div>
+-                        <label style={{
+-                          display: 'block',
+-                          fontSize: '13px',
+-                          fontWeight: '500',
+-                          color: '#495057',
+-                          marginBottom: '6px'
+-                        }}>이메일 (계산서)</label>
+-                        <input
+-                          type="email"
+-                          value={account.business_email || ''}
+-                          onChange={(e) => {
+-                            const updated = additionalAccounts.map(acc =>
+-                              acc.id === account.id ? { ...acc, business_email: e.target.value } : acc
+-                            );
+-                            setAdditionalAccounts(updated);
+-                          }}
+-                          placeholder="example@company.com"
+-                          style={{
+-                            width: '100%',
+-                            padding: '10px 12px',
+-                            border: '1px solid #dee2e6',
+-                            borderRadius: '8px',
+-                            fontSize: '13px',
+-                            outline: 'none',
+-                            transition: 'border 0.2s'
+-                          }}
+-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+-                        />
+-                      </div>
+-
+-                      <div>
+-                        <label style={{
+-                          display: 'block',
+-                          fontSize: '13px',
+-                          fontWeight: '500',
+-                          color: '#495057',
+-                          marginBottom: '6px'
+-                        }}>대표자명</label>
+-                        <input
+-                          type="text"
+-                          value={account.representative_name || ''}
+-                          onChange={(e) => {
+-                            const updated = additionalAccounts.map(acc =>
+-                              acc.id === account.id ? { ...acc, representative_name: e.target.value } : acc
+-                            );
+-                            setAdditionalAccounts(updated);
+-                          }}
+-                          placeholder="대표자명"
+-                          style={{
+-                            width: '100%',
+-                            padding: '10px 12px',
+-                            border: '1px solid #dee2e6',
+-                            borderRadius: '8px',
+-                            fontSize: '13px',
+-                            outline: 'none',
+-                            transition: 'border 0.2s'
+-                          }}
+-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+-                        />
+-                      </div>
+-
+-                      <div>
+-                        <label style={{
+-                          display: 'block',
+-                          fontSize: '13px',
+-                          fontWeight: '500',
+-                          color: '#495057',
+-                          marginBottom: '6px'
+-                        }}>대표자 연락처</label>
+-                        <input
+-                          type="tel"
+-                          value={account.representative_phone || ''}
+-                          onChange={(e) => {
+-                            const numbers = e.target.value.replace(/[^\d]/g, '');
+-                            let formatted = numbers;
+-                            if (numbers.length <= 3) {
+-                              formatted = numbers;
+-                            } else if (numbers.length <= 7) {
+-                              formatted = `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+-                            } else {
+-                              formatted = `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+-                            }
+-                            const updated = additionalAccounts.map(acc =>
+-                              acc.id === account.id ? { ...acc, representative_phone: formatted } : acc
+-                            );
+-                            setAdditionalAccounts(updated);
+-                          }}
+-                          placeholder="010-0000-0000"
+-                          maxLength={13}
+-                          style={{
+-                            width: '100%',
+-                            padding: '10px 12px',
+-                            border: '1px solid #dee2e6',
+-                            borderRadius: '8px',
+-                            fontSize: '13px',
+-                            outline: 'none',
+-                            transition: 'border 0.2s'
+-                          }}
+-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+-                        />
+-                      </div>
+-                    </div>
+-                  </div>
+-
+-                  {/* 담당자 및 정산 정보 */}
+-                  <div>
+-                    <h3 style={{
+-                      fontSize: '16px',
+-                      fontWeight: '600',
+-                      color: '#343a40',
+-                      marginBottom: '16px',
+-                      paddingBottom: '8px',
+-                      borderBottom: '2px solid #e9ecef'
+-                    }}>담당자 정보</h3>
+-
+-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+-                      <div>
+-                        <label style={{
+-                          display: 'block',
+-                          fontSize: '13px',
+-                          fontWeight: '500',
+-                          color: '#495057',
+-                          marginBottom: '6px'
+-                        }}>이름</label>
+-                        <input
+-                          type="text"
+-                          value={account.manager_name || ''}
+-                          onChange={(e) => {
+-                            const updated = additionalAccounts.map(acc =>
+-                              acc.id === account.id ? { ...acc, manager_name: e.target.value } : acc
+-                            );
+-                            setAdditionalAccounts(updated);
+-                          }}
+-                          placeholder="담당자 이름"
+-                          style={{
+-                            width: '100%',
+-                            padding: '10px 12px',
+-                            border: '1px solid #dee2e6',
+-                            borderRadius: '8px',
+-                            fontSize: '13px',
+-                            outline: 'none',
+-                            transition: 'border 0.2s'
+-                          }}
+-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+-                        />
+-                      </div>
+-
+-                      <div>
+-                        <label style={{
+-                          display: 'block',
+-                          fontSize: '13px',
+-                          fontWeight: '500',
+-                          color: '#495057',
+-                          marginBottom: '6px'
+-                        }}>연락처</label>
+-                        <input
+-                          type="tel"
+-                          value={account.manager_phone || ''}
+-                          onChange={(e) => {
+-                            const numbers = e.target.value.replace(/[^\d]/g, '');
+-                            let formatted = numbers;
+-                            if (numbers.length <= 3) {
+-                              formatted = numbers;
+-                            } else if (numbers.length <= 7) {
+-                              formatted = `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+-                            } else {
+-                              formatted = `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+-                            }
+-                            const updated = additionalAccounts.map(acc =>
+-                              acc.id === account.id ? { ...acc, manager_phone: formatted } : acc
+-                            );
+-                            setAdditionalAccounts(updated);
+-                          }}
+-                          placeholder="010-0000-0000"
+-                          maxLength={13}
+-                          style={{
+-                            width: '100%',
+-                            padding: '10px 12px',
+-                            border: '1px solid #dee2e6',
+-                            borderRadius: '8px',
+-                            fontSize: '13px',
+-                            outline: 'none',
+-                            transition: 'border 0.2s'
+-                          }}
+-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+-                        />
+-                      </div>
+-                    </div>
+-
+-                    <h3 style={{
+-                      fontSize: '16px',
+-                      fontWeight: '600',
+-                      color: '#343a40',
+-                      marginBottom: '16px',
+-                      paddingBottom: '8px',
+-                      borderBottom: '2px solid #e9ecef'
+-                    }}>정산 계좌</h3>
+-
+-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+-                      <div>
+-                        <label style={{
+-                          display: 'block',
+-                          fontSize: '13px',
+-                          fontWeight: '500',
+-                          color: '#495057',
+-                          marginBottom: '6px'
+-                        }}>은행명</label>
+-                        <input
+-                          type="text"
+-                          value={account.bank_name || ''}
+-                          onChange={(e) => {
+-                            const updated = additionalAccounts.map(acc =>
+-                              acc.id === account.id ? { ...acc, bank_name: e.target.value } : acc
+-                            );
+-                            setAdditionalAccounts(updated);
+-                          }}
+-                          placeholder="예: 국민은행"
+-                          style={{
+-                            width: '100%',
+-                            padding: '10px 12px',
+-                            border: '1px solid #dee2e6',
+-                            borderRadius: '8px',
+-                            fontSize: '13px',
+-                            outline: 'none',
+-                            transition: 'border 0.2s'
+-                          }}
+-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+-                        />
+-                      </div>
+-
+-                      <div>
+-                        <label style={{
+-                          display: 'block',
+-                          fontSize: '13px',
+-                          fontWeight: '500',
+-                          color: '#495057',
+-                          marginBottom: '6px'
+-                        }}>계좌번호</label>
+-                        <input
+-                          type="text"
+-                          value={account.bank_account || ''}
+-                          onChange={(e) => {
+-                            const updated = additionalAccounts.map(acc =>
+-                              acc.id === account.id ? { ...acc, bank_account: e.target.value } : acc
+-                            );
+-                            setAdditionalAccounts(updated);
+-                          }}
+-                          placeholder="'-' 없이 입력"
+-                          style={{
+-                            width: '100%',
+-                            padding: '10px 12px',
+-                            border: '1px solid #dee2e6',
+-                            borderRadius: '8px',
+-                            fontSize: '13px',
+-                            outline: 'none',
+-                            transition: 'border 0.2s'
+-                          }}
+-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+-                        />
+-                      </div>
+-
+-                      <div>
+-                        <label style={{
+-                          display: 'block',
+-                          fontSize: '13px',
+-                          fontWeight: '500',
+-                          color: '#495057',
+-                          marginBottom: '6px'
+-                        }}>예금주</label>
+-                        <input
+-                          type="text"
+-                          value={account.account_holder || ''}
+-                          onChange={(e) => {
+-                            const updated = additionalAccounts.map(acc =>
+-                              acc.id === account.id ? { ...acc, account_holder: e.target.value } : acc
+-                            );
+-                            setAdditionalAccounts(updated);
+-                          }}
+-                          placeholder="예금주명"
+-                          style={{
+-                            width: '100%',
+-                            padding: '10px 12px',
+-                            border: '1px solid #dee2e6',
+-                            borderRadius: '8px',
+-                            fontSize: '13px',
+-                            outline: 'none',
+-                            transition: 'border 0.2s'
+-                          }}
+-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+-                          onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+-                        />
+-                      </div>
+-                    </div>
+-                  </div>
+-
+-                  {/* 플레이스홀더 (멤버 관리 없음) */}
+-                  <div>
+-                    <h3 style={{
+-                      fontSize: '16px',
+-                      fontWeight: '600',
+-                      color: '#343a40',
+-                      marginBottom: '16px',
+-                      paddingBottom: '8px',
+-                      borderBottom: '2px solid #e9ecef'
+-                    }}>셀러계정 생성 후</h3>
+-                    <div style={{
+-                      background: '#f8f9fa',
+-                      borderRadius: '8px',
+-                      padding: '16px',
+-                      fontSize: '13px',
+-                      color: '#6c757d',
+-                      lineHeight: '1.6'
+-                    }}>
+-                      저장하기를 누르면 새로운 셀러계정이 생성되며, 멤버 관리 기능을 사용할 수 있습니다.
+-                    </div>
+-                  </div>
+-                </div>
+-
+-                {/* 송장 출력 정보 */}
+-                <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid #e9ecef' }}>
+-                  <h3 style={{
+-                    fontSize: '16px',
+-                    fontWeight: '600',
+-                    color: '#343a40',
+-                    marginBottom: '16px',
+-                    paddingBottom: '8px',
+-                    borderBottom: '2px solid #e9ecef'
+-                  }}>송장 출력 정보</h3>
+-
+-                  <div style={{
+-                    display: 'grid',
+-                    gridTemplateColumns: '1fr 1fr 1fr',
+-                    gap: '16px'
+-                  }}>
+-                    <div>
+-                      <label style={{
+-                        display: 'block',
+-                        fontSize: '13px',
+-                        fontWeight: '500',
+-                        color: '#495057',
+-                        marginBottom: '6px'
+-                      }}>업체명</label>
+-                      <input
+-                        type="text"
+-                        value={account.store_name || ''}
+-                        onChange={(e) => {
+-                          const updated = additionalAccounts.map(acc =>
+-                            acc.id === account.id ? { ...acc, store_name: e.target.value } : acc
+-                          );
+-                          setAdditionalAccounts(updated);
+-                        }}
+-                        placeholder="업체명"
+-                        style={{
+-                          width: '100%',
+-                          padding: '10px 12px',
+-                          border: '1px solid #dee2e6',
+-                          borderRadius: '8px',
+-                          fontSize: '13px',
+-                          outline: 'none',
+-                          transition: 'border 0.2s'
+-                        }}
+-                        onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+-                        onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+-                      />
+-                    </div>
+-
+-                    <div>
+-                      <label style={{
+-                        display: 'block',
+-                        fontSize: '13px',
+-                        fontWeight: '500',
+-                        color: '#495057',
+-                        marginBottom: '6px'
+-                      }}>전화번호</label>
+-                      <input
+-                        type="tel"
+-                        value={account.store_phone || ''}
+-                        onChange={(e) => {
+-                          const numbers = e.target.value.replace(/[^\d]/g, '');
+-                          let formatted = numbers;
+-                          if (numbers.length <= 3) {
+-                            formatted = numbers;
+-                          } else if (numbers.length <= 7) {
+-                            formatted = `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+-                          } else {
+-                            formatted = `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+-                          }
+-                          const updated = additionalAccounts.map(acc =>
+-                            acc.id === account.id ? { ...acc, store_phone: formatted } : acc
+-                          );
+-                          setAdditionalAccounts(updated);
+-                        }}
+-                        placeholder="010-0000-0000"
+-                        maxLength={13}
+-                        style={{
+-                          width: '100%',
+-                          padding: '10px 12px',
+-                          border: '1px solid #dee2e6',
+-                          borderRadius: '8px',
+-                          fontSize: '13px',
+-                          outline: 'none',
+-                          transition: 'border 0.2s'
+-                        }}
+-                        onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+-                        onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+-                      />
+-                    </div>
+-                  </div>
+-                </div>
+-              </div>
+-            ))}
+-
+-            {/* 셀러계정 시스템 안내 */}
++            {/* ?�?�계???�스???�내 */}
+             {organization && user && (
+               <div style={{
+                 background: 'white',
+@@ -2154,7 +1489,7 @@ export default function ProfilePage() {
+                 marginTop: '24px',
+                 boxShadow: '0 2px 20px rgba(0, 0, 0, 0.05)'
+               }}>
+-                {/* 안내 */}
++                {/* ?�내 */}
+                 <div style={{
+                   background: '#f8f9fa',
+                   borderRadius: '12px',
+@@ -2167,17 +1502,17 @@ export default function ProfilePage() {
+                     fontWeight: '600',
+                     marginBottom: '12px',
+                     color: '#495057'
+-                  }}>셀러계정 시스템 안내</h4>
++                  }}>?�?�계???�스???�내</h4>
+                   <ul style={{
+                     margin: 0,
+                     paddingLeft: '20px',
+                     listStyle: 'disc'
+                   }}>
+-                    <li>같은 셀러계정의 모든 멤버는 주문, 발주서 등의 데이터를 공유합니다</li>
+-                    <li>소유자와 관리자는 멤버를 초대하고 관리할 수 있습니다</li>
+-                    <li>각 멤버별로 세부 권한을 설정할 수 있습니다</li>
+-                    <li>캐시와 크레딧은 셀러계정 단위로 관리됩니다</li>
+-                    <li>멤버가 등록한 주문은 자동으로 셀러계정에 연결되어 모든 멤버가 조회 가능합니다</li>
++                    <li>같�? ?�?�계?�의 모든 멤버??주문, 발주???�의 ?�이?��? 공유?�니??/li>
++                    <li>?�유?��? 관리자??멤버�?초�??�고 관리할 ???�습?�다</li>
++                    <li>�?멤버별로 ?��? 권한???�정?????�습?�다</li>
++                    <li>캐시?� ?�레?��? ?�?�계???�위�?관리됩?�다</li>
++                    <li>멤버가 ?�록??주문?� ?�동?�로 ?�?�계?�에 ?�결?�어 모든 멤버가 조회 가?�합?�다</li>
+                   </ul>
+                 </div>
+               </div>

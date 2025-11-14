@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-security'
 
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) return auth.error
 
     const invitationId = request.nextUrl.searchParams.get('invitation_id')
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 현재 사용자 이메일 조회
     const { data: user } = await supabase

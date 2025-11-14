@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { getUserPrimaryOrganization } from '@/lib/organization-utils';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const searchParams = request.nextUrl.searchParams;
 
     const periodType = searchParams.get('period') || 'monthly';

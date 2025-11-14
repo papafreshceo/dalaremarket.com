@@ -34,7 +34,8 @@ interface SellerInfo {
   store_phone?: string;  // 전화번호
 }
 
-export default function SellerInfoTab({ userId }: { userId: string }) {
+export default function SellerInfoTab() {
+  const [userId, setUserId] = useState<string>('');
   const [sellerInfo, setSellerInfo] = useState<SellerInfo>({
     name: '',
     email: '',
@@ -63,6 +64,19 @@ export default function SellerInfoTab({ userId }: { userId: string }) {
   const [countdown, setCountdown] = useState(0);
 
   const supabase = createClient();
+
+  // 로그인한 사용자 ID 조회
+  useEffect(() => {
+    const fetchUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      } else {
+        setUserId('guest');
+      }
+    };
+    fetchUserId();
+  }, []);
 
   useEffect(() => {
     if (userId) {

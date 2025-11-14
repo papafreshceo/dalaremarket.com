@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { getUserPrimaryOrganization } from '@/lib/organization-utils';
 
 /**
@@ -8,7 +8,7 @@ import { getUserPrimaryOrganization } from '@/lib/organization-utils';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // impersonate 헤더 확인
     const impersonateUserId = request.headers.get('X-Impersonate-User-Id');

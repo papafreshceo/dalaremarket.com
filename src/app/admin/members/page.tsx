@@ -5,44 +5,53 @@ import Link from 'next/link';
 import { Search, Filter, Download, UserPlus, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface Member {
+  // 멤버 식별자
+  member_id: string; // organization_members.id
+  organization_id: string;
+
+  // 사용자 정보
   id: string;
   email: string;
   name: string | null;
   profile_name: string | null;
-  business_name: string | null;
-  business_number: string | null;
-  role: string;
   phone: string | null;
-  address: string | null;
+  user_role: string; // 회원구분 (super_admin, admin, employee, seller, partner)
   created_at: string;
   updated_at: string | null;
-  last_login: string | null;
-  tier: string | null;
-  manual_tier: string | null; // 관리자가 수동으로 설정한 등급
-  last_login_provider: string | null; // 로그인 제공자
-  // 정산 관련 필드
-  settlement_cycle: string | null;
-  bank_name: string | null;
-  account_number: string | null;
-  account_holder: string | null;
-  memo: string | null;
-  discount_rate: number | null; // 티어별 할인율
-  // 포인트/캐시
-  cash_balance: number;
-  credit_balance: number;
-  accumulated_points: number; // 기여점수
-  // 사업자 정보
-  company_address: string | null;
+  last_login_provider: string | null;
+
+  // 조직 내 역할
+  org_role: string; // owner, member
+  org_status: string; // active, invited, suspended
+
+  // 조직 정보
+  business_name: string | null;
+  business_number: string | null;
+  business_address: string | null;
+  business_email: string | null;
   representative_name: string | null;
   representative_phone: string | null;
   manager_name: string | null;
   manager_phone: string | null;
-  tax_invoice_email: string | null;
-  [key: string]: any; // 기타 필드
+  bank_name: string | null;
+  account_number: string | null;
+  account_holder: string | null;
+  depositor_name: string | null;
+  store_name: string | null;
+  store_phone: string | null;
+  tier: string | null;
+  seller_code: string | null;
+
+  // 조직 잔액
+  cash_balance: number;
+  credit_balance: number;
+
+  [key: string]: any;
 }
 
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
+  const [organizations, setOrganizations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -75,6 +84,7 @@ export default function MembersPage() {
 
   useEffect(() => {
     loadMembers();
+    loadOrganizations();
   }, []);
 
   const loadMembers = async () => {
@@ -90,6 +100,27 @@ export default function MembersPage() {
       console.error('회원 목록 로드 오류:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadOrganizations = async () => {
+    try {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('조직 목록 로드 오류:', error);
+        return;
+      }
+
+      setOrganizations(data || []);
+    } catch (error) {
+      console.error('조직 목록 로드 오류:', error);
     }
   };
 
@@ -365,7 +396,22 @@ export default function MembersPage() {
     }
   };
 
-  const filteredMembers = members.filter(member => {
+  // 조직별로 그룹핑 (organization_id 기준으로 owner만 표시)
+  const organizationMembers = new Map<string, Member>();
+  members.forEach(member => {
+    // 조직별로 첫 번째 멤버만 또는 owner만 저장
+    if (!organizationMembers.has(member.organization_id)) {
+      organizationMembers.set(member.organization_id, member);
+    } else if (member.org_role === 'owner') {
+      // owner가 있으면 owner로 교체
+      organizationMembers.set(member.organization_id, member);
+    }
+  });
+
+  const uniqueOrganizations = Array.from(organizationMembers.values());
+
+  // 필터링 적용
+  const filteredOrgs = uniqueOrganizations.filter(member => {
     const matchesSearch =
       member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -373,6 +419,8 @@ export default function MembersPage() {
       member.business_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.business_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.business_address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.business_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.bank_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.account_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.account_holder?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -380,27 +428,28 @@ export default function MembersPage() {
       member.representative_phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.manager_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.manager_phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.tax_invoice_email?.toLowerCase().includes(searchTerm.toLowerCase());
+      member.store_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.store_phone?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // 역할 필터 로직
+    // 역할 필터 로직 (회원구분 기준)
     const matchesRole =
       roleFilter === 'all' ||
-      (roleFilter === 'super_admin' && member.role === 'super_admin') ||
-      (roleFilter === 'admin' && member.role === 'admin') ||
-      (roleFilter === 'employee' && member.role === 'employee') ||
-      (roleFilter === 'seller' && !['super_admin', 'admin', 'employee'].includes(member.role));
+      (roleFilter === 'super_admin' && member.user_role === 'super_admin') ||
+      (roleFilter === 'admin' && member.user_role === 'admin') ||
+      (roleFilter === 'employee' && member.user_role === 'employee') ||
+      (roleFilter === 'seller' && !['super_admin', 'admin', 'employee'].includes(member.user_role));
 
     // 티어 필터 로직
     const matchesTier =
       tierFilter === 'all' ||
-      (tierFilter === 'none' && !member.tier && !['super_admin', 'admin', 'employee'].includes(member.role)) ||
-      (member.tier?.toUpperCase() === tierFilter && !['super_admin', 'admin', 'employee'].includes(member.role));
+      (tierFilter === 'none' && !member.tier && !['super_admin', 'admin', 'employee'].includes(member.user_role)) ||
+      (member.tier?.toUpperCase() === tierFilter && !['super_admin', 'admin', 'employee'].includes(member.user_role));
 
     return matchesSearch && matchesRole && matchesTier;
   });
 
   // 정렬 적용
-  const sortedMembers = [...filteredMembers].sort((a, b) => {
+  const sortedOrgs = [...filteredOrgs].sort((a, b) => {
     if (!sortField) return 0;
 
     let aValue: any = a[sortField as keyof Member];
@@ -424,8 +473,8 @@ export default function MembersPage() {
     return 0;
   });
 
-  const totalPages = Math.ceil(sortedMembers.length / itemsPerPage);
-  const paginatedMembers = sortedMembers.slice(
+  const totalPages = Math.ceil(sortedOrgs.length / itemsPerPage);
+  const paginatedMembers = sortedOrgs.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -439,15 +488,38 @@ export default function MembersPage() {
     );
   };
 
-  const getRoleBadge = (role: string) => {
+  const getUserRoleBadge = (userRole: string) => {
     const roleConfig: Record<string, { bg: string; text: string; label: string }> = {
       super_admin: { bg: '#7c3aed', text: '#ffffff', label: '최고관리자' },
       admin: { bg: '#dc2626', text: '#ffffff', label: '관리자' },
       employee: { bg: '#f59e0b', text: '#ffffff', label: '직원' },
+      seller: { bg: '#10b981', text: '#ffffff', label: '셀러' },
+      partner: { bg: '#3b82f6', text: '#ffffff', label: '파트너' },
     };
 
-    // 내부 역할이 아니면 모두 판매자로 표시
-    const config = roleConfig[role] || { bg: '#10b981', text: '#ffffff', label: '판매자' };
+    const config = roleConfig[userRole] || { bg: '#10b981', text: '#ffffff', label: '셀러' };
+
+    return (
+      <span style={{
+        padding: '4px 12px',
+        background: config.bg,
+        color: config.text,
+        borderRadius: '12px',
+        fontSize: '12px',
+        fontWeight: '600',
+      }}>
+        {config.label}
+      </span>
+    );
+  };
+
+  const getOrgRoleBadge = (orgRole: string) => {
+    const roleConfig: Record<string, { bg: string; text: string; label: string }> = {
+      owner: { bg: '#8b5cf6', text: '#ffffff', label: '소유자' },
+      member: { bg: '#6b7280', text: '#ffffff', label: '담당자' },
+    };
+
+    const config = roleConfig[orgRole] || { bg: '#6b7280', text: '#ffffff', label: '담당자' };
 
     return (
       <span style={{
@@ -529,10 +601,10 @@ export default function MembersPage() {
         }}>
           {[
             { label: '전체', value: 'all', count: members.length },
-            { label: '최고관리자', value: 'super_admin', count: members.filter(m => m.role === 'super_admin').length },
-            { label: '관리자', value: 'admin', count: members.filter(m => m.role === 'admin').length },
-            { label: '직원', value: 'employee', count: members.filter(m => m.role === 'employee').length },
-            { label: '판매자', value: 'seller', count: members.filter(m => !['super_admin', 'admin', 'employee'].includes(m.role)).length },
+            { label: '최고관리자', value: 'super_admin', count: members.filter(m => m.user_role === 'super_admin').length },
+            { label: '관리자', value: 'admin', count: members.filter(m => m.user_role === 'admin').length },
+            { label: '직원', value: 'employee', count: members.filter(m => m.user_role === 'employee').length },
+            { label: '판매자', value: 'seller', count: members.filter(m => !['super_admin', 'admin', 'employee'].includes(m.user_role)).length },
           ].map(item => (
             <button
               key={item.value}
@@ -588,13 +660,13 @@ export default function MembersPage() {
         marginBottom: '24px'
       }}>
         {[
-          { label: '전체', value: 'all', count: members.filter(m => !['super_admin', 'admin', 'employee'].includes(m.role)).length },
-          { label: 'LEGEND', value: 'LEGEND', count: members.filter(m => m.tier?.toUpperCase() === 'LEGEND' && !['super_admin', 'admin', 'employee'].includes(m.role)).length },
-          { label: 'ELITE', value: 'ELITE', count: members.filter(m => m.tier?.toUpperCase() === 'ELITE' && !['super_admin', 'admin', 'employee'].includes(m.role)).length },
-          { label: 'ADVANCE', value: 'ADVANCE', count: members.filter(m => m.tier?.toUpperCase() === 'ADVANCE' && !['super_admin', 'admin', 'employee'].includes(m.role)).length },
-          { label: 'STANDARD', value: 'STANDARD', count: members.filter(m => m.tier?.toUpperCase() === 'STANDARD' && !['super_admin', 'admin', 'employee'].includes(m.role)).length },
-          { label: 'LIGHT', value: 'LIGHT', count: members.filter(m => m.tier?.toUpperCase() === 'LIGHT' && !['super_admin', 'admin', 'employee'].includes(m.role)).length },
-          { label: '티어없음', value: 'none', count: members.filter(m => !m.tier && !['super_admin', 'admin', 'employee'].includes(m.role)).length },
+          { label: '전체', value: 'all', count: members.filter(m => !['super_admin', 'admin', 'employee'].includes(m.user_role)).length },
+          { label: 'LEGEND', value: 'LEGEND', count: members.filter(m => m.tier?.toUpperCase() === 'LEGEND' && !['super_admin', 'admin', 'employee'].includes(m.user_role)).length },
+          { label: 'ELITE', value: 'ELITE', count: members.filter(m => m.tier?.toUpperCase() === 'ELITE' && !['super_admin', 'admin', 'employee'].includes(m.user_role)).length },
+          { label: 'ADVANCE', value: 'ADVANCE', count: members.filter(m => m.tier?.toUpperCase() === 'ADVANCE' && !['super_admin', 'admin', 'employee'].includes(m.user_role)).length },
+          { label: 'STANDARD', value: 'STANDARD', count: members.filter(m => m.tier?.toUpperCase() === 'STANDARD' && !['super_admin', 'admin', 'employee'].includes(m.user_role)).length },
+          { label: 'LIGHT', value: 'LIGHT', count: members.filter(m => m.tier?.toUpperCase() === 'LIGHT' && !['super_admin', 'admin', 'employee'].includes(m.user_role)).length },
+          { label: '티어없음', value: 'none', count: members.filter(m => !m.tier && !['super_admin', 'admin', 'employee'].includes(m.user_role)).length },
         ].map(item => (
           <button
             key={item.value}
@@ -635,6 +707,12 @@ export default function MembersPage() {
                   <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '80px' }}>
                     전환
                   </th>
+                  <th onClick={() => handleSort('seller_code')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}>
+                    셀러코드{getSortIcon('seller_code')}
+                  </th>
+                  <th onClick={() => handleSort('business_name')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '150px', cursor: 'pointer', userSelect: 'none' }}>
+                    셀러계정(사업자명){getSortIcon('business_name')}
+                  </th>
                   <th onClick={() => handleSort('email')} style={{ padding: '8px', textAlign: 'left', fontWeight: '600', minWidth: '200px', cursor: 'pointer', userSelect: 'none' }}>
                     이메일{getSortIcon('email')}
                   </th>
@@ -644,32 +722,26 @@ export default function MembersPage() {
                   <th onClick={() => handleSort('profile_name')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}>
                     프로필명{getSortIcon('profile_name')}
                   </th>
-                  <th onClick={() => handleSort('business_name')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '120px', cursor: 'pointer', userSelect: 'none' }}>
-                    회사명{getSortIcon('business_name')}
-                  </th>
                   <th onClick={() => handleSort('business_number')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '120px', cursor: 'pointer', userSelect: 'none' }}>
                     사업자번호{getSortIcon('business_number')}
                   </th>
                   <th onClick={() => handleSort('phone')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '120px', cursor: 'pointer', userSelect: 'none' }}>
                     연락처{getSortIcon('phone')}
                   </th>
-                  <th onClick={() => handleSort('address')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '150px', cursor: 'pointer', userSelect: 'none' }}>
-                    주소{getSortIcon('address')}
+                  <th onClick={() => handleSort('business_address')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '150px', cursor: 'pointer', userSelect: 'none' }}>
+                    사업자주소{getSortIcon('business_address')}
+                  </th>
+                  <th onClick={() => handleSort('org_role')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}>
+                    역할{getSortIcon('org_role')}
                   </th>
                   <th onClick={() => handleSort('tier')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '220px', cursor: 'pointer', userSelect: 'none' }}>
                     등급설정{getSortIcon('tier')}
                   </th>
-                  <th onClick={() => handleSort('role')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '120px', cursor: 'pointer', userSelect: 'none' }}>
-                    역할{getSortIcon('role')}
+                  <th onClick={() => handleSort('user_role')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '120px', cursor: 'pointer', userSelect: 'none' }}>
+                    회원구분{getSortIcon('user_role')}
                   </th>
                   <th onClick={() => handleSort('last_login_provider')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}>
                     가입유형{getSortIcon('last_login_provider')}
-                  </th>
-                  <th onClick={() => handleSort('discount_rate')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '70px', cursor: 'pointer', userSelect: 'none' }}>
-                    할인율{getSortIcon('discount_rate')}
-                  </th>
-                  <th onClick={() => handleSort('accumulated_points')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '70px', cursor: 'pointer', userSelect: 'none' }}>
-                    기여점수{getSortIcon('accumulated_points')}
                   </th>
                   <th onClick={() => handleSort('cash_balance')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '70px', cursor: 'pointer', userSelect: 'none' }}>
                     캐시{getSortIcon('cash_balance')}
@@ -692,8 +764,8 @@ export default function MembersPage() {
                   <th onClick={() => handleSort('account_holder')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}>
                     예금주{getSortIcon('account_holder')}
                   </th>
-                  <th onClick={() => handleSort('company_address')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '150px', cursor: 'pointer', userSelect: 'none' }}>
-                    회사주소{getSortIcon('company_address')}
+                  <th onClick={() => handleSort('business_email')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '150px', cursor: 'pointer', userSelect: 'none' }}>
+                    사업자이메일{getSortIcon('business_email')}
                   </th>
                   <th onClick={() => handleSort('representative_name')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}>
                     대표자명{getSortIcon('representative_name')}
@@ -707,30 +779,28 @@ export default function MembersPage() {
                   <th onClick={() => handleSort('manager_phone')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '120px', cursor: 'pointer', userSelect: 'none' }}>
                     담당자전화{getSortIcon('manager_phone')}
                   </th>
-                  <th onClick={() => handleSort('tax_invoice_email')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '150px', cursor: 'pointer', userSelect: 'none' }}>
-                    전자계산서이메일{getSortIcon('tax_invoice_email')}
+                  <th onClick={() => handleSort('store_name')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '120px', cursor: 'pointer', userSelect: 'none' }}>
+                    매장명{getSortIcon('store_name')}
                   </th>
-                  <th onClick={() => handleSort('memo')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '200px', cursor: 'pointer', userSelect: 'none' }}>
-                    메모{getSortIcon('memo')}
+                  <th onClick={() => handleSort('store_phone')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '120px', cursor: 'pointer', userSelect: 'none' }}>
+                    매장전화{getSortIcon('store_phone')}
                   </th>
                   <th onClick={() => handleSort('created_at')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}>
                     가입일{getSortIcon('created_at')}
-                  </th>
-                  <th onClick={() => handleSort('last_login')} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: '600', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}>
-                    최근 로그인{getSortIcon('last_login')}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedMembers.length === 0 ? (
                   <tr>
-                    <td colSpan={28} style={{ padding: '60px', textAlign: 'center', color: '#6c757d' }}>
+                    <td colSpan={29} style={{ padding: '60px', textAlign: 'center', color: '#6c757d' }}>
                       검색 결과가 없습니다
                     </td>
                   </tr>
                 ) : (
-                  paginatedMembers.map((member, index) => (
-                    <tr key={member.id} style={{ borderBottom: '1px solid #dee2e6' }}>
+                  paginatedMembers.map((member, index) => {
+                    return (
+                    <tr key={member.member_id} style={{ borderBottom: '1px solid #dee2e6' }}>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                         <div style={{ fontSize: '14px', fontWeight: '500' }}>
                           {(currentPage - 1) * itemsPerPage + index + 1}
@@ -762,6 +832,12 @@ export default function MembersPage() {
                           전환
                         </button>
                       </td>
+                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '14px', fontWeight: '500' }}>{member.seller_code || '-'}</div>
+                      </td>
+                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '14px', fontWeight: '500' }}>{member.business_name || '-'}</div>
+                      </td>
                       <td style={{ padding: '4px 8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontSize: '14px', fontWeight: '500' }}>{member.email}</span>
@@ -792,18 +868,18 @@ export default function MembersPage() {
                         <div style={{ fontSize: '14px' }}>{member.profile_name || '-'}</div>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.business_name || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                         <div style={{ fontSize: '14px' }}>{member.business_number || '-'}</div>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                         <div style={{ fontSize: '14px' }}>{member.phone || '-'}</div>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '12px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={member.address || '-'}>
-                          {member.address || '-'}
+                        <div style={{ fontSize: '12px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={member.business_address || '-'}>
+                          {member.business_address || '-'}
                         </div>
+                      </td>
+                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                        {getOrgRoleBadge(member.org_role)}
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -910,70 +986,64 @@ export default function MembersPage() {
                         </div>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        {getRoleBadge(member.role)}
+                        {getUserRoleBadge(member.user_role)}
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                         {getProviderBadge(member.last_login_provider)}
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.discount_rate ? `${member.discount_rate}%` : '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#8b5cf6' }}>{member.accumulated_points?.toLocaleString() || '0'}</div>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                         <div style={{ fontSize: '14px', fontWeight: '600', color: '#10b981' }}>{member.cash_balance?.toLocaleString() || '0'}</div>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                         <button
-                          onClick={() => openCashModal(member)}
-                          style={{
-                            padding: '4px 8px',
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                            transition: 'all 0.2s',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
-                        >
-                          지급
-                        </button>
+                            onClick={() => openCashModal(member)}
+                            style={{
+                              padding: '4px 8px',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                          >
+                            지급
+                          </button>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                         <div style={{ fontSize: '14px', fontWeight: '600', color: '#8b5cf6' }}>{member.credit_balance?.toLocaleString() || '0'}</div>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                         <button
-                          onClick={() => openCreditModal(member)}
-                          style={{
-                            padding: '4px 8px',
-                            background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                            transition: 'all 0.2s',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
-                        >
-                          지급
-                        </button>
+                            onClick={() => openCreditModal(member)}
+                            style={{
+                              padding: '4px 8px',
+                              background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                          >
+                            지급
+                          </button>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                         <div style={{ fontSize: '14px' }}>{member.bank_name || '-'}</div>
@@ -985,8 +1055,8 @@ export default function MembersPage() {
                         <div style={{ fontSize: '14px' }}>{member.account_holder || '-'}</div>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '12px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={member.company_address || '-'}>
-                          {member.company_address || '-'}
+                        <div style={{ fontSize: '12px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={member.business_email || '-'}>
+                          {member.business_email || '-'}
                         </div>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
@@ -1002,23 +1072,17 @@ export default function MembersPage() {
                         <div style={{ fontSize: '14px' }}>{member.manager_phone || '-'}</div>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '12px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={member.tax_invoice_email || '-'}>
-                          {member.tax_invoice_email || '-'}
-                        </div>
+                        <div style={{ fontSize: '14px' }}>{member.store_name || '-'}</div>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={member.memo || '-'}>
-                          {member.memo || '-'}
-                        </div>
+                        <div style={{ fontSize: '14px' }}>{member.store_phone || '-'}</div>
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center', fontSize: '14px' }}>
                         {formatDate(member.created_at)}
                       </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center', fontSize: '14px' }}>
-                        {formatDate(member.last_login)}
-                      </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1068,6 +1132,78 @@ export default function MembersPage() {
           )}
         </>
       )}
+
+      {/* 조직 현황 테이블 */}
+      <div style={{ marginTop: '48px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '16px' }}>
+          조직 현황 ({organizations.length}개)
+        </h2>
+        <div style={{
+          background: 'white',
+          borderRadius: '16px',
+          overflow: 'auto',
+          border: '1px solid #dee2e6'
+        }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '60px' }}>No</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '150px' }}>사업자명</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '120px' }}>사업자번호</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '200px' }}>사업자주소</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '150px' }}>사업자이메일</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '100px' }}>대표자명</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '120px' }}>대표전화</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '100px' }}>담당자명</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '120px' }}>담당자전화</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '100px' }}>은행명</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '150px' }}>계좌번호</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '100px' }}>예금주</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '100px' }}>입금자명</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '120px' }}>매장명</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '120px' }}>매장전화</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '100px' }}>등급</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '100px' }}>셀러코드</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '100px' }}>파트너코드</th>
+                <th style={{ padding: '8px', textAlign: 'center', fontWeight: '600', minWidth: '120px' }}>생성일</th>
+              </tr>
+            </thead>
+            <tbody>
+              {organizations.length === 0 ? (
+                <tr>
+                  <td colSpan={19} style={{ padding: '60px', textAlign: 'center', color: '#6c757d' }}>
+                    조직이 없습니다
+                  </td>
+                </tr>
+              ) : (
+                organizations.map((org, index) => (
+                  <tr key={org.id} style={{ borderBottom: '1px solid #dee2e6' }}>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{index + 1}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.business_name || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.business_number || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '12px' }}>{org.business_address || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.business_email || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.representative_name || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.representative_phone || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.manager_name || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.manager_phone || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.bank_name || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.bank_account || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.account_holder || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.depositor_name || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.store_name || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.store_phone || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.tier || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.seller_code || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{org.partner_code || '-'}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px' }}>{formatDate(org.created_at)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* 크레딧 지급 모달 */}
       {showCreditModal && selectedMember && (

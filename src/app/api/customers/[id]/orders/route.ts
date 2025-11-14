@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-security';
 
@@ -14,7 +14,7 @@ export async function GET(
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.error;
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const customerId = params.id;
 
     // 고객 정보 조회

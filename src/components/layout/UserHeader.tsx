@@ -178,20 +178,21 @@ export default function UserHeader() {
       if (user) {
         const { data: userData } = await supabase
           .from('users')
-          .select('role, primary_organization_id, seller_code')
+          .select('role, primary_organization_id')
           .eq('id', user.id)
           .single();
 
         setUserRole(userData?.role || null);
-        setSellerCode(userData?.seller_code || '');
 
-        // 조직의 기여점수, 티어, 셀러계정명 조회
+        // 조직의 기여점수, 티어, 셀러계정명, 셀러코드 조회
         if (userData?.primary_organization_id) {
           const { data: orgData } = await supabase
             .from('organizations')
-            .select('accumulated_points, tier, business_name')
+            .select('accumulated_points, tier, business_name, seller_code')
             .eq('id', userData.primary_organization_id)
             .single();
+
+          setSellerCode(orgData?.seller_code || '');
 
           setContributionPoints(orgData?.accumulated_points || 0);
           setOrganizationName(orgData?.business_name || '');

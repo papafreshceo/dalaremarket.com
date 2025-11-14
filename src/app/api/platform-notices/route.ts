@@ -1,9 +1,9 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 관리자 권한 확인
     const { data: { user } } = await supabase.auth.getUser();
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 관리자 권한 확인
     const { data: { user } } = await supabase.auth.getUser();
@@ -136,7 +136,7 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 관리자 권한 확인
     const { data: { user } } = await supabase.auth.getUser();

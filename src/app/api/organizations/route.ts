@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-security'
 import { CreateOrganizationRequest, UpdateOrganizationRequest } from '@/types/organization'
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth(request)
     if (!auth.authorized) return auth.error
 
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 사용자가 속한 모든 조직 조회
     const { data: memberOrgs, error: memberError } = await supabase
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     if (!auth.authorized) return auth.error
 
     const body: CreateOrganizationRequest = await request.json()
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 조직 생성
     const { data: organization, error: orgError } = await supabase
@@ -164,7 +164,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body: UpdateOrganizationRequest = await request.json()
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 권한 확인: 소유자만 수정 가능
     const { data: member } = await supabase

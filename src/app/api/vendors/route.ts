@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 /**
@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server';
  */
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // integrated_orders에서 unique한 vendor_name 가져오기
     const { data, error } = await supabase

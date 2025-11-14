@@ -70,6 +70,7 @@ export default function ProfilePage() {
 
   // 추가 셀러계정 state
   const [additionalAccounts, setAdditionalAccounts] = useState<any[]>([]);
+  const [savingSubAccounts, setSavingSubAccounts] = useState<Record<string, boolean>>({});
 
   // 티어별 최대 계정 수 계산
   const getMaxAccountsByTier = (tier: string | null | undefined) => {
@@ -102,8 +103,12 @@ export default function ProfilePage() {
 
   useEffect(() => {
     setIsMounted(true);
-    loadUserProfile();
-    loadOrganizationInfo();
+    const initializeData = async () => {
+      await loadUserProfile();  // 먼저 실행
+      await loadOrganizationInfo();  // 그 다음 실행 (덮어쓰지 않도록)
+      await loadSubAccounts();
+    };
+    initializeData();
   }, []);
 
   // 사업자명과 동일 체크박스가 체크되어 있으면 사업자명을 스토어명에 자동 반영
@@ -126,50 +131,31 @@ export default function ProfilePage() {
       const response = await fetch('/api/user/profile');
       const data = await response.json();
 
+      console.log('🔍 프로필 API 응답:', data);
+
       if (data.success) {
+        console.log('👤 User 데이터:', {
+          id: data.user.id,
+          email: data.user.email,
+          primary_organization_id: data.user.primary_organization_id,
+          business_name: data.user.business_name,
+        });
         setUser(data.user);
         // 프로필 이름이 없으면 이메일 앞부분을 기본값으로 설정
         const defaultProfileName = data.user.profile_name || data.user.email?.split('@')[0] || '';
         setProfileName(defaultProfileName);
         setOriginalProfileName(data.user.profile_name || ''); // 원래 프로필 이름 저장
 
-        // 판매자 정보 로드
+        // 기본 정보만 로드 (셀러계정 정보는 loadOrganizationInfo에서 가져옴)
         const loadedInfo = {
           name: data.user.name || '',
           email: data.user.email || '',
           phone: data.user.phone || '',
           profile_name: data.user.profile_name || '',
-          business_name: data.user.business_name || '',
-          business_address: data.user.business_address || '',
-          business_number: data.user.business_number || '',
-          business_email: data.user.business_email || data.user.email || '',
-          representative_name: data.user.representative_name || '',
-          representative_phone: data.user.representative_phone || '',
-          manager_name: data.user.manager_name || '',
-          manager_phone: data.user.manager_phone || '',
-          bank_account: data.user.bank_account || '',
-          bank_name: data.user.bank_name || '',
-          account_holder: data.user.account_holder || '',
-          depositor_name: data.user.depositor_name || '',
-          store_name: data.user.store_name || data.user.business_name || '',
-          store_phone: data.user.store_phone || '',
         };
 
-        setSellerInfo(loadedInfo);
-
-        // 스토어명이 사업자명과 같거나 없으면 체크박스를 체크 상태로
-        if (!data.user.store_name || data.user.store_name === data.user.business_name) {
-          setIsSameAsBusinessName(true);
-        } else {
-          setIsSameAsBusinessName(false);
-        }
-
-        // 사업자 이메일이 기본 이메일과 같거나 없으면 체크박스를 체크 상태로
-        if (!data.user.business_email || data.user.business_email === data.user.email) {
-          setIsSameAsEmail(true);
-        } else {
-          setIsSameAsEmail(false);
-        }
+        console.log('📝 sellerInfo 기본정보 설정:', loadedInfo);
+        setSellerInfo(prev => ({ ...prev, ...loadedInfo }));
       }
     } catch (error) {
       console.error('프로필 로드 오류:', error);
@@ -190,36 +176,122 @@ export default function ProfilePage() {
         .eq('id', authUser.id)
         .single();
 
+      console.log('🏢 Organization 로드 - userData:', userData);
+
       // 관리자는 셀러계정 시스템 적용 안 함
       if (userData?.role === 'admin' || userData?.role === 'super_admin') {
+        console.log('⚠️ 관리자 계정 - 셀러계정 시스템 스킵');
         return;
       }
 
-      if (!userData?.primary_organization_id) return;
+      if (!userData?.primary_organization_id) {
+        console.warn('⚠️ primary_organization_id 없음');
+        return;
+      }
+
+      console.log('🔍 Organization ID:', userData.primary_organization_id);
 
       // Organization 정보 가져오기
-      const { data: orgData } = await supabase
+      const { data: orgData, error: orgError } = await supabase
         .from('organizations')
-        .select('*')
+        .select(`
+          id,
+          owner_id,
+          is_active,
+          seller_code,
+          partner_code,
+          business_name,
+          business_number,
+          business_address,
+          business_email,
+          representative_name,
+          representative_phone,
+          manager_name,
+          manager_phone,
+          bank_account,
+          depositor_name,
+          store_name,
+          store_phone,
+          tier,
+          created_at,
+          updated_at
+        `)
         .eq('id', userData.primary_organization_id)
         .single();
 
-      if (orgData) {
-        setOrganization(orgData);
-        setIsOwner(orgData.owner_id === authUser.id);
+      if (orgError) {
+        console.error('Organization 로드 오류:', orgError);
+        console.error('Error details:', JSON.stringify(orgError, null, 2));
+        return;
       }
 
-      // Member 정보 가져오기
+      if (orgData) {
+        console.log('Organization owner_id:', orgData.owner_id);
+
+        // organization에서 owner 정보 가져오기
+        // business_name만 사용 (없으면 null)
+        const ownerData = {
+          seller_code: orgData.seller_code || null,
+          business_name: orgData.business_name || null
+        };
+        console.log('Organization에서 owner 정보 사용:', ownerData);
+
+        // organization 객체에 owner 정보 추가
+        const orgWithOwner = {
+          ...orgData,
+          owner: ownerData
+        };
+
+        console.log('최종 Organization 데이터:', orgWithOwner);
+        setOrganization(orgWithOwner);
+        setIsOwner(orgData.owner_id === authUser.id);
+
+        // 셀러계정 정보 업데이트 (소유자만)
+        if (orgData.owner_id === authUser.id) {
+          console.log('📝 셀러계정 정보 로드:', {
+            business_name: orgData.business_name
+          });
+
+          setSellerInfo(prev => ({
+            ...prev,
+            business_name: orgData.business_name || '',
+            business_address: orgData.business_address || '',
+            business_number: orgData.business_number || '',
+            business_email: orgData.business_email || prev.email || '',
+            representative_name: orgData.representative_name || '',
+            representative_phone: orgData.representative_phone || '',
+            manager_name: orgData.manager_name || '',
+            manager_phone: orgData.manager_phone || '',
+            bank_account: orgData.bank_account || '',
+            bank_name: orgData.bank_name || '',
+            account_holder: orgData.account_holder || '',
+            depositor_name: orgData.depositor_name || '',
+            store_name: orgData.store_name || '',
+            store_phone: orgData.store_phone || '',
+          }));
+
+          // 체크박스 상태 설정
+          setIsSameAsBusinessName(!orgData.store_name || orgData.store_name === orgData.business_name);
+          setIsSameAsEmail(!orgData.business_email || orgData.business_email === prev.email);
+        }
+      } else {
+        console.warn('Organization 데이터가 없습니다');
+      }
+
+      // Member 정보 가져오기 (탈퇴한 소유자는 멤버 레코드가 없을 수 있음)
       const { data: memberData } = await supabase
         .from('organization_members')
         .select('*')
         .eq('organization_id', userData.primary_organization_id)
         .eq('user_id', authUser.id)
-        .single();
+        .maybeSingle();
 
       if (memberData) {
         setMember(memberData);
         setCanManageMembers(memberData.can_manage_members || false);
+      } else if (orgData?.owner_id === authUser.id) {
+        // 소유자인 경우 멤버 레코드가 없어도 관리 권한 부여
+        setCanManageMembers(true);
       }
     } catch (error) {
       console.error('셀러계정 정보 로드 오류:', error);
@@ -394,33 +466,114 @@ export default function ProfilePage() {
     }
   };
 
+  // 서브 계정 목록 불러오기
+  const loadSubAccounts = async () => {
+    try {
+      const response = await fetch('/api/organizations/sub');
+      const data = await response.json();
+
+      if (data.success && data.sub_organizations) {
+        // 서브 계정 목록을 additionalAccounts에 설정
+        const subAccounts = data.sub_organizations.map((org: any) => ({
+          id: org.id,
+          business_name: org.business_name || '',
+          business_address: org.address || '',
+          business_number: org.business_number || '',
+          business_email: org.email || '',
+          representative_name: org.representative_name || '',
+          representative_phone: org.phone || '',
+          bank_account: org.account_number || '',
+          bank_name: org.bank_name || '',
+          account_holder: org.account_holder || '',
+          store_name: org.store_name || '',
+          store_phone: org.store_phone || '',
+        }));
+        setAdditionalAccounts(subAccounts);
+      }
+    } catch (error) {
+      console.error('서브 계정 목록 조회 오류:', error);
+    }
+  };
+
   // 서브 계정 저장
   const handleSaveSubAccount = async (account: any) => {
     console.log('🔄 서브 계정 저장 시작:', account);
 
+    // 저장 중 상태 설정
+    setSavingSubAccounts(prev => ({ ...prev, [account.id]: true }));
+
     try {
       // 필수 입력 확인
       if (!account.business_name) {
-        console.log('❌ 사업자명 없음');
         toast.error('사업자명을 입력해주세요.');
+        setSavingSubAccounts(prev => ({ ...prev, [account.id]: false }));
+        return;
+      }
+      if (!account.business_address) {
+        toast.error('주소를 입력해주세요.');
+        setSavingSubAccounts(prev => ({ ...prev, [account.id]: false }));
+        return;
+      }
+      if (!account.business_number) {
+        toast.error('사업자등록번호를 입력해주세요.');
+        setSavingSubAccounts(prev => ({ ...prev, [account.id]: false }));
+        return;
+      }
+      if (!account.business_email) {
+        toast.error('이메일을 입력해주세요.');
+        setSavingSubAccounts(prev => ({ ...prev, [account.id]: false }));
+        return;
+      }
+      if (!account.representative_name) {
+        toast.error('대표자명을 입력해주세요.');
+        setSavingSubAccounts(prev => ({ ...prev, [account.id]: false }));
+        return;
+      }
+      if (!account.bank_name) {
+        toast.error('은행명을 입력해주세요.');
+        setSavingSubAccounts(prev => ({ ...prev, [account.id]: false }));
+        return;
+      }
+      if (!account.bank_account) {
+        toast.error('계좌번호를 입력해주세요.');
+        setSavingSubAccounts(prev => ({ ...prev, [account.id]: false }));
+        return;
+      }
+      if (!account.account_holder) {
+        toast.error('예금주를 입력해주세요.');
+        setSavingSubAccounts(prev => ({ ...prev, [account.id]: false }));
         return;
       }
 
-      console.log('📤 API 요청 전송 중...');
+      // 신규 생성인지 수정인지 구분 (임시 ID는 timestamp로 큰 숫자)
+      const isNewAccount = typeof account.id === 'number' && account.id > 1000000000000;
+      const method = isNewAccount ? 'POST' : 'PUT';
+
+      console.log(`📤 API 요청 전송 중... (${isNewAccount ? '신규 생성' : '수정'})`);
+
+      const requestBody = {
+        business_name: account.business_name,
+        business_number: account.business_number,
+        address: account.business_address,
+        email: account.business_email,
+        representative_name: account.representative_name,
+        phone: account.representative_phone,
+        bank_name: account.bank_name,
+        account_number: account.bank_account,
+        account_holder: account.account_holder,
+        store_name: account.store_name,
+        store_phone: account.store_phone,
+      };
+
+      // 수정인 경우 ID 포함
+      if (!isNewAccount) {
+        requestBody.id = account.id;
+      }
+
       const response = await fetch('/api/organizations/sub', {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          business_name: account.business_name,
-          business_number: account.business_number,
-          address: account.business_address,
-          email: account.business_email,
-          representative_name: account.representative_name,
-          phone: account.representative_phone,
-          bank_name: account.bank_name,
-          account_number: account.bank_account,
-          account_holder: account.account_holder,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       console.log('📥 API 응답 상태:', response.status);
@@ -429,15 +582,10 @@ export default function ProfilePage() {
 
       if (data.success) {
         console.log('✅ 저장 성공!');
-        toast.success('서브 셀러계정이 저장되었습니다.');
+        toast.success(isNewAccount ? '서브 셀러계정이 생성되었습니다.' : '서브 셀러계정이 수정되었습니다.');
 
-        // 저장 후 additionalAccounts에서 제거 (저장 완료)
-        setAdditionalAccounts(prev => prev.filter(acc => acc.id !== account.id));
-
-        // 페이지 새로고침하여 데이터 다시 불러오기
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
+        // 서브 계정 목록 다시 불러오기
+        await loadSubAccounts();
       } else {
         console.log('❌ 저장 실패:', data.error || data.message);
         toast.error(data.message || data.error || '저장에 실패했습니다.');
@@ -445,6 +593,9 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('❌ 서브 계정 저장 오류:', error);
       toast.error('저장 중 오류가 발생했습니다.');
+    } finally {
+      // 저장 완료 후 상태 해제
+      setSavingSubAccounts(prev => ({ ...prev, [account.id]: false }));
     }
   };
 
@@ -790,47 +941,54 @@ export default function ProfilePage() {
                   margin: 0
                 }}>셀러계정 설정</h2>
 
-                {sellerInfo.business_name && (
-                  <span style={{
-                    fontSize: '15px',
-                    fontWeight: '600',
-                    color: '#212529'
-                  }}>
-                    {sellerInfo.business_name}
-                  </span>
-                )}
+                {/* 셀러계정명 배지 */}
+                {(() => {
+                  // 소유자: organization.business_name만 표시 (없으면 표시 안함)
+                  // 담당자: organization.owner.business_name만 표시 (없으면 표시 안함)
+                  const businessName = isOwner
+                    ? organization?.business_name
+                    : organization?.owner?.business_name;
+                  return businessName ? (
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#059669',
+                      background: '#d1fae5',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #6ee7b7'
+                    }}>
+                      {businessName}
+                    </span>
+                  ) : null;
+                })()}
 
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px'
                 }}>
-                  {user?.seller_code && (
-                    <span style={{
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      color: '#3b82f6',
-                      background: '#eff6ff',
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #dbeafe'
-                    }}>
-                      {user.seller_code}
-                    </span>
-                  )}
-                  {user?.partner_code && (
-                    <span style={{
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      color: '#a855f7',
-                      background: '#faf5ff',
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #e9d5ff'
-                    }}>
-                      {user.partner_code}
-                    </span>
-                  )}
+                  {/* 셀러코드 배지 */}
+                  {(() => {
+                    // 소유자: organization.seller_code
+                    // 담당자: organization.owner.seller_code
+                    const sellerCode = isOwner
+                      ? organization?.seller_code
+                      : organization?.owner?.seller_code;
+                    return sellerCode ? (
+                      <span style={{
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        color: '#3b82f6',
+                        background: '#eff6ff',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #dbeafe'
+                      }}>
+                        {sellerCode}
+                      </span>
+                    ) : null;
+                  })()}
                 </div>
 
                 <div style={{ flex: 1 }} />
@@ -872,17 +1030,17 @@ export default function ProfilePage() {
                   <button
                     onClick={() => {
                       // 새 셀러계정 추가 (테스트용 샘플 데이터)
-                      const sampleNumber = additionalAccounts.length + 2;
+                      const sampleNumber = additionalAccounts.length + 1;
                       setAdditionalAccounts([...additionalAccounts, {
                         id: Date.now(),
-                        business_name: `테스트사업자${sampleNumber}`,
-                        business_address: `서울시 강남구 테헤란로 ${100 + sampleNumber}길`,
+                        business_name: `sub테스트사업자${sampleNumber}`,
+                        business_address: `sub서울시 강남구 테헤란로 ${100 + sampleNumber}길`,
                         business_number: `${100 + sampleNumber}-${10 + sampleNumber}-${10000 + sampleNumber}`,
-                        business_email: `test${sampleNumber}@example.com`,
-                        representative_name: `대표자${sampleNumber}`,
+                        business_email: `sub${sampleNumber}@example.com`,
+                        representative_name: `sub대표자${sampleNumber}`,
                         bank_account: `${1000000 + sampleNumber * 1111}`,
-                        bank_name: '국민은행',
-                        account_holder: `예금주${sampleNumber}`,
+                        bank_name: 'sub국민은행',
+                        account_holder: `sub예금주${sampleNumber}`,
                       }]);
                     }}
                     style={{
@@ -1526,7 +1684,7 @@ export default function ProfilePage() {
                     fontWeight: '700',
                     color: '#212529',
                     margin: 0
-                  }}>셀러계정 설정 {index + 2}</h2>
+                  }}>서브계정 {index + 1}</h2>
 
                   {account.business_name && (
                     <span style={{
@@ -1543,34 +1701,68 @@ export default function ProfilePage() {
                   {/* 저장 버튼 */}
                   <button
                     onClick={() => handleSaveSubAccount(account)}
+                    disabled={savingSubAccounts[account.id]}
                     style={{
                       padding: '10px 20px',
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      background: savingSubAccounts[account.id]
+                        ? '#adb5bd'
+                        : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '10px',
                       fontSize: '14px',
                       fontWeight: '600',
-                      cursor: 'pointer',
+                      cursor: savingSubAccounts[account.id] ? 'not-allowed' : 'pointer',
                       transition: 'all 0.2s',
                       whiteSpace: 'nowrap'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+                      if (!savingSubAccounts[account.id]) {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+                      }
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0)';
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
-                    저장
+                    {savingSubAccounts[account.id] ? '저장 중...' : '저장'}
                   </button>
 
                   <button
-                    onClick={() => {
-                      // 해당 계정 삭제
-                      setAdditionalAccounts(additionalAccounts.filter(acc => acc.id !== account.id));
+                    onClick={async () => {
+                      // 삭제 확인
+                      if (!window.confirm('⚠️ 경고\n\n이 서브계정을 완전히 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.')) {
+                        return;
+                      }
+
+                      try {
+                        // DB에 저장된 계정인지 확인 (id가 숫자가 아니면 임시 계정)
+                        if (typeof account.id === 'string' || account.id > 1000000000000) {
+                          // 임시 계정 (아직 저장 안됨) - state에서만 제거
+                          setAdditionalAccounts(additionalAccounts.filter(acc => acc.id !== account.id));
+                          toast.success('서브계정이 제거되었습니다.');
+                        } else {
+                          // DB에 저장된 계정 - API로 삭제
+                          const response = await fetch(`/api/organizations/sub?id=${account.id}`, {
+                            method: 'DELETE',
+                          });
+
+                          const data = await response.json();
+
+                          if (data.success) {
+                            toast.success('서브계정이 완전히 삭제되었습니다.');
+                            // state에서도 제거
+                            setAdditionalAccounts(additionalAccounts.filter(acc => acc.id !== account.id));
+                          } else {
+                            toast.error(data.error || '삭제에 실패했습니다.');
+                          }
+                        }
+                      } catch (error) {
+                        console.error('서브계정 삭제 오류:', error);
+                        toast.error('삭제 중 오류가 발생했습니다.');
+                      }
                     }}
                     style={{
                       padding: '10px 20px',
@@ -1593,7 +1785,7 @@ export default function ProfilePage() {
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
-                    계정삭제
+                    삭제
                   </button>
                 </div>
 
@@ -1616,7 +1808,7 @@ export default function ProfilePage() {
                           fontWeight: '500',
                           color: '#495057',
                           marginBottom: '6px'
-                        }}>사업자명</label>
+                        }}>사업자명 <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           type="text"
                           value={account.business_name || ''}
@@ -1648,7 +1840,7 @@ export default function ProfilePage() {
                           fontWeight: '500',
                           color: '#495057',
                           marginBottom: '6px'
-                        }}>주소</label>
+                        }}>주소 <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           type="text"
                           value={account.business_address || ''}
@@ -1680,7 +1872,7 @@ export default function ProfilePage() {
                           fontWeight: '500',
                           color: '#495057',
                           marginBottom: '6px'
-                        }}>사업자등록번호</label>
+                        }}>사업자등록번호 <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           type="text"
                           value={account.business_number || ''}
@@ -1722,7 +1914,7 @@ export default function ProfilePage() {
                           fontWeight: '500',
                           color: '#495057',
                           marginBottom: '6px'
-                        }}>이메일 (계산서)</label>
+                        }}>이메일 (계산서) <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           type="email"
                           value={account.business_email || ''}
@@ -1754,7 +1946,7 @@ export default function ProfilePage() {
                           fontWeight: '500',
                           color: '#495057',
                           marginBottom: '6px'
-                        }}>대표자명</label>
+                        }}>대표자명 <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           type="text"
                           value={account.representative_name || ''}
@@ -1794,7 +1986,7 @@ export default function ProfilePage() {
                         borderBottom: '2px solid #e9ecef'
                       }}>정산 계좌</h3>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
                       <div>
                         <label style={{
                           display: 'block',
@@ -1802,7 +1994,7 @@ export default function ProfilePage() {
                           fontWeight: '500',
                           color: '#495057',
                           marginBottom: '6px'
-                        }}>은행명</label>
+                        }}>은행명 <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           type="text"
                           value={account.bank_name || ''}
@@ -1834,7 +2026,7 @@ export default function ProfilePage() {
                           fontWeight: '500',
                           color: '#495057',
                           marginBottom: '6px'
-                        }}>계좌번호</label>
+                        }}>계좌번호 <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           type="text"
                           value={account.bank_account || ''}
@@ -1866,7 +2058,7 @@ export default function ProfilePage() {
                           fontWeight: '500',
                           color: '#495057',
                           marginBottom: '6px'
-                        }}>예금주</label>
+                        }}>예금주 <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           type="text"
                           value={account.account_holder || ''}
@@ -1904,7 +2096,7 @@ export default function ProfilePage() {
                         borderBottom: '2px solid #e9ecef'
                       }}>송장 출력 정보</h3>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
                     <div>
                       <label style={{
                         display: 'block',

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { canUpdateServer } from '@/lib/permissions-server';
 
@@ -11,7 +11,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 관리자 권한 확인
     const { data: { user: adminUser }, error: authError } = await supabase.auth.getUser();
@@ -100,7 +100,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 관리자 권한 확인
     const { data: { user: adminUser }, error: authError } = await supabase.auth.getUser();

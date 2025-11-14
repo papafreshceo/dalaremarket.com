@@ -272,14 +272,17 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
   // 날짜 포맷(KST 기준)
   const formatYmdKst = (date: Date) => ymdKst(date);
 
-  // 날짜 필터 상태 (기본값: 최근 7일, KST 기준)
+  // 날짜 필터 상태 (기본값: 이번 주, KST 기준)
   const [startDate, setStartDate] = useState(() => {
-    const start = new Date();
-    start.setDate(start.getDate() - 6);
-    return formatYmdKst(start);
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0(일) ~ 6(토)
+    const monday = new Date(today);
+    // 월요일로 이동: 일요일(0)이면 -6일, 월요일(1)이면 0일, 화요일(2)이면 -1일...
+    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    return formatYmdKst(monday);
   });
   const [endDate, setEndDate] = useState(() => formatYmdKst(new Date()));
-  const [activeDateFilter, setActiveDateFilter] = useState<'today' | 'yesterday' | '7days' | '30days' | '90days' | '365days' | 'thisYear' | null>('7days');
+  const [activeDateFilter, setActiveDateFilter] = useState<'today' | 'yesterday' | 'thisWeek' | '7days' | '30days' | '90days' | '365days' | 'thisYear' | null>('thisWeek');
 
   // 이번 달 첫날과 마지막 날
   const firstDayOfMonth = useMemo(() => new Date(currentYear, currentMonth - 1, 1), [currentYear, currentMonth]);
@@ -375,6 +378,15 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     setEndDate(formatYmdKst(t));
     setActiveDateFilter('thisYear');
   };
+  const handleThisWeek = () => {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0(일) ~ 6(토)
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    setStartDate(formatYmdKst(monday));
+    setEndDate(formatYmdKst(today));
+    setActiveDateFilter('thisWeek');
+  };
 
   // 날짜별 주문 집계 (발주서확정일 기준) - UTC→KST
   const ordersByDate = useMemo(() => {
@@ -464,14 +476,21 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     return { totalAmount, totalCount };
   }, [orders, now]);
 
-  // 최근 7일 통계 (KST + BASE_FIELD)
+  // 이번 주 통계 (일요일~토요일, KST + BASE_FIELD)
   const last7DaysStats = useMemo(() => {
     const stats: { day: string; date: string; value: number; amount: number; count: number }[] = [];
     const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
 
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
+    // 이번 주 일요일 찾기
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0(일) ~ 6(토)
+    const sunday = new Date(today);
+    sunday.setDate(today.getDate() - dayOfWeek); // 이번 주 일요일
+
+    // 일요일(0)부터 토요일(6)까지 순회
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(sunday);
+      d.setDate(sunday.getDate() + i);
 
       let amount = 0;
       let count = 0;
@@ -487,7 +506,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
       const k = toKst(d);
       stats.push({
-        day: dayNames[k.getUTCDay()],
+        day: dayNames[i], // i가 0이면 '일', 1이면 '월'...
         date: `${k.getUTCMonth() + 1}/${k.getUTCDate()}`,
         value: 0,
         amount,
@@ -1854,17 +1873,17 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                   어제
                 </button>
                 <button
-                  onClick={() => setDateRange(7)}
+                  onClick={handleThisWeek}
                   className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
                   style={{
                     padding: '2px 6px',
                     borderRadius: '4px',
                     fontSize: '11px',
                     cursor: 'pointer',
-                    fontWeight: activeDateFilter === '7days' ? '600' : '400',
-                    border: activeDateFilter === '7days' ? '1px solid #3b82f6' : '1px solid',
-                    color: activeDateFilter === '7days' ? '#3b82f6' : 'var(--color-text)',
-                    backgroundColor: activeDateFilter === '7days' ? 'rgba(59, 130, 246, 0.05)' : undefined,
+                    fontWeight: activeDateFilter === 'thisWeek' ? '600' : '400',
+                    border: activeDateFilter === 'thisWeek' ? '1px solid #3b82f6' : '1px solid',
+                    color: activeDateFilter === 'thisWeek' ? '#3b82f6' : 'var(--color-text)',
+                    backgroundColor: activeDateFilter === 'thisWeek' ? 'rgba(59, 130, 246, 0.05)' : undefined,
                     boxSizing: 'border-box',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1872,7 +1891,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                     lineHeight: '16px'
                   }}
                 >
-                  7일
+                  이번주
                 </button>
                 <button
                   onClick={() => setDateRange(30)}
@@ -3307,9 +3326,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               gap: '20px'
             }}
           >
-            {/* 최근 7일 발주 현황 */}
+            {/* 이번 주 발주 현황 */}
             <div className="card" style={{ borderRadius: '12px', padding: '20px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: 'var(--color-text)' }}>최근 7일 발주 현황</h3>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: 'var(--color-text)' }}>이번 주 발주 현황</h3>
               <div
                 style={{
                   display: 'flex',
@@ -3322,6 +3341,11 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
               >
                 {last7DaysStats.map((item, idx) => {
                   const barHeight = item.amount > 0 ? Math.max(item.value * 1.2, 10) : 2;
+                  // 오늘 요일 계산 (일요일=0 부터 시작)
+                  const today = new Date();
+                  const todayDayOfWeek = today.getDay();
+                  const isToday = idx === todayDayOfWeek;
+
                   return (
                     <div
                       key={idx}
@@ -3351,7 +3375,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                         style={{
                           width: '100%',
                           height: `${barHeight}px`,
-                          background: idx === 6 ? '#10b981' : '#93c5fd',
+                          background: isToday ? '#10b981' : '#93c5fd',
                           borderRadius: '4px 4px 0 0',
                           transition: 'height 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
                         }}
@@ -3359,14 +3383,13 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
                       <div
                         style={{
                           display: 'flex',
-                          flexDirection: 'column',
                           alignItems: 'center',
-                          gap: '1px',
+                          gap: '2px',
                           marginTop: '4px'
                         }}
                       >
-                        <span style={{ fontSize: '10px', fontWeight: '500', color: 'var(--color-text)' }}>{item.day}</span>
-                        <span style={{ fontSize: '9px', color: 'var(--color-text-secondary)' }}>{item.date}</span>
+                        <span style={{ fontSize: '9px', color: idx === 0 ? '#ef4444' : idx === 6 ? '#3b82f6' : 'var(--color-text-secondary)' }}>{item.date}</span>
+                        <span style={{ fontSize: '10px', fontWeight: '500', color: idx === 0 ? '#ef4444' : idx === 6 ? '#3b82f6' : 'var(--color-text)' }}>{item.day}</span>
                       </div>
                     </div>
                   );

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 
 /**
  * GET /api/cloudinary/analytics
@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 1. 전체 통계
     const { data: allImages, error: imagesError } = await supabase

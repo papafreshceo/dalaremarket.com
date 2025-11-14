@@ -1,9 +1,9 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 export async function POST() {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 기본 테마 CSS 변수 (현재 사용 중인 값)
     const defaultTheme = {

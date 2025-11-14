@@ -1,9 +1,9 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
 
 export async function GET() {
-  const supabase = await createClient();
+  const supabase = await createClientForRouteHandler();
 
   // 1. option_products에서 데이터 조회
   const { data: options, error: optError } = await supabase

@@ -1,9 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // Service role client로 실행
     const { createAdminClient } = await import('@/lib/supabase/server')

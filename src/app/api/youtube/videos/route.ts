@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 
 // 영상 목록 조회
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { searchParams } = new URL(request.url);
 
     const page = parseInt(searchParams.get('page') || '1');
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 // 영상 수정 (is_active 토글 등)
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
     const { id, is_active } = body;
 
@@ -90,7 +90,7 @@ export async function PUT(request: NextRequest) {
 // 영상 삭제
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

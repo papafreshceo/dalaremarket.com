@@ -1,10 +1,10 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { SignJWT } from 'jose';
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { memberId } = await request.json();
 
     if (!memberId) {

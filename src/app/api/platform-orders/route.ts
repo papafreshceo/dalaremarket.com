@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
 import { applyOptionMappingToOrdersServer } from '@/lib/option-mapping-utils';
@@ -14,7 +14,7 @@ import { getOrganizationDataFilter } from '@/lib/organization-utils';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { searchParams } = new URL(request.url);
 
     // 날짜 필터 파라미터
@@ -117,21 +117,22 @@ export async function GET(request: NextRequest) {
       endDate
     });
 
-    // 🔒 조직 필터 적용
+    // 🔒 조직 필터 적용 (모든 사용자는 기본 조직을 가짐)
     const organizationId = await getOrganizationDataFilter(effectiveUserId);
+
+    if (!organizationId) {
+      return NextResponse.json(
+        { success: false, error: '조직 정보를 찾을 수 없습니다.' },
+        { status: 400 }
+      );
+    }
 
     // 쿼리 빌더
     let query = dbClient
       .from('integrated_orders')
       .select('*')
-      .eq('is_deleted', false);
-
-    // 조직이 있으면 조직 주문, 없으면 본인 주문만 조회
-    if (organizationId) {
-      query = query.eq('organization_id', organizationId);
-    } else {
-      query = query.eq('seller_id', effectiveUserId);
-    }
+      .eq('is_deleted', false)
+      .eq('organization_id', organizationId);
 
     // 날짜 필터 적용
     if (startDate) {
@@ -245,7 +246,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
 
     // 현재 로그인한 사용자 확인

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-security';
 
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.error;
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     const { data, error } = await supabase
       .from('ranking_score_settings')
@@ -50,7 +50,7 @@ export async function PUT(request: NextRequest) {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.error;
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
 
     // 유효성 검증

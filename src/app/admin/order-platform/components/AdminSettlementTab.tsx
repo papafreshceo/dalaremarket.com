@@ -10,7 +10,7 @@ import DatePicker from '@/components/ui/DatePicker';
 interface IntegratedOrder {
   id: number;
   order_number?: string;
-  seller_id?: string;
+  organization_id?: string;
   vendor_name?: string;
   option_name: string;
   shipping_status?: string;
@@ -47,8 +47,46 @@ interface Order {
 }
 
 interface AdminSettlementTabProps {
-  integratedOrders: IntegratedOrder[];
-  sellerNames: Map<string, string>;
+  integratedOrders: IntegratedOrder[]; // 레거시: PDF 다운로드용으로만 사용
+  organizationNames: Map<string, string>;
+}
+
+interface Settlement {
+  id: string;
+  organization_id: string;
+  settlement_year: number;
+  settlement_month: number;
+  settlement_date: string;
+  confirmed_amount: number;
+  cancel_amount: number;
+  shipped_amount: number;
+  refund_amount: number;
+  net_amount: number;
+  confirmed_count: number;
+  cancel_count: number;
+  shipped_count: number;
+  refund_count: number;
+  payment_confirmed_at?: string;
+  confirmed_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface MonthlySettlement {
+  year: number;
+  month: number;
+  yearMonth: string;
+  confirmedAmount: number;
+  cancelAmount: number;
+  shippedAmount: number;
+  refundAmount: number;
+  netAmount: number;
+  confirmedCount: number;
+  cancelCount: number;
+  shippedCount: number;
+  refundCount: number;
+  settlementDays: number;
+  dailyData: Settlement[];
 }
 
 interface CompanyInfo {
@@ -61,7 +99,7 @@ interface CompanyInfo {
   email: string;
 }
 
-interface SellerInfo {
+interface OrganizationInfo {
   name: string;
   business_number?: string;
   company_address?: string;
@@ -70,7 +108,7 @@ interface SellerInfo {
   email?: string;
 }
 
-export default function AdminSettlementTab({ integratedOrders, sellerNames }: AdminSettlementTabProps) {
+export default function AdminSettlementTab({ integratedOrders, organizationNames }: AdminSettlementTabProps) {
   // 탭 상태 관리
   const [activeTab, setActiveTab] = useState<'월별' | '기간설정'>('월별');
   // 확장/축소된 월 상태 관리
@@ -79,12 +117,17 @@ export default function AdminSettlementTab({ integratedOrders, sellerNames }: Ad
   const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null);
   // 기본 회사 정보
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
-  // 셀러 목록
-  const [sellers, setSellers] = useState<Array<{ id: string; name: string }>>([]);
-  // 선택된 셀러
-  const [selectedSeller, setSelectedSeller] = useState<string>('all');
-  // 셀러 정보 맵
-  const [sellerInfoMap, setSellerInfoMap] = useState<Map<string, SellerInfo>>(new Map());
+  // 조직 목록
+  const [organizations, setOrganizations] = useState<Array<{ id: string; name: string }>>([]);
+  // 선택된 조직
+  const [selectedOrganization, setSelectedOrganization] = useState<string>('all');
+  // 조직 정보 맵
+  const [organizationInfoMap, setOrganizationInfoMap] = useState<Map<string, OrganizationInfo>>(new Map());
+
+  // settlements 데이터
+  const [monthlySettlements, setMonthlySettlements] = useState<MonthlySettlement[]>([]);
+  const [periodSettlements, setPeriodSettlements] = useState<Settlement[]>([]);
+  const [loadingSettlements, setLoadingSettlements] = useState(false);
 
   // 기간설정 상태 (기본값: 오늘부터 1달 전)
   const [startDate, setStartDate] = useState<string>(() => {
@@ -104,103 +147,78 @@ export default function AdminSettlementTab({ integratedOrders, sellerNames }: Ad
     return `${year}-${month}-${day}`;
   });
 
-  // UTC를 KST(한국시간, UTC+9)로 변환하여 날짜 추출
-  const getKSTDate = (utcDateString: string): string => {
-    const utcDate = new Date(utcDateString);
-    // UTC+9 시간 추가
-    const kstDate = new Date(utcDate.getTime() + (9 * 60 * 60 * 1000));
-    return kstDate.toISOString().substring(0, 10); // YYYY-MM-DD
-  };
+  // 전체 집계 통계 (월별 탭용 - 모든 정산 데이터 합산)
+  const totalStats = useMemo(() => {
+    if (monthlySettlements.length === 0) {
+      return {
+        confirmedCount: 0,
+        confirmedAmount: 0,
+        cancelCount: 0,
+        cancelAmount: 0,
+        shippedCount: 0,
+        shippedAmount: 0,
+        refundAmount: 0
+      };
+    }
 
-  // integrated_orders를 platform/orders의 Order 형식으로 변환
-  const convertToOrders = (integratedOrders: IntegratedOrder[]): Order[] => {
-    return integratedOrders.map(order => {
-      // shipping_status를 Order의 status로 변환
-      let status: Order['status'] = 'registered';
-      if (order.shipping_status === '발주서등록') status = 'registered';
-      else if (order.shipping_status === '발주서확정' || order.shipping_status === '결제완료') status = 'confirmed';
-      else if (order.shipping_status === '상품준비중') status = 'preparing';
-      else if (order.shipping_status === '발송완료') status = 'shipped';
-      else if (order.shipping_status === '취소요청') status = 'cancelRequested';
-      else if (order.shipping_status === '취소완료') status = 'cancelled';
-      else if (order.refund_processed_at) status = 'refunded';
+    return {
+      confirmedCount: monthlySettlements.reduce((sum, m) => sum + m.confirmedCount, 0),
+      confirmedAmount: monthlySettlements.reduce((sum, m) => sum + m.confirmedAmount, 0),
+      cancelCount: monthlySettlements.reduce((sum, m) => sum + m.cancelCount, 0),
+      cancelAmount: monthlySettlements.reduce((sum, m) => sum + m.cancelAmount, 0),
+      shippedCount: monthlySettlements.reduce((sum, m) => sum + m.shippedCount, 0),
+      shippedAmount: monthlySettlements.reduce((sum, m) => sum + m.shippedAmount, 0),
+      refundAmount: monthlySettlements.reduce((sum, m) => sum + m.refundAmount, 0)
+    };
+  }, [monthlySettlements]);
 
-      const amount = Number(order.final_payment_amount || order.settlement_amount || 0);
+  // 월별 정산 데이터를 UI용 형태로 변환 (일별 데이터에 no와 date 추가)
+  const displayMonthlySettlements = useMemo(() => {
+    return monthlySettlements.map(month => {
+      const dailyData = month.dailyData
+        .sort((a, b) => new Date(b.settlement_date).getTime() - new Date(a.settlement_date).getTime())
+        .map((settlement, index) => ({
+          no: index + 1,
+          date: settlement.settlement_date,
+          confirmedCount: settlement.confirmed_count,
+          confirmedAmount: settlement.confirmed_amount,
+          cancelCount: settlement.cancel_count,
+          cancelAmount: settlement.cancel_amount,
+          shippedCount: settlement.shipped_count,
+          shippedAmount: settlement.shipped_amount,
+          refundAmount: settlement.refund_amount
+        }));
 
       return {
-        id: order.id,
-        orderNo: order.order_number || `ORD-${order.id}`,
-        orderNumber: order.order_number,
-        products: order.option_name || '상품명 없음',
-        amount: amount,
-        quantity: Number(order.quantity) || 1,
-        status: status,
-        date: order.sheet_date || order.created_at,
-        registeredAt: order.created_at,
-        confirmedAt: order.confirmed_at,
-        cancelRequestedAt: order.cancel_requested_at,
-        cancelledAt: order.canceled_at,
-        refundedAt: order.refund_processed_at,
-        refundAmount: status === 'refunded' ? amount : undefined
+        ...month,
+        dailyData
       };
     });
+  }, [monthlySettlements]);
+
+  // 다운로드용 주문 데이터 필터링 (integratedOrders prop 사용)
+  const convertToOrders = (orders: IntegratedOrder[]) => {
+    return orders.map(order => ({
+      ...order,
+      confirmedAt: order.confirmed_at,
+      status: order.shipping_status === '발송완료' ? 'shipped' :
+              order.shipping_status === '취소완료' || order.shipping_status === '취소요청' ? 'cancelled' :
+              order.refund_processed_at ? 'refunded' :
+              order.confirmed_at ? 'confirmed' : 'pending',
+      amount: parseFloat(order.final_payment_amount || order.settlement_amount || '0'),
+      refundAmount: order.refund_processed_at ? parseFloat(order.final_payment_amount || order.settlement_amount || '0') : 0
+    }));
   };
 
-  // 필터링된 주문 (선택된 셀러만)
   const filteredOrders = useMemo(() => {
-    const filtered = selectedSeller === 'all'
-      ? integratedOrders
-      : integratedOrders.filter(order => (order.seller_id || '미지정') === selectedSeller);
+    if (!integratedOrders || integratedOrders.length === 0) return [];
 
-    return convertToOrders(filtered);
-  }, [integratedOrders, selectedSeller]);
-
-  // 기간별 집계 데이터
-  const periodStats = useMemo(() => {
-    const stats = {
-      confirmedCount: 0,
-      confirmedAmount: 0,
-      cancelCount: 0,
-      cancelAmount: 0,
-      shippedCount: 0,
-      shippedAmount: 0,
-      refundAmount: 0
-    };
-
-    const hasPeriod = startDate && endDate;
-
-    filteredOrders.forEach(order => {
-      if (!order.confirmedAt) return;
-
-      let shouldCount = true;
-      if (hasPeriod) {
-        const confirmedDate = getKSTDate(order.confirmedAt);
-        shouldCount = confirmedDate >= startDate && confirmedDate <= endDate;
-      }
-
-      if (shouldCount) {
-        stats.confirmedCount++;
-        stats.confirmedAmount += order.amount || 0;
-
-        if (order.status === 'cancelled' || order.status === 'cancelRequested' || order.status === 'refunded') {
-          stats.cancelCount++;
-          stats.cancelAmount += order.amount || 0;
-        }
-
-        if (order.status === 'shipped') {
-          stats.shippedCount++;
-          stats.shippedAmount += order.amount || 0;
-        }
-
-        if (order.status === 'refunded') {
-          const refundAmt = order.refundAmount || order.amount || 0;
-          stats.refundAmount += refundAmt;
-        }
-      }
-    });
-
-    return stats;
-  }, [filteredOrders, startDate, endDate]);
+    return convertToOrders(
+      selectedOrganization === 'all'
+        ? integratedOrders
+        : integratedOrders.filter(o => o.organization_id === selectedOrganization)
+    );
+  }, [integratedOrders, selectedOrganization]);
 
   // 기본 회사 정보 및 셀러 목록 로드
   useEffect(() => {
@@ -240,134 +258,134 @@ export default function AdminSettlementTab({ integratedOrders, sellerNames }: Ad
         });
       }
 
-      // 2. 셀러 정보 로드 (users 테이블에서)
+      // 2. 조직 정보 로드 (organizations 테이블에서)
       try {
-        const { data: usersData, error: usersError } = await supabase
-          .from('users')
-          .select('id, name, email, business_number, company_address, representative_name, representative_phone');
+        const { data: orgsData, error: orgsError } = await supabase
+          .from('organizations')
+          .select('id, business_name, business_number, business_address, representative_name, representative_phone, business_email');
 
-        if (!usersError && usersData) {
-          const infoMap = new Map<string, SellerInfo>();
-          usersData.forEach(user => {
-            infoMap.set(user.id, {
-              name: user.name || '이름 없음',
-              business_number: user.business_number,
-              company_address: user.company_address,
-              representative_name: user.representative_name,
-              representative_phone: user.representative_phone,
-              email: user.email
+        if (!orgsError && orgsData) {
+          const infoMap = new Map<string, OrganizationInfo>();
+          orgsData.forEach(org => {
+            infoMap.set(org.id, {
+              name: org.business_name || '이름 없음',
+              business_number: org.business_number,
+              company_address: org.business_address,
+              representative_name: org.representative_name,
+              representative_phone: org.representative_phone,
+              email: org.business_email
             });
           });
-          setSellerInfoMap(infoMap);
+          setOrganizationInfoMap(infoMap);
         }
       } catch (error) {
-        console.error('셀러 정보 로드 실패:', error);
+        console.error('조직 정보 로드 실패:', error);
       }
     };
 
     loadInfo();
   }, []);
 
-  // 셀러 목록 추출
+  // 조직 목록 추출 (organizationNames에서)
   useEffect(() => {
-    const sellerSet = new Set<string>();
-    integratedOrders.forEach(order => {
-      if (order.seller_id) {
-        sellerSet.add(order.seller_id);
-      }
-    });
-
-    const sellerList = Array.from(sellerSet).map(sellerId => ({
-      id: sellerId,
-      name: sellerNames.get(sellerId) || sellerId
+    const organizationList = Array.from(organizationNames.entries()).map(([id, name]) => ({
+      id,
+      name
     }));
 
-    sellerList.sort((a, b) => a.name.localeCompare(b.name));
-    setSellers(sellerList);
-  }, [integratedOrders, sellerNames]);
+    organizationList.sort((a, b) => a.name.localeCompare(b.name));
+    setOrganizations(organizationList);
+  }, [organizationNames]);
 
-  // 월별 + 일별 정산 데이터 계산
-  const monthlySettlements = useMemo(() => {
-    const monthlyMap = new Map<string, any>();
+  // settlements API에서 월별 정산 데이터 로드
+  useEffect(() => {
+    const loadMonthlySettlements = async () => {
+      setLoadingSettlements(true);
+      try {
+        const params = new URLSearchParams();
+        params.append('groupBy', 'month');
+        if (selectedOrganization !== 'all') {
+          params.append('organizationId', selectedOrganization);
+        }
 
-    filteredOrders.forEach(order => {
-      if (!order.confirmedAt) return;
+        const response = await fetch(`/api/settlements?${params.toString()}`);
+        const result = await response.json();
 
-      const confirmedDate = getKSTDate(order.confirmedAt);
-      const yearMonth = confirmedDate.substring(0, 7);
-
-      if (!monthlyMap.has(yearMonth)) {
-        monthlyMap.set(yearMonth, {
-          yearMonth,
-          confirmedCount: 0,
-          confirmedAmount: 0,
-          cancelCount: 0,
-          cancelAmount: 0,
-          shippedCount: 0,
-          shippedAmount: 0,
-          refundAmount: 0,
-          dailyData: new Map<string, any>()
-        });
+        if (result.success && result.data) {
+          setMonthlySettlements(result.data);
+        } else {
+          console.error('정산 데이터 로드 실패:', result.error);
+          setMonthlySettlements([]);
+        }
+      } catch (error) {
+        console.error('정산 데이터 로드 오류:', error);
+        setMonthlySettlements([]);
+      } finally {
+        setLoadingSettlements(false);
       }
+    };
 
-      const monthData = monthlyMap.get(yearMonth);
+    loadMonthlySettlements();
+  }, [selectedOrganization]);
 
-      if (!monthData.dailyData.has(confirmedDate)) {
-        monthData.dailyData.set(confirmedDate, {
-          no: 0,
-          date: confirmedDate,
-          confirmedCount: 0,
-          confirmedAmount: 0,
-          cancelCount: 0,
-          cancelAmount: 0,
-          shippedCount: 0,
-          shippedAmount: 0,
-          refundAmount: 0
-        });
+  // 기간별 정산 데이터 로드
+  useEffect(() => {
+    if (!startDate || !endDate) return;
+
+    const loadPeriodSettlements = async () => {
+      setLoadingSettlements(true);
+      try {
+        const params = new URLSearchParams();
+        params.append('startDate', startDate);
+        params.append('endDate', endDate);
+        if (selectedOrganization !== 'all') {
+          params.append('organizationId', selectedOrganization);
+        }
+
+        const response = await fetch(`/api/settlements?${params.toString()}`);
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          setPeriodSettlements(result.data);
+        } else {
+          console.error('정산 데이터 로드 실패:', result.error);
+          setPeriodSettlements([]);
+        }
+      } catch (error) {
+        console.error('정산 데이터 로드 오류:', error);
+        setPeriodSettlements([]);
+      } finally {
+        setLoadingSettlements(false);
       }
+    };
 
-      const dayData = monthData.dailyData.get(confirmedDate);
+    loadPeriodSettlements();
+  }, [startDate, endDate, selectedOrganization]);
 
-      monthData.confirmedCount++;
-      monthData.confirmedAmount += order.amount || 0;
-      dayData.confirmedCount++;
-      dayData.confirmedAmount += order.amount || 0;
+  // 기간별 집계 통계 (settlements 기반)
+  const periodStats = useMemo(() => {
+    if (periodSettlements.length === 0) {
+      return {
+        confirmedCount: 0,
+        confirmedAmount: 0,
+        cancelCount: 0,
+        cancelAmount: 0,
+        shippedCount: 0,
+        shippedAmount: 0,
+        refundAmount: 0
+      };
+    }
 
-      if (order.status === 'cancelled' || order.status === 'cancelRequested' || order.status === 'refunded') {
-        monthData.cancelCount++;
-        monthData.cancelAmount += order.amount || 0;
-        dayData.cancelCount++;
-        dayData.cancelAmount += order.amount || 0;
-      }
-
-      if (order.status === 'shipped') {
-        monthData.shippedCount++;
-        monthData.shippedAmount += order.amount || 0;
-        dayData.shippedCount++;
-        dayData.shippedAmount += order.amount || 0;
-      }
-
-      if (order.status === 'refunded') {
-        const refundAmt = order.refundAmount || order.amount || 0;
-        monthData.refundAmount += refundAmt;
-        dayData.refundAmount += refundAmt;
-      }
-    });
-
-    const monthlyArray = Array.from(monthlyMap.values()).sort((a, b) => b.yearMonth.localeCompare(a.yearMonth));
-
-    monthlyArray.forEach(month => {
-      const dailyArray = Array.from(month.dailyData.values()).sort((a, b) => a.date.localeCompare(b.date));
-
-      dailyArray.forEach((dayData, index) => {
-        dayData.no = index + 1;
-      });
-
-      month.dailyData = dailyArray;
-    });
-
-    return monthlyArray;
-  }, [filteredOrders]);
+    return {
+      confirmedCount: periodSettlements.reduce((sum, s) => sum + s.confirmed_count, 0),
+      confirmedAmount: periodSettlements.reduce((sum, s) => sum + s.confirmed_amount, 0),
+      cancelCount: periodSettlements.reduce((sum, s) => sum + s.cancel_count, 0),
+      cancelAmount: periodSettlements.reduce((sum, s) => sum + s.cancel_amount, 0),
+      shippedCount: periodSettlements.reduce((sum, s) => sum + s.shipped_count, 0),
+      shippedAmount: periodSettlements.reduce((sum, s) => sum + s.shipped_amount, 0),
+      refundAmount: periodSettlements.reduce((sum, s) => sum + s.refund_amount, 0)
+    };
+  }, [periodSettlements]);
 
   // 월 토글 핸들러
   const toggleMonth = (yearMonth: string) => {
@@ -400,18 +418,18 @@ export default function AdminSettlementTab({ integratedOrders, sellerNames }: Ad
       ? `${companyInfo.address} ${companyInfo.address_detail}`
       : companyInfo.address;
 
-    // 선택된 셀러의 정보 가져오기
-    const buyerInfo = selectedSeller !== 'all' && sellerInfoMap.has(selectedSeller)
+    // 선택된 조직의 정보 가져오기
+    const buyerInfo = selectedOrganization !== 'all' && organizationInfoMap.has(selectedOrganization)
       ? {
-          name: sellerInfoMap.get(selectedSeller)!.name,
-          businessNumber: sellerInfoMap.get(selectedSeller)!.business_number || '',
-          representative: sellerInfoMap.get(selectedSeller)!.representative_name || '',
-          address: sellerInfoMap.get(selectedSeller)!.company_address || '',
-          phone: sellerInfoMap.get(selectedSeller)!.representative_phone || '',
-          email: sellerInfoMap.get(selectedSeller)!.email || ''
+          name: organizationInfoMap.get(selectedOrganization)!.name,
+          businessNumber: organizationInfoMap.get(selectedOrganization)!.business_number || '',
+          representative: organizationInfoMap.get(selectedOrganization)!.representative_name || '',
+          address: organizationInfoMap.get(selectedOrganization)!.company_address || '',
+          phone: organizationInfoMap.get(selectedOrganization)!.representative_phone || '',
+          email: organizationInfoMap.get(selectedOrganization)!.email || ''
         }
       : {
-          name: '전체 셀러',
+          name: '전체 조직',
           businessNumber: '',
           representative: '',
           address: '',
@@ -433,19 +451,19 @@ export default function AdminSettlementTab({ integratedOrders, sellerNames }: Ad
 
   return (
     <div style={{ maxWidth: 'calc(100% - 200px)', margin: '0 auto' }}>
-      {/* 셀러 선택 드롭다운 */}
+      {/* 조직 선택 드롭다운 */}
       <div className="mb-6 flex items-center gap-4">
-        <label className="text-sm font-medium text-gray-700">셀러 선택:</label>
+        <label className="text-sm font-medium text-gray-700">조직 선택:</label>
         <select
-          value={selectedSeller}
-          onChange={(e) => setSelectedSeller(e.target.value)}
+          value={selectedOrganization}
+          onChange={(e) => setSelectedOrganization(e.target.value)}
           className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           style={{ width: '200px' }}
         >
-          <option value="all">전체 셀러</option>
-          {sellers.map(seller => (
-            <option key={seller.id} value={seller.id}>
-              {seller.name}
+          <option value="all">전체 조직</option>
+          {organizations.map(org => (
+            <option key={org.id} value={org.id}>
+              {org.name}
             </option>
           ))}
         </select>
@@ -475,10 +493,10 @@ export default function AdminSettlementTab({ integratedOrders, sellerNames }: Ad
             발주
           </div>
           <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#3b82f6' }}>
-            {filteredOrders.filter(o => o.confirmedAt).length}건
+            {activeTab === '월별' ? totalStats.confirmedCount : periodStats.confirmedCount}건
           </div>
           <div style={{ fontSize: '16px', color: 'var(--color-text)', marginLeft: 'auto' }}>
-            {filteredOrders.filter(o => o.confirmedAt).reduce((sum, o) => sum + (o.amount || 0), 0).toLocaleString()}
+            {(activeTab === '월별' ? totalStats.confirmedAmount : periodStats.confirmedAmount).toLocaleString()}
           </div>
         </div>
 
@@ -497,11 +515,10 @@ export default function AdminSettlementTab({ integratedOrders, sellerNames }: Ad
             취소
           </div>
           <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ef4444' }}>
-            {filteredOrders.filter(o => o.status === 'cancelled' || o.status === 'cancelRequested').length}건
+            {activeTab === '월별' ? totalStats.cancelCount : periodStats.cancelCount}건
           </div>
           <div style={{ fontSize: '16px', color: 'var(--color-text)', marginLeft: 'auto' }}>
-            {filteredOrders.filter(o => o.status === 'cancelled' || o.status === 'cancelRequested')
-              .reduce((sum, o) => sum + (o.amount || 0), 0).toLocaleString()}
+            {(activeTab === '월별' ? totalStats.cancelAmount : periodStats.cancelAmount).toLocaleString()}
           </div>
         </div>
 
@@ -520,11 +537,10 @@ export default function AdminSettlementTab({ integratedOrders, sellerNames }: Ad
             발송
           </div>
           <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#10b981' }}>
-            {filteredOrders.filter(o => o.status === 'shipped').length}건
+            {activeTab === '월별' ? totalStats.shippedCount : periodStats.shippedCount}건
           </div>
           <div style={{ fontSize: '16px', color: 'var(--color-text)', marginLeft: 'auto' }}>
-            {filteredOrders.filter(o => o.status === 'shipped')
-              .reduce((sum, o) => sum + (o.amount || 0), 0).toLocaleString()}
+            {(activeTab === '월별' ? totalStats.shippedAmount : periodStats.shippedAmount).toLocaleString()}
           </div>
         </div>
 
@@ -543,11 +559,10 @@ export default function AdminSettlementTab({ integratedOrders, sellerNames }: Ad
             환불
           </div>
           <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#f59e0b' }}>
-            {filteredOrders.filter(o => o.status === 'refunded').length}건
+            -
           </div>
           <div style={{ fontSize: '16px', color: 'var(--color-text)', marginLeft: 'auto' }}>
-            {filteredOrders.filter(o => o.status === 'refunded')
-              .reduce((sum, o) => sum + (o.refundAmount || o.amount || 0), 0).toLocaleString()}
+            {(activeTab === '월별' ? totalStats.refundAmount : periodStats.refundAmount).toLocaleString()}
           </div>
         </div>
       </div>
@@ -593,7 +608,17 @@ export default function AdminSettlementTab({ integratedOrders, sellerNames }: Ad
         {/* 월별 정산 내역 탭 - SettlementTab과 동일한 UI 사용 */}
         {activeTab === '월별' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {monthlySettlements.map((month, monthIndex) => {
+            {loadingSettlements && (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                정산 데이터를 불러오는 중...
+              </div>
+            )}
+            {!loadingSettlements && displayMonthlySettlements.length === 0 && (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                정산 내역이 없습니다.
+              </div>
+            )}
+            {!loadingSettlements && displayMonthlySettlements.map((month, monthIndex) => {
             const isExpanded = expandedMonths.has(month.yearMonth);
             const [year, monthNum] = month.yearMonth.split('-');
 
@@ -1234,17 +1259,17 @@ export default function AdminSettlementTab({ integratedOrders, sellerNames }: Ad
                         ? `${companyInfo.address} ${companyInfo.address_detail}`
                         : companyInfo.address;
 
-                      const buyerInfo = selectedSeller !== 'all' && sellerInfoMap.has(selectedSeller)
+                      const buyerInfo = selectedOrganization !== 'all' && organizationInfoMap.has(selectedOrganization)
                         ? {
-                            name: sellerInfoMap.get(selectedSeller)!.name,
-                            businessNumber: sellerInfoMap.get(selectedSeller)!.business_number || '',
-                            representative: sellerInfoMap.get(selectedSeller)!.representative_name || '',
-                            address: sellerInfoMap.get(selectedSeller)!.company_address || '',
-                            phone: sellerInfoMap.get(selectedSeller)!.representative_phone || '',
-                            email: sellerInfoMap.get(selectedSeller)!.email || ''
+                            name: organizationInfoMap.get(selectedOrganization)!.name,
+                            businessNumber: organizationInfoMap.get(selectedOrganization)!.business_number || '',
+                            representative: organizationInfoMap.get(selectedOrganization)!.representative_name || '',
+                            address: organizationInfoMap.get(selectedOrganization)!.company_address || '',
+                            phone: organizationInfoMap.get(selectedOrganization)!.representative_phone || '',
+                            email: organizationInfoMap.get(selectedOrganization)!.email || ''
                           }
                         : {
-                            name: '전체 셀러',
+                            name: '전체 조직',
                             businessNumber: '',
                             representative: '',
                             address: '',

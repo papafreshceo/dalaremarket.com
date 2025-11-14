@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-security'
 import { InviteMemberRequest } from '@/types/organization'
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body: InviteMemberRequest = await request.json()
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 권한 확인: 멤버 관리 권한 필요
     const hasPermission = await canManageMembers(organizationId, auth.user.id)
@@ -103,11 +103,11 @@ export async function POST(request: NextRequest) {
     // 초대한 사람 정보 조회
     const { data: inviter } = await supabase
       .from('users')
-      .select('profile_name, company_name, email')
+      .select('profile_name, name, email')
       .eq('id', auth.user.id)
       .single()
 
-    const inviterName = inviter?.profile_name || inviter?.company_name || inviter?.email || '관리자'
+    const inviterName = inviter?.profile_name || inviter?.name || inviter?.email || '관리자'
     const orgName = organization?.name || '셀러계정'
 
     // 초대받은 사용자 조회 (이미 가입된 경우만 알림 생성)
@@ -233,7 +233,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 권한 확인: 멤버 관리 권한 필요
     const hasPermission = await canManageMembers(organizationId, auth.user.id)
@@ -253,7 +253,7 @@ export async function GET(request: NextRequest) {
           id,
           email,
           profile_name,
-          company_name
+          name
         )
       `)
       .eq('organization_id', organizationId)
@@ -297,7 +297,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 초대 정보 조회
     const { data: invitation } = await supabase

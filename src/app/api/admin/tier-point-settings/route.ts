@@ -1,9 +1,9 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 누적점수 설정 조회
     const { data: settings, error } = await supabase
@@ -26,7 +26,7 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 요청 데이터 파싱
     const {

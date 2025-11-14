@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-security';
 import { getOrganizationDataFilter } from '@/lib/organization-utils';
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.error;
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const searchParams = request.nextUrl.searchParams;
 
     // 쿼리 파라미터 추출

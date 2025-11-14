@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import cloudinary from '@/lib/cloudinary/config';
 
 /**
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     let query = supabase.from('cloudinary_images').select('*', { count: 'exact' });
 
     // 필터 적용
@@ -94,7 +94,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 외래 키 값 확인
     const newOptionProductId = option_product_id || null;
@@ -244,7 +244,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // DB에서 cloudinary_id 조회
     const { data: image, error: fetchError } = await supabase

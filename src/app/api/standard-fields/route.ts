@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 
 /**
  * GET /api/standard-fields
@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 기본 필드 (field_1 ~ field_44)
     // SearchTab.tsx의 fieldToColumnMap과 동일한 순서

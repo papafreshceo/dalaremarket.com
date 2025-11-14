@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/api-security';
 
 // 테마 목록 조회
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   if (!auth.authorized) return auth.error;
 
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     const { data: themes, error } = await supabase
       .from('design_themes')
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   if (!auth.authorized) return auth.error;
 
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
 
     const { name, description, css_variables } = body;

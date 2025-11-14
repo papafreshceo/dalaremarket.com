@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-security';
 import fs from 'fs';
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.error;
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const url = new URL(request.url);
     const year = url.searchParams.get('year') || new Date().getFullYear().toString();
 
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.error;
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
     const { holiday_date, holiday_name, holiday_type } = body;
 
@@ -107,7 +107,7 @@ export async function PUT(request: NextRequest) {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.error;
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
     const { year } = body;
 
@@ -181,7 +181,7 @@ export async function DELETE(request: NextRequest) {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.error;
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
 

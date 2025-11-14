@@ -1,11 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth-middleware'
 
 // GET: 역할별 권한 조회 (관리자 이상만 가능)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 🔒 보안: 로그인 사용자만 조회 가능 (임시로 완화)
     const authResult = await withAuth(request, {
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 // POST: 권한 생성 (최고관리자만 가능)
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 🔒 보안: 최고관리자만 권한 생성 가능
     const authResult = await withAuth(request, {
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 // PATCH: 권한 수정 (최고관리자만 가능)
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 🔒 보안: 최고관리자만 권한 수정 가능
     const authResult = await withAuth(request, {
@@ -115,7 +115,7 @@ export async function PATCH(request: NextRequest) {
 // DELETE: 권한 삭제 (최고관리자만 가능)
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 🔒 보안: 최고관리자만 권한 삭제 가능
     const authResult = await withAuth(request, {

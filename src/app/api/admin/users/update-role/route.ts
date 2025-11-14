@@ -1,7 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/api-security'
-import { generateSellerCode, generatePartnerCode } from '@/lib/user-codes'
+import { generateSellerCode } from '@/lib/user-codes'
 
 export async function POST(request: NextRequest) {
   // 🔒 보안: 관리자만 역할 변경 가능
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   if (!auth.authorized) return auth.error
 
   try {
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
     const body = await request.json()
     const { userId, newRole, oldRole } = body
 
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       updateData.primary_organization_id = null
     }
 
-    // 셀러/파트너로 변경 시 코드 생성
+    // 셀러로 변경 시 코드 생성
     if (newRole === 'seller' && oldRole !== 'seller') {
       try {
         const code = await generateSellerCode()
@@ -38,14 +38,8 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.error('Failed to generate seller code:', error)
       }
-    } else if (newRole === 'partner' && oldRole !== 'partner') {
-      try {
-        const code = await generatePartnerCode()
-        updateData.partner_code = code
-      } catch (error) {
-        console.error('Failed to generate partner code:', error)
-      }
     }
+    // 파트너 코드는 관리자가 수동으로 생성/할당
 
     const { data, error } = await supabase
       .from('users')

@@ -13,10 +13,6 @@ interface Transaction {
   created_at: string;
 }
 
-interface CashHistoryTabProps {
-  userId: string;
-}
-
 const transactionTypeConfig: Record<Transaction['type'], { label: string; color: string; icon: string }> = {
   login: { label: '로그인 보상', color: '#10b981', icon: '🎁' },
   activity: { label: '활동 보상', color: '#3b82f6', icon: '⏱️' },
@@ -25,7 +21,7 @@ const transactionTypeConfig: Record<Transaction['type'], { label: string; color:
   daily_refill: { label: '일일 리필', color: '#7c3aed', icon: '🔄' }
 };
 
-export default function CashHistoryTab({ userId }: CashHistoryTabProps) {
+export default function CashHistoryTab() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [cashBalance, setCashBalance] = useState<number>(0);
   const [creditBalance, setCreditBalance] = useState<number>(0);

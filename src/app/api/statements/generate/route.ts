@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { nanoid } from 'nanoid';
 import QRCode from 'qrcode';
 import puppeteer from 'puppeteer';
@@ -11,7 +11,7 @@ import { generateStatementHTML } from '@/lib/statement-template';
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 현재 로그인한 사용자 확인 (선택적)
     const { data: { user } } = await supabase.auth.getUser();

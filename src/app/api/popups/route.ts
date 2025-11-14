@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 
 /**
  * GET /api/popups
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const activeOnly = searchParams.get('active_only') === 'true';
     const includeImage = searchParams.get('include_image') === 'true';
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     let query = supabase
       .from('popups')
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     const { data, error } = await supabase
       .from('popups')
@@ -172,7 +172,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     const updateData: any = {
       title,
@@ -236,7 +236,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     const { error } = await supabase.from('popups').delete().eq('id', id);
 

@@ -1,8 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClientForRouteHandler, createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-security'
 import { UpdateMemberRoleRequest } from '@/types/organization'
 import { canManageMembers, getOrganizationMembers } from '@/lib/organization-utils'
+import { autoCreateOrganizationFromUser } from '@/lib/auto-create-organization'
+import { generateUserCodes } from '@/lib/user-codes'
 
 /**
  * GET /api/organizations/members?organization_id=xxx
@@ -21,18 +23,29 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
-    // 권한 확인: 해당 조직의 멤버만 조회 가능
+    // 권한 확인: 해당 조직의 멤버 또는 소유자만 조회 가능
+    // 1. 조직 소유자인지 확인
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('owner_id')
+      .eq('id', organizationId)
+      .single()
+
+    const isOwner = org?.owner_id === auth.user.id
+
+    // 2. 멤버인지 확인
     const { data: myMember } = await supabase
       .from('organization_members')
       .select('id')
       .eq('organization_id', organizationId)
       .eq('user_id', auth.user.id)
       .eq('status', 'active')
-      .single()
+      .maybeSingle()
 
-    if (!myMember) {
+    // 소유자도 아니고 멤버도 아니면 권한 없음
+    if (!isOwner && !myMember) {
       return NextResponse.json(
         { error: '조직 멤버 정보를 조회할 권한이 없습니다' },
         { status: 403 }
@@ -73,7 +86,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body: UpdateMemberRoleRequest = await request.json()
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 권한 확인: 멤버 관리 권한 필요
     const hasPermission = await canManageMembers(organizationId, auth.user.id)
@@ -165,7 +178,8 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
+    const adminSupabase = createAdminClient()
 
     // 권한 확인: 멤버 관리 권한 필요
     const hasPermission = await canManageMembers(organizationId, auth.user.id)
@@ -204,7 +218,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // 제거된 사용자의 primary_organization_id 초기화
+    // 제거된 사용자의 개인 셀러계정 및 셀러코드 자동 생성
     if (targetMember?.user_id) {
       const { data: user } = await supabase
         .from('users')
@@ -213,16 +227,52 @@ export async function DELETE(request: NextRequest) {
         .single()
 
       if (user?.primary_organization_id === organizationId) {
-        await supabase
-          .from('users')
-          .update({ primary_organization_id: null })
-          .eq('id', targetMember.user_id)
+        try {
+          console.log('🚀 [멤버삭제] 개인 셀러계정 생성 시작, user_id:', targetMember.user_id)
+          // 개인 셀러계정 자동 생성
+          const result = await autoCreateOrganizationFromUser(targetMember.user_id)
+          console.log('✅ [멤버삭제] 개인 셀러계정 생성 결과:', result)
+
+          if (!result.organization_id) {
+            throw new Error('셀러계정 ID가 반환되지 않았습니다')
+          }
+
+          // users의 primary_organization_id 업데이트 (Admin Client로 RLS 우회)
+          console.log('🔄 [멤버삭제] primary_organization_id 업데이트 시작:', {
+            user_id: targetMember.user_id,
+            new_org_id: result.organization_id
+          })
+          const { data: updateData, error: updateError } = await adminSupabase
+            .from('users')
+            .update({ primary_organization_id: result.organization_id })
+            .eq('id', targetMember.user_id)
+            .select()
+
+          if (updateError) {
+            console.error('❌ [멤버삭제] primary_organization_id 업데이트 실패:', updateError)
+            throw updateError
+          }
+          console.log('✅ [멤버삭제] primary_organization_id 업데이트 성공:', updateData)
+
+          // 셀러코드 자동 생성
+          console.log('🔑 [멤버삭제] 셀러코드 생성 시작')
+          await generateUserCodes(targetMember.user_id)
+
+          console.log(`✅ [멤버삭제] 완료: user_id=${targetMember.user_id}, org_id=${result.organization_id}`)
+        } catch (createError) {
+          console.error('❌ [멤버삭제] 개인 셀러계정 생성 실패:', createError)
+          // 실패 시 최소한 primary_organization_id는 null로 (Admin Client 사용)
+          await adminSupabase
+            .from('users')
+            .update({ primary_organization_id: null })
+            .eq('id', targetMember.user_id)
+        }
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: '멤버가 제거되었습니다',
+      message: '멤버가 제거되었습니다. 해당 사용자의 개인 셀러계정이 자동으로 생성되었습니다.',
     })
   } catch (error) {
     console.error('멤버 제거 오류:', error)

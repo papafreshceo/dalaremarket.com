@@ -10,7 +10,8 @@ import AdminRankingTab from './components/AdminRankingTab';
 interface Order {
   id: number;
   order_number?: string;
-  seller_id?: string;
+  seller_id?: string; // 레거시 지원
+  organization_id?: string; // 조직 기반
   vendor_name?: string;
   option_name: string;
   shipping_status?: string;
@@ -34,9 +35,9 @@ interface ConfirmedBatch {
   입금확인: boolean;
 }
 
-interface SellerStats {
-  seller_id: string;
-  seller_name: string;
+interface OrganizationStats {
+  organization_id: string;
+  organization_name: string;
   총금액: number;
   입금확인: boolean;
   업로드_건수: number;
@@ -61,17 +62,17 @@ interface SellerStats {
 }
 
 export default function OrderPlatformPage() {
-  const [activeTab, setActiveTab] = useState<'주문관리' | '셀러별정산내역' | '셀러랭킹'>('주문관리');
+  const [activeTab, setActiveTab] = useState<'주문관리' | '조직별정산내역' | '조직랭킹'>('주문관리');
   const [orders, setOrders] = useState<Order[]>([]);
-  const [sellerStats, setSellerStats] = useState<SellerStats[]>([]);
+  const [organizationStats, setOrganizationStats] = useState<OrganizationStats[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sellerStatsExpanded, setSellerStatsExpanded] = useState(true);
-  const [selectedSeller, setSelectedSeller] = useState<string | null>(null);
+  const [organizationStatsExpanded, setOrganizationStatsExpanded] = useState(true);
+  const [selectedOrganization, setSelectedOrganization] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPayment, setFilterPayment] = useState<string>('all');
   const [filterRefund, setFilterRefund] = useState<string>('all');
-  const [sellerNames, setSellerNames] = useState<Map<string, string>>(new Map());
-  const [expandedSellers, setExpandedSellers] = useState<Set<string>>(new Set());
+  const [organizationNames, setOrganizationNames] = useState<Map<string, string>>(new Map());
+  const [expandedOrganizations, setExpandedOrganizations] = useState<Set<string>>(new Set());
   const [totalExpanded, setTotalExpanded] = useState(false);
 
 
@@ -125,39 +126,38 @@ export default function OrderPlatformPage() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      // onlyWithSeller=true로 seller_id가 있는 주문만 DB에서 필터링
+      // onlyWithOrganization=true로 organization_id가 있는 주문만 DB에서 필터링
       // limit을 10000으로 설정하여 충분한 데이터 가져오기
-      const response = await fetch('/api/integrated-orders?onlyWithSeller=true&limit=10000');
+      const response = await fetch('/api/integrated-orders?onlyWithOrganization=true&limit=10000');
       const result = await response.json();
 
       if (result.success) {
-        const sellerOrders = result.data || [];
+        const organizationOrders = result.data || [];
 
-        // 셀러 ID 수집
-        const sellerIds = [...new Set(sellerOrders.map((o: Order) => o.seller_id).filter(Boolean))];
+        // 조직 ID 수집
+        const organizationIds = [...new Set(organizationOrders.map((o: Order) => o.organization_id).filter(Boolean))];
 
-        // 셀러 정보 조회 (users 테이블에서 company_name 가져오기)
+        // 조직 정보 조회 (organizations 테이블에서 name 가져오기)
         let nameMap = new Map<string, string>();
-        if (sellerIds.length > 0) {
+        if (organizationIds.length > 0) {
           const { createClient } = await import('@/lib/supabase/client');
           const supabase = createClient();
 
-          const { data: users, error } = await supabase
-            .from('users')
-            .select('id, company_name, name')
-            .in('id', sellerIds);
+          const { data: organizations, error } = await supabase
+            .from('organizations')
+            .select('id, business_name')
+            .in('id', organizationIds);
 
-          if (!error && users) {
-            users.forEach((user: any) => {
-              const displayName = user.company_name || user.name || user.id;
-              nameMap.set(user.id, displayName);
+          if (!error && organizations) {
+            organizations.forEach((org: any) => {
+              nameMap.set(org.id, org.business_name || org.id);
             });
-            setSellerNames(nameMap);
+            setOrganizationNames(nameMap);
           }
         }
 
-        setOrders(sellerOrders);
-        calculateSellerStats(sellerOrders, nameMap);
+        setOrders(organizationOrders);
+        calculateOrganizationStats(organizationOrders, nameMap);
       }
     } catch (error) {
       console.error('주문 조회 오류:', error);
@@ -171,16 +171,16 @@ export default function OrderPlatformPage() {
     fetchOrders();
   }, []);
 
-  const calculateSellerStats = (orderData: Order[], nameMap?: Map<string, string>) => {
-    const statsMap = new Map<string, SellerStats>();
-    const names = nameMap || sellerNames;
+  const calculateOrganizationStats = (orderData: Order[], nameMap?: Map<string, string>) => {
+    const statsMap = new Map<string, OrganizationStats>();
+    const names = nameMap || organizationNames;
 
     orderData.forEach((order) => {
-      const sellerId = order.seller_id || '미지정';
-      if (!statsMap.has(sellerId)) {
-        statsMap.set(sellerId, {
-          seller_id: sellerId,
-          seller_name: names.get(sellerId) || sellerId,
+      const organizationId = order.organization_id || '미지정';
+      if (!statsMap.has(organizationId)) {
+        statsMap.set(organizationId, {
+          organization_id: organizationId,
+          organization_name: names.get(organizationId) || organizationId,
           총금액: 0,
           입금확인: false,
           업로드_건수: 0,
@@ -204,7 +204,7 @@ export default function OrderPlatformPage() {
         });
       }
 
-      const stats = statsMap.get(sellerId)!;
+      const stats = statsMap.get(organizationId)!;
       const status = order.shipping_status;
       if (!status) return; // shipping_status가 없으면 통계에서 제외
       const quantity = Number(order.quantity) || 0;
@@ -271,17 +271,17 @@ export default function OrderPlatformPage() {
     // 발주확정 배치 계산 (confirmed_at별 그룹화)
     statsArray.forEach(stat => {
       // 발주서확정 + 결제완료 상태의 주문 모두 확인 (confirmed_at이 있는 것만)
-      const sellerOrdersWithConfirmedAt = orderData.filter(order =>
-        (order.seller_id || '미지정') === stat.seller_id &&
+      const organizationOrdersWithConfirmedAt = orderData.filter(order =>
+        (order.organization_id || '미지정') === stat.organization_id &&
         (order.shipping_status === '발주서확정' || order.shipping_status === '결제완료') &&
         order.confirmed_at
       );
 
-      if (sellerOrdersWithConfirmedAt.length > 0) {
+      if (organizationOrdersWithConfirmedAt.length > 0) {
         // confirmed_at별로 그룹화
         const batchMap = new Map<string, ConfirmedBatch>();
 
-        sellerOrdersWithConfirmedAt.forEach(order => {
+        organizationOrdersWithConfirmedAt.forEach(order => {
           const confirmedAt = order.confirmed_at!;
           const finalAmount = Number(order.final_payment_amount) || Number(order.settlement_amount) || 0;
           const isPaymentConfirmed = order.shipping_status === '결제완료';
@@ -308,7 +308,7 @@ export default function OrderPlatformPage() {
 
         // 각 배치의 입금확인 상태 계산
         batchMap.forEach((batch, confirmedAt) => {
-          const batchOrders = sellerOrdersWithConfirmedAt.filter(o => o.confirmed_at === confirmedAt);
+          const batchOrders = organizationOrdersWithConfirmedAt.filter(o => o.confirmed_at === confirmedAt);
           const allPaymentConfirmed = batchOrders.every(o => o.shipping_status === '결제완료');
           batch.입금확인 = allPaymentConfirmed;
         });
@@ -327,9 +327,9 @@ export default function OrderPlatformPage() {
     statsArray.sort((a, b) => (b.업로드_건수 + b.발주서확정_건수 + b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수 + b.환불완료_건수) - (a.업로드_건수 + a.발주서확정_건수 + a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수 + a.환불완료_건수));
 
     // 합계 계산
-    const totalStats: SellerStats = {
-      seller_id: 'total',
-      seller_name: '합계',
+    const totalStats: OrganizationStats = {
+      organization_id: 'total',
+      organization_name: '합계',
       총금액: statsArray.reduce((sum, s) => sum + s.총금액, 0),
       입금확인: false,
       업로드_건수: statsArray.reduce((sum, s) => sum + s.업로드_건수, 0),
@@ -355,18 +355,18 @@ export default function OrderPlatformPage() {
     // 합계를 맨 앞에 추가
     statsArray.unshift(totalStats);
 
-    setSellerStats(statsArray);
+    setOrganizationStats(statsArray);
   };
 
-  const handlePaymentCheckToggle = async (sellerId: string, confirmedAt?: string) => {
-    const currentStat = sellerStats.find(s => s.seller_id === sellerId);
+  const handlePaymentCheckToggle = async (organizationId: string, confirmedAt?: string) => {
+    const currentStat = organizationStats.find(s => s.organization_id === organizationId);
     if (!currentStat) return;
 
     // 실제 orders 데이터에서 배치의 현재 상태 확인
     let currentBatchIsConfirmed = false;
     if (confirmedAt) {
       const batchOrders = orders.filter(order =>
-        (order.seller_id || '미지정') === sellerId &&
+        (order.organization_id || '미지정') === organizationId &&
         order.confirmed_at === confirmedAt
       );
       // 해당 배치의 모든 주문이 결제완료 상태면 입금확인 완료 상태
@@ -379,25 +379,25 @@ export default function OrderPlatformPage() {
       : !currentStat.입금확인;
 
     if (newCheckState) {
-      const sellerOrders = orders.filter(order => {
-        const orderSellerId = order.seller_id || '미지정';
+      const organizationOrders = orders.filter(order => {
+        const orderOrgId = order.organization_id || '미지정';
         const status = order.shipping_status;
         const matchesBatch = confirmedAt ? order.confirmed_at === confirmedAt : true;
-        return orderSellerId === sellerId && status === '발주서확정' && matchesBatch;
+        return orderOrgId === organizationId && status === '발주서확정' && matchesBatch;
       });
 
-      if (sellerOrders.length === 0) {
-        toast.error('해당 셀러의 발주서확정 상태 주문이 없습니다.');
+      if (organizationOrders.length === 0) {
+        toast.error('해당 조직의 발주서확정 상태 주문이 없습니다.');
         return;
       }
 
       try {
         const now = getCurrentTimeUTC();
 
-        const updatedOrders = sellerOrders.map(order => ({
+        const updatedOrders = organizationOrders.map(order => ({
           id: order.id,
           order_number: order.order_number,
-          seller_id: order.seller_id,
+          organization_id: order.organization_id,
           option_name: order.option_name,
           shipping_status: '결제완료',
           quantity: order.quantity,
@@ -422,16 +422,16 @@ export default function OrderPlatformPage() {
           // 로컬 상태 업데이트 - orders 업데이트
           setOrders(prev => prev.map(order => {
             const matchesBatch = confirmedAt ? order.confirmed_at === confirmedAt : true;
-            if (order.seller_id === sellerId && order.shipping_status === '발주서확정' && matchesBatch) {
+            if (order.organization_id === organizationId && order.shipping_status === '발주서확정' && matchesBatch) {
               return { ...order, shipping_status: '결제완료', payment_confirmed_at: now };
             }
             return order;
           }));
 
-          // sellerStats 업데이트 (배치별 입금확인 상태 업데이트)
-          setSellerStats(prev =>
+          // organizationStats 업데이트 (배치별 입금확인 상태 업데이트)
+          setOrganizationStats(prev =>
             prev.map(stat => {
-              if (stat.seller_id === sellerId) {
+              if (stat.organization_id === organizationId) {
                 if (confirmedAt && stat.발주확정_배치) {
                   // 특정 배치의 입금확인 상태 업데이트
                   const updatedBatches = stat.발주확정_배치.map(batch =>
@@ -455,16 +455,40 @@ export default function OrderPlatformPage() {
           setTimeout(() => {
             const updatedOrders = orders.map(order => {
               const matchesBatch = confirmedAt ? order.confirmed_at === confirmedAt : true;
-              if (order.seller_id === sellerId && order.shipping_status === '발주서확정' && matchesBatch) {
+              if (order.organization_id === organizationId && order.shipping_status === '발주서확정' && matchesBatch) {
                 return { ...order, shipping_status: '결제완료', payment_confirmed_at: now };
               }
               return order;
             });
-            calculateSellerStats(updatedOrders);
+            calculateOrganizationStats(updatedOrders);
           }, 0);
 
           const batchInfo = confirmedAt ? ` (${formatDateTimeForDisplay(confirmedAt).slice(0, 16)} 배치)` : '';
           toast.success(`${result.count}건의 주문이 결제완료로 변경되었습니다.${batchInfo}`);
+
+          // 정산 레코드 자동 생성
+          try {
+            // 발주확정일자별로 정산 레코드 생성
+            const confirmedDates = new Set(
+              organizationOrders
+                .filter(o => o.confirmed_at)
+                .map(o => new Date(o.confirmed_at!).toISOString().split('T')[0])
+            );
+
+            for (const date of confirmedDates) {
+              await fetch('/api/settlements/upsert', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  organizationId,
+                  settlementDate: date,
+                }),
+              });
+            }
+          } catch (settlementError) {
+            console.error('정산 레코드 생성 오류:', settlementError);
+            // 정산 생성 실패해도 입금확인은 성공으로 처리
+          }
         } else {
           toast.error('상태 변경 실패: ' + result.error);
         }
@@ -473,23 +497,23 @@ export default function OrderPlatformPage() {
         toast.error('입금확인 처리 중 오류가 발생했습니다.');
       }
     } else {
-      const sellerOrders = orders.filter(order => {
-        const orderSellerId = order.seller_id || '미지정';
+      const organizationOrders = orders.filter(order => {
+        const orderOrgId = order.organization_id || '미지정';
         const status = order.shipping_status;
         const matchesBatch = confirmedAt ? order.confirmed_at === confirmedAt : true;
-        return orderSellerId === sellerId && status === '결제완료' && matchesBatch;
+        return orderOrgId === organizationId && status === '결제완료' && matchesBatch;
       });
 
-      if (sellerOrders.length === 0) {
-        toast.error('해당 셀러의 결제완료 상태 주문이 없습니다.');
+      if (organizationOrders.length === 0) {
+        toast.error('해당 조직의 결제완료 상태 주문이 없습니다.');
         return;
       }
 
       try {
-        const updatedOrders = sellerOrders.map(order => ({
+        const updatedOrders = organizationOrders.map(order => ({
           id: order.id,
           order_number: order.order_number,
-          seller_id: order.seller_id,
+          organization_id: order.organization_id,
           option_name: order.option_name,
           shipping_status: '발주서확정',
           quantity: order.quantity,
@@ -514,16 +538,16 @@ export default function OrderPlatformPage() {
           // 로컬 상태 업데이트 - orders 업데이트
           setOrders(prev => prev.map(order => {
             const matchesBatch = confirmedAt ? order.confirmed_at === confirmedAt : true;
-            if (order.seller_id === sellerId && order.shipping_status === '결제완료' && matchesBatch) {
+            if (order.organization_id === organizationId && order.shipping_status === '결제완료' && matchesBatch) {
               return { ...order, shipping_status: '발주서확정', payment_confirmed_at: null };
             }
             return order;
           }));
 
-          // sellerStats 업데이트 (배치별 입금확인 상태 업데이트)
-          setSellerStats(prev =>
+          // organizationStats 업데이트 (배치별 입금확인 상태 업데이트)
+          setOrganizationStats(prev =>
             prev.map(stat => {
-              if (stat.seller_id === sellerId) {
+              if (stat.organization_id === organizationId) {
                 if (confirmedAt && stat.발주확정_배치) {
                   // 특정 배치의 입금확인 상태 취소
                   const updatedBatches = stat.발주확정_배치.map(batch =>
@@ -547,12 +571,12 @@ export default function OrderPlatformPage() {
           setTimeout(() => {
             const updatedOrders = orders.map(order => {
               const matchesBatch = confirmedAt ? order.confirmed_at === confirmedAt : true;
-              if (order.seller_id === sellerId && order.shipping_status === '결제완료' && matchesBatch) {
+              if (order.organization_id === organizationId && order.shipping_status === '결제완료' && matchesBatch) {
                 return { ...order, shipping_status: '발주서확정', payment_confirmed_at: null };
               }
               return order;
             });
-            calculateSellerStats(updatedOrders);
+            calculateOrganizationStats(updatedOrders);
           }, 0);
 
           const batchInfo = confirmedAt ? ` (${formatDateTimeForDisplay(confirmedAt).slice(0, 16)} 배치)` : '';
@@ -567,25 +591,25 @@ export default function OrderPlatformPage() {
     }
   };
 
-  const handleRefundComplete = async (sellerId: string) => {
-    const sellerRefundOrders = orders.filter(order => {
-      const orderSellerId = order.seller_id || '미지정';
+  const handleRefundComplete = async (organizationId: string) => {
+    const organizationRefundOrders = orders.filter(order => {
+      const orderOrgId = order.organization_id || '미지정';
       const status = order.shipping_status;
-      return orderSellerId === sellerId && status === '취소요청';
+      return orderOrgId === organizationId && status === '취소요청';
     });
 
-    if (sellerRefundOrders.length === 0) {
-      toast.error('해당 셀러의 취소요청 상태 주문이 없습니다.');
+    if (organizationRefundOrders.length === 0) {
+      toast.error('해당 조직의 취소요청 상태 주문이 없습니다.');
       return;
     }
 
     try {
       const now = getCurrentTimeUTC();
 
-      const updatedOrders = sellerRefundOrders.map(order => ({
+      const updatedOrders = organizationRefundOrders.map(order => ({
         id: order.id,
         order_number: order.order_number,
-        seller_id: order.seller_id,
+        organization_id: order.organization_id,
         option_name: order.option_name,
         shipping_status: order.shipping_status,
         quantity: order.quantity,
@@ -609,18 +633,18 @@ export default function OrderPlatformPage() {
       if (result.success) {
         // 로컬 상태 업데이트 - orders 업데이트
         setOrders(prev => prev.map(order => {
-          const sellerRefundOrder = sellerRefundOrders.find(o => o.id === order.id);
-          if (sellerRefundOrder) {
+          const organizationRefundOrder = organizationRefundOrders.find(o => o.id === order.id);
+          if (organizationRefundOrder) {
             return { ...order, refund_processed_at: now };
           }
           return order;
         }));
 
-        // sellerStats 업데이트
+        // organizationStats 업데이트
         const formattedDateTime = new Date(now).toISOString().slice(0, 16).replace('T', ' ');
-        setSellerStats(prev =>
+        setOrganizationStats(prev =>
           prev.map(stat =>
-            stat.seller_id === sellerId
+            stat.organization_id === organizationId
               ? { ...stat, 환불처리일시: formattedDateTime }
               : stat
           )
@@ -629,13 +653,13 @@ export default function OrderPlatformPage() {
         // total stat도 업데이트
         setTimeout(() => {
           const updatedOrders = orders.map(order => {
-            const sellerRefundOrder = sellerRefundOrders.find(o => o.id === order.id);
-            if (sellerRefundOrder) {
+            const organizationRefundOrder = organizationRefundOrders.find(o => o.id === order.id);
+            if (organizationRefundOrder) {
               return { ...order, refund_processed_at: now };
             }
             return order;
           });
-          calculateSellerStats(updatedOrders);
+          calculateOrganizationStats(updatedOrders);
         }, 0);
 
         toast.success(`${result.count}건의 주문에 대해 환불처리가 완료되었습니다.`);
@@ -690,7 +714,7 @@ export default function OrderPlatformPage() {
           const updatedOrders = orders.map(o =>
             o.id === orderId ? { ...o, shipping_status: '취소완료', canceled_at: now } : o
           );
-          calculateSellerStats(updatedOrders);
+          calculateOrganizationStats(updatedOrders);
         }, 0);
 
         toast.success('취소가 승인되었습니다.');
@@ -742,7 +766,7 @@ export default function OrderPlatformPage() {
           const updatedOrders = orders.map(o =>
             o.id === orderId ? { ...o, shipping_status: '상품준비중' } : o
           );
-          calculateSellerStats(updatedOrders);
+          calculateOrganizationStats(updatedOrders);
         }, 0);
 
         toast.success('취소가 반려되었습니다. 상품준비중 상태로 변경되었습니다.');
@@ -791,12 +815,12 @@ export default function OrderPlatformPage() {
           o.id === orderId ? { ...o, shipping_status: '환불완료', refund_processed_at: now } : o
         ));
 
-        // sellerStats 재계산
+        // organizationStats 재계산
         setTimeout(() => {
           const updatedOrders = orders.map(o =>
             o.id === orderId ? { ...o, shipping_status: '환불완료', refund_processed_at: now } : o
           );
-          calculateSellerStats(updatedOrders);
+          calculateOrganizationStats(updatedOrders);
         }, 0);
 
         toast.success('환불처리가 완료되었습니다.');
@@ -839,8 +863,8 @@ export default function OrderPlatformPage() {
   }
 
   const filteredOrders = orders.filter(order => {
-    const sellerId = order.seller_id || '미지정';
-    if (selectedSeller && sellerId !== selectedSeller) return false;
+    const organizationId = order.organization_id || '미지정';
+    if (selectedOrganization && organizationId !== selectedOrganization) return false;
 
     const status = order.shipping_status;
     if (filterStatus !== 'all' && status !== filterStatus) return false;
@@ -872,14 +896,14 @@ export default function OrderPlatformPage() {
       if (endDate && koreaDateStr > endDate) return false;
     }
 
-    // 검색어 필터 (주문번호, 옵션상품, 셀러명)
+    // 검색어 필터 (주문번호, 옵션상품, 조직명)
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      const sellerName = sellerNames.get(sellerId)?.toLowerCase() || '';
+      const organizationName = organizationNames.get(organizationId)?.toLowerCase() || '';
       const orderNumber = (order.order_number || '').toLowerCase();
       const optionName = (order.option_name || '').toLowerCase();
 
-      if (!sellerName.includes(query) && !orderNumber.includes(query) && !optionName.includes(query)) {
+      if (!organizationName.includes(query) && !orderNumber.includes(query) && !optionName.includes(query)) {
         return false;
       }
     }
@@ -889,14 +913,14 @@ export default function OrderPlatformPage() {
 
   // 필터된 주문으로 통계 재계산
   const filteredStats = (() => {
-    const statsMap = new Map<string, SellerStats>();
+    const statsMap = new Map<string, OrganizationStats>();
 
     filteredOrders.forEach((order) => {
-      const sellerId = order.seller_id || '미지정';
-      if (!statsMap.has(sellerId)) {
-        statsMap.set(sellerId, {
-          seller_id: sellerId,
-          seller_name: sellerNames.get(sellerId) || sellerId,
+      const organizationId = order.organization_id || '미지정';
+      if (!statsMap.has(organizationId)) {
+        statsMap.set(organizationId, {
+          organization_id: organizationId,
+          organization_name: organizationNames.get(organizationId) || organizationId,
           총금액: 0,
           입금확인: false,
           업로드_건수: 0,
@@ -920,7 +944,7 @@ export default function OrderPlatformPage() {
         });
       }
 
-      const stats = statsMap.get(sellerId)!;
+      const stats = statsMap.get(organizationId)!;
       const status = order.shipping_status;
       if (!status) return; // shipping_status가 없으면 통계에서 제외
       const quantity = Number(order.quantity) || 0;
@@ -987,17 +1011,17 @@ export default function OrderPlatformPage() {
     // 발주확정 배치 계산 (confirmed_at별 그룹화)
     statsArray.forEach(stat => {
       // 발주서확정 + 결제완료 상태의 주문 모두 확인 (confirmed_at이 있는 것만)
-      const sellerOrdersWithConfirmedAt = filteredOrders.filter(order =>
-        (order.seller_id || '미지정') === stat.seller_id &&
+      const organizationOrdersWithConfirmedAt = filteredOrders.filter(order =>
+        (order.organization_id || '미지정') === stat.organization_id &&
         (order.shipping_status === '발주서확정' || order.shipping_status === '결제완료') &&
         order.confirmed_at
       );
 
-      if (sellerOrdersWithConfirmedAt.length > 0) {
+      if (organizationOrdersWithConfirmedAt.length > 0) {
         // confirmed_at별로 그룹화
         const batchMap = new Map<string, ConfirmedBatch>();
 
-        sellerOrdersWithConfirmedAt.forEach(order => {
+        organizationOrdersWithConfirmedAt.forEach(order => {
           const confirmedAt = order.confirmed_at!;
           const finalAmount = Number(order.final_payment_amount) || Number(order.settlement_amount) || 0;
           const isPaymentConfirmed = order.shipping_status === '결제완료';
@@ -1024,7 +1048,7 @@ export default function OrderPlatformPage() {
 
         // 각 배치의 입금확인 상태 계산
         batchMap.forEach((batch, confirmedAt) => {
-          const batchOrders = sellerOrdersWithConfirmedAt.filter(o => o.confirmed_at === confirmedAt);
+          const batchOrders = organizationOrdersWithConfirmedAt.filter(o => o.confirmed_at === confirmedAt);
           const allPaymentConfirmed = batchOrders.every(o => o.shipping_status === '결제완료');
           batch.입금확인 = allPaymentConfirmed;
         });
@@ -1042,9 +1066,9 @@ export default function OrderPlatformPage() {
 
     statsArray.sort((a, b) => (b.업로드_건수 + b.발주서확정_건수 + b.결제완료_건수 + b.상품준비중_건수 + b.발송완료_건수 + b.취소요청_건수 + b.취소완료_건수 + b.환불완료_건수) - (a.업로드_건수 + a.발주서확정_건수 + a.결제완료_건수 + a.상품준비중_건수 + a.발송완료_건수 + a.취소요청_건수 + a.취소완료_건수 + a.환불완료_건수));
 
-    const totalStats: SellerStats = {
-      seller_id: 'total',
-      seller_name: '합계',
+    const totalStats: OrganizationStats = {
+      organization_id: 'total',
+      organization_name: '합계',
       총금액: statsArray.reduce((sum, s) => sum + s.총금액, 0),
       입금확인: false,
       업로드_건수: statsArray.reduce((sum, s) => sum + s.업로드_건수, 0),
@@ -1071,23 +1095,23 @@ export default function OrderPlatformPage() {
     return statsArray;
   })();
 
-  // 셀러별로 주문 그룹화
-  const getSellerOrders = (sellerId: string) => {
-    return filteredOrders.filter(order => (order.seller_id || '미지정') === sellerId);
+  // 조직별로 주문 그룹화
+  const getOrganizationOrders = (organizationId: string) => {
+    return filteredOrders.filter(order => (order.organization_id || '미지정') === organizationId);
   };
 
-  const toggleSeller = (sellerId: string) => {
-    const newExpanded = new Set(expandedSellers);
-    if (newExpanded.has(sellerId)) {
-      newExpanded.delete(sellerId);
+  const toggleOrganization = (organizationId: string) => {
+    const newExpanded = new Set(expandedOrganizations);
+    if (newExpanded.has(organizationId)) {
+      newExpanded.delete(organizationId);
     } else {
-      newExpanded.add(sellerId);
+      newExpanded.add(organizationId);
     }
-    setExpandedSellers(newExpanded);
+    setExpandedOrganizations(newExpanded);
   };
 
-  const totalStat = filteredStats.find(s => s.seller_id === 'total');
-  const sellerList = filteredStats.filter(s => s.seller_id !== 'total');
+  const totalStat = filteredStats.find(s => s.organization_id === 'total');
+  const organizationList = filteredStats.filter(s => s.organization_id !== 'total');
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -1301,21 +1325,21 @@ export default function OrderPlatformPage() {
           </div>
         )}
 
-        {/* 셀러별 아코디언 */}
-        {sellerList.map((stat) => {
-          const isExpanded = expandedSellers.has(stat.seller_id);
-          const sellerOrders = getSellerOrders(stat.seller_id);
+        {/* 조직별 아코디언 */}
+        {organizationList.map((stat) => {
+          const isExpanded = expandedOrganizations.has(stat.organization_id);
+          const organizationOrders = getOrganizationOrders(stat.organization_id);
 
           return (
-            <div key={stat.seller_id} className="bg-white border border-gray-200">
+            <div key={stat.organization_id} className="bg-white border border-gray-200">
               <button
-                onClick={() => toggleSeller(stat.seller_id)}
+                onClick={() => toggleOrganization(stat.organization_id)}
                 className="w-full px-6 py-4 hover:bg-gray-50 transition-colors"
               >
                 <div className="grid grid-cols-14 gap-4 items-center">
                   <div className="col-span-2 flex items-center gap-2 font-semibold text-gray-900 text-left pl-8">
                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    {stat.seller_name}
+                    {stat.organization_name}
                   </div>
                   <div className="col-span-1 text-center font-semibold text-purple-700">
                     {stat.업로드_건수 > 0 ? stat.업로드_건수 : '-'}
@@ -1419,7 +1443,7 @@ export default function OrderPlatformPage() {
                             </div>
                             <div>
                               <div
-                                onClick={() => handlePaymentCheckToggle(stat.seller_id, batch.confirmed_at)}
+                                onClick={() => handlePaymentCheckToggle(stat.organization_id, batch.confirmed_at)}
                                 className="w-11 h-6 rounded-full cursor-pointer relative transition-colors"
                                 style={{ backgroundColor: batch.입금확인 ? '#0891B2' : '#D1D5DB' }}
                                 title={batch.입금확인 ? '클릭하여 입금확인 취소' : '클릭하여 입금확인'}
@@ -1455,7 +1479,7 @@ export default function OrderPlatformPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {sellerOrders.slice(0, 30).map((order) => {
+                        {organizationOrders.slice(0, 30).map((order) => {
                           const status = order.shipping_status;
                           // refunded 상태인 경우에만 환불액 표시
                           const refundAmount = (status === '환불완료')
@@ -1542,9 +1566,9 @@ export default function OrderPlatformPage() {
                         })}
                       </tbody>
                     </table>
-                    {sellerOrders.length > 30 && (
+                    {organizationOrders.length > 30 && (
                       <div className="px-4 py-3 bg-gray-100 text-center text-xs text-gray-600">
-                        총 {sellerOrders.length}건 중 30건 표시
+                        총 {organizationOrders.length}건 중 30건 표시
                       </div>
                     )}
                   </div>
@@ -1556,15 +1580,15 @@ export default function OrderPlatformPage() {
       </>
     )}
 
-        {/* 셀러별 정산내역 탭 컨텐츠 */}
-        {activeTab === '셀러별정산내역' && (
+        {/* 조직별 정산내역 탭 컨텐츠 */}
+        {activeTab === '조직별정산내역' && (
           <div className="bg-white border border-gray-200 p-6 rounded-lg">
-            <AdminSettlementTab integratedOrders={orders} sellerNames={sellerNames} />
+            <AdminSettlementTab integratedOrders={orders} organizationNames={organizationNames} />
           </div>
         )}
 
-        {/* 셀러 랭킹 탭 컨텐츠 */}
-        {activeTab === '셀러랭킹' && (
+        {/* 조직 랭킹 탭 컨텐츠 */}
+        {activeTab === '조직랭킹' && (
           <div className="bg-white border border-gray-200 p-6 rounded-lg">
             <AdminRankingTab />
           </div>

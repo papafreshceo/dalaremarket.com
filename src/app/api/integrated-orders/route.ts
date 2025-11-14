@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
 import { requireAuth, requireStaff, auditLog } from '@/lib/api-security';
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.error;
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const searchParams = request.nextUrl.searchParams;
 
     // 쿼리 파라미터
@@ -28,7 +28,8 @@ export async function GET(request: NextRequest) {
     const searchKeyword = searchParams.get('searchKeyword');
     const shippingStatus = searchParams.get('shippingStatus');
     const vendorName = searchParams.get('vendorName');
-    const onlyWithSeller = searchParams.get('onlyWithSeller') === 'true'; // seller_id가 있는 주문만
+    const onlyWithSeller = searchParams.get('onlyWithSeller') === 'true'; // seller_id가 있는 주문만 (레거시)
+    const onlyWithOrganization = searchParams.get('onlyWithOrganization') === 'true'; // organization_id가 있는 주문만
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '100');
     const offsetParam = searchParams.get('offset');
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
       .eq('is_deleted', false);
 
     // 🔒 조직 필터: 같은 조직의 주문만 조회 (관리자 제외)
-    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin') {
+    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin' && auth.user.role !== 'employee') {
       const organizationId = await getOrganizationDataFilter(auth.user.id);
       if (organizationId) {
         query = query.eq('organization_id', organizationId);
@@ -51,7 +52,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // seller_id가 있는 주문만 필터링
+    // organization_id가 있는 주문만 필터링 (관리자용)
+    if (onlyWithOrganization) {
+      query = query.not('organization_id', 'is', null);
+    }
+
+    // seller_id가 있는 주문만 필터링 (레거시 지원)
     if (onlyWithSeller) {
       query = query.not('seller_id', 'is', null);
     }
@@ -189,7 +195,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
 
     // 필수 필드 검증
@@ -207,6 +213,9 @@ export async function POST(request: NextRequest) {
     if (!body.sheet_date) {
       body.sheet_date = new Date().toISOString().split('T')[0];
     }
+
+    // 🔒 등록자 설정 (audit trail)
+    body.created_by = auth.user.id;
 
     // 🔒 조직 ID 자동 설정 (관리자 제외)
     if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin') {
@@ -275,7 +284,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const body = await request.json();
 
     if (!body.id) {
@@ -345,7 +354,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
 

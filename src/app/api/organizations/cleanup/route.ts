@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/api-security'
 
 /**
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth(request)
     if (!auth.authorized) return auth.error
 
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 사용자 정보 조회
     const { data: user } = await supabase
@@ -66,7 +66,7 @@ export async function DELETE(request: NextRequest) {
     const auth = await requireAuth(request)
     if (!auth.authorized) return auth.error
 
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 서브 조직들 삭제
     const { data: deleted, error } = await supabase

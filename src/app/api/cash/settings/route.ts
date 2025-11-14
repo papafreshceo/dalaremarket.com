@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/api-security';
 
 /**
@@ -8,7 +8,7 @@ import { requireAdmin } from '@/lib/api-security';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 캐시 설정 조회
     const { data: settings, error: settingsError } = await supabase
@@ -49,7 +49,7 @@ export async function PUT(request: NextRequest) {
   if (!auth.authorized) return auth.error;
 
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
 
     // 요청 본문 파싱
     const body = await request.json();

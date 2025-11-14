@@ -35,7 +35,6 @@ interface OrderRegistrationTabProps {
   endDate: Date | null;
   setEndDate: (date: Date | null) => void;
   onRefresh?: () => void;
-  userId: string;
   userEmail: string;
 }
 
@@ -61,9 +60,12 @@ export default function OrderRegistrationTab({
   endDate,
   setEndDate,
   onRefresh,
-  userId,
   userEmail
 }: OrderRegistrationTabProps) {
+
+  // 사용자 정보 (내부에서 조회)
+  const [userId, setUserId] = useState<string>('');
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
 
   // 툴팁 상태 관리 (최상단에 배치)
   const [hoveredStatus, setHoveredStatus] = useState<Order['status'] | null>(null);
@@ -96,6 +98,41 @@ export default function OrderRegistrationTab({
   // 공급가 갱신 상태
   const [isPriceUpdated, setIsPriceUpdated] = useState<boolean>(false);
   const [isUpdatingPrice, setIsUpdatingPrice] = useState<boolean>(false);
+
+  // 사용자 정보 조회 (userId, organizationId)
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setUserId(user.id);
+
+          // 사용자의 primary_organization_id 조회
+          const { data: userData } = await supabase
+            .from('users')
+            .select('primary_organization_id')
+            .eq('id', user.id)
+            .single();
+
+          if (userData?.primary_organization_id) {
+            setOrganizationId(userData.primary_organization_id);
+          }
+        } else {
+          setUserId('guest');
+          setOrganizationId(null);
+        }
+      } catch (error) {
+        console.error('사용자 정보 조회 실패:', error);
+        setUserId('guest');
+        setOrganizationId(null);
+      }
+    };
+
+    fetchUserInfo();
+  }, []);
 
   // 필터 상태 변경 시 공급가 갱신 상태 확인
   useEffect(() => {
@@ -362,7 +399,7 @@ export default function OrderRegistrationTab({
         _metadata: {
           id: order.id, // 기존 주문 ID (업데이트용)
           sheet_date: order.date?.split('T')[0] || utcTime.split('T')[0],
-          seller_id: userId,
+          organization_id: organizationId,
           created_by: userId,
           market_name: order.marketName || '플랫폼',
           payment_date: utcTime,
@@ -3088,7 +3125,8 @@ export default function OrderRegistrationTab({
                   shipping_status: '발주서확정',
                   order_number: orderNo,
                   confirmed_at: now,
-                  seller_id: userId, // 셀러 ID 저장
+                  organization_id: organizationId, // 조직 ID 저장
+                  created_by: userId, // 등록자 ID 저장
                   option_name: order.optionName, // 수정된 옵션상품
                   seller_supply_price: unitPrice,
                   settlement_amount: supplyPrice,

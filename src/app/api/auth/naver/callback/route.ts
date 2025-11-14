@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClientForRouteHandler } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 3. Supabase에 사용자 등록/로그인
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 기존 사용자 확인
     const { data: existingUser } = await supabase

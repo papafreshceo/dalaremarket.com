@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     const videosData = await videosResponse.json();
 
     // 4. 데이터베이스에 저장
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const savedVideos = [];
 
     for (const video of videosData.items) {

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { autoCreateOrganizationFromUser, syncOrganizationFromUser } from '@/lib/auto-create-organization';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -29,53 +29,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 조직 정보 추가 (티어 + 셀러계정 정보)
+    // 조직 티어 정보만 추가 (나머지는 프론트엔드에서 직접 가져옴)
     if (userData.primary_organization_id) {
       const { data: orgData } = await supabase
         .from('organizations')
-        .select(`
-          tier,
-          tier_updated_at,
-          is_manual_tier,
-          business_name,
-          business_address,
-          business_number,
-          business_email,
-          representative_name,
-          representative_phone,
-          manager_name,
-          manager_phone,
-          bank_account,
-          bank_name,
-          account_holder,
-          depositor_name,
-          store_name,
-          store_phone
-        `)
+        .select('tier, tier_updated_at, is_manual_tier')
         .eq('id', userData.primary_organization_id)
         .single();
 
       if (orgData) {
-        // 티어 정보
         userData.tier = orgData.tier;
         userData.tier_updated_at = orgData.tier_updated_at;
         userData.is_manual_tier = orgData.is_manual_tier;
-
-        // 셀러계정 정보
-        userData.business_name = orgData.business_name;
-        userData.business_address = orgData.business_address;
-        userData.business_number = orgData.business_number;
-        userData.business_email = orgData.business_email;
-        userData.representative_name = orgData.representative_name;
-        userData.representative_phone = orgData.representative_phone;
-        userData.manager_name = orgData.manager_name;
-        userData.manager_phone = orgData.manager_phone;
-        userData.bank_account = orgData.bank_account;
-        userData.bank_name = orgData.bank_name;
-        userData.account_holder = orgData.account_holder;
-        userData.depositor_name = orgData.depositor_name;
-        userData.store_name = orgData.store_name;
-        userData.store_phone = orgData.store_phone;
       }
     }
 
@@ -95,7 +60,7 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {

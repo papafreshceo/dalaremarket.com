@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-security'
 
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth(request)
     if (!auth.authorized) return auth.error
 
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
     const searchParams = request.nextUrl.searchParams
 
     // 쿼리 파라미터
@@ -82,7 +82,7 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json()
     const { notification_ids, mark_all } = body
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     if (mark_all) {
       // 모든 알림 읽음 처리
@@ -151,7 +151,7 @@ export async function DELETE(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const notificationId = searchParams.get('id')
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     if (!notificationId) {
       return NextResponse.json(

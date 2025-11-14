@@ -1828,7 +1828,6 @@ function OrdersPageContent() {
               endDate={endDate}
               setEndDate={setEndDate}
               onRefresh={fetchOrders}
-              userId={userId}
               userEmail={userEmail}
             />
           </div>
@@ -1862,10 +1861,10 @@ function OrdersPageContent() {
           </div>
         )}
         {activeTab === '판매자정보' && (
-          <SellerInfoTab userId={userId} />
+          <SellerInfoTab />
         )}
         {activeTab === '지갑' && (
-          <CashHistoryTab userId={userId} />
+          <CashHistoryTab />
         )}
 
         {/* 모달들 */}

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
 import { requireStaff } from '@/lib/api-security';
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { orders, overwriteDuplicates = false, skipDuplicateCheck = false } = await request.json();
 
     if (!orders || !Array.isArray(orders) || orders.length === 0) {
@@ -40,11 +40,13 @@ export async function POST(request: NextRequest) {
       organizationId = await getOrganizationDataFilter(auth.user.id);
     }
 
-    // sheet_date 기본값 및 조직 ID 설정
+    // sheet_date 기본값, 등록자, 조직 ID 설정
     const ordersWithDate = orders.map((order) => {
       if (!order.sheet_date) {
         order.sheet_date = new Date().toISOString().split('T')[0];
       }
+      // 🔒 등록자 설정 (audit trail)
+      order.created_by = auth.user.id;
       if (organizationId) {
         order.organization_id = organizationId;
       }
@@ -294,7 +296,7 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { orders } = await request.json();
 
     if (!orders || !Array.isArray(orders) || orders.length === 0) {
@@ -302,6 +304,30 @@ export async function PUT(request: NextRequest) {
         { success: false, error: '주문 데이터가 필요합니다.' },
         { status: 400 }
       );
+    }
+
+    // 🔒 조직 필터: 일반 사용자는 자신의 조직 주문만 수정 가능
+    let organizationId = null;
+    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin' && auth.user.role !== 'employee') {
+      organizationId = await getOrganizationDataFilter(auth.user.id);
+
+      // 모든 주문이 현재 사용자의 조직에 속하는지 확인
+      const orderIds = orders.map(o => o.id).filter(Boolean);
+      const { data: existingOrders } = await supabase
+        .from('integrated_orders')
+        .select('id, organization_id')
+        .in('id', orderIds);
+
+      const unauthorizedOrders = (existingOrders || []).filter(
+        order => order.organization_id !== organizationId
+      );
+
+      if (unauthorizedOrders.length > 0) {
+        return NextResponse.json(
+          { success: false, error: '다른 조직의 주문은 수정할 수 없습니다.' },
+          { status: 403 }
+        );
+      }
     }
 
     // 업데이트 가능한 칼럼 목록 (DB에 실제로 존재하는 칼럼만)
@@ -395,7 +421,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { ids } = await request.json();
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -403,6 +429,29 @@ export async function DELETE(request: NextRequest) {
         { success: false, error: 'IDs 배열이 필요합니다.' },
         { status: 400 }
       );
+    }
+
+    // 🔒 조직 필터: 일반 사용자는 자신의 조직 주문만 삭제 가능
+    let organizationId = null;
+    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin' && auth.user.role !== 'employee') {
+      organizationId = await getOrganizationDataFilter(auth.user.id);
+
+      // 모든 주문이 현재 사용자의 조직에 속하는지 확인
+      const { data: existingOrders } = await supabase
+        .from('integrated_orders')
+        .select('id, organization_id')
+        .in('id', ids);
+
+      const unauthorizedOrders = (existingOrders || []).filter(
+        order => order.organization_id !== organizationId
+      );
+
+      if (unauthorizedOrders.length > 0) {
+        return NextResponse.json(
+          { success: false, error: '다른 조직의 주문은 삭제할 수 없습니다.' },
+          { status: 403 }
+        );
+      }
     }
 
     const { error } = await supabase

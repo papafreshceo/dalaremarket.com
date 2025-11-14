@@ -174,29 +174,49 @@ export default function OrganizationMembers({
                 </td>
                 {hasManagePermission && (
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {/* 소유자: 다른 멤버 삭제 가능 */}
-                    {isOwner && member.role !== 'owner' && member.user_id !== currentUserId && (
-                      <button
-                        onClick={() =>
-                          handleRemoveMember(
-                            member.id,
-                            member.user.profile_name || member.user.email
-                          )
-                        }
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        삭제
-                      </button>
-                    )}
-                    {/* 담당자: 본인만 탈퇴 가능 */}
-                    {!isOwner && member.user_id === currentUserId && member.role !== 'owner' && (
-                      <button
-                        onClick={handleLeaveOrganization}
-                        className="text-orange-600 hover:text-orange-900 font-medium"
-                      >
-                        셀러계정 탈퇴
-                      </button>
-                    )}
+                    {(() => {
+                      // 디버깅 로그
+                      const showDeleteButton = isOwner && member.role !== 'owner' && member.user_id !== currentUserId;
+                      const showLeaveButton = !isOwner && member.user_id === currentUserId && member.role !== 'owner';
+
+                      console.log('멤버 버튼 체크:', {
+                        memberEmail: member.user.email,
+                        isOwner,
+                        memberRole: member.role,
+                        memberUserId: member.user_id,
+                        currentUserId,
+                        showDeleteButton,
+                        showLeaveButton
+                      });
+
+                      return (
+                        <>
+                          {/* 소유자: 다른 멤버 삭제 가능 */}
+                          {showDeleteButton && (
+                            <button
+                              onClick={() =>
+                                handleRemoveMember(
+                                  member.id,
+                                  member.user.profile_name || member.user.email
+                                )
+                              }
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              삭제
+                            </button>
+                          )}
+                          {/* 담당자: 본인만 탈퇴 가능 */}
+                          {showLeaveButton && (
+                            <button
+                              onClick={handleLeaveOrganization}
+                              className="text-orange-600 hover:text-orange-900 font-medium"
+                            >
+                              셀러계정 탈퇴
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
                   </td>
                 )}
               </tr>

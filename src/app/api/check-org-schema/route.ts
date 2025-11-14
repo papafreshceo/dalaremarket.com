@@ -1,9 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
-    const supabase = await createClient()
+    const supabase = await createClientForRouteHandler()
 
     // 현재 사용자의 조직 정보를 모두 조회하여 어떤 컬럼이 있는지 확인
     const { data, error } = await supabase

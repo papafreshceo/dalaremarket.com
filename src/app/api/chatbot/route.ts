@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Supabase에서 원물 데이터 조회
-    const supabase = await createClient();
+    const supabase = await createClientForRouteHandler();
     const { data: rawMaterials, error } = await supabase
       .from('raw_materials')
       .select('product_code, product_name, category_2, category_3, category_4, unit, supply_status, season, season_start_date, season_end_date')

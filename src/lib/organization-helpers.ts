@@ -213,11 +213,11 @@ export async function canCreateSubOrganization(
 
   // 티어별 최대 계정 수
   const getMaxAccounts = (tier: string | null) => {
-    if (!tier) return 1
+    if (!tier) return 2
     const lowerTier = tier.toLowerCase()
     switch (lowerTier) {
       case 'light':
-        return 1
+        return 2
       case 'standard':
         return 2
       case 'advance':
@@ -225,7 +225,7 @@ export async function canCreateSubOrganization(
       case 'legend':
         return 3
       default:
-        return 1
+        return 2
     }
   }
 
