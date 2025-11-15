@@ -448,7 +448,7 @@ function PlatformContentInner() {
           isOpen={!!selectedTool}
           onClose={handleCloseToolModal}
           toolId={selectedTool}
-          toolName={tools.find(t => t.id === selectedTool)?.name}
+          toolName={tools?.find(t => t.id === selectedTool)?.name}
           onOpenSimulator={() => {
             handleCloseToolModal();
             setTimeout(() => setSelectedTool('price-simulator'), 100);

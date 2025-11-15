@@ -637,7 +637,7 @@ function ProductsPageInner() {
             isOpen={!!selectedTool}
             onClose={() => setSelectedTool(null)}
             toolId={selectedTool}
-            toolName={tools.find(t => t.id === selectedTool)?.name || '업무도구'}
+            toolName={tools?.find(t => t.id === selectedTool)?.name || '업무도구'}
             zIndex={10000}
           />
         </>
