@@ -1,5 +1,5 @@
-import PlatformContent from './PlatformContent';
+import ProductsContent from './products/ProductsContent';
 
 export default function PlatformPage() {
-  return <PlatformContent />;
+  return <ProductsContent />;
 }

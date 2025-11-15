@@ -7,11 +7,18 @@ interface OrderSystemItem {
 }
 
 interface OrderSystemSectionProps {
-  items: OrderSystemItem[];
+  items?: OrderSystemItem[];
   isMobile?: boolean;
 }
 
-export default function OrderSystemSection({ items, isMobile = false }: OrderSystemSectionProps) {
+const DEFAULT_ITEMS: OrderSystemItem[] = [
+  { title: '발주하기', desc: '신규 발주 등록', primary: true },
+  { title: '발주내역', desc: '발주 이력 조회', primary: false },
+  { title: '정산관리', desc: '정산 내역 확인', primary: false },
+  { title: '배송조회', desc: '배송 현황 추적', primary: false }
+];
+
+export default function OrderSystemSection({ items = DEFAULT_ITEMS, isMobile = false }: OrderSystemSectionProps) {
   return (
     <div style={{
       background: 'rgba(255, 255, 255, 0.1)',
@@ -32,7 +39,7 @@ export default function OrderSystemSection({ items, isMobile = false }: OrderSys
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
         gap: '12px'
       }}>
-        {items.map((item, idx) => (
+        {items?.map((item, idx) => (
           <div key={idx} style={{
             padding: '16px',
             borderRadius: '8px',
