@@ -63,7 +63,6 @@ interface CalendarDay {
 function PlatformContentInner() {
   const searchParams = useSearchParams();
   const [isMobile, setIsMobile] = useState<boolean>(false);
-  const [isMounted, setIsMounted] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [organizationInfo, setOrganizationInfo] = useState<OrganizationInfo | null>(null);
@@ -77,18 +76,13 @@ function PlatformContentInner() {
   const [tools, setTools] = useState<any[]>([]);
 
   useEffect(() => {
-    setIsMounted(true);
     const checkMobile = () => {
-      if (typeof window !== 'undefined') {
-        setIsMobile(window.innerWidth <= 768);
-      }
+      setIsMobile(window.innerWidth <= 768);
     };
 
     checkMobile();
-    if (typeof window !== 'undefined') {
-      window.addEventListener('resize', checkMobile);
-      return () => window.removeEventListener('resize', checkMobile);
-    }
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // URL 파라미터로 로그인 모달 열기
@@ -328,10 +322,6 @@ function PlatformContentInner() {
     setExpandedComponent(null);
   };
 
-  if (!isMounted) {
-    return null;
-  }
-
   return (
     <>
       <div style={{
@@ -533,7 +523,18 @@ function PlatformContentInner() {
 
 export default function PlatformContent() {
   return (
-    <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center' }}>로딩 중...</div>}>
+    <Suspense fallback={
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '18px',
+        color: '#6c757d'
+      }}>
+        <div>로딩 중...</div>
+      </div>
+    }>
       <PlatformContentInner />
     </Suspense>
   );
