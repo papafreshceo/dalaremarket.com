@@ -34,15 +34,33 @@ export default function UploadModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000
+      zIndex: 1000,
+      animation: 'fadeIn 0.3s ease-in-out'
     }}>
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from {
+            transform: scale(0.95);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
       <div style={{
         background: 'var(--color-surface)',
         borderRadius: '16px',
         width: '500px',
         maxWidth: '90%',
         padding: '32px',
-        border: '1px solid var(--color-border)'
+        border: '1px solid var(--color-border)',
+        animation: 'scaleIn 0.3s ease-in-out'
       }}>
         <div style={{
           display: 'flex',

@@ -3,10 +3,11 @@ import { createClientForRouteHandler } from '@/lib/supabase/server';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClientForRouteHandler();
+    const { id } = await params;
 
     // 관리자 권한 확인
     const { data: { user } } = await supabase.auth.getUser();
@@ -31,7 +32,7 @@ export async function PUT(
         .from('admin_nicknames')
         .select('id')
         .eq('nickname', nickname.trim())
-        .neq('id', params.id)
+        .neq('id', id)
         .single();
 
       if (existingNickname) {
@@ -45,7 +46,7 @@ export async function PUT(
     const { data: updatedNickname, error } = await supabase
       .from('admin_nicknames')
       .update(updateData)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single();
 
@@ -73,10 +74,11 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClientForRouteHandler();
+    const { id } = await params;
 
     // 관리자 권한 확인
     const { data: { user } } = await supabase.auth.getUser();
@@ -90,7 +92,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('admin_nicknames')
       .delete()
-      .eq('id', params.id);
+      .eq('id', id);
 
     if (error) {
       console.error('관리자 닉네임 삭제 오류:', error);

@@ -41,8 +41,25 @@ export default function MappingResultModal({
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 2500,
-      padding: '20px'
+      padding: '20px',
+      animation: 'fadeIn 0.3s ease-in-out'
     }}>
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from {
+            transform: scale(0.95);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
       <div style={{
         background: 'var(--color-surface)',
         borderRadius: '16px',
@@ -51,7 +68,8 @@ export default function MappingResultModal({
         maxHeight: '90vh',
         display: 'flex',
         flexDirection: 'column',
-        border: '1px solid var(--color-border)'
+        border: '1px solid var(--color-border)',
+        animation: 'scaleIn 0.3s ease-in-out'
       }}>
         {/* 헤더 */}
         <div style={{

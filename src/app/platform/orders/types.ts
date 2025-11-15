@@ -38,6 +38,7 @@ export interface Order {
   marketName?: string; // 마켓명
   sellerMarketName?: string; // 셀러 마켓명
   priceUpdatedAt?: string; // 공급가 갱신 일시
+  subAccountId?: string | null; // 서브계정 ID (null = 메인계정)
 }
 
 export interface StatusConfig {

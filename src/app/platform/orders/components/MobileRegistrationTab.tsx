@@ -9,6 +9,7 @@ interface MobileRegistrationTabProps {
   isMobile: boolean;
   onRefresh?: () => void;
   userEmail: string;
+  selectedSubAccount?: any | null;
 }
 
 interface SelectedProduct {
@@ -22,7 +23,8 @@ interface SelectedProduct {
 export default function MobileRegistrationTab({
   isMobile,
   onRefresh,
-  userEmail
+  userEmail,
+  selectedSubAccount
 }: MobileRegistrationTabProps) {
   const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -47,6 +49,7 @@ export default function MobileRegistrationTab({
         selectedProduct={selectedProduct}
         onRefresh={onRefresh}
         userEmail={userEmail}
+        selectedSubAccount={selectedSubAccount}
       />
     </>
   );

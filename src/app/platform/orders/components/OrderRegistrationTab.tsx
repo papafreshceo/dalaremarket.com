@@ -37,7 +37,11 @@ interface OrderRegistrationTabProps {
   onRefresh?: () => void;
   userEmail: string;
   organizationId: string;
+  selectedSubAccount: any | null;
   isSampleMode?: boolean;
+  subAccounts?: any[];
+  organizationName?: string;
+  organizationTier?: string;
 }
 
 export default function OrderRegistrationTab({
@@ -64,7 +68,11 @@ export default function OrderRegistrationTab({
   setEndDate,
   onRefresh,
   userEmail,
-  organizationId: propOrganizationId
+  organizationId: propOrganizationId,
+  selectedSubAccount,
+  subAccounts = [],
+  organizationName = '',
+  organizationTier = 'LIGHT'
 }: OrderRegistrationTabProps) {
 
   // 사용자 정보 (내부에서 조회)
@@ -89,7 +97,13 @@ export default function OrderRegistrationTab({
   // 옵션 검증 모달 상태 (발주확정 전 검증용)
   const [showOptionValidationModal, setShowOptionValidationModal] = useState(false);
   const [validatedOrders, setValidatedOrders] = useState<any[]>([]);
+
+  // 안내문구 펼침/접기 상태 (처음엔 접힌 상태)
+  const [isGuideExpanded, setIsGuideExpanded] = useState(false);
   const [optionProductsMap, setOptionProductsMap] = useState<Map<string, any>>(new Map());
+
+  // 다크모드 상태 추적
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // 판매자 정보 검증 모달 상태
   const [showSellerInfoValidationModal, setShowSellerInfoValidationModal] = useState(false);
@@ -107,6 +121,10 @@ export default function OrderRegistrationTab({
   // 공급가 갱신 상태
   const [isPriceUpdated, setIsPriceUpdated] = useState<boolean>(false);
   const [isUpdatingPrice, setIsUpdatingPrice] = useState<boolean>(false);
+
+  // 티어 할인율 관련 state
+  const [userTier, setUserTier] = useState<string>('LIGHT');
+  const [discountRate, setDiscountRate] = useState<number>(0);
 
   // organizationId prop 변경 시 state 업데이트
   useEffect(() => {
@@ -149,6 +167,84 @@ export default function OrderRegistrationTab({
 
     fetchUserInfo();
   }, [propOrganizationId]);
+
+  // 다크모드 감지
+  useEffect(() => {
+    // 초기 다크모드 상태 설정
+    const initialDarkMode = document.documentElement.classList.contains('dark');
+    console.log('🌓 초기 다크모드 상태:', initialDarkMode);
+    setIsDarkMode(initialDarkMode);
+
+    // MutationObserver로 dark 클래스 변경 감지
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'class') {
+          const newDarkMode = document.documentElement.classList.contains('dark');
+          console.log('🌓 다크모드 변경 감지:', newDarkMode, 'classList:', document.documentElement.className);
+          setIsDarkMode(newDarkMode);
+        }
+      });
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // 조직의 tier와 할인율 조회 (prop에서 받은 tier 사용)
+  useEffect(() => {
+    const fetchDiscountRate = async () => {
+      const tier = organizationTier?.toUpperCase() || 'LIGHT';
+      setUserTier(tier);
+
+      if (!tier) {
+        console.log('⚠️ organizationTier 없음 - 기본값 적용 (LIGHT, 0.5%)');
+        setDiscountRate(0.5);
+        return;
+      }
+
+      try {
+        console.log('🔍 티어 할인율 조회 시작:', { tier });
+
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+
+        // tier_criteria에서 할인율 조회
+        const { data: criteriaData, error: criteriaError } = await supabase
+          .from('tier_criteria')
+          .select('discount_rate, description')
+          .eq('tier', tier)
+          .single();
+
+        if (criteriaError) {
+          console.error('❌ 티어 기준 조회 오류:', criteriaError);
+          // tier_criteria 조회 실패 시 기본 할인율 0.5 설정
+          setDiscountRate(0.5);
+          return;
+        }
+
+        if (criteriaData) {
+          const rate = Number(criteriaData.discount_rate) || 0;
+          setDiscountRate(rate);
+          console.log('✅ 티어 할인율 적용:', {
+            조직명: organizationName,
+            티어: tier,
+            할인율: `${rate}%`,
+            설명: criteriaData.description
+          });
+        }
+      } catch (error) {
+        console.error('❌ 티어 할인율 조회 중 오류:', error);
+        // 오류 발생 시 기본값 설정
+        setDiscountRate(0.5);
+      }
+    };
+
+    fetchDiscountRate();
+  }, [organizationTier, organizationName]);
 
   // 필터 상태 변경 시 공급가 갱신 상태 확인
   useEffect(() => {
@@ -275,11 +371,24 @@ export default function OrderRegistrationTab({
         }
 
         // DB 업데이트 (price_updated_at 필드에 갱신 일시 저장)
+        // 할인 금액 계산 후 10원 단위 절사
+        const discountAmount = Math.floor((newSupplyPrice * discountRate / 100) / 10) * 10;
+        const finalSupplyPrice = newSupplyPrice - discountAmount;
+
+        if (updatedCount === 0) {
+          console.log('💰 할인율 적용 예시:', {
+            원공급가: newSupplyPrice,
+            할인율: `${discountRate}%`,
+            할인금액: discountAmount,
+            할인후공급가: finalSupplyPrice
+          });
+        }
+
         const { error: updateError } = await supabase
           .from('integrated_orders')
           .update({
             seller_supply_price: newUnitPrice.toString(),
-            settlement_amount: newSupplyPrice.toString(),
+            settlement_amount: finalSupplyPrice.toString(),
             price_updated_at: now
           })
           .eq('id', order.id);
@@ -321,15 +430,38 @@ export default function OrderRegistrationTab({
 
     let finalDepositorName = '';
 
-    // 1단계: 셀러계정(조직) 정보 검증
+    // 1단계: 셀러계정(조직 또는 서브계정) 정보 검증
     try {
       if (!organizationId) {
         showModal('alert', '오류', '셀러계정 정보가 없습니다.');
         return;
       }
 
-      // 직접 supabase로 조직 정보 조회 (profile 페이지와 동일한 방식)
-      console.log('🔍 셀러계정 정보 조회 시작:', { organizationId });
+      // 서브계정이 선택된 경우 서브계정 정보 사용
+      if (selectedSubAccount && selectedSubAccount !== 'main') {
+        console.log('🔍 선택된 서브계정:', selectedSubAccount);
+
+        // 필수 정보 확인
+        const missingFields = [];
+        if (!selectedSubAccount?.account_number?.trim()) missingFields.push('정산계좌번호');
+        if (!selectedSubAccount?.bank_name?.trim()) missingFields.push('은행명');
+        if (!selectedSubAccount?.account_holder?.trim()) missingFields.push('예금주');
+        if (!selectedSubAccount?.representative_name?.trim()) missingFields.push('대표자명');
+
+        if (missingFields.length > 0) {
+          showModal('alert', '오류', `서브계정 정보가 불완전합니다.\n부족한 정보: ${missingFields.join(', ')}\n\n프로필 페이지에서 서브계정 정보를 완성해주세요.`);
+          return;
+        }
+
+        // 서브계정의 예금주를 입금자명으로 사용
+        setDefaultDepositorName(selectedSubAccount.account_holder);
+        setDepositorNameInput(selectedSubAccount.account_holder);
+        setShowDepositorNameModal(true);
+        return;
+      }
+
+      // 메인 계정 정보 조회
+      console.log('🔍 메인 셀러계정 정보 조회 시작:', { organizationId });
       const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
 
@@ -475,10 +607,11 @@ export default function OrderRegistrationTab({
             order_number: orderNo,
             confirmed_at: now,
             organization_id: organizationId, // 조직 ID 저장
+            sub_account_id: (selectedSubAccount && selectedSubAccount !== 'main') ? selectedSubAccount.id : null, // 서브계정 ID 저장 (서브계정 선택 시만)
             created_by: userId, // 등록자 ID 저장
             final_deposit_amount: Math.round(finalPaymentAmount), // 최종입금액 저장 (settlement_amount - cash_used)
             cash_used: orderCashUsed, // 주문별 캐시 사용액 저장
-            depositor_name: finalDepositorName, // 입금자명 저장 (배치별)
+            depositor_name: (selectedSubAccount && selectedSubAccount !== 'main') ? selectedSubAccount.account_holder : finalDepositorName, // 서브계정 예금주 또는 메인계정 입금자명
           })
           .eq('id', order.id);
 
@@ -879,6 +1012,15 @@ export default function OrderRegistrationTab({
     });
   };
 
+  // 서브계정 ID로 사업자명 찾기 헬퍼 함수
+  const getAccountName = (subAccountId: string | null | undefined): string => {
+    if (!subAccountId) {
+      return organizationName || '메인계정';
+    }
+    const subAccount = subAccounts.find(sub => sub.id === subAccountId);
+    return subAccount?.business_name || '알 수 없음';
+  };
+
   // 상태별 칼럼 정의
   const getColumnsByStatus = useMemo(() => {
     // 날짜 렌더러 함수 - UTC를 한국 시간으로 변환하여 표시
@@ -977,6 +1119,16 @@ export default function OrderRegistrationTab({
           align: 'center' as const,
           renderer: (value: any, row: any, index: number) => (
             <span style={{ fontSize: '13px' }}>{index + 1}</span>
+          )
+        },
+        {
+          key: 'accountName',
+          title: '계정',
+          width: 120,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any, row: Order) => (
+            <span style={{ fontSize: '13px' }}>{getAccountName(row.subAccountId)}</span>
           )
         },
         {
@@ -1081,6 +1233,16 @@ export default function OrderRegistrationTab({
           align: 'center' as const,
           renderer: (value: any, row: any, index: number) => (
             <span style={{ fontSize: '13px' }}>{index + 1}</span>
+          )
+        },
+        {
+          key: 'accountName',
+          title: '계정',
+          width: 120,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any, row: Order) => (
+            <span style={{ fontSize: '13px' }}>{getAccountName(row.subAccountId)}</span>
           )
         },
         {
@@ -1192,6 +1354,16 @@ export default function OrderRegistrationTab({
           align: 'center' as const,
           renderer: (value: any, row: any, index: number) => (
             <span style={{ fontSize: '13px' }}>{index + 1}</span>
+          )
+        },
+        {
+          key: 'accountName',
+          title: '계정',
+          width: 120,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any, row: Order) => (
+            <span style={{ fontSize: '13px' }}>{getAccountName(row.subAccountId)}</span>
           )
         },
         {
@@ -1313,6 +1485,16 @@ export default function OrderRegistrationTab({
               </span>
             );
           }
+        },
+        {
+          key: 'accountName',
+          title: '계정',
+          width: 120,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any, row: Order) => (
+            <span style={{ fontSize: '13px' }}>{getAccountName(row.subAccountId)}</span>
+          )
         },
         {
           key: 'courier',
@@ -1438,6 +1620,16 @@ export default function OrderRegistrationTab({
           renderer: dateRenderer
         },
         {
+          key: 'accountName',
+          title: '계정',
+          width: 120,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any, row: Order) => (
+            <span style={{ fontSize: '13px' }}>{getAccountName(row.subAccountId)}</span>
+          )
+        },
+        {
           key: 'cancelReason',
           title: '취소사유',
           readOnly: true,
@@ -1547,6 +1739,16 @@ export default function OrderRegistrationTab({
           readOnly: true,
           align: 'center' as const,
           renderer: dateRenderer
+        },
+        {
+          key: 'accountName',
+          title: '계정',
+          width: 120,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any, row: Order) => (
+            <span style={{ fontSize: '13px' }}>{getAccountName(row.subAccountId)}</span>
+          )
         },
         {
           key: 'cancelRequestedAt',
@@ -1678,6 +1880,16 @@ export default function OrderRegistrationTab({
               </span>
             );
           }
+        },
+        {
+          key: 'accountName',
+          title: '계정',
+          width: 120,
+          readOnly: true,
+          align: 'center' as const,
+          renderer: (value: any, row: Order) => (
+            <span style={{ fontSize: '13px' }}>{getAccountName(row.subAccountId)}</span>
+          )
         },
         {
           key: 'refundAmount',
@@ -1926,7 +2138,7 @@ export default function OrderRegistrationTab({
         }
       }
     ];
-  }, [filterStatus, statusConfig]);
+  }, [filterStatus, statusConfig, subAccounts, organizationName]);
 
   // 엑셀 양식 다운로드 핸들러
   const handleDownloadTemplate = () => {
@@ -2107,12 +2319,25 @@ export default function OrderRegistrationTab({
   // 주문건수 및 공급가 합계 계산
   const orderSummary = useMemo(() => {
     const count = filteredOrders.length;
+
+    // 원래 공급가 합계 (할인 전)
     const totalSupplyPrice = filteredOrders.reduce((sum, order) => {
       const price = parseFloat(order.supplyPrice || '0');
       return sum + (isNaN(price) ? 0 : price);
     }, 0);
-    return { count, totalSupplyPrice };
-  }, [filteredOrders]);
+
+    // 할인 금액 계산 후 10원 단위 절사
+    const discountAmount = Math.floor((totalSupplyPrice * discountRate / 100) / 10) * 10;
+    // 할인 후 공급가 = 원래 공급가 - 절사된 할인금액
+    const discountedTotalSupplyPrice = totalSupplyPrice - discountAmount;
+
+    return {
+      count,
+      totalSupplyPrice,           // 원래 공급가
+      discountAmount,             // 할인 금액 (10원 단위 절사)
+      discountedTotalSupplyPrice  // 할인 후 공급가
+    };
+  }, [filteredOrders, discountRate]);
 
   // 상태별 설명 텍스트
   const statusDescriptions: Record<Order['status'], string> = {
@@ -2277,7 +2502,11 @@ export default function OrderRegistrationTab({
             }}
             style={{
               padding: '4px 12px',
-              border: selectedDateFilter === 'today' ? '2px solid #3b82f6' : '1px solid var(--color-border)',
+              border: selectedDateFilter === 'today'
+                ? '2px solid #3b82f6'
+                : document.documentElement.classList.contains('dark')
+                  ? '0.2px solid var(--color-border)'
+                  : '1px solid var(--color-border)',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px',
@@ -2311,7 +2540,11 @@ export default function OrderRegistrationTab({
             }}
             style={{
               padding: '4px 12px',
-              border: selectedDateFilter === 'yesterday' ? '2px solid #3b82f6' : '1px solid var(--color-border)',
+              border: selectedDateFilter === 'yesterday'
+                ? '2px solid #3b82f6'
+                : document.documentElement.classList.contains('dark')
+                  ? '0.2px solid var(--color-border)'
+                  : '1px solid var(--color-border)',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px',
@@ -2345,7 +2578,11 @@ export default function OrderRegistrationTab({
             }}
             style={{
               padding: '4px 12px',
-              border: selectedDateFilter === '7days' ? '2px solid #3b82f6' : '1px solid var(--color-border)',
+              border: selectedDateFilter === '7days'
+                ? '2px solid #3b82f6'
+                : document.documentElement.classList.contains('dark')
+                  ? '0.2px solid var(--color-border)'
+                  : '1px solid var(--color-border)',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px',
@@ -2379,7 +2616,11 @@ export default function OrderRegistrationTab({
             }}
             style={{
               padding: '4px 12px',
-              border: selectedDateFilter === '30days' ? '2px solid #3b82f6' : '1px solid var(--color-border)',
+              border: selectedDateFilter === '30days'
+                ? '2px solid #3b82f6'
+                : document.documentElement.classList.contains('dark')
+                  ? '0.2px solid var(--color-border)'
+                  : '1px solid var(--color-border)',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px',
@@ -2413,7 +2654,11 @@ export default function OrderRegistrationTab({
             }}
             style={{
               padding: '4px 12px',
-              border: selectedDateFilter === '90days' ? '2px solid #3b82f6' : '1px solid var(--color-border)',
+              border: selectedDateFilter === '90days'
+                ? '2px solid #3b82f6'
+                : document.documentElement.classList.contains('dark')
+                  ? '0.2px solid var(--color-border)'
+                  : '1px solid var(--color-border)',
               borderRadius: '6px',
               fontSize: '12px',
               height: '28px',
@@ -2456,55 +2701,165 @@ export default function OrderRegistrationTab({
         {/* 발주서 관리 버튼들 - 우측 (발주서등록 상태만) */}
         {filterStatus === 'registered' && (
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={() => setShowMarketFileUploadModal(true)}
-              className="bg-purple hover:bg-purple-hover"
-              style={{
-                padding: '6px 16px',
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <button
+                onClick={() => {
+                  // 서브계정이 있는 경우에만 선택 검증
+                  if (subAccounts && subAccounts.length > 0 && !selectedSubAccount) {
+                    toast.error('발주 계정을 먼저 선택해주세요', {
+                      duration: 3000,
+                      position: 'top-center',
+                    });
+                    return;
+                  }
+                  setShowMarketFileUploadModal(true);
+                }}
+                onMouseEnter={(e) => {
+                  const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                  if (tooltip) tooltip.style.visibility = 'visible';
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                  if (tooltip) tooltip.style.visibility = 'hidden';
+                  e.currentTarget.style.background = 'transparent';
+                }}
+                style={{
+                  padding: '6px 16px',
+                  color: '#8b5cf6',
+                  background: 'transparent',
+                  border: '1px solid #8b5cf6',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Upload size={14} />
+                마켓파일 업로드
+              </button>
+              <div style={{
+                visibility: 'hidden',
+                position: 'absolute',
+                bottom: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                marginBottom: '8px',
+                padding: '8px 12px',
+                background: '#1f2937',
                 color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                height: '28px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <Upload size={14} />
-              마켓파일 업로드
-            </button>
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="bg-primary hover:bg-primary-hover"
-              style={{
-                padding: '6px 16px',
+                fontSize: '11px',
+                borderRadius: '4px',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                pointerEvents: 'none',
+                zIndex: 1000
+              }}>
+                <strong>지원마켓</strong> 스마트스토어 쿠팡 11번가 토스 ESM 카카오 올웨이즈 및 셀러요청 마켓
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '5px solid transparent',
+                  borderRight: '5px solid transparent',
+                  borderTop: '5px solid #1f2937'
+                }}></div>
+              </div>
+            </div>
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <button
+                onClick={() => {
+                  // 서브계정이 있는 경우에만 선택 검증
+                  if (subAccounts && subAccounts.length > 0 && !selectedSubAccount) {
+                    toast.error('발주 계정을 먼저 선택해주세요', {
+                      duration: 3000,
+                      position: 'top-center',
+                    });
+                    return;
+                  }
+                  setShowUploadModal(true);
+                }}
+                onMouseEnter={(e) => {
+                  const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                  if (tooltip) tooltip.style.visibility = 'visible';
+                  e.currentTarget.style.background = 'rgba(37, 99, 235, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                  if (tooltip) tooltip.style.visibility = 'hidden';
+                  e.currentTarget.style.background = 'transparent';
+                }}
+                style={{
+                  padding: '6px 16px',
+                  color: '#2563eb',
+                  background: 'transparent',
+                  border: '1px solid #2563eb',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Upload size={14} />
+                발주서 업로드
+              </button>
+              <div style={{
+                visibility: 'hidden',
+                position: 'absolute',
+                bottom: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                marginBottom: '8px',
+                padding: '8px 12px',
+                background: '#1f2937',
                 color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                height: '28px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <Upload size={14} />
-              발주서 업로드
-            </button>
+                fontSize: '11px',
+                borderRadius: '4px',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                pointerEvents: 'none',
+                zIndex: 1000
+              }}>
+                달래마켓 양식 사용
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '5px solid transparent',
+                  borderRight: '5px solid transparent',
+                  borderTop: '5px solid #1f2937'
+                }}></div>
+              </div>
+            </div>
             <button
               onClick={handleDownloadTemplate}
-              className="bg-success hover:bg-success-hover"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
               style={{
                 padding: '6px 16px',
-                color: 'white',
-                border: 'none',
+                color: '#10b981',
+                background: 'transparent',
+                border: '1px solid #10b981',
                 borderRadius: '6px',
                 fontSize: '12px',
                 fontWeight: '500',
@@ -2543,58 +2898,53 @@ export default function OrderRegistrationTab({
                 {orderSummary.count.toLocaleString()}건
               </span>
             </div>
+
             <div>
               <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>공급가 합계</span>
-              <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-primary)' }}>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-text)' }}>
                 {orderSummary.totalSupplyPrice.toLocaleString()}원
               </span>
             </div>
 
-            {/* 공급가 갱신 버튼 (발주서등록 상태일 때만) */}
-            {filterStatus === 'registered' && !isPriceUpdated ? (
-              <button
-                onClick={handlePriceUpdate}
-                disabled={isUpdatingPrice}
-                style={{
-                  padding: '6px 14px',
-                  background: isUpdatingPrice ? '#9ca3af' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: isUpdatingPrice ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 2px 4px rgba(245, 158, 11, 0.2)',
-                  whiteSpace: 'nowrap',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isUpdatingPrice) e.currentTarget.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={(e) => {
-                  if (!isUpdatingPrice) e.currentTarget.style.transform = 'translateY(0)';
-                }}
-              >
-                <RefreshCw size={14} className={isUpdatingPrice ? 'animate-spin' : ''} />
-                {isUpdatingPrice ? '처리 중...' : '공급가'}
-              </button>
-            ) : filterStatus === 'registered' ? (
-              <div style={{
-                padding: '6px 14px',
-                background: '#d1fae5',
-                color: '#059669',
-                border: '1px solid #10b981',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: '600',
-                whiteSpace: 'nowrap'
-              }}>
-                ✓ 완료
+            {/* 화살표 */}
+            {discountRate > 0 && (
+              <svg width="32" height="24" viewBox="0 0 32 24" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M6 8L10 12L6 16M14 8L18 12L14 16" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+
+            {/* 등급할인적용 */}
+            {discountRate > 0 && (
+              <div>
+                <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>등급할인적용 ({userTier} {discountRate}%)</span>
+                <span style={{ fontSize: '18px', fontWeight: '700', color: '#f87171' }}>
+                  -{orderSummary.discountAmount.toLocaleString()}원
+                </span>
               </div>
-            ) : null}
+            )}
+
+            {/* 화살표 */}
+            {discountRate > 0 && (
+              <svg width="32" height="24" viewBox="0 0 32 24" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M6 8L10 12L6 16M14 8L18 12L14 16" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+
+            {/* 할인 후 금액 */}
+            {discountRate > 0 && (
+              <div>
+                <span style={{ fontSize: '18px', fontWeight: '700', color: '#10b981' }}>
+                  {orderSummary.discountedTotalSupplyPrice.toLocaleString()}원
+                </span>
+              </div>
+            )}
+
+            {/* 화살표 */}
+            {filterStatus === 'registered' && isPriceUpdated && (
+              <svg width="32" height="24" viewBox="0 0 32 24" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M6 8L10 12L6 16M14 8L18 12L14 16" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
 
             {/* 캐시 사용 - 공급가 갱신 후에만 활성화 (발주서등록 상태일 때만) */}
             {filterStatus === 'registered' && isPriceUpdated && (
@@ -2605,8 +2955,8 @@ export default function OrderRegistrationTab({
                   style={{
                     padding: '4px 10px',
                     background: 'transparent',
-                    color: '#10b981',
-                    border: '1px solid #10b981',
+                    color: 'var(--color-primary, #2563eb)',
+                    border: '1px solid var(--color-primary, #2563eb)',
                     borderRadius: '4px',
                     fontSize: '11px',
                     fontWeight: '600',
@@ -2616,7 +2966,7 @@ export default function OrderRegistrationTab({
                     outline: 'none'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#d1fae5';
+                    e.currentTarget.style.background = 'var(--color-primary-light, #dbeafe)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = 'transparent';
@@ -2633,9 +2983,9 @@ export default function OrderRegistrationTab({
                     }}
                     style={{
                       padding: '4px 10px',
-                      background: '#10b981',
+                      background: 'var(--color-primary, #2563eb)',
                       color: 'white',
-                      border: '1px solid #10b981',
+                      border: '1px solid var(--color-primary, #2563eb)',
                       borderRadius: '4px',
                       fontSize: '11px',
                       fontWeight: '600',
@@ -2645,10 +2995,10 @@ export default function OrderRegistrationTab({
                       outline: 'none'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#059669';
+                      e.currentTarget.style.background = 'var(--color-primary-dark, #1d4ed8)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#10b981';
+                      e.currentTarget.style.background = 'var(--color-primary, #2563eb)';
                     }}
                   >
                     캐시사용
@@ -2658,103 +3008,202 @@ export default function OrderRegistrationTab({
                     value={cashToUse || ''}
                     onChange={(e) => {
                       const value = parseInt(e.target.value) || 0;
-                      const maxCash = Math.min(cashBalance, orderSummary.totalSupplyPrice);
-                      setCashToUse(Math.max(0, Math.min(value, maxCash)));
+                      // 10원 단위로 절사
+                      const roundedValue = Math.floor(value / 10) * 10;
+                      const maxCash = Math.min(cashBalance, orderSummary.discountedTotalSupplyPrice);
+                      setCashToUse(Math.max(0, Math.min(roundedValue, maxCash)));
                     }}
                     min={0}
-                    max={Math.min(cashBalance, orderSummary.totalSupplyPrice)}
+                    max={Math.min(cashBalance, orderSummary.discountedTotalSupplyPrice)}
+                    step={10}
                     placeholder="캐시 입력"
                     style={{
                       width: '100px',
                       height: '26px',
                       padding: '0 8px',
-                      border: '1px solid #10b981',
+                      border: '1px solid var(--color-primary, #2563eb)',
                       borderRadius: '4px',
                       fontSize: '12px',
                       fontWeight: '600',
-                      color: '#10b981',
+                      color: 'var(--color-primary, #2563eb)',
                       background: 'transparent',
                       textAlign: 'right',
                       boxSizing: 'border-box'
                     }}
                   />
-                  <button
-                    onClick={() => {
-                      const maxCash = Math.min(cashBalance, orderSummary.totalSupplyPrice);
-                      setCashToUse(maxCash);
-                    }}
-                    style={{
-                      height: '26px',
-                      padding: '0 8px',
-                      background: '#10b981',
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <button
+                      onClick={() => {
+                        const maxCash = Math.min(cashBalance, orderSummary.discountedTotalSupplyPrice);
+                        // 10원 단위로 절사
+                        const roundedMaxCash = Math.floor(maxCash / 10) * 10;
+                        setCashToUse(roundedMaxCash);
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--color-primary-dark, #1d4ed8)';
+                        const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                        if (tooltip) tooltip.style.visibility = 'visible';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'var(--color-primary, #2563eb)';
+                        const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                        if (tooltip) tooltip.style.visibility = 'hidden';
+                      }}
+                      style={{
+                        height: '26px',
+                        padding: '0 8px',
+                        background: 'var(--color-primary, #2563eb)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center',
+                        outline: 'none'
+                      }}
+                    >
+                      전액
+                    </button>
+                    <div style={{
+                      visibility: 'hidden',
+                      position: 'absolute',
+                      bottom: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      marginBottom: '8px',
+                      padding: '6px 10px',
+                      background: 'var(--color-tooltip-bg, #1f2937)',
                       color: 'white',
-                      border: 'none',
+                      fontSize: '11px',
                       borderRadius: '4px',
-                      fontSize: '10px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
                       whiteSpace: 'nowrap',
-                      display: 'flex',
-                      alignItems: 'center',
-                      outline: 'none'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
-                  >
-                    전액
-                  </button>
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                      pointerEvents: 'none',
+                      zIndex: 1000
+                    }}>
+                      캐시는 10원 단위로 사용 가능합니다
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: 0,
+                        height: 0,
+                        borderLeft: '5px solid transparent',
+                        borderRight: '5px solid transparent',
+                        borderTop: '5px solid var(--color-tooltip-bg, #1f2937)'
+                      }}></div>
+                    </div>
+                  </div>
                 </>
               )}
               </div>
             )}
 
-            {/* 구분선 - 공급가 갱신 후에만 (발주서등록 상태일 때만) */}
+            {/* 화살표 */}
             {filterStatus === 'registered' && isPriceUpdated && (
-              <div style={{ width: '1px', height: '24px', background: 'var(--color-border)', margin: '0 12px' }}></div>
+              <svg width="32" height="24" viewBox="0 0 32 24" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M6 8L10 12L6 16M14 8L18 12L14 16" stroke="var(--color-primary, #2563eb)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             )}
 
             {/* 최종 입금액 - 공급가 갱신 후에만 (발주서등록 상태일 때만) */}
             {filterStatus === 'registered' && isPriceUpdated && (
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ fontSize: '14px', fontWeight: '700', color: '#10b981' }}>최종 입금액</span>
-                <span style={{ fontSize: '18px', fontWeight: '700', color: '#10b981' }}>
-                  {(orderSummary.totalSupplyPrice - cashToUse).toLocaleString()}원
+                <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--color-primary, #2563eb)' }}>최종 입금액</span>
+                <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-primary, #2563eb)' }}>
+                  {(orderSummary.discountedTotalSupplyPrice - cashToUse).toLocaleString()}원
                 </span>
               </div>
             )}
           </div>
         </div>
 
-        {/* 발주확정 버튼 (발주서등록 상태일 때만) */}
+        {/* 공급가 갱신 및 발주확정 버튼 영역 (발주서등록 상태일 때만) */}
         {filterStatus === 'registered' && (
-          <button
-            onClick={handlePaymentConfirmation}
-            disabled={!isPriceUpdated}
-            style={{
-              padding: '12px 24px',
-              alignSelf: 'center',
-              background: !isPriceUpdated
-                ? '#9ca3af'
-                : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: '600',
-              transition: 'all 0.2s',
-              boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
-              alignSelf: 'flex-start'
-            }}
-            onMouseEnter={(e) => {
-              if (isPriceUpdated) e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              if (isPriceUpdated) e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            💳 입금완료 및 발주확정
-          </button>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {/* 공급가 갱신 버튼 */}
+            {!isPriceUpdated ? (
+              <button
+                onClick={handlePriceUpdate}
+                disabled={isUpdatingPrice}
+                style={{
+                  padding: '12px 24px',
+                  background: isUpdatingPrice ? '#9ca3af' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: isUpdatingPrice ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 2px 4px rgba(245, 158, 11, 0.2)',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isUpdatingPrice) e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!isUpdatingPrice) e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <RefreshCw size={16} className={isUpdatingPrice ? 'animate-spin' : ''} />
+                {isUpdatingPrice ? '처리 중...' : '공급가 갱신'}
+              </button>
+            ) : (
+              <div style={{
+                padding: '12px 24px',
+                background: 'transparent',
+                color: '#059669',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '600',
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                ✓ 공급가 갱신 완료
+              </div>
+            )}
+
+            {/* 발주확정 버튼 */}
+            <button
+              onClick={handlePaymentConfirmation}
+              disabled={!isPriceUpdated}
+              style={{
+                padding: '12px 24px',
+                background: 'transparent',
+                color: !isPriceUpdated ? '#9ca3af' : '#2563eb',
+                border: !isPriceUpdated ? '1px solid #9ca3af' : '1px solid #2563eb',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '600',
+                transition: 'all 0.2s',
+                cursor: !isPriceUpdated ? 'not-allowed' : 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                if (isPriceUpdated) {
+                  e.currentTarget.style.background = 'rgba(37, 99, 235, 0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (isPriceUpdated) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+            >
+              💳 입금완료 및 발주확정
+            </button>
+          </div>
         )}
         </div>
       )}
@@ -2921,30 +3370,36 @@ export default function OrderRegistrationTab({
             fontSize: '18px',
             fontWeight: '600',
             color: 'var(--color-text)',
-            marginBottom: '12px'
+            marginBottom: '16px'
           }}>
             등록된 주문이 없습니다
           </h3>
-          <p style={{
+
+          <div style={{
             fontSize: '14px',
             color: 'var(--color-text-secondary)',
-            marginBottom: '8px'
+            lineHeight: '1.6',
+            maxWidth: '600px',
+            margin: '0 auto'
           }}>
-            상단의 "마켓파일 업로드" 또는 "발주서 업로드" 버튼을 사용하여
-          </p>
-          <p style={{
-            fontSize: '14px',
-            color: 'var(--color-text-secondary)'
-          }}>
-            주문을 등록해주세요
-          </p>
+            <p style={{ marginBottom: '12px' }}>
+              <strong style={{ color: 'var(--color-text)' }}>마켓파일 업로드:</strong> 스마트스토어, 쿠팡, 11번가, 토스, ESM, 카카오, 올웨이즈 및 셀러요청 마켓 지원
+            </p>
+            <p style={{ marginBottom: '12px' }}>
+              <strong style={{ color: 'var(--color-text)' }}>발주서 업로드:</strong> 달래마켓 전용 양식 사용
+            </p>
+            <p style={{ marginTop: '16px', fontSize: '13px' }}>
+              주문 등록 후 <strong style={{ color: 'var(--color-text)' }}>공급가 갱신</strong> 버튼으로 최신 공급가를 적용하고,<br />
+              <strong style={{ color: 'var(--color-text)' }}>등급할인</strong>이 자동 적용되며 <strong style={{ color: '#2563eb' }}>캐시</strong>를 사용하여 최종 입금액을 확인할 수 있습니다.
+            </p>
+          </div>
         </div>
       )}
 
       {/* 발주 테이블 (주문이 있을 때만) */}
       {filteredOrders.length > 0 && (
       <EditableAdminGrid
-        key={`grid-${refreshTrigger}`}
+        key={`grid-${refreshTrigger}-${isDarkMode ? 'dark' : 'light'}`}
         data={filteredOrders}
         columns={getColumnsByStatus}
         height="600px"
@@ -2963,10 +3418,13 @@ export default function OrderRegistrationTab({
           setSelectedOrders(selectedIds);
         }}
         getRowStyle={filterStatus === 'registered' ? (row: Order) => {
+          const darkModeNow = document.documentElement.classList.contains('dark');
+
           if (!row.priceUpdatedAt) {
-            // 미갱신 - 빨간색 계열
+            // 미갱신 - 밝은 빨간색 계열
+            const bgColor = darkModeNow ? 'rgba(252, 165, 165, 0.05)' : '#fef2f2';
             return {
-              backgroundColor: '#fef2f2',
+              backgroundColor: bgColor,
             };
           }
 
@@ -2982,14 +3440,16 @@ export default function OrderRegistrationTab({
           const isToday = updatedDateStr === todayStr;
 
           if (isToday) {
-            // 오늘 갱신 완료 - 녹색 계열
+            // 오늘 갱신 완료 - 밝은 하늘색 계열
+            const bgColor = darkModeNow ? 'rgba(125, 211, 252, 0.05)' : '#f0f9ff';
             return {
-              backgroundColor: '#f0fdf4',
+              backgroundColor: bgColor,
             };
           } else {
-            // 과거 갱신 - 주황색 계열
+            // 과거 갱신 - 녹색 계열
+            const bgColor = darkModeNow ? 'rgba(134, 239, 172, 0.05)' : '#f0fdf4';
             return {
-              backgroundColor: '#fffbeb',
+              backgroundColor: bgColor,
             };
           }
         } : undefined}
@@ -3000,53 +3460,208 @@ export default function OrderRegistrationTab({
       {filterStatus === 'registered' && filteredOrders.length > 0 && (
         <div style={{
           marginTop: '16px',
-          padding: '16px 20px',
-          background: '#f8fafc',
-          borderRadius: '8px',
-          border: '1px solid #e2e8f0'
+          position: 'relative'
         }}>
-          <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+          {/* 펼치기/접기 버튼 - 왼쪽 상단에 작게 */}
+          <button
+            onClick={() => setIsGuideExpanded(!isGuideExpanded)}
+            style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              zIndex: 10,
+              width: '24px',
+              height: '24px',
+              background: document.documentElement.classList.contains('dark') ? 'var(--color-surface)' : '#ffffff',
+              border: document.documentElement.classList.contains('dark') ? '0.2px solid #3b82f6' : '0.5px solid #3b82f6',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              outline: 'none',
+              boxShadow: '0 1px 3px rgba(59,130,246,0.1)'
+            }}
+            onMouseEnter={(e) => {
+              const isDark = document.documentElement.classList.contains('dark');
+              e.currentTarget.style.background = isDark ? 'var(--color-surface-hover)' : '#eff6ff';
+              e.currentTarget.style.borderColor = '#2563eb';
+            }}
+            onMouseLeave={(e) => {
+              const isDark = document.documentElement.classList.contains('dark');
+              e.currentTarget.style.background = isDark ? 'var(--color-surface)' : '#ffffff';
+              e.currentTarget.style.borderColor = '#3b82f6';
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              style={{
+                transform: isGuideExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.3s ease-in-out'
+              }}
+            >
+              {/* 오른쪽 하단 대각선 화살표 */}
+              <path
+                d="M6 6L10 10"
+                stroke="#3b82f6"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M10 7L10 10L7 10"
+                stroke="#3b82f6"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+
+          <div
+            style={{
+              transformOrigin: 'top left',
+              transform: isGuideExpanded ? 'scale(1)' : 'scale(0)',
+              opacity: isGuideExpanded ? 1 : 0,
+              transition: 'all 0.6s ease-in-out',
+              overflow: 'hidden',
+              marginTop: '32px'
+            }}
+          >
+          <div
+            style={{
+              padding: '16px 20px 16px 40px'
+            }}
+          >
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
             <div style={{ flex: 1 }}>
-              <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text)', marginBottom: '8px' }}>
                 📌 행 배경색 안내
               </h4>
-              <div style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.6' }}>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '1.6' }}>
                 <div style={{ marginBottom: '4px' }}>
-                  <span style={{ display: 'inline-block', width: '16px', height: '16px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '3px', marginRight: '8px', verticalAlign: 'middle' }}></span>
-                  <span style={{ color: '#ef4444', fontWeight: '600' }}>빨간색</span>: 공급가 미갱신 (처음 등록된 주문)
+                  <span style={{
+                    display: 'inline-block',
+                    width: '16px',
+                    height: '16px',
+                    backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(252, 165, 165, 0.05)' : '#fef2f2',
+                    border: document.documentElement.classList.contains('dark') ? 'none' : '1px solid #fecaca',
+                    borderRadius: '3px',
+                    marginRight: '8px',
+                    verticalAlign: 'middle'
+                  }}></span>
+                  <span style={{ color: '#ef4444', fontWeight: '600' }}>빨간색</span>: 공급가 미갱신
                 </div>
                 <div style={{ marginBottom: '4px' }}>
-                  <span style={{ display: 'inline-block', width: '16px', height: '16px', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '3px', marginRight: '8px', verticalAlign: 'middle' }}></span>
-                  <span style={{ color: '#f59e0b', fontWeight: '600' }}>주황색</span>: 과거 갱신됨 (어제 이전 공급단가로 갱신)
+                  <span style={{
+                    display: 'inline-block',
+                    width: '16px',
+                    height: '16px',
+                    backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(134, 239, 172, 0.05)' : '#f0fdf4',
+                    border: document.documentElement.classList.contains('dark') ? 'none' : '1px solid #86efac',
+                    borderRadius: '3px',
+                    marginRight: '8px',
+                    verticalAlign: 'middle'
+                  }}></span>
+                  <span style={{ color: '#10b981', fontWeight: '600' }}>녹색</span>: 과거 갱신됨
                 </div>
                 <div>
-                  <span style={{ display: 'inline-block', width: '16px', height: '16px', backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '3px', marginRight: '8px', verticalAlign: 'middle' }}></span>
-                  <span style={{ color: '#10b981', fontWeight: '600' }}>녹색</span>: 오늘 갱신 완료 (최신 공급단가 적용)
+                  <span style={{
+                    display: 'inline-block',
+                    width: '16px',
+                    height: '16px',
+                    backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(125, 211, 252, 0.05)' : '#f0f9ff',
+                    border: document.documentElement.classList.contains('dark') ? 'none' : '1px solid #7dd3fc',
+                    borderRadius: '3px',
+                    marginRight: '8px',
+                    verticalAlign: 'middle'
+                  }}></span>
+                  <span style={{ color: '#0ea5e9', fontWeight: '600' }}>파란색</span>: 오늘 갱신 완료
                 </div>
               </div>
             </div>
             <div style={{ flex: 1 }}>
-              <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text)', marginBottom: '8px' }}>
                 ℹ️ 발주확정 절차
               </h4>
-              <div style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.6' }}>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '1.6' }}>
                 <div style={{ marginBottom: '4px' }}>
-                  1. <span style={{ fontWeight: '600', color: '#f59e0b' }}>공급가 갱신</span> 버튼을 클릭하여 최신 공급단가로 업데이트
+                  1. <span style={{ fontWeight: '600', color: 'var(--color-warning, #f59e0b)' }}>공급가 갱신</span>
                 </div>
                 <div style={{ marginBottom: '4px' }}>
-                  2. 모든 주문이 <span style={{ fontWeight: '600', color: '#10b981' }}>녹색</span>으로 변경되면 캐시 사용 가능
+                  2. <span style={{ fontWeight: '600', color: 'var(--color-text)' }}>등급할인</span> 자동 적용
+                </div>
+                <div style={{ marginBottom: '4px' }}>
+                  3. <span style={{ fontWeight: '600', color: 'var(--color-primary, #2563eb)' }}>캐시 사용</span> (10원 단위)
                 </div>
                 <div>
-                  3. 입금완료 및 발주확정 실행 (다음 단계로 이관)
+                  4. <span style={{ fontWeight: '600', color: 'var(--color-text)' }}>입금완료 및 발주확정</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ marginBottom: '8px' }}>
+                <button
+                  style={{
+                    padding: '4px 12px',
+                    background: 'var(--color-purple, #8b5cf6)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: '500',
+                    cursor: 'default',
+                    height: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    pointerEvents: 'none',
+                    opacity: 0.9
+                  }}
+                >
+                  <Upload size={12} />
+                  마켓파일 업로드
+                </button>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '1.6' }}>
+                <div style={{ marginBottom: '4px' }}>
+                  <span style={{ fontWeight: '600', color: 'var(--color-purple, #8b5cf6)' }}>✓ 1분 안에 발주 완료</span>
+                </div>
+                <div style={{ marginBottom: '4px', color: 'var(--color-text-secondary)', fontSize: '11px' }}>
+                  주문 파일을 <strong style={{ color: 'var(--color-text)' }}>수정 없이 그대로</strong> 업로드하면 자동 통합
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary, #94a3b8)' }}>
+                  마켓별/상품별 통계, 차트 완벽 활용
+                </div>
+              </div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <h4 style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text)', marginBottom: '8px' }}>
+                🏢 서브계정 분리 정산
+              </h4>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '1.6' }}>
+                <div style={{ marginBottom: '6px' }}>
+                  <span style={{ fontWeight: '600', color: 'var(--color-cyan, #0891b2)' }}>✓ 사업자별 자동 분리</span>
+                </div>
+                <div style={{ marginBottom: '4px', color: 'var(--color-text-secondary)' }}>
+                  서브계정별 발주서 등록 및 <strong style={{ color: 'var(--color-text)' }}>자동 정산 처리</strong>
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary, #94a3b8)', marginTop: '4px' }}>
+                  거래명세서, 세금계산서 등 모든 정산 서류 자동 분리 발행
                 </div>
               </div>
             </div>
           </div>
-          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
-            <p style={{ fontSize: '11px', color: '#94a3b8', lineHeight: '1.5' }}>
-              <strong>참고:</strong> 공급가 갱신은 매일 최신 공급단가를 반영하기 위해 필요합니다.
-              어제 이전에 갱신된 주문(주황색)은 오늘 다시 갱신해야 합니다.
+          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--color-border)' }}>
+            <p style={{ fontSize: '11px', color: 'var(--color-text-tertiary, #94a3b8)', lineHeight: '1.5' }}>
+              <strong style={{ color: 'var(--color-text-secondary)' }}>💡 파일 업로드:</strong> <span style={{ fontWeight: '600', color: 'var(--color-text)' }}>마켓파일</span> (스마트스토어, 쿠팡, 11번가, 토스, ESM, 카카오, 올웨이즈 등) 또는 <span style={{ fontWeight: '600', color: 'var(--color-text)' }}>발주서</span> (달래마켓 양식) 업로드 가능 •
+              <strong style={{ color: 'var(--color-text-secondary)' }}>공급가 갱신은 매일 필요</strong>하며, 어제 이전 갱신 주문(주황색)은 오늘 다시 갱신해야 합니다.
             </p>
+          </div>
+          </div>
           </div>
         </div>
       )}
@@ -3246,6 +3861,7 @@ export default function OrderRegistrationTab({
         }}
         userId={userId}
         userEmail={userEmail}
+        selectedSubAccount={selectedSubAccount}
       />
 
       {/* 옵션 검증 모달 (발주확정용) */}
@@ -3261,8 +3877,13 @@ export default function OrderRegistrationTab({
             // 각 주문에 발주번호 생성 및 업데이트
             const now = getCurrentTimeUTC();
 
-            // 총 공급가 계산
-            const totalSupplyPrice = validatedOrders.reduce((sum, order) => sum + (order.supplyPrice || 0), 0);
+            // 총 공급가 계산 (할인 금액 10원 단위 절사)
+            const totalSupplyPrice = validatedOrders.reduce((sum, order) => {
+              const price = order.supplyPrice || 0;
+              const discountAmount = Math.floor((price * discountRate / 100) / 10) * 10;
+              const finalPrice = price - discountAmount;
+              return sum + finalPrice;
+            }, 0);
             // 주문당 캐시 차감액 계산
             const cashPerOrder = cashToUse / validatedOrders.length;
 
@@ -3272,10 +3893,14 @@ export default function OrderRegistrationTab({
               const quantity = parseInt(order.quantity) || 1;
               const unitPrice = order.unitPrice || 0;
               const supplyPrice = order.supplyPrice || (unitPrice * quantity);
+              // 할인 금액 계산 후 10원 단위 절사
+              const discountAmount = Math.floor((supplyPrice * discountRate / 100) / 10) * 10;
+              const finalSupplyPrice = supplyPrice - discountAmount;
 
-              // 주문별 최종입금액 계산 (공급가 - 캐시사용액 비율 분배)
-              const orderCashDeduction = totalSupplyPrice > 0 ? (supplyPrice / totalSupplyPrice) * cashToUse : 0;
-              const finalPaymentAmount = supplyPrice - orderCashDeduction;
+              // 주문별 최종입금액 계산 (할인된 공급가 - 캐시사용액 비율 분배)
+              const orderCashDeduction = totalSupplyPrice > 0 ? (finalSupplyPrice / totalSupplyPrice) * cashToUse : 0;
+              const finalPaymentAmount = finalSupplyPrice - orderCashDeduction;
+              const roundedFinalPayment = Math.floor(finalPaymentAmount / 10) * 10;
 
               const { error } = await supabase
                 .from('integrated_orders')
@@ -3287,8 +3912,8 @@ export default function OrderRegistrationTab({
                   created_by: userId, // 등록자 ID 저장
                   option_name: order.optionName, // 수정된 옵션상품
                   seller_supply_price: unitPrice,
-                  settlement_amount: supplyPrice,
-                  final_payment_amount: Math.round(finalPaymentAmount).toString() // 최종입금액 저장
+                  settlement_amount: finalSupplyPrice,
+                  final_payment_amount: roundedFinalPayment.toString() // 최종입금액 저장 (10원 단위 절사)
                 })
                 .eq('id', order._metadata.id);
 
@@ -3367,7 +3992,7 @@ export default function OrderRegistrationTab({
         >
           <div style={{ padding: '20px' }}>
             <p style={{ marginBottom: '16px', color: '#666' }}>
-              이 배치의 입금자명을 입력해주세요.
+              입금자명을 입력해주세요.
             </p>
             <input
               type="text"

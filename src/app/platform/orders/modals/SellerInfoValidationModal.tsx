@@ -183,10 +183,27 @@ export default function SellerInfoValidationModal({
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 10000,
-        padding: '20px'
+        padding: '20px',
+        animation: 'fadeIn 0.3s ease-in-out'
       }}
       onClick={onClose}
     >
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from {
+            transform: scale(0.95);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
       <div
         style={{
           background: 'var(--color-surface)',
@@ -195,7 +212,8 @@ export default function SellerInfoValidationModal({
           width: '100%',
           maxHeight: '90vh',
           overflow: 'auto',
-          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)'
+          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+          animation: 'scaleIn 0.3s ease-in-out'
         }}
         onClick={(e) => e.stopPropagation()}
       >

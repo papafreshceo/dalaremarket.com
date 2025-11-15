@@ -38,24 +38,21 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
         />
-        {/* FOUC 방지: 관리자 화면에서만 테마 적용 */}
-        <script dangerouslySetInnerHTML={{
-          __html: `
-            (function() {
-              try {
-                // 관리자 화면에서만 다크모드 적용
-                if (window.location.pathname.startsWith('/admin')) {
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
                   const theme = localStorage.getItem('theme');
-                  if (theme === 'dark') {
+                  const path = window.location.pathname;
+                  if ((path.startsWith('/admin') || path.startsWith('/platform/orders')) && theme === 'dark') {
                     document.documentElement.classList.add('dark');
-                  } else {
-                    document.documentElement.classList.remove('dark');
                   }
-                }
-              } catch (e) {}
-            })();
-          `
-        }} />
+                } catch(e) {}
+              })();
+            `
+          }}
+        />
       </head>
       <body className="font-pretendard antialiased" style={{ visibility: 'visible' }}>
         <ThemeProvider>

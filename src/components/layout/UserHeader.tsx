@@ -320,12 +320,12 @@ export default function UserHeader() {
 
   const navItems: NavItem[] = [
     {
-      path: '/platform/products',
+      path: '/platform',
       text: '공급상품',
       hasSubmenu: true,
       submenu: [
-        { path: '/platform/products/all', text: '전체상품' },
-        { path: '/platform/products/calendar', text: '상품캘린더' },
+        { path: '/platform/all', text: '전체상품' },
+        { path: '/platform/calendar', text: '상품캘린더' },
         { path: '/gallery', text: '이미지다운로드' }
       ]
     },
@@ -347,6 +347,7 @@ export default function UserHeader() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     showToast('로그아웃되었습니다.', 'success');
+    router.push('/platform');
   };
 
   // 상태별 설정
@@ -420,7 +421,7 @@ export default function UserHeader() {
         right: 0,
         height: isMobile ? '35px' : '70px',
         background: isMobile ? 'transparent' : 'white',
-        borderBottom: isMobile ? 'none' : '1px solid #e0e0e0',
+        borderBottom: 'none',
         zIndex: 1000,
         transition: isMobile ? 'left 0.3s ease' : 'none'
       }}>
@@ -457,7 +458,7 @@ export default function UserHeader() {
               </button>
             )}
 
-            <Link href="/">
+            <Link href="/platform">
               <img
                 src="https://res.cloudinary.com/dde1hpbrp/image/upload/v1753148563/05_etc/dalraemarket_papafarmers.com/DalraeMarket_loge_trans.png"
                 alt="달래마켓"

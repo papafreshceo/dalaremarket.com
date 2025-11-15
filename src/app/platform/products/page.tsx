@@ -1,7 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { AuthModal } from '@/components/auth/AuthModal';
+import ToolModal from '@/components/tools/ToolModal';
 import StatsCards from './components/StatsCards';
 import SupplyProductsTable from './components/SupplyProductsTable';
 import MarketPrices from './components/MarketPrices';
@@ -58,6 +61,7 @@ interface CalendarDay {
 }
 
 export default function ProductsPage() {
+  const searchParams = useSearchParams();
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [isMounted, setIsMounted] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -67,6 +71,10 @@ export default function ProductsPage() {
   const [shippingMonth, setShippingMonth] = useState(new Date());
   const [productMonth, setProductMonth] = useState(new Date());
   const [orders, setOrders] = useState<any[]>([]); // 차트 컴포넌트용 빈 배열
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [expandedComponent, setExpandedComponent] = useState<string | null>(null);
+  const [selectedTool, setSelectedTool] = useState<string | null>(null);
+  const [tools, setTools] = useState<any[]>([]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -82,6 +90,13 @@ export default function ProductsPage() {
       return () => window.removeEventListener('resize', checkMobile);
     }
   }, []);
+
+  // URL 파라미터로 로그인 모달 열기
+  useEffect(() => {
+    if (searchParams.get('login') === 'true') {
+      setShowLoginModal(true);
+    }
+  }, [searchParams]);
 
   // 통계 데이터 가져오기
   useEffect(() => {
@@ -142,6 +157,22 @@ export default function ProductsPage() {
     };
 
     fetchStats();
+  }, []);
+
+  // 도구 목록 가져오기
+  useEffect(() => {
+    const fetchTools = async () => {
+      try {
+        const response = await fetch('/api/tools');
+        const data = await response.json();
+        if (data.success && data.tools) {
+          setTools(data.tools);
+        }
+      } catch (error) {
+        console.error('도구 목록 로드 실패:', error);
+      }
+    };
+    fetchTools();
   }, []);
 
   // 출하중인 상품 목록 가져오기
@@ -317,14 +348,14 @@ export default function ProductsPage() {
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'linear-gradient(180deg, #3b82f6 0%, #60a5fa 300px, #93c5fd 600px, #bfdbfe 900px, #dbeafe 1200px, #f0f9ff 1500px, #ffffff 1800px, #ffffff 100%)',
+        background: 'linear-gradient(180deg, #ffffff 0%, #fefefe 50px, #fafaff 100px, #f5f7ff 150px, #f0f4ff 200px, #e8f0ff 250px, #dce7fe 300px, #d0dffe 350px, #c0d4fd 400px, #b0c9fc 450px, #9ebcfb 500px, #8aaffa 550px, #75a2f9 600px, #5f94f8 650px, #4787f6 700px, #3b82f6 750px, #60a5fa 1050px, #93c5fd 1350px, #bfdbfe 1650px, #dbeafe 1950px, #f0f9ff 2250px, #ffffff 2550px, #ffffff 100%)',
         zIndex: -3
       }} />
 
       {/* 왼쪽 연두색 */}
       <div style={{
         position: 'absolute',
-        top: '400px',
+        top: '600px',
         left: 0,
         width: '600px',
         height: '400px',
@@ -335,11 +366,11 @@ export default function ProductsPage() {
       {/* 우측 상단 보라색 */}
       <div style={{
         position: 'absolute',
-        top: 0,
+        top: '400px',
         right: 0,
         width: '1600px',
         height: '1200px',
-        background: 'radial-gradient(ellipse at 100% 0%, rgba(139, 92, 246, 0.5) 0%, transparent 60%)',
+        background: 'radial-gradient(ellipse at 100% 50%, rgba(139, 92, 246, 0.3) 0%, transparent 60%)',
         zIndex: -1
       }} />
 
@@ -353,65 +384,271 @@ export default function ProductsPage() {
       }}>
         {/* 칼럼 1 - 메인 콘텐츠 */}
         <div>
-          <StatsCards stats={stats} isMobile={isMobile} />
-          <SupplyProductsTable products={products} loading={loading} isMobile={isMobile} />
+          <div onClick={() => setExpandedComponent('stats')} style={{ cursor: 'pointer' }}>
+            <StatsCards stats={stats} isMobile={isMobile} />
+          </div>
+          <div onClick={() => setExpandedComponent('products')} style={{ cursor: 'pointer' }}>
+            <SupplyProductsTable products={products} loading={loading} isMobile={isMobile} />
+          </div>
         </div>
 
         {/* 칼럼 2 - 시세정보 */}
-        <div>
+        <div onClick={() => setExpandedComponent('market')} style={{ cursor: 'pointer' }}>
           <MarketPrices prices={marketPrices} isMobile={isMobile} />
         </div>
 
         {/* 칼럼 3 - 캘린더 */}
         <div>
-          <ProductCalendar
-            title="발송캘린더"
-            year={shippingMonth.getFullYear()}
-            month={shippingMonth.getMonth()}
-            days={generateCalendarDays(shippingMonth)}
-            onPrevMonth={() => changeMonth('shipping', 'prev')}
-            onNextMonth={() => changeMonth('shipping', 'next')}
-            isMobile={isMobile}
-          />
-          <ProductCalendar
-            title="상품캘린더"
-            year={productMonth.getFullYear()}
-            month={productMonth.getMonth()}
-            days={generateCalendarDays(productMonth)}
-            onPrevMonth={() => changeMonth('product', 'prev')}
-            onNextMonth={() => changeMonth('product', 'next')}
-            isMobile={isMobile}
-          />
+          <div onClick={() => setExpandedComponent('shipping-calendar')} style={{ cursor: 'pointer' }}>
+            <ProductCalendar
+              title="발송캘린더"
+              year={shippingMonth.getFullYear()}
+              month={shippingMonth.getMonth()}
+              days={generateCalendarDays(shippingMonth)}
+              onPrevMonth={() => changeMonth('shipping', 'prev')}
+              onNextMonth={() => changeMonth('shipping', 'next')}
+              isMobile={isMobile}
+            />
+          </div>
+          <div onClick={() => setExpandedComponent('product-calendar')} style={{ cursor: 'pointer' }}>
+            <ProductCalendar
+              title="상품캘린더"
+              year={productMonth.getFullYear()}
+              month={productMonth.getMonth()}
+              days={generateCalendarDays(productMonth)}
+              onPrevMonth={() => changeMonth('product', 'prev')}
+              onNextMonth={() => changeMonth('product', 'next')}
+              isMobile={isMobile}
+            />
+          </div>
         </div>
 
         {/* 칼럼 4 - 셀러계정, 발주시스템, Win-Win, 발주 그래프 */}
         <div>
-          <SellerAccountInfo organizationInfo={organizationInfo} isMobile={isMobile} />
-          <OrderSystemSection items={orderSystemItems} isMobile={isMobile} />
-          <WinWinProgram isMobile={isMobile} />
-          <div style={{ marginBottom: '16px' }}>
+          <div onClick={() => setExpandedComponent('seller-account')} style={{ cursor: 'pointer' }}>
+            <SellerAccountInfo organizationInfo={organizationInfo} isMobile={isMobile} />
+          </div>
+          <div onClick={() => setExpandedComponent('order-system')} style={{ cursor: 'pointer' }}>
+            <OrderSystemSection items={orderSystemItems} isMobile={isMobile} />
+          </div>
+          <div onClick={() => setExpandedComponent('winwin')} style={{ cursor: 'pointer' }}>
+            <WinWinProgram isMobile={isMobile} />
+          </div>
+          <div onClick={() => setExpandedComponent('weekly-chart')} style={{ marginBottom: '16px', cursor: 'pointer' }}>
             <WeeklyOrderChart orders={orders} isMobile={isMobile} />
           </div>
-          <div>
+          <div onClick={() => setExpandedComponent('monthly-chart')} style={{ cursor: 'pointer' }}>
             <MonthlyOrderChart orders={orders} isMobile={isMobile} />
           </div>
         </div>
 
         {/* 칼럼 5 - 발주 TOP 10 */}
-        <div>
+        <div onClick={() => setExpandedComponent('top10')} style={{ cursor: 'pointer' }}>
           <ProductTop10Chart orders={orders} isMobile={isMobile} />
         </div>
 
-        {/* 병합 행 1 - 업무도구 */}
-        <div style={{ gridColumn: '1 / -1' }}>
-          <BusinessTools isMobile={isMobile} />
-        </div>
-
-        {/* 병합 행 2 - 빈 행 */}
+        {/* 병합 행 1 - 빈 행 */}
         <div style={{ gridColumn: '1 / -1' }}>
           {/* 추가 콘텐츠 영역 */}
         </div>
       </div>
+
+      {/* 확대 모달 */}
+      {expandedComponent && (
+        <div
+          onClick={() => setExpandedComponent(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '20px',
+            overflow: 'hidden'
+          }}
+        >
+          {/* 배경 레이어들 */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'linear-gradient(180deg, #ffffff 0%, #fefefe 50px, #fafaff 100px, #f5f7ff 150px, #f0f4ff 200px, #e8f0ff 250px, #dce7fe 300px, #d0dffe 350px, #c0d4fd 400px, #b0c9fc 450px, #9ebcfb 500px, #8aaffa 550px, #75a2f9 600px, #5f94f8 650px, #4787f6 700px, #3b82f6 750px, #60a5fa 1050px, #93c5fd 1350px, #bfdbfe 1650px, #dbeafe 1950px, #f0f9ff 2250px, #ffffff 2550px, #ffffff 100%)',
+            zIndex: -3,
+            opacity: 0,
+            animation: 'fadeInBackground 0.5s ease-out forwards'
+          }} />
+
+          {/* 왼쪽 연두색 */}
+          <div style={{
+            position: 'absolute',
+            top: '600px',
+            left: 0,
+            width: '600px',
+            height: '400px',
+            background: 'radial-gradient(ellipse at 0% 50%, rgba(187, 247, 208, 0.4) 0%, transparent 60%)',
+            zIndex: -2,
+            opacity: 0,
+            animation: 'fadeInBackground 0.5s ease-out 0.1s forwards'
+          }} />
+
+          {/* 우측 상단 보라색 */}
+          <div style={{
+            position: 'absolute',
+            top: '400px',
+            right: 0,
+            width: '1600px',
+            height: '1200px',
+            background: 'radial-gradient(ellipse at 100% 50%, rgba(139, 92, 246, 0.3) 0%, transparent 60%)',
+            zIndex: -1,
+            opacity: 0,
+            animation: 'fadeInBackground 0.5s ease-out 0.2s forwards'
+          }} />
+
+          {/* 어두운 오버레이 */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0)',
+            zIndex: 0,
+            opacity: 0,
+            animation: 'fadeInOverlay 0.3s ease-out forwards'
+          }} />
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              transform: 'scale(2)',
+              transformOrigin: 'center',
+              transition: 'transform 0.3s ease-out',
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              overflow: 'auto'
+            }}
+          >
+            {expandedComponent === 'stats' && <StatsCards stats={stats} isMobile={isMobile} />}
+            {expandedComponent === 'products' && <SupplyProductsTable products={products} loading={loading} isMobile={isMobile} />}
+            {expandedComponent === 'market' && <MarketPrices prices={marketPrices} isMobile={isMobile} />}
+            {expandedComponent === 'shipping-calendar' && (
+              <ProductCalendar
+                title="발송캘린더"
+                year={shippingMonth.getFullYear()}
+                month={shippingMonth.getMonth()}
+                days={generateCalendarDays(shippingMonth)}
+                onPrevMonth={() => changeMonth('shipping', 'prev')}
+                onNextMonth={() => changeMonth('shipping', 'next')}
+                isMobile={isMobile}
+              />
+            )}
+            {expandedComponent === 'product-calendar' && (
+              <ProductCalendar
+                title="상품캘린더"
+                year={productMonth.getFullYear()}
+                month={productMonth.getMonth()}
+                days={generateCalendarDays(productMonth)}
+                onPrevMonth={() => changeMonth('product', 'prev')}
+                onNextMonth={() => changeMonth('product', 'next')}
+                isMobile={isMobile}
+              />
+            )}
+            {expandedComponent === 'seller-account' && <SellerAccountInfo organizationInfo={organizationInfo} isMobile={isMobile} />}
+            {expandedComponent === 'order-system' && <OrderSystemSection items={orderSystemItems} isMobile={isMobile} />}
+            {expandedComponent === 'winwin' && <WinWinProgram isMobile={isMobile} />}
+            {expandedComponent === 'weekly-chart' && <WeeklyOrderChart orders={orders} isMobile={isMobile} />}
+            {expandedComponent === 'monthly-chart' && <MonthlyOrderChart orders={orders} isMobile={isMobile} />}
+            {expandedComponent === 'top10' && <ProductTop10Chart orders={orders} isMobile={isMobile} />}
+          </div>
+
+          {/* 닫기 버튼 */}
+          <button
+            onClick={() => setExpandedComponent(null)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'rgba(255, 255, 255, 0.9)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              cursor: 'pointer',
+              fontSize: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 1)';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* 오른쪽 플로팅 업무도구 사이드바 */}
+      {!isMobile && (
+        <div style={{
+          position: 'fixed',
+          right: '20px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          zIndex: 1000,
+          width: '80px'
+        }}>
+          <BusinessTools isMobile={isMobile} onToolClick={(toolId) => setSelectedTool(toolId)} />
+        </div>
+      )}
+
+      {/* 툴 모달 - 간단한 오버레이 */}
+      {selectedTool && (
+        <>
+          <div
+            onClick={() => setSelectedTool(null)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.1)',
+              zIndex: 9999,
+              animation: 'fadeIn 0.3s ease-out',
+              pointerEvents: 'auto'
+            }}
+          />
+
+          {/* 실제 ToolModal */}
+          <ToolModal
+            isOpen={!!selectedTool}
+            onClose={() => setSelectedTool(null)}
+            toolId={selectedTool}
+            toolName={tools.find(t => t.id === selectedTool)?.name || '업무도구'}
+            zIndex={10000}
+          />
+        </>
+      )}
+
+      {/* 로그인 모달 */}
+      <AuthModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        initialMode="login"
+      />
     </div>
   );
 }

@@ -70,31 +70,50 @@ export default function ProfilePage() {
   const [additionalAccounts, setAdditionalAccounts] = useState<any[]>([]);
   const [savingSubAccounts, setSavingSubAccounts] = useState<Record<string, boolean>>({});
 
-  // 티어별 최대 계정 수 계산
+  /**
+   * ============================================================
+   * 서브계정 추가 한도 설정
+   * ============================================================
+   *
+   * 계정 구조:
+   * - 메인 셀러계정 1개 (organizations 테이블)
+   * - 메인 서브계정 1개 (sub_accounts, is_main=true) - DB에만 존재, UI에 표시 안함
+   * - 추가 서브계정 N개 (sub_accounts, is_main=false) - 사용자가 추가 가능
+   *
+   * maxAccounts = 메인 셀러계정(1) + 추가 서브계정 최대 개수
+   * 예: maxAccounts = 3 → 메인 1개 + 추가 서브계정 2개까지 가능
+   */
   const getMaxAccountsByTier = (tier: string | null | undefined) => {
-    if (!tier) return 2; // 티어 없으면 2개
+    // 티어 없으면 기본값 3개 (메인 1 + 서브 2)
+    if (!tier) return 3;
 
     const lowerTier = tier.toLowerCase();
     switch (lowerTier) {
       case 'light':
-        return 2; // 라이트: 2개
+        return 3; // 메인 1 + 서브 2개
       case 'standard':
-        return 2; // 스탠다드: 2개
+        return 3; // 메인 1 + 서브 2개
       case 'advance':
+        return 3; // 메인 1 + 서브 2개
       case 'elite':
+        return 3; // 메인 1 + 서브 2개
       case 'legend':
-        return 3; // 어드밴스, 엘리트, 레전드: 3개
+        return 3; // 메인 1 + 서브 2개
       default:
-        return 2;
+        return 3;
     }
   };
 
-  // 현재 보유 가능한 계정 수 (안전하게 계산)
+  // 현재 보유 가능한 최대 계정 수
   const maxAccounts = useMemo(() => {
-    return user ? getMaxAccountsByTier(user.tier) : 1;
-  }, [user]);
+    return organization ? getMaxAccountsByTier(organization.tier) : 1;
+  }, [organization]);
 
-  const currentAccountCount = 1 + additionalAccounts.length; // 기본 1개 + 추가 계정들
+  // 현재 보유 중인 계정 수 = 메인 셀러계정(1) + 추가 서브계정 개수
+  // additionalAccounts는 is_main=false인 서브계정만 포함 (API에서 필터링됨)
+  const currentAccountCount = 1 + additionalAccounts.length;
+
+  // 계정 추가 가능 여부 = 소유자 && 현재 개수 < 최대 개수
   const canAddAccount = isOwner && currentAccountCount < maxAccounts;
 
   const supabase = createClient();
@@ -1097,11 +1116,6 @@ export default function ProfilePage() {
                     whiteSpace: 'nowrap'
                   }}>
                     계정 한도 ({currentAccountCount}/{maxAccounts})
-                    {user?.tier && ['light', 'basic'].includes(user.tier.toLowerCase()) && (
-                      <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
-                        스탠다드 이상 등급 필요
-                      </span>
-                    )}
                   </div>
                 ) : null}
               </div>

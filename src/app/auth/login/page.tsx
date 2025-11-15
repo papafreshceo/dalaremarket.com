@@ -55,7 +55,7 @@ export default function LoginPage() {
         }
 
         // 공급상품 페이지로 리다이렉트
-        window.location.href = '/platform/products'
+        window.location.href = '/platform'
       }
     } catch (err) {
       console.error('Login error:', err)  // 에러 상세 확인

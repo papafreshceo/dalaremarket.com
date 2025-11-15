@@ -1087,16 +1087,23 @@ td.text-blue-500,
 .dark table th,
 .dark table td {
   border-color: var(--color-border) !important;
+}
+
+.dark table td:not([data-has-bg="true"]) {
   background-color: var(--color-background) !important;
 }
 
-/* 기본 테이블 셀 색상 (특정 색상 클래스가 없을 때만 적용) */
-.dark table td:not([class*="text-red"]):not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-purple"]) {
-  color: var(--color-text) !important;
+/* 행 배경색이 설정된 경우 인라인 스타일 우선 적용 */
+.dark table td[data-has-bg="true"] {
+  background-color: var(--row-bg-color) !important;
 }
 
 .dark table th {
   background-color: var(--color-surface) !important;
+}
+
+/* 기본 테이블 셀 색상 (특정 색상 클래스가 없을 때만 적용) */
+.dark table td:not([class*="text-red"]):not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-purple"]) {
   color: var(--color-text) !important;
 }
 
@@ -2105,4 +2112,50 @@ input[type="number"] {
 
 .notice-content a:hover {
   color: #1d4ed8;
+}
+
+/* 확인 모달 애니메이션 */
+@keyframes fadeInBackground {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInOverlay {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 오른쪽에서 부드럽게 들어오는 애니메이션 */
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(100px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 모달 오픈 시 body 스크롤 방지 */
+body.modal-open {
+  overflow: hidden;
+  padding-right: 0px; /* 스크롤바 너비만큼 padding 추가하여 레이아웃 shift 방지 */
 }

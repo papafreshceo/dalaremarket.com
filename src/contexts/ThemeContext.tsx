@@ -21,7 +21,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // 초기 로드 시 테마 적용 (이미 FOUC 방지 스크립트에서 적용되었으므로 state만 동기화)
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+    if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/platform/orders'))) {
       const savedTheme = localStorage.getItem('theme') as Theme
       const initialTheme = savedTheme || 'light'
 
@@ -68,7 +68,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // 테마 변경 시 HTML 클래스 업데이트
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+    if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/platform/orders'))) {
       if (theme === 'dark') {
         document.documentElement.classList.add('dark')
       } else {
@@ -78,19 +78,46 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme])
 
   useEffect(() => {
-    // 사용자 ID만 로드
+    // 사용자 ID 및 테마 설정 로드
     const loadUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setUserId(user.id)
+
+        // DB에서 사용자 테마 설정 가져오기
+        const { data: userData } = await supabase
+          .from('users')
+          .select('theme_preference')
+          .eq('id', user.id)
+          .single()
+
+        if (userData?.theme_preference) {
+          const dbTheme = userData.theme_preference as Theme
+          // DB의 테마를 localStorage에 동기화
+          localStorage.setItem('theme', dbTheme)
+          setTheme(dbTheme)
+
+          // HTML 클래스 적용 (admin과 platform/orders에서만)
+          const path = window.location.pathname
+          if (path.startsWith('/admin') || path.startsWith('/platform/orders')) {
+            if (dbTheme === 'dark') {
+              document.documentElement.classList.add('dark')
+            } else {
+              document.documentElement.classList.remove('dark')
+            }
+          } else {
+            // 다른 페이지에서는 무조건 라이트모드
+            document.documentElement.classList.remove('dark')
+          }
+        }
       }
     }
     loadUser()
   }, [])
 
   const toggleTheme = async () => {
-    // 관리자 화면에서만 테마 토글 작동
-    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/admin')) {
+    // 관리자 및 발주관리 화면에서만 테마 토글 작동
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/admin') && !window.location.pathname.startsWith('/platform/orders')) {
       return
     }
 

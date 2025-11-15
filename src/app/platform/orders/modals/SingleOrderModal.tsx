@@ -20,6 +20,7 @@ interface SingleOrderModalProps {
   } | null;
   onRefresh?: () => void;
   userEmail: string;
+  selectedSubAccount?: any | null;
 }
 
 interface OptionProduct {
@@ -46,7 +47,8 @@ export default function SingleOrderModal({
   onClose,
   selectedProduct,
   onRefresh,
-  userEmail
+  userEmail,
+  selectedSubAccount
 }: SingleOrderModalProps) {
   const [formData, setFormData] = useState<FormData>({
     orderNumber: '',
@@ -665,7 +667,8 @@ export default function SingleOrderModal({
             market_name: '플랫폼',
             created_by: user.id,
             created_at: getCurrentTimeUTC(),
-            is_deleted: false
+            is_deleted: false,
+            sub_account_id: (selectedSubAccount && selectedSubAccount !== 'main') ? selectedSubAccount.id : null
           };
 
           ordersToInsert.push(orderData);
@@ -712,7 +715,8 @@ export default function SingleOrderModal({
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 10000,
-        padding: '20px'
+        padding: '20px',
+        animation: 'fadeIn 0.3s ease-in-out'
       }}
       onClick={(e) => {
         // 주문등록 중에는 클릭 무시
@@ -723,6 +727,26 @@ export default function SingleOrderModal({
         );
       }}
     >
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        @keyframes scaleIn {
+          from {
+            transform: scale(0.95);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
       <div
         style={{
           background: 'var(--color-surface)',
@@ -734,7 +758,8 @@ export default function SingleOrderModal({
           position: 'relative',
           border: 'none',
           outline: 'none',
-          boxShadow: 'none'
+          boxShadow: 'none',
+          animation: 'scaleIn 0.3s ease-in-out'
         }}
         onClick={(e) => {
           // 주문등록 중에는 클릭 무시

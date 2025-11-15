@@ -23,7 +23,7 @@ export default function BannersPage() {
       id: '1',
       title: '신규 회원 가입 이벤트',
       image_url: 'https://via.placeholder.com/1200x400',
-      link_url: '/platform/products',
+      link_url: '/platform',
       display_order: 1,
       is_active: true,
       start_date: '2025-01-01',

@@ -31,6 +31,19 @@ export default function ToolModal({ isOpen, onClose, toolId, toolName, onOpenSim
     }
   }, [isOpen, zIndex]);
 
+  // 모달 열릴 때 body 스크롤 방지
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [isOpen]);
+
   // 드래그 시작
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button')) return; // 버튼 클릭은 드래그 안함

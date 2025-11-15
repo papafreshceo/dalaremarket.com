@@ -61,9 +61,10 @@ interface SellerExcelTabProps {
   onOrdersUploaded: () => void;
   userId: string; // UUID
   userEmail: string; // Email for display
+  selectedSubAccount?: any | null;
 }
 
-export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, userEmail }: SellerExcelTabProps) {
+export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, userEmail, selectedSubAccount }: SellerExcelTabProps) {
   const [uploadedOrders, setUploadedOrders] = useState<SellerUploadedOrder[]>([]);
   const [detectedMarket, setDetectedMarket] = useState<MarketTemplate | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<FilePreview[]>([]);
@@ -666,7 +667,8 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
           seller_id: userId,
           created_by: userId,
           created_at: utcTime,
-          is_deleted: false
+          is_deleted: false,
+          sub_account_id: (selectedSubAccount && selectedSubAccount !== 'main') ? selectedSubAccount.id : null
         };
       });
 
@@ -1059,7 +1061,8 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
                 seller_id: userId,
                 created_by: userId,
                 created_at: utcTime,
-                is_deleted: false
+                is_deleted: false,
+                sub_account_id: (selectedSubAccount && selectedSubAccount !== 'main') ? selectedSubAccount.id : null
               };
             });
 

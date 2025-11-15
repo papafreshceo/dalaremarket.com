@@ -156,8 +156,17 @@ export default function AdminClientLayout({
         </svg>
       )
     },
-    { 
-      name: '구매관리', 
+    {
+      name: '환불내역',
+      href: '/admin/refund-history',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+        </svg>
+      )
+    },
+    {
+      name: '구매관리',
       href: '/admin/purchase',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -423,7 +432,7 @@ export default function AdminClientLayout({
 
             {/* 플랫폼 화면 버튼 */}
             <Link
-              href="/platform/products"
+              href="/platform"
               className="px-2.5 py-1.5 text-xs bg-primary text-white rounded-md hover:bg-primary-hover transition-colors flex items-center gap-1.5"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -432,7 +441,6 @@ export default function AdminClientLayout({
               <span className="font-medium">플랫폼</span>
             </Link>
 
-            <LogoutButton />
           </div>
         </div>
       </header>
@@ -492,11 +500,14 @@ export default function AdminClientLayout({
           {/* 하단 정보 */}
           <div className="p-4 border-t border-border space-y-3">
             <div className="flex justify-center">
-              <ThemeToggle />
+              <LogoutButton />
             </div>
             <div className="text-xs text-text-tertiary space-y-1 text-center">
               <p>© 2025 달래마켓</p>
               <p>Version 2.0</p>
+            </div>
+            <div className="flex justify-center">
+              <ThemeToggle />
             </div>
           </div>
         </aside>

@@ -37,14 +37,59 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 비로그인 사용자는 빈 배열 반환
+    // 비로그인 사용자 샘플 데이터 처리
     if (!effectiveUserId) {
+
+      // 실제 option_products 조회 (service role 사용으로 RLS 우회)
+      const { createClient: createServiceClient } = await import('@supabase/supabase-js');
+      const supabaseAdmin = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+
+      const { data: optionProducts, error: opError } = await supabaseAdmin
+        .from('option_products')
+        .select('id, option_name, seller_supply_price')
+        .eq('is_active', true);
+
+      if (opError) {
+        console.error('[GET platform-orders] option_products 조회 실패:', opError);
+        return NextResponse.json(
+          { success: false, error: '샘플 데이터 생성 실패' },
+          { status: 500 }
+        );
+      }
+
+      if (!optionProducts || optionProducts.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          isSample: true,
+          message: '옵션 상품을 먼저 등록해주세요.',
+        });
+      }
+
+      // 🔑 organization_id를 시드값으로 사용하여 조직별로 다른 샘플 데이터 생성
+      const sampleOrdersData = generateSampleOrders(
+        optionProducts.map(op => ({
+          id: op.id,
+          option_name: op.option_name,
+          seller_supply_price: op.seller_supply_price,
+        })),
+        'guest' // 조직 ID를 시드로 전달
+      );
+
+      // DB 포맷으로 변환 (조직 ID 추가)
+      const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, 'guest').map(order => ({
+        ...order,
+        organization_id: 'guest'
+      }));
+
+
       return NextResponse.json({
         success: true,
-        data: [],
-        isSample: false,
-        isGuest: true,
-        message: '로그인이 필요합니다.',
+        data: sampleOrders,
+        isSample: true,
       });
     }
 

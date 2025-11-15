@@ -59,6 +59,19 @@ export default function PlatformFooter() {
     fetchSettings()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 모달 열릴 때 body 스크롤 방지
+  useEffect(() => {
+    if (showTermsModal || showPrivacyModal || showCashPolicyModal) {
+      document.body.classList.add('modal-open')
+    } else {
+      document.body.classList.remove('modal-open')
+    }
+
+    return () => {
+      document.body.classList.remove('modal-open')
+    }
+  }, [showTermsModal, showPrivacyModal, showCashPolicyModal])
+
   if (!settings) return null
 
   return (
@@ -130,7 +143,7 @@ export default function PlatformFooter() {
 
       {/* 이용약관 모달 */}
       {showTermsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4" onClick={() => setShowTermsModal(false)}>
+        <div className="fixed inset-0 flex items-center justify-center z-[100] p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.1)' }} onClick={() => setShowTermsModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
               <h2 className="text-lg font-bold text-gray-900">이용약관</h2>
@@ -223,7 +236,7 @@ export default function PlatformFooter() {
 
       {/* 개인정보처리방침 모달 */}
       {showPrivacyModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4" onClick={() => setShowPrivacyModal(false)}>
+        <div className="fixed inset-0 flex items-center justify-center z-[100] p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.1)' }} onClick={() => setShowPrivacyModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
               <h2 className="text-lg font-bold text-gray-900">개인정보처리방침</h2>
@@ -310,7 +323,7 @@ export default function PlatformFooter() {
 
       {/* 캐시 등 운영정책 모달 */}
       {showCashPolicyModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4" onClick={() => setShowCashPolicyModal(false)}>
+        <div className="fixed inset-0 flex items-center justify-center z-[100] p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.1)' }} onClick={() => setShowCashPolicyModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
               <h2 className="text-lg font-bold text-gray-900">캐시 등 운영정책</h2>

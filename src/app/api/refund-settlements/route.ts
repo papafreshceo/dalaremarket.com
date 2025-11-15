@@ -73,6 +73,20 @@ export async function POST(request: NextRequest) {
         vendor_name: order.vendor_name,
         option_name: order.option_name,
         quantity: order.quantity,
+        // 주문자 정보
+        orderer_name: order.buyer_name || null,
+        orderer_phone: order.buyer_phone || null,
+        // 수령인 정보
+        recipient_name: order.recipient_name || null,
+        recipient_phone: order.recipient_phone || null,
+        recipient_address: order.recipient_address || null,
+        // 셀러 공급가
+        seller_supply_price: order.seller_supply_price || null,
+        // CS 정보 (발송완료 후 환불인 경우에만 존재)
+        cs_type: order.cs_type || null,
+        cs_content: order.cs_content || null,
+        resolution_method: order.cs_resolution_method || null,
+        refund_ratio: order.refund_ratio || null,
         refund_processed_at: new Date().toISOString(),
         processed_by: auth.user.id,
         processed_by_name: userData?.name || null,

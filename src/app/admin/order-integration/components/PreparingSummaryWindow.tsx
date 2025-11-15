@@ -27,6 +27,7 @@ interface PreparingSummaryWindowProps {
 export default function PreparingSummaryWindow({ startDate, endDate }: PreparingSummaryWindowProps) {
   const [data, setData] = useState<PreparingSummary[]>([]);
   const [rawMaterials, setRawMaterials] = useState<RawMaterialSummary[]>([]);
+  const [unmappedOptions, setUnmappedOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     startDate,
@@ -42,11 +43,23 @@ export default function PreparingSummaryWindow({ startDate, endDate }: Preparing
       const params = new URLSearchParams({
         startDate: filters.startDate,
         endDate: filters.endDate,
-        shippingStatus: '상품준비중',
+        // shippingStatus 파라미터 제거 - 전체 주문 집계
+      });
+
+      console.log('🔍 집계 조회 파라미터:', {
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        url: `/api/integrated-orders/preparing-summary?${params}`
       });
 
       const res = await fetch(`/api/integrated-orders/preparing-summary?${params}`);
       const result = await res.json();
+
+      console.log('📊 집계 조회 결과:', {
+        success: result.success,
+        orderCount: result.data?.orders?.length || 0,
+        rawMaterialCount: result.data?.rawMaterials?.length || 0
+      });
 
       if (result.success) {
         // 옵션상품 기준 가나다순 정렬
@@ -61,6 +74,7 @@ export default function PreparingSummaryWindow({ startDate, endDate }: Preparing
 
         setData(sortedOrders);
         setRawMaterials(sortedRawMaterials);
+        setUnmappedOptions(result.data?.unmappedOptions || []);
       } else {
         alert('데이터 조회 실패: ' + result.error);
       }
@@ -135,8 +149,14 @@ export default function PreparingSummaryWindow({ startDate, endDate }: Preparing
           <div className="grid grid-cols-3 gap-4">
             {/* 옵션별 집계 테이블 */}
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="bg-yellow-50 px-4 py-2 border-b border-yellow-200">
+              <div className="bg-yellow-50 px-4 py-2 border-b border-yellow-200 flex items-center justify-between">
                 <h3 className="font-bold text-gray-900" style={{ fontSize: '14px' }}>옵션별 주문 집계</h3>
+                <div className="text-xs">
+                  <span className="text-gray-600">전체 {data.length}개 옵션</span>
+                  {unmappedOptions.length > 0 && (
+                    <span className="ml-2 text-red-600 font-semibold">미매핑 {unmappedOptions.length}개</span>
+                  )}
+                </div>
               </div>
               <div className="overflow-auto max-h-[600px]">
                 <table className="w-full" style={{ fontSize: '16px' }}>
@@ -150,15 +170,21 @@ export default function PreparingSummaryWindow({ startDate, endDate }: Preparing
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {data.map((item, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-2 py-2 text-gray-500">{index + 1}</td>
-                        <td className="px-2 py-2 text-gray-900 font-medium">{item.option_name}</td>
-                        <td className="px-2 py-2 text-gray-700">{item.vendor_name || '-'}</td>
-                        <td className="px-2 py-2 text-right text-gray-900">{item.order_count.toLocaleString()}</td>
-                        <td className="px-2 py-2 text-right font-medium text-green-600">{item.total_quantity.toLocaleString()}</td>
-                      </tr>
-                    ))}
+                    {data.map((item, index) => {
+                      const isUnmapped = unmappedOptions.includes(item.option_name);
+                      return (
+                        <tr key={index} className={`hover:bg-gray-50 ${isUnmapped ? 'bg-red-50' : ''}`}>
+                          <td className="px-2 py-2 text-gray-500">{index + 1}</td>
+                          <td className="px-2 py-2 font-medium flex items-center gap-1">
+                            <span className={isUnmapped ? 'text-red-700' : 'text-gray-900'}>{item.option_name}</span>
+                            {isUnmapped && <span className="text-xs text-red-600 font-bold">⚠️</span>}
+                          </td>
+                          <td className="px-2 py-2 text-gray-700">{item.vendor_name || '-'}</td>
+                          <td className="px-2 py-2 text-right text-gray-900">{item.order_count.toLocaleString()}</td>
+                          <td className="px-2 py-2 text-right font-medium text-green-600">{item.total_quantity.toLocaleString()}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                   <tfoot className="bg-gray-50 border-t-2 border-gray-300 sticky bottom-0">
                     <tr>
@@ -173,8 +199,11 @@ export default function PreparingSummaryWindow({ startDate, endDate }: Preparing
 
             {/* 원물 필요량 테이블 */}
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="bg-green-50 px-4 py-2 border-b border-green-200">
+              <div className="bg-green-50 px-4 py-2 border-b border-green-200 flex items-center justify-between">
                 <h3 className="font-bold text-gray-900" style={{ fontSize: '14px' }}>원물 필요량</h3>
+                <div className="text-xs text-gray-600">
+                  매핑된 원물 {rawMaterials.length}개
+                </div>
               </div>
               <div className="overflow-auto max-h-[600px]">
                 <table className="w-full" style={{ fontSize: '16px' }}>

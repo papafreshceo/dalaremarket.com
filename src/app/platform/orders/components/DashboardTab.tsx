@@ -9,9 +9,10 @@ interface DashboardTabProps {
   isMobile: boolean;
   orders: Order[];
   statusConfig: Record<Order['status'], StatusConfig>;
+  isSampleMode?: boolean;
 }
 
-export default function DashboardTab({ isMobile, orders, statusConfig }: DashboardTabProps) {
+export default function DashboardTab({ isMobile, orders, statusConfig, isSampleMode }: DashboardTabProps) {
   // 부드러운 곡선 경로 생성 함수 (Monotone Cubic Interpolation)
   const createSmoothPath = (points: { x: number; y: number }[]) => {
     if (points.length < 2) return '';
@@ -2052,7 +2053,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
 
           {/* 내 순위 위젯 */}
           <div style={{ margin: '0 4px' }}>
-            <MyRankingWidget />
+            <MyRankingWidget isSampleMode={isSampleMode} />
           </div>
         </div>
 

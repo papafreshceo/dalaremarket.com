@@ -164,7 +164,7 @@ export default function PlatformHome() {
                 달래마켓은 농가와 소비자를 직접 연결하여<br />
                 더 신선하고 더 저렴한 농산물을 제공합니다
               </p>
-              <Link href="/auth/register">
+              <Link href="/platform?login=true">
                 <button style={{
                   padding: '18px 56px',
                   background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',

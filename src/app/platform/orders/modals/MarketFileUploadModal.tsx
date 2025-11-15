@@ -9,6 +9,7 @@ interface MarketFileUploadModalProps {
   onOrdersUploaded: () => void;
   userId: string; // UUID
   userEmail: string; // Email for display
+  selectedSubAccount?: any | null;
 }
 
 export default function MarketFileUploadModal({
@@ -16,7 +17,8 @@ export default function MarketFileUploadModal({
   onClose,
   onOrdersUploaded,
   userId,
-  userEmail
+  userEmail,
+  selectedSubAccount
 }: MarketFileUploadModalProps) {
   if (!show) return null;
 
@@ -33,10 +35,27 @@ export default function MarketFileUploadModal({
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 9999,
-        padding: '20px'
+        padding: '20px',
+        animation: 'fadeIn 0.3s ease-in-out'
       }}
       onClick={onClose}
     >
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from {
+            transform: scale(0.95);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
       <div
         id="modal-content-container"
         style={{
@@ -47,7 +66,8 @@ export default function MarketFileUploadModal({
           maxHeight: '90vh',
           overflow: 'auto',
           position: 'relative',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          animation: 'scaleIn 0.3s ease-in-out'
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -98,6 +118,7 @@ export default function MarketFileUploadModal({
           onOrdersUploaded={onOrdersUploaded}
           userId={userId}
           userEmail={userEmail}
+          selectedSubAccount={selectedSubAccount}
         />
       </div>
     </div>

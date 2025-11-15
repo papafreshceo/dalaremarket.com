@@ -11,13 +11,19 @@ import { withAuth } from '@/lib/auth-middleware'
  * 인증이 필요한 API 래퍼
  * 로그인한 사용자만 접근 가능
  */
-export async function requireAuth(request: NextRequest) {
+export async function requireAuth(request: NextRequest): Promise<
+  | { authorized: false; error: NextResponse; user: null; userData: null }
+  | { authorized: true; error: null; user: any; userData: any }
+> {
   const authResult = await withAuth(request, { requireAuth: true })
 
   if (!authResult.authorized) {
     return {
       authorized: false,
-      error: authResult.response,
+      error: authResult.response || NextResponse.json(
+        { success: false, error: '인증이 필요합니다.' },
+        { status: 401 }
+      ),
       user: null,
       userData: null,
     }
@@ -34,7 +40,10 @@ export async function requireAuth(request: NextRequest) {
 /**
  * 직원 이상 권한 필요 (employee, admin, super_admin 모두 허용)
  */
-export async function requireStaff(request: NextRequest) {
+export async function requireStaff(request: NextRequest): Promise<
+  | { authorized: false; error: NextResponse; user: null; userData: null }
+  | { authorized: true; error: null; user: any; userData: any }
+> {
   const authResult = await withAuth(request, {
     requireRole: ['super_admin', 'admin', 'employee']
   })
@@ -42,7 +51,10 @@ export async function requireStaff(request: NextRequest) {
   if (!authResult.authorized) {
     return {
       authorized: false,
-      error: authResult.response,
+      error: authResult.response || NextResponse.json(
+        { success: false, error: '직원 이상의 권한이 필요합니다.' },
+        { status: 403 }
+      ),
       user: null,
       userData: null,
     }
@@ -59,7 +71,10 @@ export async function requireStaff(request: NextRequest) {
 /**
  * 관리자 이상 권한 필요 (admin, super_admin만 허용)
  */
-export async function requireAdmin(request: NextRequest) {
+export async function requireAdmin(request: NextRequest): Promise<
+  | { authorized: false; error: NextResponse; user: null; userData: null }
+  | { authorized: true; error: null; user: any; userData: any }
+> {
   const authResult = await withAuth(request, {
     requireRole: ['super_admin', 'admin']
   })
@@ -67,7 +82,10 @@ export async function requireAdmin(request: NextRequest) {
   if (!authResult.authorized) {
     return {
       authorized: false,
-      error: authResult.response,
+      error: authResult.response || NextResponse.json(
+        { success: false, error: '관리자 권한이 필요합니다.' },
+        { status: 403 }
+      ),
       user: null,
       userData: null,
     }
@@ -84,7 +102,10 @@ export async function requireAdmin(request: NextRequest) {
 /**
  * 최고관리자만 접근 가능
  */
-export async function requireSuperAdmin(request: NextRequest) {
+export async function requireSuperAdmin(request: NextRequest): Promise<
+  | { authorized: false; error: NextResponse; user: null; userData: null }
+  | { authorized: true; error: null; user: any; userData: any }
+> {
   const authResult = await withAuth(request, {
     requireRole: 'super_admin'
   })
@@ -92,7 +113,10 @@ export async function requireSuperAdmin(request: NextRequest) {
   if (!authResult.authorized) {
     return {
       authorized: false,
-      error: authResult.response,
+      error: authResult.response || NextResponse.json(
+        { success: false, error: '최고관리자 권한이 필요합니다.' },
+        { status: 403 }
+      ),
       user: null,
       userData: null,
     }

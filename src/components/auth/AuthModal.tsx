@@ -41,6 +41,19 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     }
   }, [isOpen, initialMode])
 
+  // 모달 열릴 때 body 스크롤 방지
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('modal-open')
+    } else {
+      document.body.classList.remove('modal-open')
+    }
+
+    return () => {
+      document.body.classList.remove('modal-open')
+    }
+  }, [isOpen])
+
   // 현재 사용자 정보와 최근 사용한 로그인 방법 불러오기
   useEffect(() => {
     const fetchUserProvider = async () => {

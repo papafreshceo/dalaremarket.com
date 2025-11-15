@@ -68,17 +68,10 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
     return kstDate.toISOString().substring(0, 10); // YYYY-MM-DD
   };
 
-  // 기간별 집계 데이터
+  // 기간별 집계 데이터 (서브계정별로 그룹핑)
   const periodStats = useMemo(() => {
-    const stats = {
-      confirmedCount: 0,
-      confirmedAmount: 0,
-      cancelCount: 0,
-      cancelAmount: 0,
-      shippedCount: 0,
-      shippedAmount: 0,
-      refundAmount: 0
-    };
+    // 서브계정별 통계 Map
+    const subAccountStatsMap = new Map<string, any>();
 
     // 날짜가 모두 선택되었는지 확인
     const hasPeriod = startDate && endDate;
@@ -94,6 +87,26 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
       }
 
       if (shouldCount) {
+        // 서브계정 ID (null이면 '기본계정')
+        const subAccountKey = order.subAccountId || 'main';
+
+        // 서브계정별 통계 초기화
+        if (!subAccountStatsMap.has(subAccountKey)) {
+          subAccountStatsMap.set(subAccountKey, {
+            subAccountId: subAccountKey,
+            subAccountName: subAccountKey === 'main' ? '기본계정' : subAccountKey,
+            confirmedCount: 0,
+            confirmedAmount: 0,
+            cancelCount: 0,
+            cancelAmount: 0,
+            shippedCount: 0,
+            shippedAmount: 0,
+            refundAmount: 0
+          });
+        }
+
+        const stats = subAccountStatsMap.get(subAccountKey);
+
         // 발주확정
         stats.confirmedCount++;
         stats.confirmedAmount += order.amount || 0;
@@ -118,7 +131,8 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
       }
     });
 
-    return stats;
+    // Map을 배열로 변환
+    return Array.from(subAccountStatsMap.values());
   }, [orders, startDate, endDate]);
 
   // 기본 회사 정보 및 사용자 정보 로드
@@ -161,7 +175,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
         });
       }
 
-      // 2. 로그인한 사용자의 조직 정보 로드
+      // 2. 로그인한 사용자의 서브계정 정보 로드 (정산용 사업자 정보)
       try {
         const { data: { user } } = await supabase.auth.getUser();
 
@@ -174,44 +188,67 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
             .single();
 
           if (userData?.primary_organization_id) {
-            // 조직 정보 조회
-            const { data: orgData, error: orgError } = await supabase
-              .from('organizations')
-              .select('business_name, business_number, address, representative_name, phone, email')
-              .eq('id', userData.primary_organization_id)
-              .single();
+            // 해당 조직의 서브계정 목록 조회 (활성화된 것만)
+            const { data: subAccounts, error: subError } = await supabase
+              .from('sub_accounts')
+              .select('id, business_name, business_number, address, representative_name, phone, email')
+              .eq('organization_id', userData.primary_organization_id)
+              .eq('is_active', true)
+              .order('created_at', { ascending: true });
 
-            if (orgError) {
-              console.error('조직 정보 로드 오류:', orgError);
-            } else if (orgData) {
-              // organizations 테이블의 필드를 userInfo 형식에 맞게 변환
+            if (subError) {
+              console.error('서브계정 정보 로드 오류 상세:', subError);
+              console.error('에러 메시지:', subError.message);
+              console.error('에러 코드:', subError.code);
+              console.error('조회 시도한 organization_id:', userData.primary_organization_id);
+            } else if (subAccounts && subAccounts.length > 0) {
+              // 첫 번째 서브계정을 기본으로 사용
+              const defaultSubAccount = subAccounts[0];
               setUserInfo({
-                name: orgData.business_name,
-                email: orgData.email,
-                business_number: orgData.business_number,
-                company_address: orgData.address,
-                representative_name: orgData.representative_name,
-                representative_phone: orgData.phone
+                name: defaultSubAccount.business_name,
+                email: defaultSubAccount.email || '',
+                business_number: defaultSubAccount.business_number,
+                company_address: defaultSubAccount.address || '',
+                representative_name: defaultSubAccount.representative_name || '',
+                representative_phone: defaultSubAccount.phone || ''
               });
+            } else {
+              console.warn('활성화된 서브계정이 없습니다. organization_id:', userData.primary_organization_id);
             }
           }
         }
       } catch (error) {
-        console.error('조직 정보 로드 실패:', error);
+        console.error('서브계정 정보 로드 실패:', error);
       }
     };
 
     loadInfo();
   }, []);
 
-  // 월별 + 일별 정산 데이터 계산 (발주확정일자 기준)
+  // 서브계정별 → 월별 → 일별 정산 데이터 계산 (발주확정일자 기준)
   const monthlySettlements = useMemo(() => {
-    const monthlyMap = new Map<string, any>();
+    // 서브계정별로 그룹핑 (subAccountId가 null이면 '기본계정'으로 분류)
+    const subAccountMap = new Map<string, any>();
 
-    // 모든 주문을 발주확정일자 기준으로 집계
+    // 모든 주문을 서브계정 → 발주확정일자 기준으로 집계
     orders.forEach(order => {
       // 발주확정일자가 없는 주문은 제외 (발주서등록 상태 등)
       if (!order.confirmedAt) return;
+
+      // 서브계정 ID (null이면 '기본계정')
+      const subAccountKey = order.subAccountId || 'main';
+
+      // 서브계정별 데이터 초기화
+      if (!subAccountMap.has(subAccountKey)) {
+        subAccountMap.set(subAccountKey, {
+          subAccountId: subAccountKey,
+          subAccountName: subAccountKey === 'main' ? '기본계정' : subAccountKey,
+          monthlyData: new Map<string, any>()
+        });
+      }
+
+      const subAccountData = subAccountMap.get(subAccountKey);
+      const monthlyMap = subAccountData.monthlyData;
 
       // UTC를 KST로 변환하여 날짜 추출
       const confirmedDate = getKSTDate(order.confirmedAt);
@@ -221,6 +258,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
       if (!monthlyMap.has(yearMonth)) {
         monthlyMap.set(yearMonth, {
           yearMonth,
+          subAccountId: subAccountKey,
           confirmedCount: 0,
           confirmedAmount: 0,
           cancelCount: 0,
@@ -281,22 +319,35 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
       }
     });
 
-    // Map을 배열로 변환하고 최신 월부터 정렬
-    const monthlyArray = Array.from(monthlyMap.values()).sort((a, b) => b.yearMonth.localeCompare(a.yearMonth));
+    // 모든 서브계정의 월별 데이터를 하나의 배열로 통합
+    const allMonthlyData: any[] = [];
 
-    // 각 월의 일별 데이터를 배열로 변환하고 정렬
-    monthlyArray.forEach(month => {
-      const dailyArray = Array.from(month.dailyData.values()).sort((a, b) => a.date.localeCompare(b.date));
+    subAccountMap.forEach(subAccountData => {
+      // 월별 데이터를 배열로 변환하고 최신 월부터 정렬
+      const monthlyArray = Array.from(subAccountData.monthlyData.values())
+        .sort((a, b) => b.yearMonth.localeCompare(a.yearMonth));
 
-      // 연번 재설정
-      dailyArray.forEach((dayData, index) => {
-        dayData.no = index + 1;
+      // 각 월의 일별 데이터를 배열로 변환하고 정렬
+      monthlyArray.forEach(month => {
+        const dailyArray = Array.from(month.dailyData.values())
+          .sort((a, b) => a.date.localeCompare(b.date));
+
+        // 연번 재설정
+        dailyArray.forEach((dayData, index) => {
+          dayData.no = index + 1;
+        });
+
+        month.dailyData = dailyArray;
+
+        // 서브계정 이름 추가
+        month.subAccountName = subAccountData.subAccountName;
       });
 
-      month.dailyData = dailyArray;
+      allMonthlyData.push(...monthlyArray);
     });
 
-    return monthlyArray;
+    // 전체 데이터를 yearMonth 기준으로 정렬
+    return allMonthlyData.sort((a, b) => b.yearMonth.localeCompare(a.yearMonth));
   }, [orders]);
 
   // 월 토글 핸들러
@@ -558,9 +609,25 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                     </svg>
                   </div>
 
-                  {/* 년월 */}
-                  <div style={{ fontSize: '15px', fontWeight: '400', color: 'var(--color-text)', minWidth: '100px', flexShrink: 0 }}>
-                    {year}년 {monthNum}월
+                  {/* 년월 + 서브계정 */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '180px', flexShrink: 0 }}>
+                    <div style={{ fontSize: '15px', fontWeight: '400', color: 'var(--color-text)' }}>
+                      {year}년 {monthNum}월
+                    </div>
+                    {month.subAccountName && (
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        color: 'var(--color-text-secondary)',
+                        padding: '2px 8px',
+                        background: 'rgba(99, 102, 241, 0.08)',
+                        borderRadius: '4px',
+                        display: 'inline-block',
+                        alignSelf: 'flex-start'
+                      }}>
+                        {month.subAccountName}
+                      </div>
+                    )}
                   </div>
 
                   {/* 통계 배지 그룹 */}
@@ -975,24 +1042,20 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
 
         {/* 기간설정 탭 */}
         {activeTab === '기간설정' && (
-          <div
-            style={{
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-surface)',
-              boxShadow: '2px 2px 3px rgba(0, 0, 0, 0.15)'
-            }}
-          >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* 날짜 선택 패널 */}
             <div
               style={{
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-surface)',
                 padding: '18px 20px',
-                background: 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '24px'
+                boxShadow: '2px 2px 3px rgba(0, 0, 0, 0.15)'
               }}
             >
-              {/* 날짜 선택 영역 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '240px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '14px', fontWeight: '500', color: 'var(--color-text)', marginRight: '12px' }}>
+                  조회 기간
+                </span>
                 <DatePicker
                   value={startDate ? new Date(startDate) : null}
                   onChange={(date) => {
@@ -1025,77 +1088,112 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                   minDate={startDate ? new Date(startDate) : undefined}
                 />
               </div>
+            </div>
 
-              {/* 통계 배지 그룹 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '60px' }}>
-                {/* 발주 */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  background: periodStats.confirmedCount > 0 ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
-                  border: periodStats.confirmedCount > 0 ? '1px solid rgba(59, 130, 246, 0.15)' : '1px solid transparent',
-                  flex: '0 0 auto',
-                  minWidth: '165px',
-                  visibility: periodStats.confirmedCount > 0 ? 'visible' : 'hidden'
-                }}>
-                  <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{periodStats.confirmedAmount.toLocaleString()}</span>
-                  <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {periodStats.confirmedCount}</span>
-                </div>
+            {/* 서브계정별 통계 */}
+            {periodStats.map((stats, index) => (
+              <div
+                key={stats.subAccountId}
+                style={{
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-surface)',
+                  boxShadow: '2px 2px 3px rgba(0, 0, 0, 0.15)'
+                }}
+              >
+                <div
+                  style={{
+                    padding: '18px 20px',
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '24px'
+                  }}
+                >
+                  {/* 서브계정 이름 */}
+                  <div style={{ minWidth: '120px', flexShrink: 0 }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      color: 'var(--color-text-secondary)',
+                      padding: '4px 10px',
+                      background: 'rgba(99, 102, 241, 0.08)',
+                      borderRadius: '4px',
+                      display: 'inline-block'
+                    }}>
+                      {stats.subAccountName}
+                    </div>
+                  </div>
 
-                {/* 취소 */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  background: periodStats.cancelCount > 0 ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
-                  border: periodStats.cancelCount > 0 ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid transparent',
-                  flex: '0 0 auto',
-                  minWidth: '165px',
-                  visibility: periodStats.cancelCount > 0 ? 'visible' : 'hidden'
-                }}>
-                  <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{periodStats.cancelAmount.toLocaleString()}</span>
-                  <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {periodStats.cancelCount}</span>
-                </div>
+                  {/* 통계 배지 그룹 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '60px' }}>
+                    {/* 발주 */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      background: stats.confirmedCount > 0 ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                      border: stats.confirmedCount > 0 ? '1px solid rgba(59, 130, 246, 0.15)' : '1px solid transparent',
+                      flex: '0 0 auto',
+                      minWidth: '165px',
+                      visibility: stats.confirmedCount > 0 ? 'visible' : 'hidden'
+                    }}>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{stats.confirmedAmount.toLocaleString()}</span>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {stats.confirmedCount}</span>
+                    </div>
 
-                {/* 발송 */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  background: periodStats.shippedCount > 0 ? 'rgba(16, 185, 129, 0.05)' : 'transparent',
-                  border: periodStats.shippedCount > 0 ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid transparent',
-                  flex: '0 0 auto',
-                  minWidth: '165px',
-                  visibility: periodStats.shippedCount > 0 ? 'visible' : 'hidden'
-                }}>
-                  <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{periodStats.shippedAmount.toLocaleString()}</span>
-                  <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {periodStats.shippedCount}</span>
-                </div>
+                    {/* 취소 */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      background: stats.cancelCount > 0 ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
+                      border: stats.cancelCount > 0 ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid transparent',
+                      flex: '0 0 auto',
+                      minWidth: '165px',
+                      visibility: stats.cancelCount > 0 ? 'visible' : 'hidden'
+                    }}>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{stats.cancelAmount.toLocaleString()}</span>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {stats.cancelCount}</span>
+                    </div>
 
-                {/* 환불 */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  background: periodStats.refundAmount > 0 ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
-                  border: periodStats.refundAmount > 0 ? '1px solid rgba(245, 158, 11, 0.15)' : '1px solid transparent',
-                  flex: '0 0 auto',
-                  minWidth: '132px',
-                  visibility: periodStats.refundAmount > 0 ? 'visible' : 'hidden'
-                }}>
-                  <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{periodStats.refundAmount.toLocaleString()}</span>
-                  <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {periodStats.refundCount}</span>
-                </div>
-              </div>
+                    {/* 발송 */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      background: stats.shippedCount > 0 ? 'rgba(16, 185, 129, 0.05)' : 'transparent',
+                      border: stats.shippedCount > 0 ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid transparent',
+                      flex: '0 0 auto',
+                      minWidth: '165px',
+                      visibility: stats.shippedCount > 0 ? 'visible' : 'hidden'
+                    }}>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{stats.shippedAmount.toLocaleString()}</span>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}> / {stats.shippedCount}</span>
+                    </div>
+
+                    {/* 환불 */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      background: stats.refundAmount > 0 ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
+                      border: stats.refundAmount > 0 ? '1px solid rgba(245, 158, 11, 0.15)' : '1px solid transparent',
+                      flex: '0 0 auto',
+                      minWidth: '132px',
+                      visibility: stats.refundAmount > 0 ? 'visible' : 'hidden'
+                    }}>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{stats.refundAmount.toLocaleString()}</span>
+                      <span style={{ color: 'var(--color-text)', fontWeight: '400', fontSize: '12px' }}></span>
+                    </div>
+                  </div>
 
               {/* 다운로드 아이콘 영역 */}
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '16px' }}>
@@ -1290,7 +1388,9 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                   )}
                 </div>
               </div>
-            </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

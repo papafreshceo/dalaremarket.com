@@ -6,14 +6,19 @@ import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC, formatDateTimeForDisplay } from '@/lib/date';
 import AdminSettlementTab from './components/AdminSettlementTab';
 import AdminRankingTab from './components/AdminRankingTab';
+import OrderStatusTab from './components/OrderStatusTab';
+import TierBadge from '@/components/TierBadge';
 
 interface Order {
   id: number;
   order_number?: string;
   seller_id?: string; // 레거시 지원
   organization_id?: string; // 조직 기반
+  sub_account_id?: string; // 서브계정 ID
+  sub_account_name?: string; // 서브계정 사업자명 (조회 후 추가)
   vendor_name?: string;
   option_name: string;
+  option_code?: string;
   shipping_status?: string;
   quantity: string;
   seller_supply_price?: string;
@@ -59,6 +64,7 @@ interface StatusBatch {
 interface OrganizationStats {
   organization_id: string;
   organization_name: string;
+  tier?: string;
   총금액: number;
   입금확인: boolean;
   업로드_건수: number;
@@ -89,7 +95,7 @@ interface OrganizationStats {
 }
 
 export default function OrderPlatformPage() {
-  const [activeTab, setActiveTab] = useState<'주문관리' | '조직별정산내역' | '조직랭킹'>('주문관리');
+  const [activeTab, setActiveTab] = useState<'주문관리' | '주문현황' | '조직별정산내역' | '조직랭킹'>('주문관리');
   const [orders, setOrders] = useState<Order[]>([]);
   const [organizationStats, setOrganizationStats] = useState<OrganizationStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +107,6 @@ export default function OrderPlatformPage() {
   const [organizationNames, setOrganizationNames] = useState<Map<string, string>>(new Map());
   const [expandedOrganizations, setExpandedOrganizations] = useState<Set<string>>(new Set());
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
-  const [totalExpanded, setTotalExpanded] = useState(false);
 
 
   // 날짜 및 검색 필터
@@ -122,9 +127,9 @@ export default function OrderPlatformPage() {
     return `${year}-${month}-${day}`;
   };
 
-  // 🔧 기본값을 빈 문자열로 설정하여 모든 주문 조회 (날짜 필터 없음)
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  // 기본값을 오늘 날짜로 설정
+  const [startDate, setStartDate] = useState<string>(getTodayDate());
+  const [endDate, setEndDate] = useState<string>(getTodayDate());
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // 날짜 빠른 선택
@@ -138,6 +143,10 @@ export default function OrderPlatformPage() {
       const month = String(today.getMonth() + 1).padStart(2, '0');
       const startDateStr = `${year}-${month}-01`;
       setStartDate(startDateStr);
+      setEndDate(endDateStr);
+    } else if (days === 0) {
+      // 오늘
+      setStartDate(endDateStr);
       setEndDate(endDateStr);
     } else {
       // 7일, 30일
@@ -153,24 +162,17 @@ export default function OrderPlatformPage() {
   };
 
   const fetchOrders = async () => {
-    console.log('🚀 [fetchOrders] 호출됨!', { startDate, endDate });
+    console.log('🚀 [fetchOrders] 호출됨 - 전체 데이터 로드');
     try {
       setLoading(true);
       // onlyWithOrganization=true로 organization_id가 있는 주문만 DB에서 필터링
       // limit을 10000으로 설정하여 충분한 데이터 가져오기
-      // 날짜 범위 필터 적용
+      // 날짜 필터는 클라이언트에서 처리
       const params = new URLSearchParams({
         onlyWithOrganization: 'true',
         limit: '10000'
       });
       console.log('📤 [fetchOrders] API 호출 직전, params:', params.toString());
-
-      if (startDate) {
-        params.append('startDate', startDate);
-      }
-      if (endDate) {
-        params.append('endDate', endDate);
-      }
 
       const response = await fetch(`/api/integrated-orders?${params.toString()}`);
       const result = await response.json();
@@ -199,9 +201,11 @@ export default function OrderPlatformPage() {
         // 조직 ID 수집
         const organizationIds = [...new Set(organizationOrders.map((o: Order) => o.organization_id).filter(Boolean))];
 
-        // 조직 정보 조회 (organizations 테이블에서 name, 은행 정보 가져오기)
+        // 조직 정보 조회 (organizations 테이블에서 name, 은행 정보, tier 가져오기)
         let nameMap = new Map<string, string>();
         const orgBankInfoMap = new Map<string, { bank_name: string; bank_account: string; account_holder: string }>();
+        const orgTierMap = new Map<string, string>(); // 조직 ID → tier
+        const subAccountNameMap = new Map<string, string>(); // 서브계정 ID → 사업자명
 
         if (organizationIds.length > 0) {
           const { createClient } = await import('@/lib/supabase/client');
@@ -209,13 +213,14 @@ export default function OrderPlatformPage() {
 
           const { data: organizations, error } = await supabase
             .from('organizations')
-            .select('id, business_name, bank_name, bank_account, account_holder')
+            .select('id, business_name, bank_name, bank_account, account_holder, tier')
             .in('id', organizationIds);
 
           if (!error && organizations) {
             console.log('🏦 조직 은행 정보 조회 결과:', organizations);
             organizations.forEach((org: any) => {
               nameMap.set(org.id, org.business_name || org.id);
+              orgTierMap.set(org.id, org.tier || 'bronze');
               const bankInfo = {
                 bank_name: org.bank_name || '',
                 bank_account: org.bank_account || '',
@@ -228,14 +233,35 @@ export default function OrderPlatformPage() {
           } else if (error) {
             console.error('❌ 조직 은행 정보 조회 실패:', error);
           }
+
+          // 서브계정 정보 조회
+          const subAccountIds = [...new Set(organizationOrders.map((o: Order) => o.sub_account_id).filter(Boolean))];
+          if (subAccountIds.length > 0) {
+            const { data: subAccounts, error: subError } = await supabase
+              .from('sub_accounts')
+              .select('id, business_name, is_main')
+              .in('id', subAccountIds);
+
+            if (!subError && subAccounts) {
+              console.log('📋 서브계정 정보 조회 결과:', subAccounts);
+              subAccounts.forEach((sub: any) => {
+                // is_main이 true면 '메인계정'으로 표시, 아니면 사업자명
+                const displayName = sub.is_main ? '메인계정' : (sub.business_name || '-');
+                subAccountNameMap.set(sub.id, displayName);
+              });
+            } else if (subError) {
+              console.error('❌ 서브계정 정보 조회 실패:', subError);
+            }
+          }
         }
 
-        // 주문에 은행 정보 매핑
+        // 주문에 은행 정보 및 서브계정명 매핑
         const ordersWithBankInfo = organizationOrders.map((order: Order) => ({
           ...order,
           bank_name: order.organization_id ? orgBankInfoMap.get(order.organization_id)?.bank_name : undefined,
           bank_account: order.organization_id ? orgBankInfoMap.get(order.organization_id)?.bank_account : undefined,
-          account_holder: order.organization_id ? orgBankInfoMap.get(order.organization_id)?.account_holder : undefined
+          account_holder: order.organization_id ? orgBankInfoMap.get(order.organization_id)?.account_holder : undefined,
+          sub_account_name: order.sub_account_id ? subAccountNameMap.get(order.sub_account_id) : undefined
         }));
 
         console.log('🏦 은행 정보가 매핑된 주문 샘플 (처음 2개):', ordersWithBankInfo.slice(0, 2).map(o => ({
@@ -247,7 +273,7 @@ export default function OrderPlatformPage() {
         })));
 
         setOrders(ordersWithBankInfo);
-        await calculateOrganizationStats(organizationOrders, nameMap);
+        await calculateOrganizationStats(organizationOrders, nameMap, orgTierMap);
       }
     } catch (error) {
       console.error('주문 조회 오류:', error);
@@ -257,11 +283,12 @@ export default function OrderPlatformPage() {
     }
   };
 
+  // 초기 로드시에만 전체 데이터 가져오기
   useEffect(() => {
     fetchOrders();
-  }, [startDate, endDate]);
+  }, []); // 빈 배열: 컴포넌트 마운트시에만 실행
 
-  const calculateOrganizationStats = async (orderData: Order[], nameMap?: Map<string, string>) => {
+  const calculateOrganizationStats = async (orderData: Order[], nameMap?: Map<string, string>, tierMap?: Map<string, string>) => {
     const statsMap = new Map<string, OrganizationStats>();
     const names = nameMap || organizationNames;
 
@@ -271,6 +298,7 @@ export default function OrderPlatformPage() {
         statsMap.set(organizationId, {
           organization_id: organizationId,
           organization_name: names.get(organizationId) || organizationId,
+          tier: tierMap?.get(organizationId) || 'bronze',
           총금액: 0,
           입금확인: false,
           업로드_건수: 0,
@@ -1432,6 +1460,7 @@ export default function OrderPlatformPage() {
             <p className="mt-1 text-sm text-gray-600">셀러별 주문 현황 및 입금환불 관리</p>
           </div>
           <button
+            type="button"
             onClick={fetchOrders}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 transition-colors"
           >
@@ -1444,6 +1473,7 @@ export default function OrderPlatformPage() {
         <div className="bg-white border-b border-gray-200 mb-4">
           <div className="flex gap-0">
             <button
+              type="button"
               onClick={() => setActiveTab('주문관리')}
               className={`px-6 py-3 text-sm font-medium transition-colors relative ${
                 activeTab === '주문관리'
@@ -1454,24 +1484,37 @@ export default function OrderPlatformPage() {
               주문관리
             </button>
             <button
-              onClick={() => setActiveTab('셀러별정산내역')}
+              type="button"
+              onClick={() => setActiveTab('주문현황')}
               className={`px-6 py-3 text-sm font-medium transition-colors relative ${
-                activeTab === '셀러별정산내역'
+                activeTab === '주문현황'
                   ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              셀러별 정산내역
+              📊 주문현황
             </button>
             <button
-              onClick={() => setActiveTab('셀러랭킹')}
+              type="button"
+              onClick={() => setActiveTab('조직별정산내역')}
               className={`px-6 py-3 text-sm font-medium transition-colors relative ${
-                activeTab === '셀러랭킹'
+                activeTab === '조직별정산내역'
                   ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              🏆 셀러 랭킹
+              조직별 정산내역
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('조직랭킹')}
+              className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+                activeTab === '조직랭킹'
+                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              🏆 조직 랭킹
             </button>
           </div>
         </div>
@@ -1506,18 +1549,28 @@ export default function OrderPlatformPage() {
             {/* 빠른 날짜 선택 버튼 */}
             <div className="flex items-center gap-2">
               <button
+                type="button"
+                onClick={() => setDateRange(0)}
+                className="px-3 py-1.5 text-sm bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 rounded transition-colors"
+              >
+                오늘
+              </button>
+              <button
+                type="button"
                 onClick={() => setDateRange(7)}
                 className="px-3 py-1.5 text-sm bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 rounded transition-colors"
               >
                 7일
               </button>
               <button
+                type="button"
                 onClick={() => setDateRange(30)}
                 className="px-3 py-1.5 text-sm bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 rounded transition-colors"
               >
                 30일
               </button>
               <button
+                type="button"
                 onClick={() => setDateRange('thisMonth')}
                 className="px-3 py-1.5 text-sm bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 rounded transition-colors"
               >
@@ -1540,6 +1593,7 @@ export default function OrderPlatformPage() {
             {/* 필터 초기화 버튼 */}
             {(startDate || endDate || searchQuery) && (
               <button
+                type="button"
                 onClick={() => {
                   setStartDate('');
                   setEndDate('');
@@ -1560,9 +1614,59 @@ export default function OrderPlatformPage() {
         </div>
 
         {/* 헤더 아코디언 (컬럼명) */}
-        <div className="bg-gray-100 border-b border-gray-300">
-          <div className="grid grid-cols-14 gap-4 px-6 py-3 text-xs font-semibold text-gray-700 uppercase">
-            <div className="col-span-2"></div>
+        <div className="bg-gray-700 border-b border-gray-600">
+          <div className="grid grid-cols-13 gap-4 px-6 py-3 text-xs font-semibold text-gray-200 uppercase">
+            <div className="col-span-2 flex items-center gap-2 pl-8">
+              <button
+                type="button"
+                onClick={() => {
+                  const totalOrgs = organizationList?.length || 0;
+                  if (expandedOrganizations.size === totalOrgs) {
+                    setExpandedOrganizations(new Set());
+                  } else {
+                    setExpandedOrganizations(new Set(organizationList?.map(s => s.organization_id) || []));
+                  }
+                }}
+                className="px-2 py-1 border border-blue-400 text-blue-400 bg-transparent text-xs hover:bg-blue-400 hover:text-white transition-colors flex items-center gap-1 whitespace-nowrap"
+              >
+                {expandedOrganizations.size === (organizationList?.length || 0) ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
+                {expandedOrganizations.size === (organizationList?.length || 0) ? '전체접기' : '전체펼치기'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const pendingOrgs = (organizationList || []).filter(stat =>
+                    stat.발주확정_배치 && stat.발주확정_배치.some(b => !b.입금확인)
+                  );
+                  const pendingOrgIds = new Set(pendingOrgs.map(s => s.organization_id));
+
+                  // 현재 펼쳐진 조직들이 모두 입금확인대상이면 접기, 아니면 입금확인대상만 펼치기
+                  const allPendingExpanded = pendingOrgs.length > 0 && pendingOrgs.every(org => expandedOrganizations.has(org.organization_id));
+
+                  if (allPendingExpanded) {
+                    setExpandedOrganizations(new Set());
+                  } else {
+                    setExpandedOrganizations(pendingOrgIds);
+                  }
+                }}
+                className="px-2 py-1 border border-orange-400 text-orange-400 bg-transparent text-xs hover:bg-orange-400 hover:text-white transition-colors flex items-center gap-1 whitespace-nowrap"
+              >
+                {(() => {
+                  const pendingOrgs = (organizationList || []).filter(stat =>
+                    stat.발주확정_배치 && stat.발주확정_배치.some(b => !b.입금확인)
+                  );
+                  const allPendingExpanded = pendingOrgs.length > 0 && pendingOrgs.every(org => expandedOrganizations.has(org.organization_id));
+                  return allPendingExpanded ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />;
+                })()}
+                {(() => {
+                  const pendingOrgs = (organizationList || []).filter(stat =>
+                    stat.발주확정_배치 && stat.발주확정_배치.some(b => !b.입금확인)
+                  );
+                  const allPendingExpanded = pendingOrgs.length > 0 && pendingOrgs.every(org => expandedOrganizations.has(org.organization_id));
+                  return allPendingExpanded ? '입금확인접기' : '입금확인대상';
+                })()}
+              </button>
+            </div>
             <div className="col-span-1 text-center">업로드</div>
             <div className="col-span-1 text-center">발주서확정</div>
             <div className="col-span-1 text-center">최종입금액</div>
@@ -1574,62 +1678,50 @@ export default function OrderPlatformPage() {
             <div className="col-span-1 text-center">취소완료</div>
             <div className="col-span-1 text-center">환불완료</div>
             <div className="col-span-1 text-center">환불액</div>
-            <div className="col-span-1 text-center">처리</div>
           </div>
         </div>
 
-        {/* 합계 아코디언 */}
+        {/* 합계 행 */}
         {totalStat && (
-          <div className="bg-gray-100 border-b border-gray-200">
-            <button
-              onClick={() => setTotalExpanded(!totalExpanded)}
-              className="w-full px-4 py-1.5 hover:bg-gray-200 transition-colors"
-            >
-              <div className="grid grid-cols-14 gap-2 items-center">
-                <div className="col-span-2 flex items-center gap-2 font-bold text-gray-900">
-                  {totalExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          <div className="bg-gray-700 border-b border-gray-600">
+            <div className="px-4 py-1.5">
+              <div className="grid grid-cols-13 gap-2 items-center">
+                <div className="col-span-2 font-bold text-white">
                   합계
                 </div>
-                <div className="col-span-1 text-center font-semibold text-purple-700">
+                <div className="col-span-1 text-center font-semibold text-purple-300">
                   {totalStat.업로드_건수 > 0 ? totalStat.업로드_건수 : '-'}
                 </div>
-                <div className="col-span-1 text-center font-semibold text-indigo-700">
+                <div className="col-span-1 text-center font-semibold text-indigo-300">
                   {totalStat.발주서확정_건수 > 0 ? totalStat.발주서확정_건수 : '-'}
                 </div>
-                <div className="col-span-1 text-center font-bold text-blue-600">
+                <div className="col-span-1 text-center font-bold text-blue-300">
                   {totalStat.총금액 > 0 ? `${totalStat.총금액.toLocaleString()}원` : '-'}
                 </div>
                 <div className="col-span-1"></div>
-                <div className="col-span-1 text-center font-semibold text-blue-700">
+                <div className="col-span-1 text-center font-semibold text-blue-300">
                   {totalStat.결제완료_건수 > 0 ? totalStat.결제완료_건수 : '-'}
                 </div>
-                <div className="col-span-1 text-center font-semibold text-yellow-600">
+                <div className="col-span-1 text-center font-semibold text-yellow-300">
                   {totalStat.상품준비중_건수 > 0 ? totalStat.상품준비중_건수 : '-'}
                 </div>
-                <div className="col-span-1 text-center font-semibold text-green-600">
+                <div className="col-span-1 text-center font-semibold text-green-300">
                   {totalStat.발송완료_건수 > 0 ? totalStat.발송완료_건수 : '-'}
                 </div>
-                <div className="col-span-1 text-center font-semibold text-orange-600">
+                <div className="col-span-1 text-center font-semibold text-orange-300">
                   {totalStat.취소요청_건수 > 0 ? totalStat.취소요청_건수 : '-'}
                 </div>
-                <div className="col-span-1 text-center font-semibold text-gray-600">
+                <div className="col-span-1 text-center font-semibold text-gray-300">
                   {totalStat.취소완료_건수 > 0 ? totalStat.취소완료_건수 : '-'}
                 </div>
-                <div className="col-span-1 text-center font-bold text-emerald-600">
+                <div className="col-span-1 text-center font-bold text-emerald-300">
                   {totalStat.환불완료_건수 > 0 ? `${totalStat.환불완료_건수}건` : '-'}
                 </div>
-                <div className="col-span-1 text-center font-bold text-red-600">
+                <div className="col-span-1 text-center font-bold text-red-300">
                   {totalStat.환불예정액 > 0 ? `${totalStat.환불예정액.toLocaleString()}원` : '-'}
                 </div>
-                <div className="col-span-1"></div>
               </div>
-            </button>
-
-            {totalExpanded && (
-              <div className="border-t border-gray-200 bg-gray-50 px-6 py-4 max-h-[600px] overflow-y-auto">
-                <div className="text-sm text-gray-600">전체 주문 통계</div>
-              </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -1639,23 +1731,27 @@ export default function OrderPlatformPage() {
           const organizationOrders = getOrganizationOrders(stat.organization_id);
 
           return (
-            <div key={stat.organization_id} className="bg-white border-b border-gray-200">
+            <div key={stat.organization_id} className="bg-gray-800 border-b border-gray-600">
               <button
+                type="button"
                 onClick={() => toggleOrganization(stat.organization_id)}
-                className="w-full px-4 py-1.5 hover:bg-gray-50 transition-colors"
+                className="w-full px-4 py-1.5 hover:bg-gray-700 transition-colors"
               >
-                <div className="grid grid-cols-14 gap-2 items-center">
-                  <div className="col-span-2 flex items-center gap-2 font-semibold text-gray-900 text-left pl-8">
+                <div className="grid grid-cols-13 gap-2 items-center">
+                  <div className="col-span-2 flex items-center gap-2 font-semibold text-white text-left pl-8">
                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    <div style={{ transform: 'scale(0.7)', display: 'flex', alignItems: 'center' }}>
+                      <TierBadge tier={stat.tier as any || 'bronze'} iconOnly glow={0} />
+                    </div>
                     {stat.organization_name}
                   </div>
-                  <div className="col-span-1 text-center font-semibold text-purple-700">
+                  <div className="col-span-1 text-center font-semibold text-purple-300">
                     {stat.업로드_건수 > 0 ? stat.업로드_건수 : '-'}
                   </div>
-                  <div className="col-span-1 text-center font-semibold text-indigo-700">
+                  <div className="col-span-1 text-center font-semibold text-indigo-300">
                     {stat.발주서확정_건수 > 0 ? stat.발주서확정_건수 : '-'}
                   </div>
-                  <div className="col-span-1 text-center font-semibold text-blue-600">
+                  <div className="col-span-1 text-center font-semibold text-blue-300">
                     {stat.총금액?.toLocaleString() || 0}원
                   </div>
                   <div className="col-span-1 flex justify-center">
@@ -1668,11 +1764,11 @@ export default function OrderPlatformPage() {
                             className="text-xs font-medium cursor-help"
                             title={`입금 대기: ${pendingBatches}개 | 입금 완료: ${confirmedBatches}개 (클릭하여 배치 확인)`}
                           >
-                            <span className="text-orange-600">{pendingBatches}</span>
+                            <span className="text-orange-400">{pendingBatches}</span>
                             {confirmedBatches > 0 && (
-                              <span className="text-cyan-600"> / {confirmedBatches}</span>
+                              <span className="text-cyan-400"> / {confirmedBatches}</span>
                             )}
-                            <span className="text-gray-500"> 배치</span>
+                            <span className="text-gray-400"> 배치</span>
                           </span>
                         );
                       })()
@@ -1688,31 +1784,30 @@ export default function OrderPlatformPage() {
                         />
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-400">-</span>
+                      <span className="text-xs text-gray-500">-</span>
                     )}
                   </div>
-                  <div className="col-span-1 text-center font-semibold text-blue-700">
+                  <div className="col-span-1 text-center font-semibold text-blue-300">
                     {stat.결제완료_건수 > 0 ? stat.결제완료_건수 : '-'}
                   </div>
-                  <div className="col-span-1 text-center font-semibold text-yellow-600">
+                  <div className="col-span-1 text-center font-semibold text-yellow-300">
                     {stat.상품준비중_건수 > 0 ? stat.상품준비중_건수 : '-'}
                   </div>
-                  <div className="col-span-1 text-center font-semibold text-green-600">
+                  <div className="col-span-1 text-center font-semibold text-green-300">
                     {stat.발송완료_건수 > 0 ? stat.발송완료_건수 : '-'}
                   </div>
-                  <div className="col-span-1 text-center font-semibold text-orange-600">
+                  <div className="col-span-1 text-center font-semibold text-orange-300">
                     {stat.취소요청_건수 > 0 ? stat.취소요청_건수 : '-'}
                   </div>
-                  <div className="col-span-1 text-center font-semibold text-gray-600">
+                  <div className="col-span-1 text-center font-semibold text-gray-400">
                     {stat.취소완료_건수 > 0 ? stat.취소완료_건수 : '-'}
                   </div>
-                  <div className="col-span-1 text-center font-semibold text-emerald-600">
+                  <div className="col-span-1 text-center font-semibold text-emerald-300">
                     {stat.환불완료_건수 > 0 ? `${stat.환불완료_건수}건` : '-'}
                   </div>
-                  <div className="col-span-1 text-center font-semibold text-red-600">
+                  <div className="col-span-1 text-center font-semibold text-red-300">
                     {stat.환불예정액 > 0 ? `${stat.환불예정액.toLocaleString()}원` : '-'}
                   </div>
-                  <div className="col-span-1"></div>
                 </div>
               </button>
 
@@ -1732,7 +1827,7 @@ export default function OrderPlatformPage() {
                             <div key={`${batch.confirmed_at}-${batch.실행자_ID}-${idx}`} className="border-b border-gray-200 last:border-b-0 pb-3 last:pb-0">
                               {/* 배치 헤더 */}
                               <div
-                                className="flex items-center justify-between p-3 rounded-lg hover:shadow-md transition-shadow"
+                                className="flex items-center justify-between p-3 rounded-lg hover:shadow-md transition-shadow border border-blue-500"
                                 style={{
                                   backgroundColor: batch.입금확인 ? '#f0fdfa' : '#f9fafb'
                                 }}
@@ -1748,17 +1843,21 @@ export default function OrderPlatformPage() {
                                   <div className="text-sm text-gray-600">
                                     {batch.주문건수 > 0 ? `${batch.주문건수}건` : '입금완료'}
                                   </div>
-                                  <div className="text-sm font-semibold text-blue-600">
-                                    {batch.총금액.toLocaleString()} - {batch.캐시사용금액.toLocaleString()} = {(batch.총금액 - batch.캐시사용금액).toLocaleString()}
+                                  <div className="text-sm flex items-center gap-3">
+                                    <span className="text-gray-900">{batch.총금액.toLocaleString()}</span>
+                                    <span className="text-gray-400">-</span>
+                                    <span className="text-gray-900">{batch.캐시사용금액.toLocaleString()}</span>
+                                    <span className="text-gray-400">&gt;&gt;</span>
+                                    <span className="text-blue-600 font-semibold">{(batch.총금액 - batch.캐시사용금액).toLocaleString()}</span>
                                   </div>
                                   <div className="text-sm text-gray-600">
                                     ({batch.입금자명 || '입금자명 없음'})
                                   </div>
                                   <div className="text-xs text-gray-500" style={{ color: '#666' }}>
-                                    실행자: {batch.실행자_이름 || '미지정'} {batch.실행자_전화번호 ? `(${batch.실행자_전화번호})` : ''}
+                                    {batch.실행자_이름 || '미지정'} {batch.실행자_전화번호 ? `(${batch.실행자_전화번호})` : ''}
                                   </div>
                                   {batch.입금확인 && (
-                                    <span className="text-xs px-2 py-1 bg-cyan-100 text-cyan-700 rounded-full font-medium">
+                                    <span className="text-xs px-2 py-1 bg-cyan-100 text-cyan-700 rounded-full font-medium border border-blue-500">
                                       입금확인 완료
                                     </span>
                                   )}
@@ -1785,101 +1884,45 @@ export default function OrderPlatformPage() {
                                   <table className="w-full seller-detail-table">
                                     <thead className="bg-gray-100">
                                       <tr className="text-gray-600" style={{ height: '24px' }}>
-                                        <th className="px-1 py-0 text-center font-medium text-xs">주문번호</th>
-                                        <th className="px-1 py-0 text-center font-medium text-xs">벤더사</th>
-                                        <th className="px-1 py-0 text-center font-medium text-xs">옵션상품</th>
-                                        <th className="px-1 py-0 text-center font-medium text-xs">수량</th>
-                                        <th className="px-1 py-0 text-center font-medium text-xs">금액</th>
-                                        <th className="px-1 py-0 text-center font-medium text-xs">상태</th>
-                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '180px' }}>발주확정</th>
-                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '180px' }}>취소요청</th>
-                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '180px' }}>취소승인</th>
-                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '180px' }}>환불완료</th>
-                                        <th className="px-1 py-0 text-center font-medium text-xs">환불액</th>
-                                        <th className="px-1 py-0 text-center font-medium text-xs">관리자처리</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '60px' }}>#</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '180px' }}>사업자명</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '200px' }}>주문번호</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '120px' }}>벤더사</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '15%' }}>옵션상품</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '60px' }}>수량</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '100px' }}>최종입금액</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '80px' }}>사용캐시</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '130px' }}>상태</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '200px' }}>발주확정</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
-                                      {batchOrders.map((order) => {
+                                      {batchOrders.map((order, index) => {
                                         const status = order.shipping_status;
-                                        const refundAmount = (status === '환불완료')
-                                          ? Number(order.settlement_amount || 0)
-                                          : 0;
 
                                         return (
                                           <tr key={order.id} className="hover:bg-white transition-colors">
-                                            <td className="px-2 py-0.5 text-xs text-gray-900">{order.order_number || '-'}</td>
-                                            <td className="px-2 py-0.5 text-xs text-gray-900">{order.vendor_name || '-'}</td>
-                                            <td className="px-2 py-0.5 text-xs text-gray-900">{order.option_name}</td>
-                                            <td className="px-2 py-0.5 text-center text-xs text-gray-900">{order.quantity}</td>
-                                            <td className="px-2 py-0.5 text-right text-xs text-gray-900">
-                                              {Number(order.settlement_amount || 0).toLocaleString()}원
+                                            <td className="px-2 py-0.5 text-center text-xs text-gray-500" style={{ width: '60px' }}>{index + 1}</td>
+                                            <td className="px-2 py-0.5 text-xs text-gray-900" style={{ width: '180px' }}>{order.sub_account_name || '-'}</td>
+                                            <td className="px-2 py-0.5 text-xs text-gray-900" style={{ width: '200px' }}>{order.order_number || '-'}</td>
+                                            <td className="px-2 py-0.5 text-xs text-gray-900" style={{ width: '120px' }}>{order.vendor_name || '-'}</td>
+                                            <td className="px-2 py-0.5 text-xs text-gray-900" style={{ width: '15%' }}>{order.option_name}</td>
+                                            <td className="px-2 py-0.5 text-center text-xs text-gray-900" style={{ width: '60px' }}>{order.quantity}</td>
+                                            <td className="px-2 py-0.5 text-right text-xs text-blue-600 font-semibold" style={{ width: '100px' }}>
+                                              {Number(order.final_deposit_amount || 0).toLocaleString()}원
                                             </td>
-                                            <td className="px-2 py-0.5 text-center">
+                                            <td className="px-2 py-0.5 text-right text-xs text-orange-600" style={{ width: '80px' }}>
+                                              {Number(order.cash_used || 0).toLocaleString()}
+                                            </td>
+                                            <td className="px-2 py-0.5 text-center" style={{ width: '130px' }}>
                                               <span className={`px-1.5 py-0 text-xs ${getStatusColor(status)}`}>
                                                 {getStatusDisplayName(status)}
                                               </span>
                                             </td>
-                                            <td className="px-1 py-0.5 text-center text-gray-600 text-xs" style={{ width: '180px' }}>
+                                            <td className="px-1 py-0.5 text-center text-gray-600 text-xs" style={{ width: '200px' }}>
                                               {order.confirmed_at
                                                 ? formatDateTimeForDisplay(order.confirmed_at).replace('. ', '-').replace('. ', '-').replace('. ', ' ')
                                                 : '-'}
-                                            </td>
-                                            <td className="px-1 py-0.5 text-center text-gray-600 text-xs" style={{ width: '180px' }}>
-                                              {order.cancel_requested_at
-                                                ? formatDateTimeForDisplay(order.cancel_requested_at).replace('. ', '-').replace('. ', '-').replace('. ', ' ')
-                                                : '-'}
-                                            </td>
-                                            <td className="px-1 py-0.5 text-center text-gray-600 text-xs" style={{ width: '180px' }}>
-                                              {order.canceled_at
-                                                ? formatDateTimeForDisplay(order.canceled_at).replace('. ', '-').replace('. ', '-').replace('. ', ' ')
-                                                : '-'}
-                                            </td>
-                                            <td className="px-1 py-0.5 text-center text-gray-600 text-xs" style={{ width: '180px' }}>
-                                              {order.refund_processed_at
-                                                ? formatDateTimeForDisplay(order.refund_processed_at).replace('. ', '-').replace('. ', '-').replace('. ', ' ')
-                                                : '-'}
-                                            </td>
-                                            <td className="px-2 py-0.5 text-right text-xs text-gray-900">
-                                              {refundAmount > 0 ? `${refundAmount.toLocaleString()}원` : '-'}
-                                            </td>
-                                            <td className="px-2 py-0.5 text-center">
-                                              {status === '환불완료' ? (
-                                                <span className="text-emerald-600 font-medium text-xs">환불완료</span>
-                                              ) : status === '취소요청' ? (
-                                                <div className="flex gap-1 justify-center">
-                                                  <button
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      handleCancelApprove(order.id);
-                                                    }}
-                                                    className="px-1.5 py-0.5 text-xs bg-blue-600 text-white hover:bg-blue-700 transition-colors rounded"
-                                                  >
-                                                    승인
-                                                  </button>
-                                                  <button
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      handleCancelReject(order.id);
-                                                    }}
-                                                    className="px-1.5 py-0.5 text-xs bg-gray-500 text-white hover:bg-gray-600 transition-colors rounded"
-                                                  >
-                                                    반려
-                                                  </button>
-                                                </div>
-                                              ) : status === '취소완료' ? (
-                                                <button
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleSingleRefundComplete(order.id);
-                                                  }}
-                                                  className="px-1.5 py-0.5 text-xs bg-red-600 text-white hover:bg-red-700 transition-colors rounded"
-                                                >
-                                                  환불완료
-                                                </button>
-                                              ) : (
-                                                <span className="text-gray-400 text-xs">-</span>
-                                              )}
                                             </td>
                                           </tr>
                                         );
@@ -1896,11 +1939,13 @@ export default function OrderPlatformPage() {
                   )}
 
                   {/* 다른 상태별 세부 내역 (배치 구조 없이) */}
-                  {['결제완료', '상품준비중', '발송완료', '취소요청', '취소완료', '환불완료'].map(status => {
+                  {['발주서등록', '접수', '결제완료', '상품준비중', '발송완료', '취소요청', '취소완료', '환불완료'].map(status => {
                     const statusOrders = organizationOrders.filter(order => order.shipping_status === status);
                     if (statusOrders.length === 0) return null;
 
                     const statusColors: Record<string, string> = {
+                      '발주서등록': 'bg-purple-50',
+                      '접수': 'bg-indigo-50',
                       '결제완료': 'bg-blue-50',
                       '상품준비중': 'bg-yellow-50',
                       '발송완료': 'bg-green-50',
@@ -1918,47 +1963,66 @@ export default function OrderPlatformPage() {
                           <table className="w-full seller-detail-table">
                             <thead className="bg-gray-100">
                               <tr className="text-gray-600" style={{ height: '24px' }}>
-                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: (status === '취소완료' || status === '환불완료') ? '10%' : '12%' }}>주문번호</th>
-                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: (status === '취소완료' || status === '환불완료') ? '8%' : '10%' }}>벤더사</th>
-                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: (status === '취소완료' || status === '환불완료') ? '15%' : '30%' }}>옵션상품</th>
-                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: (status === '취소완료' || status === '환불완료') ? '6%' : '8%' }}>수량</th>
-                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: (status === '취소완료' || status === '환불완료') ? '10%' : '12%' }}>
-                                  {status === '취소완료' ? '환불예정금액' : status === '환불완료' ? '환불완료금액' : '금액'}
+                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '60px' }}>#</th>
+                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '180px' }}>사업자명</th>
+                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '200px' }}>주문번호</th>
+                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '120px' }}>벤더사</th>
+                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '15%' }}>옵션상품</th>
+                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '60px' }}>수량</th>
+                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '100px' }}>
+                                  {status === '취소완료' ? '환불예정금액' : status === '환불완료' ? '환불완료금액' : (status === '발주서등록' || status === '접수') ? '정산예정금액' : '최종입금액'}
                                 </th>
+                                {(status === '결제완료' || status === '상품준비중' || status === '발송완료' || status === '취소요청') && (
+                                  <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '80px' }}>사용캐시</th>
+                                )}
                                 {(status === '취소완료' || status === '환불완료') && (
                                   <>
-                                    <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '8%' }}>
+                                    <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '100px' }}>
                                       {status === '취소완료' ? '환불예정캐시' : '환불완료캐시'}
                                     </th>
-                                    <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '18%' }}>환불계좌</th>
+                                    <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '280px' }}>환불계좌</th>
                                   </>
                                 )}
-                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '5%' }}>상태</th>
+                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '130px' }}>상태</th>
                                 {status === '취소요청' && (
-                                  <th className="px-1 py-0 text-center font-medium text-xs">작업</th>
+                                  <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '120px' }}>작업</th>
                                 )}
                                 {status === '취소완료' && (
-                                  <th className="px-1 py-0 text-center font-medium text-xs">작업</th>
+                                  <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '100px' }}>작업</th>
                                 )}
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
-                              {statusOrders.map((order) => {
+                              {statusOrders.map((order, index) => {
                                 return (
                                   <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-2 py-0.5 text-xs text-gray-900">{order.order_number || '-'}</td>
-                                    <td className="px-2 py-0.5 text-xs text-gray-900">{order.vendor_name || '-'}</td>
-                                    <td className="px-2 py-0.5 text-xs text-gray-900">{order.option_name}</td>
-                                    <td className="px-2 py-0.5 text-center text-xs text-gray-900">{order.quantity}</td>
-                                    <td className={`px-2 py-0.5 text-right text-xs ${(status === '취소완료' || status === '환불완료') ? 'text-red-600 font-semibold' : 'text-gray-900'}`}>
-                                      {Number(order.final_deposit_amount || 0).toLocaleString()}원
+                                    <td className="px-2 py-0.5 text-center text-xs text-gray-500" style={{ width: '60px' }}>{index + 1}</td>
+                                    <td className="px-2 py-0.5 text-xs text-gray-900" style={{ width: '180px' }}>{order.sub_account_name || '-'}</td>
+                                    <td className="px-2 py-0.5 text-xs text-gray-900" style={{ width: '200px' }}>{order.order_number || '-'}</td>
+                                    <td className="px-2 py-0.5 text-xs text-gray-900" style={{ width: '120px' }}>{order.vendor_name || '-'}</td>
+                                    <td className="px-2 py-0.5 text-xs text-gray-900" style={{ width: '15%' }}>{order.option_name}</td>
+                                    <td className="px-2 py-0.5 text-center text-xs text-gray-900" style={{ width: '60px' }}>{order.quantity}</td>
+                                    <td className={`px-2 py-0.5 text-right text-xs ${(status === '취소완료' || status === '환불완료') ? 'text-red-600 font-semibold' : (status === '발주서등록' || status === '접수') ? 'text-gray-900' : 'text-blue-600 font-semibold'}`} style={{ width: '100px' }}>
+                                      {(() => {
+                                        // 업로드 단계: settlement_amount (정산예정금액)
+                                        if (status === '발주서등록' || status === '접수') {
+                                          return `${Number(order.settlement_amount || 0).toLocaleString()}원`;
+                                        }
+                                        // 발주확정 이후: final_deposit_amount (최종입금액)
+                                        return `${Number(order.final_deposit_amount || 0).toLocaleString()}원`;
+                                      })()}
                                     </td>
+                                    {(status === '결제완료' || status === '상품준비중' || status === '발송완료' || status === '취소요청') && (
+                                      <td className="px-2 py-0.5 text-right text-xs text-orange-600" style={{ width: '80px' }}>
+                                        {Number(order.cash_used || 0).toLocaleString()}
+                                      </td>
+                                    )}
                                     {(status === '취소완료' || status === '환불완료') && (
                                       <>
-                                        <td className="px-2 py-0.5 text-right text-xs text-orange-600 font-semibold">
+                                        <td className="px-2 py-0.5 text-right text-xs text-orange-600 font-semibold" style={{ width: '100px' }}>
                                           {Number(order.cash_used || 0).toLocaleString()}캐시
                                         </td>
-                                        <td className="px-2 py-0.5 text-xs text-gray-700">
+                                        <td className="px-2 py-0.5 text-xs text-gray-700" style={{ width: '280px' }}>
                                           {order.bank_name || order.bank_account || order.account_holder ? (
                                             <span>
                                               {order.bank_name || '-'} {order.bank_account || '-'} ({order.account_holder || '-'})
@@ -1969,13 +2033,13 @@ export default function OrderPlatformPage() {
                                         </td>
                                       </>
                                     )}
-                                    <td className="px-2 py-0.5 text-center">
+                                    <td className="px-2 py-0.5 text-center" style={{ width: '130px' }}>
                                       <span className={`px-1.5 py-0 text-xs ${getStatusColor(order.shipping_status)}`}>
                                         {getStatusDisplayName(order.shipping_status)}
                                       </span>
                                     </td>
                                     {status === '취소요청' && (
-                                    <td className="px-2 py-0.5 text-center">
+                                    <td className="px-2 py-0.5 text-center" style={{ width: '120px' }}>
                                       <div className="flex gap-1 justify-center">
                                         <button
                                           onClick={async (e) => {
@@ -2058,7 +2122,7 @@ export default function OrderPlatformPage() {
                                     </td>
                                   )}
                                   {status === '취소완료' && (
-                                    <td className="px-2 py-0.5 text-center">
+                                    <td className="px-2 py-0.5 text-center" style={{ width: '100px' }}>
                                       <button
                                         onClick={async (e) => {
                                           e.stopPropagation();
@@ -2156,6 +2220,16 @@ export default function OrderPlatformPage() {
         })}
       </>
     )}
+
+        {/* 주문현황 탭 컨텐츠 */}
+        {activeTab === '주문현황' && (
+          <OrderStatusTab orders={orders.map(order => ({
+            ...order,
+            organization_name: organizationNames.get(order.organization_id || '') || '미지정',
+            final_deposit_amount: Number(order.final_deposit_amount) || 0,
+            cash_used: Number(order.cash_used) || 0,
+          }))} />
+        )}
 
         {/* 조직별 정산내역 탭 컨텐츠 */}
         {activeTab === '조직별정산내역' && (

@@ -28,7 +28,8 @@ export default function ProductCalendar({
 
   return (
     <div style={{
-      background: '#ffffff',
+      background: 'rgba(255, 255, 255, 0.1)',
+      border: '1px solid rgba(222, 226, 230, 0.1)',
       borderRadius: '12px',
       padding: isMobile ? '16px' : '24px',
       marginBottom: '16px'
@@ -116,11 +117,11 @@ export default function ProductCalendar({
           <div
             key={idx}
             style={{
-              border: '1px solid #f1f3f5',
+              border: '1px solid rgba(241, 243, 245, 0.1)',
               borderRadius: '6px',
               padding: '6px',
               minHeight: '40px',
-              background: dayInfo.day ? '#ffffff' : 'transparent'
+              background: dayInfo.day ? 'rgba(255, 255, 255, 0.1)' : 'transparent'
             }}
           >
             {dayInfo.day && (

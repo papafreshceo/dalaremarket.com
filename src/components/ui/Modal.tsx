@@ -44,14 +44,14 @@ export function Modal({
   useEffect(() => {
     if (isOpen) {
       setShouldRender(true)
-      document.body.style.overflow = 'hidden'
+      document.body.classList.add('modal-open')
       // 다음 프레임에서 애니메이션 시작
       requestAnimationFrame(() => {
         setIsVisible(true)
       })
     } else {
       setIsVisible(false)
-      document.body.style.overflow = 'unset'
+      document.body.classList.remove('modal-open')
       // 애니메이션이 끝난 후 DOM에서 제거
       const timer = setTimeout(() => {
         setShouldRender(false)
@@ -59,7 +59,7 @@ export function Modal({
       return () => clearTimeout(timer)
     }
     return () => {
-      document.body.style.overflow = 'unset'
+      document.body.classList.remove('modal-open')
     }
   }, [isOpen])
 

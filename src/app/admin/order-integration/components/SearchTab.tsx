@@ -2701,7 +2701,28 @@ export default function SearchTab() {
       } else {
       }
 
-      // 1. CS 기록 저장
+      // 1. 재발송비용 계산 (재발송일 경우)
+      let resendCost = null;
+      if (csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend') {
+        if (csFormData.resendOption && csFormData.resendQty) {
+          // option_products에서 셀러공급가 조회
+          const optionResponse = await fetch(`/api/option-products?option_name=${encodeURIComponent(csFormData.resendOption)}`);
+          const optionResult = await optionResponse.json();
+
+          if (optionResult.success && optionResult.data && optionResult.data.length > 0) {
+            const sellerSupplyPrice = Number(optionResult.data[0].seller_supply_price) || 0;
+            resendCost = sellerSupplyPrice * csFormData.resendQty;
+            console.log('✅ 재발송비용 계산:', {
+              상품: csFormData.resendOption,
+              셀러공급가: sellerSupplyPrice,
+              수량: csFormData.resendQty,
+              재발송비용: resendCost
+            });
+          }
+        }
+      }
+
+      // 2. CS 기록 저장
       const csRecordData = {
         receipt_date: new Date().toISOString().split('T')[0], // 오늘 날짜
         cs_type: csFormData.category,
@@ -2709,6 +2730,7 @@ export default function SearchTab() {
         order_number: selectedOrder.order_number || '',
         market_name: selectedOrder.market_name || '',
         orderer_name: selectedOrder.buyer_name || '',
+        orderer_phone: selectedOrder.buyer_phone || '',
         recipient_name: selectedOrder.recipient_name || '',
         recipient_phone: selectedOrder.recipient_phone || '',
         recipient_address: selectedOrder.recipient_address || '',
@@ -2717,6 +2739,21 @@ export default function SearchTab() {
         cs_reason: csFormData.category,
         cs_content: csFormData.content,
         status: '접수',
+        // 원주문 상세 정보 (스냅샷)
+        sheet_date: selectedOrder.sheet_date || null,
+        shipping_source: selectedOrder.shipping_source || null,
+        vendor_name: selectedOrder.vendor_name || null,
+        shipping_cost: selectedOrder.shipping_cost || null,
+        shipped_date: selectedOrder.shipped_date || null,
+        courier_company: selectedOrder.courier_company || null,
+        tracking_number: selectedOrder.tracking_number || null,
+        seller_supply_price: selectedOrder.seller_supply_price || null,
+        settlement_amount: selectedOrder.settlement_amount || null,
+        cash_used: selectedOrder.cash_used || null,
+        final_deposit_amount: selectedOrder.final_deposit_amount || null,
+        sub_account_id: selectedOrder.sub_account_id || null,
+        depositor_name: selectedOrder.depositor_name || null,
+        organization_id: selectedOrder.organization_id || null,
         // 환불 정보 (부분환불일 경우)
         refund_amount: csFormData.solution === 'partial_refund' ? csFormData.refundAmount : null,
         // 재발송 정보 (재발송일 경우)
@@ -2727,10 +2764,11 @@ export default function SearchTab() {
         resend_address: (csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend') ? csFormData.address : null,
         resend_note: (csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend') ? csFormData.resendNote : null,
         additional_amount: (csFormData.solution === 'partial_resend' || csFormData.solution === 'full_resend') ? csFormData.additionalAmount : null,
-        // 부분환불 계좌 정보
-        bank_name: csFormData.solution === 'partial_refund' ? csFormData.bank : null,
-        account_holder: csFormData.solution === 'partial_refund' ? csFormData.accountHolder : null,
-        account_number: csFormData.solution === 'partial_refund' ? csFormData.accountNumber : null,
+        resend_cost: resendCost, // 재발송비용 (셀러공급가 * 수량)
+        // 환불 계좌 정보 (전체환불/부분환불)
+        bank_name: (csFormData.solution === 'partial_refund' || csFormData.solution === 'full_refund') ? csFormData.bank : null,
+        account_holder: (csFormData.solution === 'partial_refund' || csFormData.solution === 'full_refund') ? csFormData.accountHolder : null,
+        account_number: (csFormData.solution === 'partial_refund' || csFormData.solution === 'full_refund') ? csFormData.accountNumber : null,
       };
 
 
@@ -2810,14 +2848,22 @@ export default function SearchTab() {
 
       }
 
-      // 3. 원주문의 cs_status 업데이트
+      // 3. 원주문의 cs_status 및 CS 상세 정보 업데이트
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orders: [{
             id: selectedOrder.id,
-            cs_status: csFormData.category
+            cs_status: csFormData.category,
+            // CS 상세 정보 저장 (환불 정산 시 활용)
+            cs_type: csFormData.category,
+            cs_content: csFormData.content,
+            cs_resolution_method: csFormData.solution === 'other_action'
+              ? csFormData.otherSolution
+              : csFormData.solution,
+            refund_ratio: csFormData.refundPercent || null,
+            cs_record_id: csResult.data.id,  // CS 기록 ID 저장
           }]
         }),
       });
@@ -3748,15 +3794,15 @@ export default function SearchTab() {
                   </label>
                   <select
                     value={csFormData.solution}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const newSolution = e.target.value;
                       setCSFormData(prev => ({ ...prev, solution: newSolution }));
 
-                      // 재발송 옵션이면 원주문 데이터 자동 채우기
-                      if (newSolution === 'partial_resend' || newSolution === 'full_resend') {
-                        if (selectedOrders.length > 0) {
-                          const order = filteredOrders.find(o => o.id === selectedOrders[0]);
-                          if (order) {
+                      if (selectedOrders.length > 0) {
+                        const order = filteredOrders.find(o => o.id === selectedOrders[0]);
+                        if (order) {
+                          // 재발송 옵션이면 원주문 데이터 자동 채우기
+                          if (newSolution === 'partial_resend' || newSolution === 'full_resend') {
                             setCSFormData(prev => ({
                               ...prev,
                               resendOption: order.option_name || '',
@@ -3764,6 +3810,39 @@ export default function SearchTab() {
                               phone: order.recipient_phone || '',
                               address: order.recipient_address || ''
                             }));
+                          }
+
+                          // 전체환불/부분환불이면 조직 계좌정보 자동 채우기 (플랫폼 주문일 경우)
+                          if (newSolution === 'full_refund' || newSolution === 'partial_refund') {
+                            if (order.organization_id) {
+                              console.log('🔍 조직 계좌정보 조회 시작:', order.organization_id);
+
+                              // 조직 계좌정보 조회
+                              const orgResponse = await fetch(`/api/organizations?id=${order.organization_id}`);
+                              const orgResult = await orgResponse.json();
+
+                              console.log('📦 조직 정보 API 응답:', orgResult);
+
+                              if (orgResult.success && orgResult.data && orgResult.data.length > 0) {
+                                const orgData = orgResult.data[0];
+                                setCSFormData(prev => ({
+                                  ...prev,
+                                  bank: orgData.bank_name || '',
+                                  accountHolder: orgData.account_holder || '',
+                                  accountNumber: orgData.bank_account || ''
+                                }));
+                                console.log('✅ 조직 계좌정보 자동 입력:', {
+                                  조직명: orgData.business_name,
+                                  은행: orgData.bank_name,
+                                  예금주: orgData.account_holder,
+                                  계좌번호: orgData.bank_account
+                                });
+                              } else {
+                                console.warn('⚠️ 조직 정보를 찾을 수 없습니다');
+                              }
+                            } else {
+                              console.log('ℹ️ 플랫폼 주문이 아닙니다 (organization_id 없음)');
+                            }
                           }
                         }
                       }
@@ -3827,49 +3906,53 @@ export default function SearchTab() {
               )}
 
               {/* 부분환불 섹션 */}
-              {csFormData.solution === 'partial_refund' && (
+              {(csFormData.solution === 'partial_refund' || csFormData.solution === 'full_refund') && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 space-y-3">
-                  <div className="text-xs text-yellow-700">
-                    ※ 결제금액은 결제내역을 확인할 수 있는 캡쳐사진으로 확인해야 합니다
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">결제금액</label>
-                      <input
-                        type="number"
-                        value={csFormData.paymentAmount || ''}
-                        onChange={(e) => {
-                          setCSFormData(prev => ({ ...prev, paymentAmount: Number(e.target.value) || 0 }));
-                          setTimeout(calculateRefundAmount, 0);
-                        }}
-                        onKeyDown={handleCSKeyDown}
-                        placeholder="결제금액"
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">환불 비율(%)</label>
-                      <input
-                        type="number"
-                        value={csFormData.refundPercent || ''}
-                        onChange={(e) => {
-                          setCSFormData(prev => ({ ...prev, refundPercent: Number(e.target.value) || 0 }));
-                          setTimeout(calculateRefundAmount, 0);
-                        }}
-                        onKeyDown={handleCSKeyDown}
-                        min="0"
-                        max="100"
-                        placeholder="환불 비율"
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">환불금액</label>
-                      <div className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50 text-lg font-semibold text-blue-600">
-                        {csFormData.refundAmount.toLocaleString()}원
+                  {csFormData.solution === 'partial_refund' && (
+                    <>
+                      <div className="text-xs text-yellow-700">
+                        ※ 결제금액은 결제내역을 확인할 수 있는 캡쳐사진으로 확인해야 합니다
                       </div>
-                    </div>
-                  </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">결제금액</label>
+                          <input
+                            type="number"
+                            value={csFormData.paymentAmount || ''}
+                            onChange={(e) => {
+                              setCSFormData(prev => ({ ...prev, paymentAmount: Number(e.target.value) || 0 }));
+                              setTimeout(calculateRefundAmount, 0);
+                            }}
+                            onKeyDown={handleCSKeyDown}
+                            placeholder="결제금액"
+                            className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">환불 비율(%)</label>
+                          <input
+                            type="number"
+                            value={csFormData.refundPercent || ''}
+                            onChange={(e) => {
+                              setCSFormData(prev => ({ ...prev, refundPercent: Number(e.target.value) || 0 }));
+                              setTimeout(calculateRefundAmount, 0);
+                            }}
+                            onKeyDown={handleCSKeyDown}
+                            min="0"
+                            max="100"
+                            placeholder="환불 비율"
+                            className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">환불금액</label>
+                          <div className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50 text-lg font-semibold text-blue-600">
+                            {csFormData.refundAmount.toLocaleString()}원
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                   <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">은행</label>
@@ -4570,9 +4653,9 @@ export default function SearchTab() {
         </div>
       </Modal>
 
-      {/* 상품준비중 집계 모달리스 윈도우 */}
+      {/* 원물 집계 모달리스 윈도우 */}
       <ModelessWindow
-        title="상품준비중 주문 집계"
+        title="원물 집계"
         isOpen={showPreparingSummary}
         onClose={() => setShowPreparingSummary(false)}
         defaultWidth={1100}

@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
-    const shippingStatus = searchParams.get('shippingStatus') || '상품준비중';
+    const shippingStatus = searchParams.get('shippingStatus'); // 상태 필터 (선택사항)
 
     if (!startDate || !endDate) {
       return NextResponse.json(
@@ -28,17 +28,34 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 상품준비중 주문 조회 (조직 필터 적용)
+    console.log('🔍 집계 API 파라미터:', {
+      startDate,
+      endDate,
+      shippingStatus: shippingStatus || '전체',
+      userRole: auth.user?.role,
+      userId: auth.user?.id
+    });
+
+    // 주문 조회 (상태 필터는 선택사항)
     let query = supabase
       .from('integrated_orders')
-      .select('option_name, quantity, final_payment_amount, vendor_name')
-      .eq('shipping_status', shippingStatus)
+      .select('option_name, quantity, final_payment_amount, vendor_name, shipping_status, sheet_date, organization_id')
       .gte('sheet_date', startDate)
-      .lte('sheet_date', endDate);
+      .lte('sheet_date', endDate)
+      .or('is_deleted.is.null,is_deleted.eq.false');
 
-    // 🔒 조직 필터: 같은 조직의 주문만 조회 (관리자 제외)
-    if (auth.user.role !== 'super_admin' && auth.user.role !== 'admin') {
+    // 상태 필터가 있으면 적용
+    if (shippingStatus) {
+      query = query.eq('shipping_status', shippingStatus);
+    }
+
+    // 🔒 조직 필터: 관리자/직원이 아니면 자신의 조직만 조회
+    const userRole = auth.userData?.role || auth.user?.role;
+    console.log('👤 사용자 권한:', { userRole, userId: auth.user?.id });
+
+    if (userRole !== 'super_admin' && userRole !== 'admin' && userRole !== 'employee') {
       const organizationId = await getOrganizationDataFilter(auth.user.id);
+      console.log('📦 조직 필터 적용:', { organizationId });
       if (organizationId) {
         query = query.eq('organization_id', organizationId);
       } else {
@@ -48,6 +65,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: orders, error } = await query;
+
+    console.log('📊 조회된 주문:', {
+      count: orders?.length || 0,
+      sample: orders?.[0],
+      error: error?.message
+    });
 
     if (error) {
       console.error('주문 조회 오류:', error);
@@ -227,11 +250,22 @@ export async function GET(request: NextRequest) {
       (a, b) => b.total_usage - a.total_usage
     );
 
+    // 미매핑 옵션 확인
+    const unmappedOptions = summary.filter(item => {
+      const optionProductId = optionNameToId.get(item.option_name);
+      if (!optionProductId) return true; // option_products에 없음
+      const materials = optionToMaterials.get(optionProductId);
+      return !materials || materials.length === 0; // 원물 매핑 없음
+    });
+
+    console.log('⚠️ 미매핑 옵션:', unmappedOptions.map(o => o.option_name));
+
     return NextResponse.json({
       success: true,
       data: {
         orders: summary,
         rawMaterials: rawMaterialSummary,
+        unmappedOptions: unmappedOptions.map(o => o.option_name),
       },
     });
   } catch (error: any) {

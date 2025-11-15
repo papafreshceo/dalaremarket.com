@@ -95,7 +95,7 @@ export default function WeeklyOrderChart({ orders, isMobile = false }: WeeklyOrd
   }, [orders]);
 
   return (
-    <div className="card" style={{ borderRadius: '12px', padding: '20px' }}>
+    <div style={{ background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(222, 226, 230, 0.1)', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)' }}>
       <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: 'var(--color-text)' }}>
         이번 주 발주 현황
       </h3>

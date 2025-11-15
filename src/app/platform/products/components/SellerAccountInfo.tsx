@@ -26,7 +26,8 @@ export default function SellerAccountInfo({ organizationInfo, isMobile = false }
 
   return (
     <div style={{
-      background: '#ffffff',
+      background: 'rgba(255, 255, 255, 0.1)',
+      border: '1px solid rgba(222, 226, 230, 0.1)',
       borderRadius: '12px',
       padding: isMobile ? '16px' : '24px',
       marginBottom: '16px'

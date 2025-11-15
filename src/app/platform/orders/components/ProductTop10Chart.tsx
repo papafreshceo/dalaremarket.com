@@ -130,15 +130,17 @@ export default function ProductTop10Chart({ orders, isMobile = false, onProductC
 
   return (
     <div
-      className="card"
       style={{
+        background: 'rgba(255, 255, 255, 0.1)',
+        border: '1px solid rgba(222, 226, 230, 0.1)',
         borderRadius: '12px',
         padding: '16px',
         display: 'flex',
         flexDirection: 'column',
         height: '480px',
         maxHeight: '480px',
-        fontSize: '14px'
+        fontSize: '14px',
+        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)'
       }}
     >
       <h3

@@ -28,8 +28,25 @@ export default function OrderDetailModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000
+      zIndex: 1000,
+      animation: 'fadeIn 0.3s ease-in-out'
     }}>
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from {
+            transform: scale(0.95);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
       <div style={{
         background: '#ffffff',
         borderRadius: '16px',
@@ -37,7 +54,8 @@ export default function OrderDetailModal({
         maxWidth: '90%',
         maxHeight: '80vh',
         overflow: 'auto',
-        padding: '32px'
+        padding: '32px',
+        animation: 'scaleIn 0.3s ease-in-out'
       }}>
         <div style={{
           display: 'flex',

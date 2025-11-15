@@ -2511,6 +2511,7 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                   contentVisibility: 'auto',
                   contain: 'layout style paint',
                   ...rowStyle,
+                  ...(rowBgColor && { backgroundColor: rowBgColor }),
                 }}
               >
                 {enableCheckbox && (
@@ -2548,12 +2549,14 @@ export default function EditableAdminGrid<T extends Record<string, any>>({
                     <td
                       key={column.key || `col-${colIdx}`}
                       className={getCellClassName(rowIndex, column.key, column, row, false)}
+                      data-has-bg={rowBgColor ? 'true' : undefined}
                       style={{
                         height: rowHeight,
                         width: width,
                         minWidth: width,
                         maxWidth: width,
                         userSelect: isDragging ? 'none' : 'text',
+                        ...(rowBgColor && { '--row-bg-color': rowBgColor } as any),
                         backgroundColor: rowBgColor,
                         ...customStyle
                       }}

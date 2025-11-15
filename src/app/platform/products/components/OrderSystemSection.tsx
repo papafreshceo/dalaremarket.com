@@ -14,7 +14,8 @@ interface OrderSystemSectionProps {
 export default function OrderSystemSection({ items, isMobile = false }: OrderSystemSectionProps) {
   return (
     <div style={{
-      background: '#ffffff',
+      background: 'rgba(255, 255, 255, 0.1)',
+      border: '1px solid rgba(222, 226, 230, 0.1)',
       borderRadius: '12px',
       padding: isMobile ? '16px' : '24px',
       marginBottom: '16px'
@@ -35,7 +36,7 @@ export default function OrderSystemSection({ items, isMobile = false }: OrderSys
           <div key={idx} style={{
             padding: '16px',
             borderRadius: '8px',
-            background: item.primary ? '#2563eb' : '#f8f9fa',
+            background: item.primary ? '#2563eb' : 'rgba(255, 255, 255, 0.1)',
             color: item.primary ? '#ffffff' : '#212529',
             cursor: 'pointer',
             transition: 'all 0.2s'

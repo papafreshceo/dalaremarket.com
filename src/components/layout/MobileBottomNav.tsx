@@ -23,7 +23,7 @@ export default function MobileBottomNav() {
 
   const navItems = [
     {
-      path: '/platform/products',
+      path: '/platform',
       label: '공급상품'
     },
     {

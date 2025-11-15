@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, Suspense } from 'react';
+import { useState, useRef, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Order, StatusConfig, StatsData, Tab } from './types';
@@ -43,6 +43,10 @@ function OrdersPageContent() {
   const [sellerCode, setSellerCode] = useState<string>('');
   const [userRole, setUserRole] = useState<string>('');
   const [memberRole, setMemberRole] = useState<string>(''); // 조직 내 역할
+
+  // 서브계정 관련 상태
+  const [subAccounts, setSubAccounts] = useState<any[]>([]);
+  const [selectedSubAccount, setSelectedSubAccount] = useState<any | null>(null); // null = 메인 계정
   const [orders, setOrders] = useState<Order[]>([]);
   const [cashBalance, setCashBalance] = useState<number>(0);
   const [creditBalance, setCreditBalance] = useState<number>(0);
@@ -142,14 +146,20 @@ function OrdersPageContent() {
   const handleThemeChange = async (newTheme: 'light' | 'dark') => {
     setLocalTheme(newTheme);
 
-    // DB에 저장
+    // localStorage에 저장 (FOUC 방지용)
+    localStorage.setItem('theme', newTheme);
+
+    // DB에 저장 (orders_theme과 theme_preference 모두 업데이트)
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (user) {
       await supabase
         .from('users')
-        .update({ orders_theme: newTheme })
+        .update({
+          orders_theme: newTheme,
+          theme_preference: newTheme // ThemeContext와 동기화
+        })
         .eq('id', user.id);
     }
   };
@@ -164,7 +174,7 @@ function OrdersPageContent() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // F5 키 가로채기 - 페이지 새로고침 대신 컴포넌트만 새로고침
+  // F5 키 가로채기 - 완전한 새로고침 (Ctrl+Shift+R과 동일)
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
       // F5 키 또는 Ctrl+R 감지 (e.code도 체크)
@@ -172,25 +182,13 @@ function OrdersPageContent() {
         e.preventDefault(); // 기본 새로고침 동작 막기
         e.stopPropagation(); // 이벤트 전파 중지
 
-        setIsRefreshing(true);
+        console.log('🔄 완전한 새로고침 시작 (캐시 무시)...');
 
         try {
-          // 현재 컴포넌트만 새로고침 (데이터 다시 로드)
-          await Promise.all([
-            fetchOrders(),
-            fetchBalances(false) // 새로고침 시에는 리필 토스트 표시 안 함
-          ]);
-
-          // 모든 탭 컴포넌트 리셋 (필터 상태 초기화)
-          setRefreshKey(prev => prev + 1);
-
-          // fetchOrders 완료 후 1초 더 표시한 다음 상태 해제
-          setTimeout(() => {
-            setIsRefreshing(false);
-          }, 1000);
+          // 강제 새로고침: 캐시를 무시하고 서버에서 새로 가져옴 (Ctrl+Shift+R과 동일)
+          window.location.reload();
         } catch (error) {
           console.error('새로고침 오류:', error);
-          setIsRefreshing(false);
         }
       }
     };
@@ -198,7 +196,7 @@ function OrdersPageContent() {
     // capture 단계에서 이벤트 캡처
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, []); // fetchOrders는 함수 선언이므로 의존성 불필요
+  }, []);
 
   useEffect(() => {
     const checkImpersonateToken = async () => {
@@ -316,10 +314,19 @@ function OrdersPageContent() {
                 business_name: orgData.business_name,
                 seller_code: orgData.seller_code,
                 partner_code: orgData.partner_code,
+                tier: orgData.tier,
                 user_role: profileUser.role
               });
               setOrganizationId(orgData.id); // organizationId 설정
               setOrganizationName(orgData.business_name || '');
+
+              // 조직의 tier 설정 (user tier가 아닌 organization tier 사용)
+              const orgTier = orgData.tier?.toLowerCase();
+              if (orgTier && validTiers.includes(orgTier)) {
+                setUserTier(orgTier as any);
+                console.log('🎯 조직 티어 설정:', orgTier);
+              }
+
               // role에 따라 적절한 코드 표시
               const code = profileUser.role === 'seller'
                 ? orgData.seller_code
@@ -330,7 +337,8 @@ function OrdersPageContent() {
               console.log('✅ 조직 정보 설정 완료:', {
                 organizationId: orgData.id,
                 organizationName: orgData.business_name,
-                sellerCode: code
+                sellerCode: code,
+                tier: orgTier
               });
             }
 
@@ -354,6 +362,19 @@ function OrdersPageContent() {
               console.log('👤 멤버 역할 설정:', roleName);
             } else {
               console.log('⚠️ 멤버 정보 없음 (organization_members에 레코드 없음)');
+            }
+
+            // 서브계정 목록 불러오기
+            try {
+              const subResponse = await fetch('/api/organizations/sub');
+              const subData = await subResponse.json();
+
+              if (subData.success && subData.sub_organizations) {
+                setSubAccounts(subData.sub_organizations);
+                console.log('📋 서브계정 목록 로드:', subData.sub_organizations.length, '개');
+              }
+            } catch (error) {
+              console.error('❌ 서브계정 목록 로드 실패:', error);
             }
           }
         } else {
@@ -616,7 +637,8 @@ function OrdersPageContent() {
       refundedAt: order.refund_processed_at, // 환불일
       marketName: order.market_name || '미지정', // 마켓명
       sellerMarketName: order.seller_market_name || '미지정', // 셀러 마켓명
-      priceUpdatedAt: order.price_updated_at // 공급가 갱신 일시
+      priceUpdatedAt: order.price_updated_at, // 공급가 갱신 일시
+      subAccountId: order.sub_account_id || null // 서브계정 ID
     }));
 
     setOrders(convertedOrders);
@@ -677,8 +699,22 @@ function OrdersPageContent() {
     refunded: { label: '환불완료', color: '#10b981', bg: '#d1fae5' }
   };
 
-  // 날짜와 검색 필터만 적용 (통계 계산용)
-  const dateAndSearchFilteredOrders = orders.filter(order => {
+  // 서브계정 필터링된 주문 목록
+  const filteredOrdersBySubAccount = useMemo(() => {
+    if (selectedSubAccount === null) {
+      // '전체' 선택: 모든 주문 표시
+      return orders;
+    } else if (selectedSubAccount === 'main') {
+      // '메인계정' 선택: sub_account_id가 null인 주문만
+      return orders.filter(order => !order.subAccountId);
+    } else {
+      // 특정 서브계정 선택: 해당 서브계정의 주문만
+      return orders.filter(order => order.subAccountId === selectedSubAccount.id);
+    }
+  }, [orders, selectedSubAccount]);
+
+  // 날짜와 검색 필터만 적용 (통계 계산용) - 서브계정 필터링된 주문 기준
+  const dateAndSearchFilteredOrders = filteredOrdersBySubAccount.filter(order => {
     // 날짜 필터 (한국 시간 기준)
     let matchesDate = true;
     if (startDate || endDate) {
@@ -899,7 +935,8 @@ function OrdersPageContent() {
             created_by: user.id,
             market_name: '플랫폼',
             payment_date: utcTime.split('T')[0],
-            shipping_status: '발주서등록'
+            shipping_status: '발주서등록',
+            sub_account_id: (selectedSubAccount && selectedSubAccount !== 'main') ? selectedSubAccount.id : null
           }
         }));
 
@@ -1068,6 +1105,7 @@ function OrdersPageContent() {
           shipping_status: order._metadata.shipping_status,
           seller_id: order._metadata.seller_id,
           created_by: order._metadata.created_by,
+          sub_account_id: order._metadata.sub_account_id,
           created_at: getCurrentTimeUTC(),
           is_deleted: false
         };
@@ -1329,61 +1367,6 @@ function OrdersPageContent() {
             </button>
           )}
 
-          {/* 나가기/닫기 버튼 */}
-          <button
-            onClick={() => {
-              if (isModalMode) {
-                window.parent.postMessage({ type: 'closeModal' }, '*');
-              } else {
-                // 새 창으로 열린 경우 창 닫기, 아니면 메인 페이지로 이동
-                if (window.opener) {
-                  window.close();
-                } else {
-                  router.push('/');
-                }
-              }
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              background: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              borderRadius: '8px',
-              fontSize: '14px',
-              color: 'var(--color-text)',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'background 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--color-surface-hover)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'var(--color-surface)';
-            }}
-          >
-            {isModalMode ? (
-              <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-                닫기
-              </>
-            ) : (
-              <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                  <polyline points="16 17 21 12 16 7"></polyline>
-                  <line x1="21" y1="12" x2="9" y2="12"></line>
-                </svg>
-                나가기
-              </>
-            )}
-          </button>
-
           {/* 로그인 정보 */}
           {!isMobile && (
             <div style={{
@@ -1447,6 +1430,120 @@ function OrdersPageContent() {
                 </div>
               )}
 
+              {/* 서브계정 선택 배지 - 서브계정이 2개 이상일 때만 표시 */}
+              {userId && userId !== 'guest' && organizationName && subAccounts.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 0'
+                }}>
+                  {/* 전체 배지 */}
+                  <button
+                    onClick={() => setSelectedSubAccount(null)}
+                    style={{
+                      padding: '4px 10px',
+                      background: !selectedSubAccount ? 'var(--color-success)' : 'var(--color-surface)',
+                      border: `1px solid ${!selectedSubAccount ? 'var(--color-success)' : 'var(--color-border)'}`,
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: !selectedSubAccount ? '#fff' : 'var(--color-text-secondary)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedSubAccount) {
+                        e.currentTarget.style.background = 'var(--color-primary-alpha)';
+                        e.currentTarget.style.borderColor = 'var(--color-primary)';
+                        e.currentTarget.style.color = 'var(--color-primary)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedSubAccount) {
+                        e.currentTarget.style.background = 'var(--color-surface)';
+                        e.currentTarget.style.borderColor = 'var(--color-border)';
+                        e.currentTarget.style.color = 'var(--color-text-secondary)';
+                      }
+                    }}
+                  >
+                    전체
+                  </button>
+
+                  {/* 메인 계정 배지 */}
+                  <button
+                    onClick={() => setSelectedSubAccount('main')}
+                    style={{
+                      padding: '4px 10px',
+                      background: selectedSubAccount === 'main' ? 'var(--color-success)' : 'var(--color-surface)',
+                      border: `1px solid ${selectedSubAccount === 'main' ? 'var(--color-success)' : 'var(--color-border)'}`,
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: selectedSubAccount === 'main' ? '#fff' : 'var(--color-text-secondary)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedSubAccount !== 'main') {
+                        e.currentTarget.style.background = 'var(--color-primary-alpha)';
+                        e.currentTarget.style.borderColor = 'var(--color-primary)';
+                        e.currentTarget.style.color = 'var(--color-primary)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedSubAccount !== 'main') {
+                        e.currentTarget.style.background = 'var(--color-surface)';
+                        e.currentTarget.style.borderColor = 'var(--color-border)';
+                        e.currentTarget.style.color = 'var(--color-text-secondary)';
+                      }
+                    }}
+                    title={organizationName}
+                  >
+                    메인계정
+                  </button>
+
+                  {/* 서브계정 배지들 */}
+                  {subAccounts.map((sub) => (
+                    <button
+                      key={sub.id}
+                      onClick={() => setSelectedSubAccount(sub)}
+                      style={{
+                        padding: '4px 10px',
+                        background: selectedSubAccount?.id === sub.id ? 'var(--color-success)' : 'var(--color-surface)',
+                        border: `1px solid ${selectedSubAccount?.id === sub.id ? 'var(--color-success)' : 'var(--color-border)'}`,
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: selectedSubAccount?.id === sub.id ? '#fff' : 'var(--color-text-secondary)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedSubAccount?.id !== sub.id) {
+                          e.currentTarget.style.background = 'var(--color-primary-alpha)';
+                          e.currentTarget.style.borderColor = 'var(--color-primary)';
+                          e.currentTarget.style.color = 'var(--color-primary)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedSubAccount?.id !== sub.id) {
+                          e.currentTarget.style.background = 'var(--color-surface)';
+                          e.currentTarget.style.borderColor = 'var(--color-border)';
+                          e.currentTarget.style.color = 'var(--color-text-secondary)';
+                        }
+                      }}
+                      title={`${sub.business_name} (${sub.representative_name})`}
+                    >
+                      {sub.business_name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* 사용자 이메일 */}
               <div style={{
                 fontSize: '14px',
@@ -1478,7 +1575,7 @@ function OrdersPageContent() {
         {/* Oxanium 폰트 로드 */}
         <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&display=swap" rel="stylesheet" />
 
-        {/* 오른쪽: 새로고침 인디케이터 + 다크모드 토글 */}
+        {/* 오른쪽: 새로고침 인디케이터 + 나가기 버튼 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '0 0 auto' }}>
           {/* 새로고침 인디케이터 */}
           {isRefreshing && (
@@ -1502,7 +1599,44 @@ function OrdersPageContent() {
               새로고침 완료
             </div>
           )}
-          <LocalThemeToggle onThemeChange={handleThemeChange} currentTheme={localTheme} />
+
+          {/* 나가기 버튼 */}
+          <button
+            onClick={() => {
+              window.close();
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              background: 'transparent',
+              border: '1px solid var(--color-border)',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '500',
+              color: 'var(--color-text)',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--color-surface-hover)';
+              e.currentTarget.style.borderColor = 'var(--color-primary)';
+              e.currentTarget.style.color = 'var(--color-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.borderColor = 'var(--color-border)';
+              e.currentTarget.style.color = 'var(--color-text)';
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            나가기
+          </button>
         </div>
       </div>
 
@@ -1846,6 +1980,21 @@ function OrdersPageContent() {
             </svg>
             지갑
           </button>
+
+          {/* 사이드바 하단: 다크모드 토글 */}
+          <div style={{
+            marginTop: 'auto',
+            paddingTop: '16px',
+            borderTop: '1px solid var(--color-border)'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              paddingBottom: '16px'
+            }}>
+              <LocalThemeToggle onThemeChange={handleThemeChange} currentTheme={localTheme} />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1854,10 +2003,10 @@ function OrdersPageContent() {
         key={refreshKey}
         style={{
           marginLeft: isMobile ? '0' : '175px',
-          paddingLeft: isMobile ? '16px' : '24px',
-          paddingRight: isMobile ? '16px' : '24px',
-          paddingTop: isSampleMode ? '134px' : '90px',
-          paddingBottom: isMobile ? '16px' : '24px',
+          paddingLeft: activeTab === '판매자정보' ? '0' : (isMobile ? '16px' : '24px'),
+          paddingRight: activeTab === '판매자정보' ? '0' : (isMobile ? '16px' : '24px'),
+          paddingTop: activeTab === '판매자정보' ? '0' : (isSampleMode ? '134px' : '90px'),
+          paddingBottom: activeTab === '판매자정보' ? '0' : (isMobile ? '16px' : '24px'),
           background: 'var(--color-background)',
           minHeight: '100vh',
           transition: 'padding-top 0.3s'
@@ -1870,8 +2019,9 @@ function OrdersPageContent() {
           }}>
             <DashboardTab
               isMobile={isMobile}
-              orders={orders}
+              orders={filteredOrdersBySubAccount}
               statusConfig={statusConfig}
+              isSampleMode={isSampleMode}
             />
           </div>
         )}
@@ -1903,7 +2053,11 @@ function OrdersPageContent() {
               onRefresh={fetchOrders}
               userEmail={userEmail}
               organizationId={organizationId}
+              selectedSubAccount={selectedSubAccount}
               isSampleMode={isSampleMode}
+              subAccounts={subAccounts}
+              organizationName={organizationName}
+              organizationTier={userTier}
             />
           </div>
         )}
@@ -1912,6 +2066,7 @@ function OrdersPageContent() {
             isMobile={isMobile}
             onRefresh={fetchOrders}
             userEmail={userEmail}
+            selectedSubAccount={selectedSubAccount}
           />
         )}
         {activeTab === '정산관리' && (
@@ -1921,7 +2076,7 @@ function OrdersPageContent() {
           }}>
             <SettlementTab
               isMobile={isMobile}
-              orders={orders}
+              orders={filteredOrdersBySubAccount}
             />
           </div>
         )}
@@ -1936,7 +2091,15 @@ function OrdersPageContent() {
           </div>
         )}
         {activeTab === '판매자정보' && (
-          <SellerInfoTab />
+          <div style={{
+            width: '100%',
+            height: '100%',
+            margin: 0,
+            padding: 0,
+            overflow: 'hidden'
+          }}>
+            <SellerInfoTab />
+          </div>
         )}
         {activeTab === '지갑' && (
           <CashHistoryTab />

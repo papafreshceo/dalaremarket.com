@@ -18,6 +18,12 @@ export default function PlatformLayout({
   useEffect(() => {
     setIsMounted(true)
     setIsInIframe(window.self !== window.top)
+
+    // platform/orders와 admin을 제외한 모든 platform 페이지에서 다크모드 강제 해제
+    const path = window.location.pathname;
+    if (!path.startsWith('/platform/orders') && !path.startsWith('/admin')) {
+      document.documentElement.classList.remove('dark');
+    }
   }, [])
 
   // 플랫폼 화면 파비콘 설정 (더 빠른 타이밍)
@@ -26,12 +32,13 @@ export default function PlatformLayout({
       // document.head가 있는지 확인 (null 체크)
       if (!document.head) return;
 
-      // 기존 파비콘 모두 제거
-      const existingFavicons = document.querySelectorAll("link[rel*='icon']");
+      // 기존 파비콘 모두 제거 (안전하게)
+      const existingFavicons = Array.from(document.querySelectorAll("link[rel*='icon']"));
       existingFavicons.forEach(el => {
         try {
-          if (el.parentNode) {
-            el.parentNode.removeChild(el);
+          // parentNode가 존재하고 실제로 DOM에 있는지 확인
+          if (el.parentNode && document.head.contains(el)) {
+            document.head.removeChild(el);
           }
         } catch (e) {
           // 이미 제거된 경우 무시

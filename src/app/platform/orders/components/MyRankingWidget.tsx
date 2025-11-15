@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 interface Badge {
   badge_id: string;
@@ -29,12 +30,70 @@ interface MyRanking {
   period_end: string;
 }
 
-export default function MyRankingWidget() {
+interface MyRankingWidgetProps {
+  isSampleMode?: boolean;
+}
+
+export default function MyRankingWidget({ isSampleMode }: MyRankingWidgetProps) {
   const [ranking, setRanking] = useState<MyRanking | null>(null);
   const [loading, setLoading] = useState(true);
   const [periodType, setPeriodType] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // 인증 상태 확인
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsAuthenticated(!!user);
+    };
+    checkAuth();
+  }, []);
+
+  // 샘플 데이터 생성 함수
+  const getSampleData = (): MyRanking => ({
+    rank: 42,
+    tier: 'gold',
+    total_score: 87.5,
+    total_sales: 12500000,
+    order_count: 156,
+    avg_confirm_hours: 4.2,
+    cancel_rate: 1.8,
+    rank_change: 5,
+    prev_rank: 47,
+    badges: [
+      {
+        badge_id: 'sample-1',
+        earned_at: new Date().toISOString(),
+        badge_definitions: {
+          name: '빠른 발주',
+          icon: '⚡',
+          description: '평균 발주 확정 시간 6시간 이내'
+        }
+      },
+      {
+        badge_id: 'sample-2',
+        earned_at: new Date().toISOString(),
+        badge_definitions: {
+          name: '우수 셀러',
+          icon: '🌟',
+          description: '월 매출 1천만원 이상'
+        }
+      }
+    ],
+    total_sellers: 250,
+    period_start: new Date().toISOString(),
+    period_end: new Date().toISOString()
+  });
 
   const fetchMyRanking = async () => {
+    // 로그인하지 않았거나 샘플 모드인 경우 샘플 데이터 표시
+    if (!isAuthenticated || isSampleMode) {
+      setLoading(false);
+      setRanking(getSampleData());
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch(`/api/seller-rankings/me?period=${periodType}`);
@@ -42,22 +101,22 @@ export default function MyRankingWidget() {
       // JSON이 아닌 응답 처리
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        console.error('내 랭킹 조회 실패: JSON이 아닌 응답');
-        setRanking(null);
+        setRanking(getSampleData());
         return;
       }
 
       const result = await response.json();
 
       if (result.success) {
-        setRanking(result.data);
+        // 데이터가 없으면 샘플 데이터 표시
+        setRanking(result.data || getSampleData());
       } else {
-        console.error('내 랭킹 조회 실패:', result.error);
-        setRanking(null);
+        // API 오류 시 샘플 데이터 표시
+        setRanking(getSampleData());
       }
     } catch (error) {
-      console.error('내 랭킹 조회 실패:', error);
-      setRanking(null);
+      // 네트워크 오류 시 샘플 데이터 표시
+      setRanking(getSampleData());
     } finally {
       setLoading(false);
     }
@@ -65,7 +124,7 @@ export default function MyRankingWidget() {
 
   useEffect(() => {
     fetchMyRanking();
-  }, [periodType]);
+  }, [periodType, isAuthenticated, isSampleMode]);
 
   const getTierIcon = (tier: string) => {
     const icons: Record<string, string> = {

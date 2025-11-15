@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
       }
 
       // 로그인 성공 - 공급상품 페이지로 리다이렉트
-      return NextResponse.redirect(new URL('/platform/products', requestUrl.origin))
+      return NextResponse.redirect(new URL('/platform', requestUrl.origin))
     }
   }
 

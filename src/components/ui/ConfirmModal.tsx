@@ -1,6 +1,7 @@
 // src/components/ui/ConfirmModal.tsx
 'use client'
 
+import { useEffect } from 'react'
 import { Button } from './Button'
 
 interface ConfirmModalProps {
@@ -24,6 +25,19 @@ export function ConfirmModal({
   onCancel,
   type = 'info'
 }: ConfirmModalProps) {
+  // 모달 열릴 때 body 스크롤 방지
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('modal-open')
+    } else {
+      document.body.classList.remove('modal-open')
+    }
+
+    return () => {
+      document.body.classList.remove('modal-open')
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   const icons = {
@@ -42,7 +56,7 @@ export function ConfirmModal({
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/10"
         onClick={onCancel}
       />
 

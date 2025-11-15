@@ -230,8 +230,54 @@ function RegisterContent() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '40px 20px'
+      padding: '40px 20px',
+      position: 'relative'
     }}>
+      {/* 뒤로가기 버튼 - 섹션 밖 */}
+      <button
+        onClick={() => {
+          if (window.history.length > 1) {
+            router.back();
+          } else {
+            router.push('/platform');
+          }
+        }}
+        style={{
+          position: 'absolute',
+          left: 'calc(50% - 650px)',
+          top: '95px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '10px 16px',
+          background: 'rgba(255, 255, 255, 0.9)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          borderRadius: '12px',
+          fontSize: '14px',
+          fontWeight: '500',
+          color: '#1f2937',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 1)'
+          e.currentTarget.style.transform = 'translateX(-4px)'
+          e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.15)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)'
+          e.currentTarget.style.transform = 'translateX(0)'
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        뒤로가기
+      </button>
+
       <div style={{
         width: '100%',
         maxWidth: '1000px',

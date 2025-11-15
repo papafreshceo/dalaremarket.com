@@ -31,8 +31,8 @@ export default function StatsCards({ stats, isMobile = false }: StatsCardsProps)
           onMouseLeave={() => setHoveredStat(null)}
           style={{
             position: 'relative',
-            background: '#ffffff',
-            border: '1px solid #dee2e6',
+            background: 'rgba(255, 255, 255, 0.1)',
+            border: '1px solid rgba(222, 226, 230, 0.1)',
             borderRadius: '8px',
             padding: isMobile ? '8px' : '10px',
             display: 'flex',

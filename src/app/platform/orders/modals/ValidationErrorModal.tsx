@@ -20,10 +20,27 @@ export default function ValidationErrorModal({ show, onClose, errors, onDownload
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 10000
+        zIndex: 10000,
+        animation: 'fadeIn 0.3s ease-in-out'
       }}
       onClick={onClose}
     >
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from {
+            transform: scale(0.95);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
       <div
         style={{
           background: 'white',
@@ -33,7 +50,8 @@ export default function ValidationErrorModal({ show, onClose, errors, onDownload
           width: '90%',
           maxHeight: '70vh',
           overflow: 'auto',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          animation: 'scaleIn 0.3s ease-in-out'
         }}
         onClick={(e) => e.stopPropagation()}
       >

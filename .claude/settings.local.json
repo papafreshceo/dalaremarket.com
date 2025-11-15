@@ -76,7 +76,17 @@
       "Bash(if exist check-field-mapping.js del /f check-field-mapping.js)",
       "Bash(del /f check-field-mapping.js 2)",
       "Bash(if exist check-bank-fields.js del /f check-bank-fields.js)",
-      "Bash(del /f check-bank-fields.js 2)"
+      "Bash(del /f check-bank-fields.js 2)",
+      "Bash(del databasemigrationscreate_user_signup_with_organization_and_main_account.sql 2)",
+      "Bash(if exist \"database\\migrations\\create_user_signup_with_organization_and_main_account.sql\" del /f \"database\\migrations\\create_user_signup_with_organization_and_main_account.sql\")",
+      "Bash(if exist update-null-sub-account-ids.js del /f update-null-sub-account-ids.js)",
+      "Bash(if exist check-org-tiers.js del /f check-org-tiers.js)",
+      "Bash(del /f check-org-tiers.js 2)",
+      "Bash(if exist .nextcache rmdir /s /q .nextcache)",
+      "Bash(if not exist \"src\\app\\api\\organizations\\[id]\" mkdir \"src\\app\\api\\organizations\\[id]\")",
+      "Bash(if not exist \"src\\app\\api\\organizations\\tier\" mkdir \"src\\app\\api\\organizations\\tier\")",
+      "Bash(if exist .next rmdir /s /q .next)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

@@ -18,7 +18,8 @@ export default function SupplyProductsTable({ products, loading, isMobile = fals
   if (loading) {
     return (
       <div style={{
-        background: '#ffffff',
+        background: 'rgba(255, 255, 255, 0.1)',
+        border: '1px solid rgba(222, 226, 230, 0.1)',
         borderRadius: '12px',
         padding: isMobile ? '16px' : '24px',
         marginBottom: '16px',
@@ -42,7 +43,8 @@ export default function SupplyProductsTable({ products, loading, isMobile = fals
 
   return (
     <div style={{
-      background: '#ffffff',
+      background: 'rgba(255, 255, 255, 0.1)',
+      border: '1px solid rgba(222, 226, 230, 0.1)',
       borderRadius: '12px',
       padding: isMobile ? '16px' : '24px',
       marginBottom: '16px',
@@ -77,7 +79,7 @@ export default function SupplyProductsTable({ products, loading, isMobile = fals
               <tr>
                 <th style={{
                   padding: '10px',
-                  borderBottom: '2px solid #dee2e6',
+                  borderBottom: '2px solid rgba(222, 226, 230, 0.1)',
                   textAlign: 'left',
                   fontSize: '13px',
                   fontWeight: '500',
@@ -85,29 +87,29 @@ export default function SupplyProductsTable({ products, loading, isMobile = fals
                 }}>품목</th>
                 <th style={{
                   padding: '10px',
-                  borderBottom: '2px solid #dee2e6',
+                  borderBottom: '2px solid rgba(222, 226, 230, 0.1)',
                   textAlign: 'left',
                   fontSize: '13px',
                   fontWeight: '500',
                   color: '#495057'
                 }}>상품명</th>
-                {!isMobile && <th style={{ padding: '10px', borderBottom: '2px solid #dee2e6', textAlign: 'left', fontSize: '13px', fontWeight: '500', color: '#495057' }}>출고</th>}
-                <th style={{ padding: '10px', borderBottom: '2px solid #dee2e6', textAlign: 'left', fontSize: '13px', fontWeight: '500', color: '#495057' }}>상태</th>
+                {!isMobile && <th style={{ padding: '10px', borderBottom: '2px solid rgba(222, 226, 230, 0.1)', textAlign: 'left', fontSize: '13px', fontWeight: '500', color: '#495057' }}>출고</th>}
+                <th style={{ padding: '10px', borderBottom: '2px solid rgba(222, 226, 230, 0.1)', textAlign: 'left', fontSize: '13px', fontWeight: '500', color: '#495057' }}>상태</th>
               </tr>
             </thead>
             <tbody>
               {products.map((product) => (
                 <tr key={product.id}>
-                  <td style={{ padding: '10px', borderBottom: '1px solid #f1f3f5', fontSize: '13px', color: '#6c757d' }}>
+                  <td style={{ padding: '10px', borderBottom: '1px solid rgba(241, 243, 245, 0.1)', fontSize: '13px', color: '#6c757d' }}>
                     {product.variety || '-'}
                   </td>
-                  <td style={{ padding: '10px', borderBottom: '1px solid #f1f3f5', fontSize: '13px' }}>
+                  <td style={{ padding: '10px', borderBottom: '1px solid rgba(241, 243, 245, 0.1)', fontSize: '13px' }}>
                     {product.name}
                   </td>
-                  {!isMobile && <td style={{ padding: '10px', borderBottom: '1px solid #f1f3f5', fontSize: '13px', color: '#6c757d' }}>
+                  {!isMobile && <td style={{ padding: '10px', borderBottom: '1px solid rgba(241, 243, 245, 0.1)', fontSize: '13px', color: '#6c757d' }}>
                     {product.origin || '-'}
                   </td>}
-                  <td style={{ padding: '10px', borderBottom: '1px solid #f1f3f5' }}>
+                  <td style={{ padding: '10px', borderBottom: '1px solid rgba(241, 243, 245, 0.1)' }}>
                     <span style={{
                       padding: '3px 6px',
                       background: 'rgba(16, 185, 129, 0.1)',

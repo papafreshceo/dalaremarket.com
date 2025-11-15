@@ -49,10 +49,16 @@ export default function CSTab() {
   const [resolutionStats, setResolutionStats] = useState<ResolutionStats[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [resolutionFilter, setResolutionFilter] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<any>(null);
+
+  // 환불처리 모달
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [selectedCSForRefund, setSelectedCSForRefund] = useState<CSRecord | null>(null);
+  const [refundOrderData, setRefundOrderData] = useState<any>(null);
 
   // 해결방법 코드를 한글로 변환
   const resolutionMethodMap: Record<string, string> = {
@@ -85,7 +91,23 @@ export default function CSTab() {
 
   // EditableAdminGrid 컬럼 정의 (key와 title 형식 사용)
   const columns = [
-    { key: 'receipt_date', title: '접수일', width: 100, type: 'text' as const },
+    // CS 기본 정보
+    { key: 'receipt_date', title: 'CS접수일', width: 100, type: 'text' as const },
+    { key: 'status', title: '처리상태', width: 90, type: 'text' as const },
+    { key: 'cs_type', title: 'CS유형', width: 100, type: 'text' as const },
+    { key: 'cs_content', title: 'CS내용', width: 250, type: 'text' as const },
+    {
+      key: 'resolution_method',
+      title: '해결방법',
+      width: 120,
+      type: 'text' as const,
+      renderer: (value: any) => {
+        return resolutionMethodMap[value] || value || '-';
+      }
+    },
+
+    // 원주문 정보
+    { key: 'sheet_date', title: '주문일', width: 100, type: 'text' as const },
     { key: 'market_name', title: '마켓명', width: 100, type: 'text' as const },
     {
       key: 'order_number',
@@ -104,33 +126,75 @@ export default function CSTab() {
       }
     },
     { key: 'orderer_name', title: '주문자', width: 100, type: 'text' as const },
+    { key: 'orderer_phone', title: '주문자전화', width: 120, type: 'text' as const },
     { key: 'recipient_name', title: '수령인', width: 100, type: 'text' as const },
     { key: 'recipient_phone', title: '수령인전화', width: 120, type: 'text' as const },
+    { key: 'recipient_address', title: '배송주소', width: 250, type: 'text' as const },
     { key: 'option_name', title: '옵션상품', width: 200, type: 'text' as const },
     { key: 'quantity', title: '수량', width: 60, type: 'number' as const },
-    { key: 'cs_type', title: 'CS유형', width: 100, type: 'text' as const },
-    { key: 'cs_content', title: 'CS내용', width: 250, type: 'text' as const },
-    {
-      key: 'resolution_method',
-      title: '해결방법',
-      width: 120,
-      type: 'text' as const,
-      renderer: (value: any) => {
-        return resolutionMethodMap[value] || value || '-';
-      }
-    },
-    { key: 'status', title: '처리상태', width: 90, type: 'text' as const },
-    { key: 'resend_tracking_number', title: '재발송번호', width: 150, type: 'text' as const },
+    { key: 'seller_supply_price', title: '셀러공급가', width: 100, type: 'number' as const },
+    { key: 'settlement_amount', title: '정산금액', width: 100, type: 'text' as const },
+    { key: 'cash_used', title: '캐시사용', width: 100, type: 'number' as const },
+    { key: 'shipping_source', title: '출고처', width: 100, type: 'text' as const },
+    { key: 'vendor_name', title: '벤더사', width: 100, type: 'text' as const },
+    { key: 'shipped_date', title: '발송일', width: 100, type: 'text' as const },
+    { key: 'courier_company', title: '택배사', width: 100, type: 'text' as const },
+    { key: 'tracking_number', title: '송장번호', width: 150, type: 'text' as const },
+
+    // 환불 정보
     { key: 'refund_amount', title: '환불금액', width: 100, type: 'number' as const },
-    { key: 'resend_option', title: '재발송상품', width: 150, type: 'text' as const },
-    { key: 'resend_quantity', title: '재발송수량', width: 80, type: 'number' as const },
-    { key: 'resend_receiver', title: '재발송수령인', width: 100, type: 'text' as const },
     { key: 'bank_name', title: '은행', width: 100, type: 'text' as const },
     { key: 'account_holder', title: '예금주', width: 100, type: 'text' as const },
     { key: 'account_number', title: '계좌번호', width: 150, type: 'text' as const },
+
+    // 재발송 정보
+    { key: 'resend_option', title: '재발송상품', width: 150, type: 'text' as const },
+    { key: 'resend_quantity', title: '재발송수량', width: 80, type: 'number' as const },
+    { key: 'resend_cost', title: '재발송비용', width: 100, type: 'number' as const },
+    { key: 'resend_receiver', title: '재발송수령인', width: 100, type: 'text' as const },
+    { key: 'resend_tracking_number', title: '재발송송장', width: 150, type: 'text' as const },
+
+    // 처리 정보
     { key: 'processing_content', title: '처리내용', width: 200, type: 'text' as const },
     { key: 'processing_datetime', title: '처리일시', width: 150, type: 'text' as const },
     { key: 'memo', title: '메모', width: 200, type: 'text' as const },
+    {
+      key: 'actions',
+      title: '작업',
+      width: 120,
+      type: 'text' as const,
+      readOnly: true,  // 셀 편집 방지
+      renderer: (value: any, row: CSRecord) => {
+        // 해결방법이 환불 관련이고, 아직 처리 안된 경우에만 버튼 표시
+        const isRefundType = ['full_refund', 'partial_refund'].includes(row.resolution_method || '');
+        const isNotProcessed = row.status !== '완료';
+
+        console.log('CSTab 환불처리 버튼 체크:', {
+          order_number: row.order_number,
+          resolution_method: row.resolution_method,
+          status: row.status,
+          isRefundType,
+          isNotProcessed,
+          shouldShow: isRefundType && isNotProcessed
+        });
+
+        if (isRefundType && isNotProcessed) {
+          return (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('환불처리 버튼 클릭됨:', row);
+                handleOpenRefundModal(row);
+              }}
+              className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+            >
+              환불처리
+            </button>
+          );
+        }
+        return '-';
+      }
+    },
   ];
 
   useEffect(() => {
@@ -147,7 +211,7 @@ export default function CSTab() {
     if (startDate && endDate) {
       loadRecords();
     }
-  }, [startDate, endDate, statusFilter]);
+  }, [startDate, endDate, statusFilter, resolutionFilter]);
 
   const loadRecords = async () => {
     setLoading(true);
@@ -157,6 +221,9 @@ export default function CSTab() {
       params.append('endDate', endDate);
       if (statusFilter !== 'all') {
         params.append('status', statusFilter);
+      }
+      if (resolutionFilter !== 'all') {
+        params.append('resolutionMethod', resolutionFilter);
       }
 
       const [recordsResponse, statsResponse] = await Promise.all([
@@ -219,6 +286,128 @@ export default function CSTab() {
 
     setStartDate(start.toISOString().split('T')[0]);
     setEndDate(end.toISOString().split('T')[0]);
+  };
+
+  // 환불처리 모달 열기
+  const handleOpenRefundModal = async (csRecord: CSRecord) => {
+    try {
+      // 원주문 조회
+      const orderResponse = await fetch(
+        `/api/integrated-orders?order_number=${csRecord.order_number}&market_name=${csRecord.market_name}`
+      );
+      const orderResult = await orderResponse.json();
+
+      if (!orderResult.success || !orderResult.data || orderResult.data.length === 0) {
+        alert('주문 정보를 찾을 수 없습니다.');
+        return;
+      }
+
+      setSelectedCSForRefund(csRecord);
+      setRefundOrderData(orderResult.data[0]);
+      setShowRefundModal(true);
+    } catch (error) {
+      console.error('주문 정보 조회 오류:', error);
+      alert('주문 정보 조회 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 환불 처리 실행
+  const handleRefundProcess = async () => {
+    if (!selectedCSForRefund || !refundOrderData) return;
+
+    if (!confirm('환불을 처리하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.')) {
+      return;
+    }
+
+    try {
+      const order = refundOrderData;
+      const cashUsed = Number(order.cash_used || 0);
+      const refundAmount = selectedCSForRefund.refund_amount || order.settlement_amount || 0;
+
+      // 1. 캐시 환불 (캐시 사용한 경우)
+      if (cashUsed > 0 && order.organization_id) {
+        const cashResponse = await fetch('/api/cash/refund', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            organizationId: order.organization_id,
+            amount: cashUsed,
+            orderId: order.id,
+            orderNumber: order.order_number,
+          }),
+        });
+
+        const cashResult = await cashResponse.json();
+
+        if (!cashResult.success) {
+          alert('캐시 환불 처리 실패: ' + cashResult.error);
+          return;
+        }
+      }
+
+      // 2. 환불 정산 데이터 저장
+      const settlementResponse = await fetch('/api/refund-settlements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id }),
+      });
+
+      const settlementResult = await settlementResponse.json();
+
+      if (!settlementResult.success) {
+        alert('환불 정산 저장 실패: ' + settlementResult.error);
+        return;
+      }
+
+      // 3. 주문 상태 → 환불완료
+      const updateOrderResponse = await fetch('/api/integrated-orders/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orders: [{
+            id: order.id,
+            shipping_status: '환불완료',
+            refund_processed_at: new Date().toISOString()
+          }]
+        }),
+      });
+
+      const updateOrderResult = await updateOrderResponse.json();
+
+      if (!updateOrderResult.success) {
+        alert('주문 상태 업데이트 실패: ' + updateOrderResult.error);
+        return;
+      }
+
+      // 4. CS 기록 상태 → 완료
+      const updateCSResponse = await fetch('/api/cs-records', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedCSForRefund.id,
+          status: '완료',
+          processing_datetime: new Date().toISOString(),
+          processing_content: '환불처리 완료'
+        }),
+      });
+
+      const updateCSResult = await updateCSResponse.json();
+
+      if (!updateCSResult.success) {
+        alert('CS 기록 업데이트 실패: ' + updateCSResult.error);
+        return;
+      }
+
+      alert('환불 처리가 완료되었습니다.');
+      setShowRefundModal(false);
+      setSelectedCSForRefund(null);
+      setRefundOrderData(null);
+      loadRecords(); // 새로고침
+
+    } catch (error) {
+      console.error('환불 처리 오류:', error);
+      alert('환불 처리 중 오류가 발생했습니다.');
+    }
   };
 
   const statusStats = {
@@ -330,6 +519,25 @@ export default function CSTab() {
               <option value="all">전체</option>
               <option value="접수">접수</option>
               <option value="완료">완료</option>
+            </select>
+          </div>
+
+          {/* 해결방법 필터 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">해결방법</label>
+            <select
+              value={resolutionFilter}
+              onChange={(e) => setResolutionFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">전체</option>
+              <option value="exchange">교환</option>
+              <option value="return">반품</option>
+              <option value="full_refund">전체환불</option>
+              <option value="partial_refund">부분환불</option>
+              <option value="full_resend">전체재발송</option>
+              <option value="partial_resend">부분재발송</option>
+              <option value="other_action">기타조치</option>
             </select>
           </div>
         </div>
@@ -534,6 +742,158 @@ export default function CSTab() {
                 </p>
               </div>
             )}
+          </div>
+        </Modal>
+      )}
+
+      {/* 환불처리 확인 모달 */}
+      {showRefundModal && selectedCSForRefund && refundOrderData && (
+        <Modal
+          isOpen={showRefundModal}
+          onClose={() => {
+            setShowRefundModal(false);
+            setSelectedCSForRefund(null);
+            setRefundOrderData(null);
+          }}
+          title="환불 처리 확인"
+          size="lg"
+          footer={
+            <>
+              <button
+                onClick={() => {
+                  setShowRefundModal(false);
+                  setSelectedCSForRefund(null);
+                  setRefundOrderData(null);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleRefundProcess}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                환불처리 실행
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            {/* 주문 정보 */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-semibold text-gray-800 mb-3">📦 주문 정보</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-gray-600">주문번호:</span>
+                  <span className="ml-2 font-medium">{selectedCSForRefund.order_number}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">주문자:</span>
+                  <span className="ml-2 font-medium">{selectedCSForRefund.orderer_name}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">주문자 전화:</span>
+                  <span className="ml-2 font-medium">{selectedCSForRefund.orderer_phone}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">수령인:</span>
+                  <span className="ml-2 font-medium">{selectedCSForRefund.recipient_name}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">수령인 전화:</span>
+                  <span className="ml-2 font-medium">{selectedCSForRefund.recipient_phone}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-gray-600">배송 주소:</span>
+                  <span className="ml-2 font-medium">{selectedCSForRefund.recipient_address}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-gray-600">옵션상품:</span>
+                  <span className="ml-2 font-medium">{selectedCSForRefund.option_name}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">수량:</span>
+                  <span className="ml-2 font-medium">{selectedCSForRefund.quantity}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">마켓:</span>
+                  <span className="ml-2 font-medium">{selectedCSForRefund.market_name}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* CS 정보 */}
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h3 className="font-semibold text-gray-800 mb-3">📞 CS 정보</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-gray-600">CS 구분:</span>
+                  <span className="ml-2 font-medium">{selectedCSForRefund.cs_type}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">해결방법:</span>
+                  <span className="ml-2 font-medium">{resolutionMethodMap[selectedCSForRefund.resolution_method || ''] || selectedCSForRefund.resolution_method}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-gray-600">CS 내용:</span>
+                  <div className="ml-2 mt-1 p-2 bg-white rounded border">
+                    {selectedCSForRefund.cs_content}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 환불 금액 정보 */}
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <h3 className="font-semibold text-gray-800 mb-3">💰 환불 금액</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-gray-600">셀러공급가:</span>
+                  <span className="ml-2 font-medium">
+                    {Number(refundOrderData.seller_supply_price || 0).toLocaleString()}원
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">정산 금액:</span>
+                  <span className="ml-2 font-medium">
+                    {Number(refundOrderData.settlement_amount || 0).toLocaleString()}원
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">환불 금액:</span>
+                  <span className="ml-2 font-bold text-purple-600">
+                    {Number(selectedCSForRefund.refund_amount || refundOrderData.settlement_amount || 0).toLocaleString()}원
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">캐시 사용:</span>
+                  <span className="ml-2 font-medium text-orange-600">
+                    {Number(refundOrderData.cash_used || 0).toLocaleString()}원
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 경고 메시지 */}
+            <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <span className="text-yellow-600 text-lg">⚠️</span>
+                <div className="text-sm text-yellow-800">
+                  <div className="font-semibold mb-1">환불 처리 시 다음 작업이 자동으로 실행됩니다:</div>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    {Number(refundOrderData.cash_used || 0) > 0 && (
+                      <li>캐시 환불: {Number(refundOrderData.cash_used || 0).toLocaleString()}원</li>
+                    )}
+                    <li>환불 정산 데이터 저장</li>
+                    <li>주문 상태 → 환불완료</li>
+                    <li>CS 기록 상태 → 완료</li>
+                  </ul>
+                  <div className="mt-2 font-semibold text-red-700">
+                    이 작업은 되돌릴 수 없습니다.
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </Modal>
       )}
