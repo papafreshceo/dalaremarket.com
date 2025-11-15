@@ -41,7 +41,7 @@ export default function BusinessTools({ isMobile = false, onToolClick }: Busines
     fetchTools();
   }, []);
 
-  if (loading || tools.length === 0) {
+  if (loading || !tools || tools.length === 0) {
     return null;
   }
 
@@ -57,7 +57,7 @@ export default function BusinessTools({ isMobile = false, onToolClick }: Busines
       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
       backdropFilter: 'blur(10px)'
     }}>
-      {tools.map((tool, idx) => (
+      {tools?.map((tool, idx) => (
         <div
           key={tool.id}
           onClick={() => {
