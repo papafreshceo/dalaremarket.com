@@ -38,6 +38,7 @@ export async function middleware(request: NextRequest) {
   // 공개 페이지 (로그인 없이 접근 가능)
   const publicPaths = [
     '/',
+    '/platform',
     '/auth/login',
     '/auth/register',
     '/auth/callback',
@@ -46,9 +47,6 @@ export async function middleware(request: NextRequest) {
 
   // 관리자 전용 페이지
   const adminPaths = ['/admin']
-  
-  // 사용자 전용 페이지
-  const platformPaths = ['/platform']
 
   // 공개 페이지는 통과
   if (publicPaths.some(path => pathname === path || pathname.startsWith(path))) {
@@ -103,16 +101,6 @@ export async function middleware(request: NextRequest) {
       // 관리자가 아니면 랜딩페이지로
       return NextResponse.redirect(new URL('/', request.url))
     }
-  }
-
-  // platform 페이지 접근 제어 (고객용)
-  if (pathname.startsWith('/platform')) {
-    const isCustomer = userData.role === 'customer' || 
-                       userData.role === 'vip_customer' || 
-                       userData.role === 'partner'
-    
-    // 관리자가 platform 페이지 접근해도 OK (테스트용)
-    // 필요하면 여기서 차단 가능
   }
 
   return response
