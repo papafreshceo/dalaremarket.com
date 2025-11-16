@@ -137,6 +137,12 @@ export async function POST(request: NextRequest) {
         if (usersError) {
           logger.error('이메일 수신 동의 사용자 조회 오류:', usersError);
         } else if (users && users.length > 0) {
+          // 테스트 모드: 1건만 발송
+          const isTestMode = process.env.EMAIL_TEST_MODE === 'true';
+          const emailTargets = isTestMode ? [users[0]] : users;
+
+          logger.info(`이메일 발송 대상: ${emailTargets.length}명 (전체: ${users.length}명, 테스트모드: ${isTestMode})`);
+
           // 이메일 템플릿 조회
           const { data: template } = await adminClient
             .from('email_templates')
@@ -157,8 +163,10 @@ export async function POST(request: NextRequest) {
             </html>
           `;
 
-          // 각 사용자에게 이메일 전송
-          for (const user of users) {
+          // 각 사용자에게 이메일 전송 (Rate Limit 회피: 초당 2건 제한)
+          for (let i = 0; i < emailTargets.length; i++) {
+            const user = emailTargets[i];
+
             const unsubscribeUrl = getUnsubscribeUrl(user.unsubscribe_token || '');
             const html = replaceVariables(htmlTemplate, {
               subject: title,
@@ -184,6 +192,11 @@ export async function POST(request: NextRequest) {
               emailSent += result.sent;
             }
             emailFailed += result.failed;
+
+            // Rate Limit 회피: 0.6초 대기 (초당 2건 제한)
+            if (i < emailTargets.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 600));
+            }
           }
 
           logger.info(`이메일 발송 완료: 성공 ${emailSent}, 실패 ${emailFailed}`);

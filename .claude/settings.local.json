@@ -10,7 +10,10 @@
       "Bash(powershell:*)",
       "Bash(del /f run-push-image-migration.ps1 2)",
       "Bash(if exist run-push-image-migration.ps1 del /f run-push-image-migration.ps1)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(if not exist \"src\\app\\api\\admin\\email-templates\" mkdir \"src\\app\\api\\admin\\email-templates\")",
+      "Bash(if not exist \"src\\app\\api\\admin\\email-templates\\[id]\" mkdir \"src\\app\\api\\admin\\email-templates\\[id]\")",
+      "Bash(if not exist \"src\\app\\api\\admin\\email-templates\\[id]\\preview\" mkdir \"src\\app\\api\\admin\\email-templates\\[id]\\preview\")"
     ],
     "deny": [],
     "ask": []

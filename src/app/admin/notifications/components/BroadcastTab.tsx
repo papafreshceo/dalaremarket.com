@@ -69,12 +69,15 @@ export default function BroadcastTab() {
 
       const data = await response.json()
 
+      console.log('📧 전송 응답:', data)
+
       if (data.success) {
         toast.success(data.message)
         setTitle('')
         setBody('')
         setUrl('/platform/notifications')
         setImageUrl('')
+        setSendEmail(false)
       } else {
         toast.error(data.error || '전송에 실패했습니다')
       }
