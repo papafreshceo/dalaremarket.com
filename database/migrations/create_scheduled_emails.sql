@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS scheduled_emails (
   id BIGSERIAL PRIMARY KEY,
 
   -- 발송 정보
-  template_id BIGINT REFERENCES email_templates(id) ON DELETE SET NULL,
+  template_id UUID REFERENCES email_templates(id) ON DELETE SET NULL,
   recipient_emails TEXT[] NOT NULL, -- 수신자 이메일 배열
   variables JSONB DEFAULT '{}', -- 변수 값들
 

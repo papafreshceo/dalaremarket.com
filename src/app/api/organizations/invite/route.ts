@@ -10,6 +10,8 @@ import {
   getInvitationExpiryDate,
   getDefaultPermissions,
 } from '@/lib/organization-utils'
+import { sendEmail, replaceVariables } from '@/lib/email/send-email'
+import { APP_URL } from '@/lib/email/resend'
 
 /**
  * POST /api/organizations/invite
@@ -171,6 +173,71 @@ export async function POST(request: NextRequest) {
           .eq('id', invitation.id)
       }
 
+      // 4. 이메일 발송
+      try {
+        const inviteUrl = `${APP_URL}/organizations/join?token=${token}`
+
+        // 이메일 템플릿 조회
+        const { data: template } = await supabase
+          .from('email_templates')
+          .select('*')
+          .eq('type', 'transactional')
+          .ilike('name', '%초대%')
+          .eq('is_active', true)
+          .single()
+
+        let html = ''
+        let emailSubject = `${orgName}에서 초대했습니다`
+
+        if (template) {
+          html = replaceVariables(template.html_content, {
+            organization_name: orgName,
+            inviter_name: inviterName,
+            role,
+            invite_url: inviteUrl,
+            message: body.message || ''
+          })
+          emailSubject = replaceVariables(template.subject, {
+            organization_name: orgName
+          })
+        } else {
+          // 기본 템플릿
+          html = `
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body style="font-family: sans-serif; line-height: 1.6;">
+              <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2>${orgName}에서 초대했습니다</h2>
+                <p>${inviterName}님이 ${orgName}에 ${role === 'owner' ? '관리자' : '멤버'}로 초대했습니다.</p>
+                ${body.message ? `<p><strong>메시지:</strong> ${body.message}</p>` : ''}
+                <p style="text-align: center; margin: 30px 0;">
+                  <a href="${inviteUrl}" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">초대 수락하기</a>
+                </p>
+                <p style="font-size: 12px; color: #666;">이 초대는 7일 후 만료됩니다.</p>
+              </div>
+            </body>
+            </html>
+          `
+        }
+
+        await sendEmail({
+          to: body.email,
+          subject: emailSubject,
+          html,
+          emailType: 'invitation',
+          recipientName: body.email,
+          metadata: {
+            invitation_id: invitation.id,
+            organization_id: organizationId,
+            role
+          }
+        })
+      } catch (emailError: any) {
+        logger.error('초대 이메일 발송 실패:', emailError)
+        // 이메일 실패해도 초대는 생성되었으므로 계속 진행
+      }
+
       return NextResponse.json({
         success: true,
         invitation,
@@ -201,11 +268,80 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // 미가입자에게도 이메일 발송
+      try {
+        const inviteUrl = `${APP_URL}/organizations/join?token=${token}`
+
+        // 이메일 템플릿 조회
+        const { data: template } = await supabase
+          .from('email_templates')
+          .select('*')
+          .eq('type', 'transactional')
+          .ilike('name', '%초대%')
+          .eq('is_active', true)
+          .single()
+
+        let html = ''
+        let emailSubject = `${orgName}에서 초대했습니다`
+
+        if (template) {
+          html = replaceVariables(template.html_content, {
+            organization_name: orgName,
+            inviter_name: inviterName,
+            role,
+            invite_url: inviteUrl,
+            message: body.message || ''
+          })
+          emailSubject = replaceVariables(template.subject, {
+            organization_name: orgName
+          })
+        } else {
+          // 기본 템플릿
+          html = `
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body style="font-family: sans-serif; line-height: 1.6;">
+              <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2>${orgName}에서 초대했습니다</h2>
+                <p>${inviterName}님이 ${orgName}에 ${role === 'owner' ? '관리자' : '멤버'}로 초대했습니다.</p>
+                ${body.message ? `<p><strong>메시지:</strong> ${body.message}</p>` : ''}
+                <p style="background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px; margin: 20px 0;">
+                  <strong>아직 달래마켓 회원이 아니신가요?</strong><br>
+                  먼저 회원가입을 완료한 후 초대를 수락해주세요.
+                </p>
+                <p style="text-align: center; margin: 30px 0;">
+                  <a href="${inviteUrl}" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">초대 수락하기</a>
+                </p>
+                <p style="font-size: 12px; color: #666;">이 초대는 7일 후 만료됩니다.</p>
+              </div>
+            </body>
+            </html>
+          `
+        }
+
+        await sendEmail({
+          to: body.email,
+          subject: emailSubject,
+          html,
+          emailType: 'invitation',
+          recipientName: body.email,
+          metadata: {
+            invitation_id: invitation.id,
+            organization_id: organizationId,
+            role
+          }
+        })
+      } catch (emailError: any) {
+        logger.error('초대 이메일 발송 실패:', emailError)
+        // 이메일 실패해도 초대는 생성되었으므로 계속 진행
+      }
+
       return NextResponse.json({
         success: true,
         invitation,
         notification_created: false,
-        message: '해당 이메일은 미가입자입니다. 가입 후 초대를 수락할 수 있습니다.',
+        message: '해당 이메일은 미가입자입니다. 초대 이메일이 발송되었습니다.',
       })
     }
   } catch (error) {
