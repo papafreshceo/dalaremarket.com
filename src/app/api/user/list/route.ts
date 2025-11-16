@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     // 모든 사용자 조회 (본인 제외)
     const { data: users, error } = await supabase
       .from('users')
-      .select('id, email, name, nickname')
+      .select('id, email, name, nickname, profile_name')
       .neq('id', user.id)
       .order('email', { ascending: true });
 
