@@ -16,8 +16,8 @@
 
 ```bash
 # OneSignal Configuration
-NEXT_PUBLIC_ONESIGNAL_APP_ID=7fd0317a-d927-4ddc-be19-f0860d31b461
-ONESIGNAL_REST_API_KEY=os_v2_org_p7idc6wze5g5zpqz6cda2mnumeil3n6t7fnueb5zyqha7bexgxaegyy3maa5tr4qxh2s4tltsvj4nvk6po5ajsuplzthn2ykr5xgwmy
+NEXT_PUBLIC_ONESIGNAL_APP_ID=your_onesignal_app_id_here
+ONESIGNAL_REST_API_KEY=your_onesignal_rest_api_key_here
 ```
 
 ### 2단계: 데이터베이스 마이그레이션 실행
