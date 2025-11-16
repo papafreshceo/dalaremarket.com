@@ -163,8 +163,12 @@ export default function FloatingMessenger() {
     try {
       const response = await fetch('/api/user/list')
       const data = await response.json()
+      console.log('사용자 목록 응답:', data)
       if (data.success) {
+        console.log('사용자 목록:', data.users)
         setUsers(data.users)
+      } else {
+        console.error('사용자 목록 조회 실패:', data.error)
       }
     } catch (error) {
       console.error('사용자 목록 조회 실패:', error)
@@ -332,7 +336,8 @@ export default function FloatingMessenger() {
                 <div className="flex-1 overflow-y-auto">
                   {users
                     .filter(user => {
-                      const query = searchQuery.toLowerCase()
+                      if (!searchQuery.trim()) return true
+                      const query = searchQuery.toLowerCase().trim()
                       return (
                         user.email?.toLowerCase().includes(query) ||
                         user.name?.toLowerCase().includes(query) ||
@@ -360,7 +365,8 @@ export default function FloatingMessenger() {
                       </div>
                     ))}
                   {users.filter(user => {
-                    const query = searchQuery.toLowerCase()
+                    if (!searchQuery.trim()) return true
+                    const query = searchQuery.toLowerCase().trim()
                     return (
                       user.email?.toLowerCase().includes(query) ||
                       user.name?.toLowerCase().includes(query) ||
