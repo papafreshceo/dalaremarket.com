@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-security';
 import logger from '@/lib/logger';
+import { sendEmail, replaceVariables, getUnsubscribeUrl } from '@/lib/email/send-email';
 
 /**
  * POST /api/admin/notifications/broadcast
@@ -13,7 +14,7 @@ export async function POST(request: NextRequest) {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.error;
 
-    const { title, body, category, url, imageUrl } = await request.json();
+    const { title, body, category, url, imageUrl, sendEmail: shouldSendEmail } = await request.json();
 
     if (!title || !body) {
       return NextResponse.json(
@@ -120,11 +121,88 @@ export async function POST(request: NextRequest) {
       // 기록 실패해도 전송은 성공으로 처리
     }
 
+    // 🔔 이메일 발송 (옵션)
+    let emailSent = 0;
+    let emailFailed = 0;
+
+    if (shouldSendEmail) {
+      try {
+        // 마케팅 이메일 수신 동의한 사용자 조회
+        const { data: users, error: usersError } = await adminClient
+          .from('users')
+          .select('email, name, profile_name, unsubscribe_token')
+          .eq('email_marketing', true)
+          .not('email', 'is', null);
+
+        if (usersError) {
+          logger.error('이메일 수신 동의 사용자 조회 오류:', usersError);
+        } else if (users && users.length > 0) {
+          // 이메일 템플릿 조회
+          const { data: template } = await adminClient
+            .from('email_templates')
+            .select('html_content')
+            .eq('type', 'broadcast')
+            .eq('is_active', true)
+            .single();
+
+          const htmlTemplate = template?.html_content || `
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body>
+              <h2>{title}</h2>
+              <p>{content}</p>
+              <p><a href="{unsubscribe_url}">수신 거부</a></p>
+            </body>
+            </html>
+          `;
+
+          // 각 사용자에게 이메일 전송
+          for (const user of users) {
+            const unsubscribeUrl = getUnsubscribeUrl(user.unsubscribe_token || '');
+            const html = replaceVariables(htmlTemplate, {
+              subject: title,
+              title: title,
+              content: body,
+              unsubscribe_url: unsubscribeUrl
+            });
+
+            const result = await sendEmail({
+              to: user.email,
+              subject: title,
+              html,
+              emailType: 'broadcast',
+              recipientName: user.profile_name || user.name || user.email,
+              metadata: {
+                category,
+                url,
+                notification_id: oneSignalData.id
+              }
+            });
+
+            if (result.success) {
+              emailSent += result.sent;
+            }
+            emailFailed += result.failed;
+          }
+
+          logger.info(`이메일 발송 완료: 성공 ${emailSent}, 실패 ${emailFailed}`);
+        }
+      } catch (emailError: any) {
+        logger.error('이메일 발송 오류:', emailError);
+        // 이메일 실패해도 푸시는 성공으로 처리
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      message: `${playerIds.length}명에게 푸시 알림이 전송되었습니다.`,
+      message: shouldSendEmail
+        ? `푸시 ${playerIds.length}명, 이메일 ${emailSent}명에게 전송되었습니다.`
+        : `${playerIds.length}명에게 푸시 알림이 전송되었습니다.`,
       notification_id: oneSignalData.id,
       recipient_count: playerIds.length,
+      email_sent: emailSent,
+      email_failed: emailFailed,
     });
 
   } catch (error: any) {

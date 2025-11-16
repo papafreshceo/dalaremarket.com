@@ -8,7 +8,9 @@
       "Bash(if exist create-admin-orgs.js del /f create-admin-orgs.js)",
       "Bash(if exist cleanup-sysy-orgs.js del /f cleanup-sysy-orgs.js)",
       "Bash(powershell:*)",
-      "Bash(del /f run-push-image-migration.ps1 2)"
+      "Bash(del /f run-push-image-migration.ps1 2)",
+      "Bash(if exist run-push-image-migration.ps1 del /f run-push-image-migration.ps1)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

@@ -18,6 +18,7 @@ export default function BroadcastTab() {
   const [category, setCategory] = useState('broadcast')
   const [url, setUrl] = useState('/platform/notifications')
   const [imageUrl, setImageUrl] = useState('')
+  const [sendEmail, setSendEmail] = useState(false)
   const [loading, setLoading] = useState(false)
   const [showImageModal, setShowImageModal] = useState(false)
   const [images, setImages] = useState<CloudinaryImage[]>([])
@@ -63,7 +64,7 @@ export default function BroadcastTab() {
       const response = await fetch('/api/admin/notifications/broadcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, body, category, url, imageUrl }),
+        body: JSON.stringify({ title, body, category, url, imageUrl, sendEmail }),
       })
 
       const data = await response.json()
@@ -285,6 +286,34 @@ export default function BroadcastTab() {
             </div>
             <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
               클라우디너리에 업로드된 공개 이미지를 선택할 수 있습니다
+            </p>
+          </div>
+
+          {/* 이메일 발송 옵션 */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '500',
+              color: '#374151'
+            }}>
+              <input
+                type="checkbox"
+                checked={sendEmail}
+                onChange={(e) => setSendEmail(e.target.checked)}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  cursor: 'pointer'
+                }}
+              />
+              <span>이메일도 함께 발송 (푸시 + 이메일 + 공지사항)</span>
+            </label>
+            <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', marginLeft: '24px' }}>
+              체크하면 푸시 알림과 함께 이메일도 전송됩니다 (마케팅 수신 동의 사용자만)
             </p>
           </div>
 
