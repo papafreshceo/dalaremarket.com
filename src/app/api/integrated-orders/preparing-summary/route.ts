@@ -259,7 +259,7 @@ export async function GET(request: NextRequest) {
       return !materials || materials.length === 0; // 원물 매핑 없음
     });
 
-    logger.debug('⚠️ 미매핑 옵션:', { data: unmappedOptions.map(o => o.option_name }););
+    logger.debug('⚠️ 미매핑 옵션:', { data: unmappedOptions.map(o => o.option_name) });
 
     return NextResponse.json({
       success: true,
