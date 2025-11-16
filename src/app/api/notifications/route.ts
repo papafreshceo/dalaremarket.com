@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
     // 필터링
     if (unreadOnly) {
-      query = query.eq('read', false)
+      query = query.eq('is_read', false)
     }
 
     if (type) {
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', auth.user.id)
-      .eq('read', false)
+      .eq('is_read', false)
 
     return NextResponse.json({
       success: true,
@@ -90,11 +90,10 @@ export async function PATCH(request: NextRequest) {
       const { error: updateError } = await supabase
         .from('notifications')
         .update({
-          read: true,
-          read_at: new Date().toISOString(),
+          is_read: true,
         })
         .eq('user_id', auth.user.id)
-        .eq('read', false)
+        .eq('is_read', false)
 
       if (updateError) {
         logger.error('알림 읽음 처리 실패:', updateError);
@@ -108,8 +107,7 @@ export async function PATCH(request: NextRequest) {
       const { error: updateError } = await supabase
         .from('notifications')
         .update({
-          read: true,
-          read_at: new Date().toISOString(),
+          is_read: true,
         })
         .in('id', notification_ids)
         .eq('user_id', auth.user.id)

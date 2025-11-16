@@ -2,8 +2,72 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Notification, NOTIFICATION_TYPE_LABELS, NOTIFICATION_TYPE_ICONS, NOTIFICATION_TYPE_COLORS } from '@/types/notification'
-import InvitationNotificationCard from '@/components/notifications/InvitationNotificationCard'
+
+// OneSignal 알림 타입 정의
+interface Notification {
+  id: string
+  user_id: string
+  title: string
+  body: string
+  category: string
+  resource_type?: string
+  resource_id?: string
+  action_url?: string
+  is_read: boolean
+  created_at: string
+  data?: any
+}
+
+// 알림 카테고리별 아이콘
+const CATEGORY_ICONS: Record<string, string> = {
+  'order_status': '📦',
+  'announcement': '📢',
+  'comment_reply': '💬',
+  'deposit_confirm': '💰',
+  'admin_new_order': '🛒',
+  'admin_support_post': '❓',
+  'admin_new_member': '👤',
+  'shipping_holiday': '🏖️',
+  'harvest_news': '🌾',
+  'price_change': '💵',
+  'out_of_stock': '❌',
+  'organization_invitation': '✉️',
+  'system_notice': '🔔',
+}
+
+// 알림 카테고리별 라벨
+const CATEGORY_LABELS: Record<string, string> = {
+  'order_status': '주문 상태',
+  'announcement': '공지사항',
+  'comment_reply': '댓글',
+  'deposit_confirm': '예치금',
+  'admin_new_order': '신규 주문',
+  'admin_support_post': '문의',
+  'admin_new_member': '신규 회원',
+  'shipping_holiday': '발송 휴무',
+  'harvest_news': '출하 소식',
+  'price_change': '가격 변동',
+  'out_of_stock': '품절 알림',
+  'organization_invitation': '초대',
+  'system_notice': '시스템',
+}
+
+// 알림 카테고리별 색상
+const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  'order_status': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-300' },
+  'announcement': { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-300' },
+  'comment_reply': { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-300' },
+  'deposit_confirm': { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-300' },
+  'admin_new_order': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-300' },
+  'admin_support_post': { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-300' },
+  'admin_new_member': { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-300' },
+  'shipping_holiday': { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-300' },
+  'harvest_news': { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-300' },
+  'price_change': { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-300' },
+  'out_of_stock': { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-300' },
+  'organization_invitation': { bg: 'bg-pink-50', text: 'text-pink-700', border: 'border-pink-300' },
+  'system_notice': { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-300' },
+}
 
 export default function NotificationsPage() {
   const router = useRouter()
@@ -85,35 +149,67 @@ export default function NotificationsPage() {
   // 알림 클릭 처리 (읽음 처리 + 페이지 이동)
   const handleNotificationClick = (notification: Notification) => {
     // 읽지 않은 알림이면 읽음 처리
-    if (!notification.read) {
+    if (!notification.is_read) {
       markAsRead(notification.id)
     }
 
-    // 알림 타입에 따라 페이지 이동
-    switch (notification.type) {
-      case 'organization_invitation':
-        // 초대 알림은 현재 페이지에서 수락/거절 가능하므로 스크롤만
-        const element = document.getElementById(`notification-${notification.id}`)
-        element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        break
+    // action_url이 있으면 해당 URL로 이동
+    if (notification.action_url) {
+      router.push(notification.action_url)
+      return
+    }
 
-      case 'order_update':
-        // 주문 업데이트 알림
-        const orderData = notification.data as any
-        if (orderData?.order_id) {
-          router.push(`/platform/orders?order_id=${orderData.order_id}`)
+    // 알림 카테고리에 따라 페이지 이동
+    switch (notification.category) {
+      case 'order_status':
+        // 주문 상태 알림
+        if (notification.resource_id) {
+          router.push(`/platform/orders?highlight=${notification.resource_id}`)
         } else {
           router.push('/platform/orders')
         }
         break
 
-      case 'payment_update':
-        // 결제/정산 알림
+      case 'announcement':
+      case 'shipping_holiday':
+      case 'harvest_news':
+      case 'price_change':
+      case 'out_of_stock':
+        // 공지사항 알림
+        router.push('/platform')
+        break
+
+      case 'comment_reply':
+        // 댓글 알림
+        if (notification.resource_id) {
+          router.push(`/platform/feed?post_id=${notification.resource_id}`)
+        } else {
+          router.push('/platform/feed')
+        }
+        break
+
+      case 'deposit_confirm':
+        // 예치금 알림
         router.push('/platform/settlement')
         break
 
-      case 'system_notice':
-        // 시스템 공지는 현재 페이지에 머물기
+      case 'admin_new_order':
+        // 관리자 - 신규 주문
+        if (notification.resource_id) {
+          router.push(`/admin/order-integration?highlight=${notification.resource_id}`)
+        } else {
+          router.push('/admin/order-integration')
+        }
+        break
+
+      case 'admin_support_post':
+        // 관리자 - 문의
+        router.push('/admin/support')
+        break
+
+      case 'admin_new_member':
+        // 관리자 - 신규 회원
+        router.push('/admin/members')
         break
 
       default:
@@ -201,19 +297,9 @@ export default function NotificationsPage() {
           </div>
         ) : (
           notifications.map((notification) => {
-            const colors = NOTIFICATION_TYPE_COLORS[notification.type]
-
-            // 초대 알림인 경우 특별한 카드 표시 (읽음/안읽음 모두)
-            if (notification.type === 'organization_invitation') {
-              return (
-                <div key={notification.id} id={`notification-${notification.id}`}>
-                  <InvitationNotificationCard
-                    notification={notification}
-                    onActionComplete={fetchNotifications}
-                  />
-                </div>
-              )
-            }
+            const colors = CATEGORY_COLORS[notification.category] || CATEGORY_COLORS['system_notice']
+            const icon = CATEGORY_ICONS[notification.category] || '🔔'
+            const label = CATEGORY_LABELS[notification.category] || '알림'
 
             // 일반 알림 카드
             return (
@@ -221,32 +307,35 @@ export default function NotificationsPage() {
                 key={notification.id}
                 id={`notification-${notification.id}`}
                 onClick={() => handleNotificationClick(notification)}
-                className={`border rounded-lg p-4 transition-colors cursor-pointer hover:shadow-md ${
-                  !notification.read
-                    ? `${colors.bg} ${colors.border} border-2`
-                    : 'bg-white border-gray-200'
+                className={`border rounded-lg p-4 transition-all cursor-pointer hover:shadow-lg ${
+                  !notification.is_read
+                    ? `${colors.bg} ${colors.border} border-2 hover:scale-[1.01]`
+                    : 'bg-white border-gray-200 hover:bg-gray-50'
                 }`}
               >
                 <div className="flex items-start gap-4">
                   {/* 아이콘 */}
-                  <span className="text-3xl flex-shrink-0">
-                    {NOTIFICATION_TYPE_ICONS[notification.type]}
-                  </span>
+                  <div className="flex-shrink-0">
+                    <span className="text-4xl">{icon}</span>
+                  </div>
 
                   {/* 내용 */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-base font-semibold text-gray-900">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="text-lg font-bold text-gray-900">
                             {notification.title}
                           </h3>
-                          {!notification.read && (
-                            <span className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"></span>
+                          {!notification.is_read && (
+                            <span className="flex items-center gap-1">
+                              <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
+                              <span className="text-xs font-semibold text-blue-600">NEW</span>
+                            </span>
                           )}
                         </div>
-                        <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${colors.bg} ${colors.text}`}>
-                          {NOTIFICATION_TYPE_LABELS[notification.type]}
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${colors.bg} ${colors.text} border ${colors.border}`}>
+                          {label}
                         </span>
                       </div>
                       <button
@@ -254,7 +343,7 @@ export default function NotificationsPage() {
                           e.stopPropagation()
                           deleteNotification(notification.id)
                         }}
-                        className="text-gray-400 hover:text-red-600 transition-colors"
+                        className="text-gray-400 hover:text-red-600 transition-colors p-1 rounded hover:bg-red-50"
                         title="삭제"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -263,27 +352,40 @@ export default function NotificationsPage() {
                       </button>
                     </div>
 
-                    {notification.message && (
-                      <p className="text-sm text-gray-700 mb-2">
-                        {notification.message}
+                    {notification.body && (
+                      <p className="text-sm text-gray-700 mb-3 leading-relaxed">
+                        {notification.body}
                       </p>
                     )}
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                      <span className="text-xs text-gray-500 flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                         {formatTime(notification.created_at)}
                       </span>
-                      {!notification.read && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            markAsRead(notification.id)
-                          }}
-                          className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                        >
-                          읽음 처리
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {!notification.is_read && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              markAsRead(notification.id)
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-700 font-semibold px-3 py-1 rounded-full hover:bg-blue-50 transition-colors"
+                          >
+                            읽음 처리
+                          </button>
+                        )}
+                        {notification.action_url && (
+                          <span className="text-xs text-gray-500 flex items-center gap-1">
+                            상세 보기
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
