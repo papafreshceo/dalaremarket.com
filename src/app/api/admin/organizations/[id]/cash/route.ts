@@ -1,6 +1,8 @@
 import { createClientForRouteHandler, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-security';
+import logger from '@/lib/logger';
+import { notifyDepositConfirm } from '@/lib/onesignal-notifications';
 
 /**
  * POST /api/admin/organizations/[id]/cash
@@ -104,6 +106,30 @@ export async function POST(
     if (historyError) {
       logger.error('히스토리 기록 오류:', historyError);
       // 히스토리 실패는 치명적이지 않으므로 계속 진행
+    }
+
+    // 🔔 셀러에게 예치금 입금확인 알림 (지급 시에만)
+    if (cash > 0) {
+      try {
+        // 조직의 소유자 ID 조회
+        const { data: org } = await adminClient
+          .from('organizations')
+          .select('created_by')
+          .eq('id', organizationId)
+          .single();
+
+        if (org?.created_by) {
+          await notifyDepositConfirm({
+            userId: org.created_by,
+            depositId: organizationId,
+            amount: cash,
+            newBalance: newBalance
+          });
+        }
+      } catch (notificationError) {
+        logger.error('예치금 입금확인 알림 전송 실패:', notificationError);
+        // 알림 실패해도 입금확인은 성공으로 처리
+      }
     }
 
     const actionType = cash > 0 ? '지급' : '회수';

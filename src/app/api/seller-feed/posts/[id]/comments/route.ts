@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import logger from '@/lib/logger';
+import { notifyCommentReply } from '@/lib/onesignal-notifications';
 
 export async function GET(
   request: NextRequest,
@@ -143,6 +144,30 @@ export async function POST(
         { success: false, error: '댓글 작성에 실패했습니다.' },
         { status: 500 }
       );
+    }
+
+    // 🔔 게시글 작성자에게 댓글 알림
+    try {
+      // 게시글 정보 조회
+      const { data: postData } = await supabase
+        .from('seller_feed_posts')
+        .select('user_id, title')
+        .eq('id', postId)
+        .single();
+
+      // 본인 댓글은 알림 안 보냄
+      if (postData && postData.user_id !== user.id) {
+        await notifyCommentReply({
+          userId: postData.user_id,
+          postId: postId,
+          postTitle: postData.title,
+          commenterName: comment.users?.nickname || comment.users?.email?.split('@')[0] || '익명',
+          commentPreview: content.trim().substring(0, 50)
+        });
+      }
+    } catch (notificationError) {
+      logger.error('댓글 알림 전송 실패:', notificationError);
+      // 알림 실패해도 댓글 작성은 성공으로 처리
     }
 
     return NextResponse.json({

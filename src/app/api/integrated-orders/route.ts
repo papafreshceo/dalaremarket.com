@@ -6,6 +6,7 @@ import { canCreateServer, canUpdateServer, canDeleteServer } from '@/lib/permiss
 import { getOrganizationDataFilter } from '@/lib/organization-utils';
 import logger from '@/lib/logger';
 import { createAuditLog } from '@/lib/audit-log';
+import { notifyOrderStatusChange } from '@/lib/onesignal-notifications';
 
 /**
  * GET /api/integrated-orders
@@ -315,7 +316,7 @@ export async function PUT(request: NextRequest) {
     // 상태 변경 전 기존 주문 정보 조회
     const { data: existingOrder } = await supabase
       .from('integrated_orders')
-      .select('status, amount, created_by')
+      .select('status, amount, created_by, shipping_status, organization_id, order_number')
       .eq('id', id)
       .single();
 
@@ -338,6 +339,42 @@ export async function PUT(request: NextRequest) {
     if (existingOrder && existingOrder.status !== 'shipped' && updateData.status === 'shipped') {
       const { trackOrderShipped } = await import('@/lib/seller-performance');
       await trackOrderShipped(data.created_by, data.amount || 0);
+    }
+
+    // 🔔 상태 변경 시 셀러에게 알림 전송
+    if (existingOrder && updateData.shipping_status && existingOrder.shipping_status !== updateData.shipping_status) {
+      try {
+        // organization_id로 조직의 대표 user_id 조회
+        if (data.organization_id) {
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('created_by')
+            .eq('id', data.organization_id)
+            .single();
+
+          if (org?.created_by) {
+            // 상태 변경 알림
+            const statusMap: Record<string, string> = {
+              '접수': '접수',
+              '입금확인': '입금확인',
+              '상품준비중': '상품준비중',
+              '발송완료': '발송완료',
+            };
+
+            await notifyOrderStatusChange({
+              userId: org.created_by,
+              orderId: data.id,
+              orderNumber: data.order_number || `주문-${data.id.substring(0, 8)}`,
+              oldStatus: statusMap[existingOrder.shipping_status] || existingOrder.shipping_status,
+              newStatus: statusMap[updateData.shipping_status] || updateData.shipping_status,
+              trackingNumber: updateData.tracking_number
+            });
+          }
+        }
+      } catch (notificationError) {
+        logger.error('발주서 상태 변경 알림 전송 실패:', notificationError);
+        // 알림 실패해도 주문 수정은 성공으로 처리
+      }
     }
 
     return NextResponse.json({ success: true, data });

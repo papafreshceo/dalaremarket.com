@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import logger from '@/lib/logger';
+import { notifyAnnouncement } from '@/lib/onesignal-notifications';
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,6 +61,28 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // 🔔 전체 셀러에게 공지사항 알림 전송
+    try {
+      // category 매핑
+      const categoryMap: Record<string, any> = {
+        'shipping_holiday': 'shipping_holiday',
+        'harvest_news': 'harvest_news',
+        'price_change': 'price_change',
+        'out_of_stock': 'out_of_stock',
+      };
+
+      await notifyAnnouncement({
+        announcementId: data.id,
+        category: categoryMap[category] || 'general',
+        title: title,
+        body: content.substring(0, 100),
+        sentByUserId: user.id
+      });
+    } catch (notificationError) {
+      logger.error('공지사항 알림 전송 실패:', notificationError);
+      // 알림 실패해도 공지사항 등록은 성공으로 처리
+    }
 
     return NextResponse.json(data);
   } catch (error) {
