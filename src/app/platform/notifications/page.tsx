@@ -18,21 +18,68 @@ interface Notification {
   data?: any
 }
 
-// 알림 카테고리별 아이콘
-const CATEGORY_ICONS: Record<string, string> = {
-  'order_status': '📦',
-  'announcement': '📢',
-  'comment_reply': '💬',
-  'deposit_confirm': '💰',
-  'admin_new_order': '🛒',
-  'admin_support_post': '❓',
-  'admin_new_member': '👤',
-  'shipping_holiday': '🏖️',
-  'harvest_news': '🌾',
-  'price_change': '💵',
-  'out_of_stock': '❌',
-  'organization_invitation': '✉️',
-  'system_notice': '🔔',
+// 알림 카테고리별 아이콘 (SVG로 대체)
+const getCategoryIcon = (category: string) => {
+  switch (category) {
+    case 'order_status':
+      return (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        </svg>
+      )
+    case 'announcement':
+    case 'shipping_holiday':
+    case 'harvest_news':
+    case 'price_change':
+    case 'out_of_stock':
+      return (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+        </svg>
+      )
+    case 'comment_reply':
+      return (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      )
+    case 'deposit_confirm':
+      return (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    case 'admin_new_order':
+      return (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+      )
+    case 'admin_support_post':
+      return (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    case 'admin_new_member':
+      return (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      )
+    case 'organization_invitation':
+      return (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      )
+    default:
+      return (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+      )
+  }
 }
 
 // 알림 카테고리별 라벨
@@ -290,7 +337,9 @@ export default function NotificationsPage() {
           </div>
         ) : notifications.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-6xl mb-4">📭</div>
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            </svg>
             <p className="text-gray-600">
               {filter === 'unread' ? '읽지 않은 알림이 없습니다' : '알림이 없습니다'}
             </p>
@@ -298,7 +347,7 @@ export default function NotificationsPage() {
         ) : (
           notifications.map((notification) => {
             const colors = CATEGORY_COLORS[notification.category] || CATEGORY_COLORS['system_notice']
-            const icon = CATEGORY_ICONS[notification.category] || '🔔'
+            const icon = getCategoryIcon(notification.category)
             const label = CATEGORY_LABELS[notification.category] || '알림'
 
             // 컴팩트한 1줄 알림 카드
@@ -315,7 +364,7 @@ export default function NotificationsPage() {
               >
                 <div className="flex items-center gap-3">
                   {/* 아이콘 */}
-                  <span className="text-2xl flex-shrink-0">{icon}</span>
+                  <div className={`flex-shrink-0 ${colors.text}`}>{icon}</div>
 
                   {/* 읽음 표시 */}
                   {!notification.is_read && (
