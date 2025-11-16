@@ -13,12 +13,13 @@ export interface Notification {
   user_id: string
   type: NotificationType
   title: string
+  body?: string
   message?: string
-  data: Record<string, any>
-  read: boolean
+  data?: Record<string, any>
+  is_read: boolean
   read_at?: string
   created_at: string
-  updated_at: string
+  updated_at?: string
 }
 
 // 조직 초대 알림 데이터

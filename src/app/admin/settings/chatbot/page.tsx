@@ -93,7 +93,19 @@ export default function ChatbotSettingsPage() {
       }
 
       if (data) {
-        setSettings(data);
+        setSettings({
+          ...defaultSettings,
+          ...data,
+          quick_replies: data.quick_replies || defaultSettings.quick_replies,
+          faqs: data.faqs || defaultSettings.faqs,
+          welcome_message: data.welcome_message || defaultSettings.welcome_message,
+          offline_message: data.offline_message || defaultSettings.offline_message,
+          error_message: data.error_message || defaultSettings.error_message,
+          company_name: data.company_name || defaultSettings.company_name,
+          company_phone: data.company_phone || defaultSettings.company_phone,
+          business_hours: data.business_hours || defaultSettings.business_hours,
+          gemini_api_key: data.gemini_api_key || ''
+        });
       }
     } catch (error) {
       console.error('설정 불러오기 실패:', error);
@@ -238,7 +250,7 @@ export default function ChatbotSettingsPage() {
               <div>
                 <label className="block text-[13px] font-medium text-gray-700 mb-2">환영 메시지</label>
                 <textarea
-                  value={settings.welcome_message}
+                  value={settings.welcome_message || ''}
                   onChange={(e) => setSettings({ ...settings, welcome_message: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[13px]"
@@ -257,7 +269,7 @@ export default function ChatbotSettingsPage() {
                 <label className="block text-[13px] font-medium text-gray-700 mb-2">회사명</label>
                 <input
                   type="text"
-                  value={settings.company_name}
+                  value={settings.company_name || ''}
                   onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[13px]"
                 />
@@ -267,7 +279,7 @@ export default function ChatbotSettingsPage() {
                 <label className="block text-[13px] font-medium text-gray-700 mb-2">전화번호</label>
                 <input
                   type="text"
-                  value={settings.company_phone}
+                  value={settings.company_phone || ''}
                   onChange={(e) => setSettings({ ...settings, company_phone: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[13px]"
                 />
@@ -277,7 +289,7 @@ export default function ChatbotSettingsPage() {
                 <label className="block text-[13px] font-medium text-gray-700 mb-2">영업시간</label>
                 <input
                   type="text"
-                  value={settings.business_hours}
+                  value={settings.business_hours || ''}
                   onChange={(e) => setSettings({ ...settings, business_hours: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[13px]"
                 />
@@ -293,7 +305,7 @@ export default function ChatbotSettingsPage() {
               <div>
                 <label className="block text-[13px] font-medium text-gray-700 mb-2">영업 시간 외 메시지</label>
                 <textarea
-                  value={settings.offline_message}
+                  value={settings.offline_message || ''}
                   onChange={(e) => setSettings({ ...settings, offline_message: e.target.value })}
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[13px]"
@@ -303,7 +315,7 @@ export default function ChatbotSettingsPage() {
               <div>
                 <label className="block text-[13px] font-medium text-gray-700 mb-2">오류 메시지</label>
                 <textarea
-                  value={settings.error_message}
+                  value={settings.error_message || ''}
                   onChange={(e) => setSettings({ ...settings, error_message: e.target.value })}
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[13px]"
@@ -340,7 +352,7 @@ export default function ChatbotSettingsPage() {
                 <label className="block text-[13px] font-medium text-gray-700 mb-2">Gemini API Key</label>
                 <input
                   type="password"
-                  value={settings.gemini_api_key}
+                  value={settings.gemini_api_key || ''}
                   onChange={(e) => setSettings({ ...settings, gemini_api_key: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[13px]"
                   placeholder="AIza..."
@@ -350,7 +362,7 @@ export default function ChatbotSettingsPage() {
               <div>
                 <label className="block text-[13px] font-medium text-gray-700 mb-2">AI 모델</label>
                 <select
-                  value={settings.ai_model}
+                  value={settings.ai_model || 'gemini-2.0-flash-lite'}
                   onChange={(e) => setSettings({ ...settings, ai_model: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[13px]"
                 >

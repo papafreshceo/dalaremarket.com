@@ -7,9 +7,10 @@ import { useRouter } from 'next/navigation'
 interface Notification {
   id: string
   user_id: string
+  type: string
+  category: string
   title: string
   body: string
-  category: string
   resource_type?: string
   resource_id?: string
   action_url?: string
@@ -35,6 +36,12 @@ const getCategoryIcon = (category: string) => {
       return (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+        </svg>
+      )
+    case 'new_message':
+      return (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
       )
     case 'comment_reply':
@@ -86,6 +93,7 @@ const getCategoryIcon = (category: string) => {
 const CATEGORY_LABELS: Record<string, string> = {
   'order_status': '주문 상태',
   'announcement': '공지사항',
+  'new_message': '메시지',
   'comment_reply': '댓글',
   'deposit_confirm': '예치금',
   'admin_new_order': '신규 주문',
@@ -103,6 +111,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   'order_status': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-300' },
   'announcement': { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-300' },
+  'new_message': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-300' },
   'comment_reply': { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-300' },
   'deposit_confirm': { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-300' },
   'admin_new_order': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-300' },
@@ -116,18 +125,42 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string
   'system_notice': { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-300' },
 }
 
+// 알림 탭 타입 정의
+type NotificationTab = 'all' | 'orders' | 'announcements' | 'payments' | 'products' | 'messages' | 'others'
+
+// 알림 탭별 포함되는 타입들
+const TAB_TYPE_MAPPING: Record<NotificationTab, string[]> = {
+  all: [], // 전체는 모든 타입 포함
+  orders: ['order_status', 'admin_new_order'],
+  announcements: ['announcement', 'shipping_holiday'],
+  payments: ['deposit_confirm'],
+  products: ['harvest_news', 'price_change', 'out_of_stock'],
+  messages: ['new_message', 'comment_reply'],
+  others: ['admin_support_post', 'admin_new_member', 'organization_invitation', 'system_notice'],
+}
+
 export default function NotificationsPage() {
   const router = useRouter()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'unread'>('all')
+  const [activeTab, setActiveTab] = useState<NotificationTab>('all')
+  const [readFilter, setReadFilter] = useState<'all' | 'unread'>('all')
   const [unreadCount, setUnreadCount] = useState(0)
+  const [tabCounts, setTabCounts] = useState<Record<NotificationTab, number>>({
+    all: 0,
+    orders: 0,
+    announcements: 0,
+    payments: 0,
+    products: 0,
+    messages: 0,
+    others: 0,
+  })
 
   // 알림 조회
   const fetchNotifications = async () => {
     try {
       setLoading(true)
-      const url = filter === 'unread'
+      const url = readFilter === 'unread'
         ? '/api/notifications?unread_only=true&limit=100'
         : '/api/notifications?limit=100'
 
@@ -135,8 +168,40 @@ export default function NotificationsPage() {
       const data = await response.json()
 
       if (data.success) {
-        setNotifications(data.notifications)
+        const allNotifications = data.notifications
+        setNotifications(allNotifications)
         setUnreadCount(data.unread_count)
+
+        // 탭별 읽지 않은 알림 개수 계산
+        const counts: Record<NotificationTab, number> = {
+          all: allNotifications.filter((n: Notification) => !n.is_read).length,
+          orders: 0,
+          announcements: 0,
+          payments: 0,
+          products: 0,
+          messages: 0,
+          others: 0,
+        }
+
+        allNotifications
+          .filter((n: Notification) => !n.is_read)
+          .forEach((n: Notification) => {
+            if (TAB_TYPE_MAPPING.orders.includes(n.type)) {
+              counts.orders++
+            } else if (TAB_TYPE_MAPPING.announcements.includes(n.type)) {
+              counts.announcements++
+            } else if (TAB_TYPE_MAPPING.payments.includes(n.type)) {
+              counts.payments++
+            } else if (TAB_TYPE_MAPPING.products.includes(n.type)) {
+              counts.products++
+            } else if (TAB_TYPE_MAPPING.messages.includes(n.type)) {
+              counts.messages++
+            } else {
+              counts.others++
+            }
+          })
+
+        setTabCounts(counts)
       }
     } catch (error) {
       console.error('알림 조회 실패:', error)
@@ -147,17 +212,64 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     fetchNotifications()
-  }, [filter])
+  }, [readFilter])
+
+  // 탭에 따라 필터링된 알림 목록
+  const filteredNotifications = notifications.filter((notification) => {
+    if (activeTab === 'all') return true
+
+    // notification.type 필드로 필터링
+    return TAB_TYPE_MAPPING[activeTab].includes(notification.type)
+  })
 
   // 알림 읽음 처리
   const markAsRead = async (notificationId: string) => {
     try {
-      await fetch('/api/notifications', {
+      const response = await fetch('/api/notifications', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notification_ids: [notificationId] }),
       })
-      fetchNotifications()
+
+      if (!response.ok) {
+        throw new Error('읽음 처리 실패')
+      }
+
+      // 읽음 처리된 알림 찾기
+      const notification = notifications.find(n => n.id === notificationId)
+
+      // 로컬 state 업데이트
+      setNotifications(prev =>
+        prev.map(n =>
+          n.id === notificationId ? { ...n, is_read: true } : n
+        )
+      )
+
+      // 읽지 않은 알림이었으면 카운트 감소
+      if (notification && !notification.is_read) {
+        setUnreadCount(prev => Math.max(0, prev - 1))
+
+        // 탭별 카운트도 업데이트
+        setTabCounts(prev => {
+          const updated = { ...prev, all: Math.max(0, prev.all - 1) }
+
+          if (TAB_TYPE_MAPPING.orders.includes(notification.type)) {
+            updated.orders = Math.max(0, prev.orders - 1)
+          } else if (TAB_TYPE_MAPPING.announcements.includes(notification.type)) {
+            updated.announcements = Math.max(0, prev.announcements - 1)
+          } else if (TAB_TYPE_MAPPING.payments.includes(notification.type)) {
+            updated.payments = Math.max(0, prev.payments - 1)
+          } else if (TAB_TYPE_MAPPING.products.includes(notification.type)) {
+            updated.products = Math.max(0, prev.products - 1)
+          } else if (TAB_TYPE_MAPPING.messages.includes(notification.type)) {
+            updated.messages = Math.max(0, prev.messages - 1)
+          } else {
+            updated.others = Math.max(0, prev.others - 1)
+          }
+
+          return updated
+        })
+      }
     } catch (error) {
       console.error('알림 읽음 처리 실패:', error)
     }
@@ -184,12 +296,48 @@ export default function NotificationsPage() {
     if (!confirm('이 알림을 삭제하시겠습니까?')) return
 
     try {
-      await fetch(`/api/notifications?id=${notificationId}`, {
+      const response = await fetch(`/api/notifications?id=${notificationId}`, {
         method: 'DELETE',
       })
-      fetchNotifications()
+
+      if (!response.ok) {
+        throw new Error('삭제 실패')
+      }
+
+      // 삭제된 알림 찾기
+      const deletedNotification = notifications.find(n => n.id === notificationId)
+
+      // 로컬 state에서만 제거 (API 재호출 없이)
+      setNotifications(prev => prev.filter(n => n.id !== notificationId))
+
+      // 읽지 않은 알림이었으면 카운트도 감소
+      if (deletedNotification && !deletedNotification.is_read) {
+        setUnreadCount(prev => Math.max(0, prev - 1))
+
+        // 탭별 카운트도 업데이트
+        setTabCounts(prev => {
+          const updated = { ...prev, all: Math.max(0, prev.all - 1) }
+
+          if (TAB_TYPE_MAPPING.orders.includes(deletedNotification.type)) {
+            updated.orders = Math.max(0, prev.orders - 1)
+          } else if (TAB_TYPE_MAPPING.announcements.includes(deletedNotification.type)) {
+            updated.announcements = Math.max(0, prev.announcements - 1)
+          } else if (TAB_TYPE_MAPPING.payments.includes(deletedNotification.type)) {
+            updated.payments = Math.max(0, prev.payments - 1)
+          } else if (TAB_TYPE_MAPPING.products.includes(deletedNotification.type)) {
+            updated.products = Math.max(0, prev.products - 1)
+          } else if (TAB_TYPE_MAPPING.messages.includes(deletedNotification.type)) {
+            updated.messages = Math.max(0, prev.messages - 1)
+          } else {
+            updated.others = Math.max(0, prev.others - 1)
+          }
+
+          return updated
+        })
+      }
     } catch (error) {
       console.error('알림 삭제 실패:', error)
+      alert('알림 삭제에 실패했습니다.')
     }
   }
 
@@ -206,8 +354,8 @@ export default function NotificationsPage() {
       return
     }
 
-    // 알림 카테고리에 따라 페이지 이동
-    switch (notification.category) {
+    // 알림 타입에 따라 페이지 이동
+    switch (notification.type) {
       case 'order_status':
         // 주문 상태 알림
         if (notification.resource_id) {
@@ -224,6 +372,15 @@ export default function NotificationsPage() {
       case 'out_of_stock':
         // 공지사항 알림
         router.push('/platform')
+        break
+
+      case 'new_message':
+        // 메시지 알림
+        if (notification.resource_id) {
+          router.push(`/platform/messages?thread_id=${notification.resource_id}`)
+        } else {
+          router.push('/platform/messages')
+        }
         break
 
       case 'comment_reply':
@@ -294,13 +451,124 @@ export default function NotificationsPage() {
         </p>
       </div>
 
-      {/* 필터 및 액션 */}
+      {/* 카테고리 탭 */}
+      <div className="mb-4 border-b border-gray-200">
+        <div className="flex gap-1 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeTab === 'all'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+            }`}
+          >
+            전체
+            {tabCounts.all > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-xs font-semibold">
+                {tabCounts.all}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeTab === 'orders'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+            }`}
+          >
+            발주/주문
+            {tabCounts.orders > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-xs font-semibold">
+                {tabCounts.orders}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('announcements')}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeTab === 'announcements'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+            }`}
+          >
+            공지사항
+            {tabCounts.announcements > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-xs font-semibold">
+                {tabCounts.announcements}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('payments')}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeTab === 'payments'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+            }`}
+          >
+            입금/정산
+            {tabCounts.payments > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-xs font-semibold">
+                {tabCounts.payments}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('products')}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeTab === 'products'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+            }`}
+          >
+            상품정보
+            {tabCounts.products > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-xs font-semibold">
+                {tabCounts.products}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('messages')}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeTab === 'messages'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+            }`}
+          >
+            메시지
+            {tabCounts.messages > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-xs font-semibold">
+                {tabCounts.messages}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('others')}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeTab === 'others'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+            }`}
+          >
+            기타
+            {tabCounts.others > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-xs font-semibold">
+                {tabCounts.others}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* 읽음 필터 및 액션 */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex gap-2">
           <button
-            onClick={() => setFilter('all')}
+            onClick={() => setReadFilter('all')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'all'
+              readFilter === 'all'
                 ? 'bg-blue-600 text-white'
                 : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
             }`}
@@ -308,14 +576,14 @@ export default function NotificationsPage() {
             전체
           </button>
           <button
-            onClick={() => setFilter('unread')}
+            onClick={() => setReadFilter('unread')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'unread'
+              readFilter === 'unread'
                 ? 'bg-blue-600 text-white'
                 : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
             }`}
           >
-            읽지 않음 {unreadCount > 0 && `(${unreadCount})`}
+            읽지 않음
           </button>
         </div>
 
@@ -335,20 +603,20 @@ export default function NotificationsPage() {
           <div className="text-center py-12 text-gray-500">
             로딩 중...
           </div>
-        ) : notifications.length === 0 ? (
+        ) : filteredNotifications.length === 0 ? (
           <div className="text-center py-12">
             <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
             </svg>
             <p className="text-gray-600">
-              {filter === 'unread' ? '읽지 않은 알림이 없습니다' : '알림이 없습니다'}
+              {readFilter === 'unread' ? '읽지 않은 알림이 없습니다' : '알림이 없습니다'}
             </p>
           </div>
         ) : (
-          notifications.map((notification) => {
-            const colors = CATEGORY_COLORS[notification.category] || CATEGORY_COLORS['system_notice']
-            const icon = getCategoryIcon(notification.category)
-            const label = CATEGORY_LABELS[notification.category] || '알림'
+          filteredNotifications.map((notification) => {
+            const colors = CATEGORY_COLORS[notification.type] || CATEGORY_COLORS['system_notice']
+            const icon = getCategoryIcon(notification.type)
+            const label = CATEGORY_LABELS[notification.type] || '알림'
 
             // 컴팩트한 1줄 알림 카드
             return (

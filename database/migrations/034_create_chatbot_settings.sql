@@ -47,15 +47,14 @@ CREATE TABLE IF NOT EXISTS chatbot_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 기본 설정 데이터 삽입
+-- 기본 설정 데이터 삽입 (테이블이 비어있을 때만)
 INSERT INTO chatbot_settings (
-  id,
   is_enabled,
   welcome_message,
   gemini_api_key,
   faqs
-) VALUES (
-  'default'::uuid,
+)
+SELECT
   true,
   '안녕하세요. 달래마켓 B2B입니다.\n\n상품 문의, 시즌 정보, 배송 등 무엇이든 물어보세요.',
   NULL,
@@ -76,8 +75,7 @@ INSERT INTO chatbot_settings (
       "answer": "다양한 결제 방법을 지원합니다.\n\n- 신용카드\n- 계좌이체\n- 무통장입금\n\n문의: 010-2688-1388"
     }
   ]'::jsonb
-)
-ON CONFLICT (id) DO NOTHING;
+WHERE NOT EXISTS (SELECT 1 FROM chatbot_settings);
 
 -- updated_at 자동 업데이트 트리거
 CREATE OR REPLACE FUNCTION update_chatbot_settings_updated_at()

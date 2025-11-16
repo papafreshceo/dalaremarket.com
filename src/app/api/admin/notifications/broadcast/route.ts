@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 전송 기록 저장
+    // 전송 기록 저장 (관리자용)
     const broadcastRecord: any = {
       title,
       body,
@@ -119,6 +119,50 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       logger.error('전송 기록 저장 오류:', insertError);
       // 기록 실패해도 전송은 성공으로 처리
+    }
+
+    // 🔔 개별 사용자 알림 레코드 생성 (알림 페이지에 표시되도록)
+    try {
+      // OneSignal Player ID를 가진 모든 사용자 ID 조회
+      const { data: users, error: usersError } = await adminClient
+        .from('onesignal_player_ids')
+        .select('user_id')
+        .eq('is_active', true);
+
+      if (usersError) {
+        logger.error('사용자 ID 조회 오류:', usersError);
+      } else if (users && users.length > 0) {
+        // 중복 제거
+        const uniqueUserIds = [...new Set(users.map(u => u.user_id))];
+
+        // 각 사용자에 대한 알림 레코드 생성
+        const notificationRecords = uniqueUserIds.map(userId => ({
+          user_id: userId,
+          type: 'announcement',
+          category: category || 'seller',
+          title,
+          body,
+          action_url: url || '/platform/notifications',
+          sent_by_user_id: auth.user.id,
+          onesignal_notification_id: oneSignalData.id,
+          is_sent: true,
+          sent_at: new Date().toISOString(),
+          priority: 'normal',
+        }));
+
+        const { error: notificationsError } = await adminClient
+          .from('notifications')
+          .insert(notificationRecords);
+
+        if (notificationsError) {
+          logger.error('개별 알림 레코드 생성 오류:', notificationsError);
+        } else {
+          logger.info(`개별 알림 레코드 생성 완료: ${uniqueUserIds.length}명`);
+        }
+      }
+    } catch (notifError: any) {
+      logger.error('개별 알림 레코드 생성 중 오류:', notifError);
+      // 실패해도 푸시는 전송되었으므로 계속 진행
     }
 
     // 🔔 이메일 발송 (옵션)

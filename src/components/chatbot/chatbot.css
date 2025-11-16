@@ -1,7 +1,7 @@
 /* 챗봇 토글 버튼 */
 .chatbot-toggle {
   position: fixed;
-  bottom: 30px;
+  bottom: 120px;
   right: 30px;
   width: 60px;
   height: 60px;
@@ -30,7 +30,7 @@
 /* 챗봇 창 */
 .chatbot-window {
   position: fixed;
-  bottom: 100px;
+  bottom: 190px;
   right: 30px;
   width: 380px;
   height: 600px;
