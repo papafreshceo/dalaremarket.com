@@ -92,7 +92,8 @@
       "Bash(if exist run-migration-remove-seller-id.js del /f run-migration-remove-seller-id.js)",
       "Bash(if not exist \"src\\app\\api\\notifications\" mkdir \"src\\app\\api\\notifications\")",
       "Bash(del /f srclibfirebase.ts srclibnotifications.ts 2)",
-      "Bash(del databasemigrationscreate_notifications_tables.sql 2)"
+      "Bash(del databasemigrationscreate_notifications_tables.sql 2)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []
