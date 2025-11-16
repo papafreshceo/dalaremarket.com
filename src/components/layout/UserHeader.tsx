@@ -48,7 +48,6 @@ export default function UserHeader() {
   const [showContributionTooltip, setShowContributionTooltip] = useState(false);
   const [organizationName, setOrganizationName] = useState<string>('');
   const [sellerCode, setSellerCode] = useState<string>('');
-  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   // 활동 추적 콜백 (useCallback으로 안정화)
   const handleRewardClaimed = useCallback((amount: number, newBalance: number) => {
@@ -101,47 +100,6 @@ export default function UserHeader() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-
-  // 읽지 않은 메시지 개수 가져오기
-  useEffect(() => {
-    const fetchUnreadCount = async () => {
-      if (!user) {
-        setUnreadMessageCount(0);
-        return;
-      }
-
-      try {
-        const { data: threads } = await supabase
-          .from('message_threads')
-          .select(`
-            id,
-            participant_1,
-            participant_2,
-            messages!inner(is_read, sender_id)
-          `)
-          .or(`participant_1.eq.${user.id},participant_2.eq.${user.id}`);
-
-        if (threads) {
-          let totalUnread = 0;
-          for (const thread of threads) {
-            const unreadInThread = (thread.messages as any[]).filter(
-              (msg: any) => !msg.is_read && msg.sender_id !== user.id
-            ).length;
-            totalUnread += unreadInThread;
-          }
-          setUnreadMessageCount(totalUnread);
-        }
-      } catch (error) {
-        console.error('읽지 않은 메시지 조회 실패:', error);
-      }
-    };
-
-    fetchUnreadCount();
-
-    // 30초마다 새로고침
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
 
   // 주문 데이터 가져오기
   useEffect(() => {
@@ -933,58 +891,6 @@ export default function UserHeader() {
 
                 {/* 알림 아이콘 */}
                 <NotificationBell />
-
-                {/* 메시지 아이콘 */}
-                <Link
-                  href="/platform/messages"
-                  style={{
-                    position: 'relative',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    background: 'transparent',
-                    border: '1px solid #e5e7eb',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    textDecoration: 'none'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#f3f4f6';
-                    e.currentTarget.style.borderColor = '#d1d5db';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                  }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                  </svg>
-                  {unreadMessageCount > 0 && (
-                    <span style={{
-                      position: 'absolute',
-                      top: '-4px',
-                      right: '-4px',
-                      minWidth: '18px',
-                      height: '18px',
-                      padding: '0 4px',
-                      background: '#ef4444',
-                      color: 'white',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      borderRadius: '9px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: '2px solid white'
-                    }}>
-                      {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
-                    </span>
-                  )}
-                </Link>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {userTier && <TierBadge tier={userTier as 'light' | 'standard' | 'advance' | 'elite' | 'legend'} iconOnly glow={0} />}

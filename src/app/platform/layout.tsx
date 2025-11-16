@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import UserHeader from '@/components/layout/UserHeader'
 import MobileBottomNav from '@/components/layout/MobileBottomNav'
 import PlatformFooter from '@/components/PlatformFooter'
+import FloatingMessenger from '@/components/FloatingMessenger'
 import { UserBalanceProvider } from '@/contexts/UserBalanceContext'
 
 export default function PlatformLayout({
@@ -77,6 +78,7 @@ export default function PlatformLayout({
         <main className="flex-1">{children}</main>
         {showHeaderAndNav && <PlatformFooter />}
         {showHeaderAndNav && <MobileBottomNav />}
+        {showHeaderAndNav && <FloatingMessenger />}
       </div>
     </UserBalanceProvider>
   )
