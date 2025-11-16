@@ -41,10 +41,54 @@ function MessagesContent() {
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [showNewMessageModal, setShowNewMessageModal] = useState(false)
+  const [users, setUsers] = useState<User[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const lastMessageTimeRef = useRef<string>('')
+
+  // 사용자 목록 조회 (새 메시지용)
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('/api/user/list')
+      const data = await response.json()
+      if (data.success) {
+        setUsers(data.users)
+      }
+    } catch (error) {
+      console.error('사용자 목록 조회 실패:', error)
+    }
+  }
+
+  // 새 대화 시작
+  const startNewConversation = async (receiverId: string) => {
+    setShowNewMessageModal(false)
+    setSearchQuery('')
+
+    // 기존 대화방이 있는지 확인
+    const existingThread = threads.find(t => t.partner?.id === receiverId)
+    if (existingThread) {
+      selectThread(existingThread)
+      return
+    }
+
+    // 새 대화방은 첫 메시지를 보내면 자동 생성됨
+    // 임시로 선택된 상대방 정보만 설정
+    const selectedUser = users.find(u => u.id === receiverId)
+    if (selectedUser) {
+      setSelectedThread({
+        id: 'new',
+        participant_1: '',
+        participant_2: receiverId,
+        created_at: new Date().toISOString(),
+        partner: selectedUser,
+        unread_count: 0
+      })
+      setMessages([])
+    }
+  }
 
   // 대화방 목록 조회
   const fetchThreads = async () => {
@@ -198,7 +242,18 @@ function MessagesContent() {
       {/* 왼쪽: 대화방 목록 */}
       <div className="w-80 border-r bg-white flex flex-col">
         <div className="p-4 border-b">
-          <h2 className="text-lg font-bold">메시지</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold">메시지</h2>
+            <button
+              onClick={() => {
+                fetchUsers()
+                setShowNewMessageModal(true)
+              }}
+              className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              + 새 메시지
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -316,6 +371,81 @@ function MessagesContent() {
           </div>
         )}
       </div>
+
+      {/* 새 메시지 모달 */}
+      {showNewMessageModal && (
+        <>
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            onClick={() => {
+              setShowNewMessageModal(false)
+              setSearchQuery('')
+            }}
+          />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-50 w-full max-w-md">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="text-lg font-bold">새 메시지</h3>
+              <button
+                onClick={() => {
+                  setShowNewMessageModal(false)
+                  setSearchQuery('')
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-4">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="사용자 검색..."
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+              />
+
+              <div className="max-h-96 overflow-y-auto">
+                {users
+                  .filter(user => {
+                    const query = searchQuery.toLowerCase()
+                    return (
+                      user.email?.toLowerCase().includes(query) ||
+                      user.name?.toLowerCase().includes(query) ||
+                      user.nickname?.toLowerCase().includes(query)
+                    )
+                  })
+                  .map(user => (
+                    <div
+                      key={user.id}
+                      onClick={() => startNewConversation(user.id)}
+                      className="p-3 hover:bg-gray-50 cursor-pointer rounded-lg transition-colors border-b"
+                    >
+                      <div className="font-semibold text-gray-900">
+                        {getDisplayName(user)}
+                      </div>
+                      <div className="text-sm text-gray-500">{user.email}</div>
+                    </div>
+                  ))}
+                {users.filter(user => {
+                  const query = searchQuery.toLowerCase()
+                  return (
+                    user.email?.toLowerCase().includes(query) ||
+                    user.name?.toLowerCase().includes(query) ||
+                    user.nickname?.toLowerCase().includes(query)
+                  )
+                }).length === 0 && (
+                  <div className="text-center text-gray-500 py-8">
+                    사용자를 찾을 수 없습니다
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
