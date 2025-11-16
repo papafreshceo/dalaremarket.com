@@ -1,7 +1,8 @@
 import { Resend } from 'resend';
 
 // Resend 클라이언트 초기화
-export const resend = new Resend(process.env.RESEND_API_KEY);
+// 빌드 타임에도 에러가 나지 않도록 fallback 제공
+export const resend = new Resend(process.env.RESEND_API_KEY || 'dummy_key_for_build');
 
 // 발신자 정보
 export const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev';
