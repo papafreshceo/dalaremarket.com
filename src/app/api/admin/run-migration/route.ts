@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    console.log('📊 통계 함수 업데이트 시작...');
+    logger.debug('📊 통계 함수 업데이트 시작...');
 
     // SQL 파일 읽기
     const sqlPath = path.join(process.cwd(), 'database', 'migrations', 'update_statistics_function_for_organization.sql');
@@ -39,16 +39,16 @@ export async function POST(request: NextRequest) {
 
     for (const statement of statements) {
       if (statement.includes('DROP FUNCTION')) {
-        console.log('🗑️ 기존 함수 삭제...');
+        logger.debug('🗑️ 기존 함수 삭제...');
         try {
           // DROP FUNCTION은 무시 (없을 수도 있음)
           await supabaseAdmin.rpc('exec', { sql: statement });
         } catch (e) {
-          console.log('⚠️ DROP FUNCTION 무시 (함수가 없을 수 있음)');
+          logger.warn('DROP FUNCTION 무시 (함수가 없을 수 있음)');
         }
         executedCount++;
       } else if (statement.includes('CREATE OR REPLACE FUNCTION')) {
-        console.log('✨ 새 함수 생성...');
+        logger.debug('✨ 새 함수 생성...');
 
         // Supabase에서는 직접 CREATE FUNCTION을 실행할 수 없으므로
         // SQL Editor를 통해 수동으로 실행해야 함
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('❌ 마이그레이션 실패:', error);
+    logger.error('❌ 마이그레이션 실패:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

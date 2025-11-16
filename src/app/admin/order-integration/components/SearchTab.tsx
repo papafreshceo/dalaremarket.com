@@ -57,7 +57,7 @@ interface Order {
   commission_1?: string;
   commission_2?: string;
   sell_id?: string;
-  seller_id?: string;
+  organization_id?: string;
   seller_name?: string;
   separate_shipping?: string;
   delivery_fee?: string;
@@ -486,7 +486,7 @@ export default function SearchTab() {
             'special_request',          // field_15 - 특이/요청사항
             'shipping_request_date',    // field_16 - 발송요청일
             'option_code',              // field_17 - 옵션코드 (새로 추가)
-            'seller_id',                // field_18 - 셀러ID (이전 field_17)
+            'organization_id',          // field_18 - 조직ID
             'seller_supply_price',      // field_19 - 셀러공급가 (이전 field_18)
             'shipping_source',          // field_20 - 출고처 (이전 field_19)
             'invoice_issuer',           // field_21 - 송장주체 (이전 field_20)
@@ -2087,7 +2087,7 @@ export default function SearchTab() {
       }
 
       const allOrders = data.data || [];
-      const sellerOrders = allOrders.filter((o: Order) => (o.seller_id || '미지정') === sellerId);
+      const sellerOrders = allOrders.filter((o: Order) => (o.organization_id || '미지정') === sellerId);
 
       if (sellerOrders.length === 0) {
         alert('다운로드할 주문이 없습니다.');

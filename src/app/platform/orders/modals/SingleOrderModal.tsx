@@ -653,7 +653,6 @@ export default function SingleOrderModal({
           const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
           const orderData = {
-            seller_id: user.id,
             order_no: orderNumber, // ✅ order_number → order_no 변경
             buyer_name: formData.orderer,
             buyer_phone: formData.ordererPhone,

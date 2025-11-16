@@ -1,5 +1,6 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 /**
  * DELETE /api/platform-orders/sample
@@ -27,7 +28,7 @@ export async function DELETE() {
       .eq('id', user.id);
 
     if (error) {
-      console.error('[DELETE platform-orders/sample] 샘플 모드 비활성화 실패:', error);
+      logger.error('[DELETE platform-orders/sample] 샘플 모드 비활성화 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -41,7 +42,7 @@ export async function DELETE() {
     });
 
   } catch (error: any) {
-    console.error('DELETE /api/platform-orders/sample 오류:', error);
+    logger.error('DELETE /api/platform-orders/sample 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

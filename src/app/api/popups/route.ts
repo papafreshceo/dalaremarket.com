@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/popups
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('팝업 조회 오류:', error);
+    logger.error('팝업 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
       message: '팝업이 추가되었습니다.',
     });
   } catch (error: any) {
-    console.error('팝업 추가 오류:', error);
+    logger.error('팝업 추가 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -212,7 +213,7 @@ export async function PUT(request: NextRequest) {
       message: '팝업이 수정되었습니다.',
     });
   } catch (error: any) {
-    console.error('팝업 수정 오류:', error);
+    logger.error('팝업 수정 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -252,7 +253,7 @@ export async function DELETE(request: NextRequest) {
       message: '팝업이 삭제되었습니다.',
     });
   } catch (error: any) {
-    console.error('팝업 삭제 오류:', error);
+    logger.error('팝업 삭제 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

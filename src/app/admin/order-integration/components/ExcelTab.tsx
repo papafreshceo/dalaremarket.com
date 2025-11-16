@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, FileSpreadsheet, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Upload, FileSpreadsheet, Save, AlertCircle, CheckCircle, RefreshCw, Calculator } from 'lucide-react';
 import EditableAdminGrid from '@/components/ui/EditableAdminGrid';
 import * as XLSX from 'xlsx';
 import toast, { Toaster } from 'react-hot-toast';
 import { getCurrentTimeUTC } from '@/lib/date';
 import PasswordModal from './PasswordModal';
+import ExcelSummaryWindow from './ExcelSummaryWindow';
 import DOMPurify from 'isomorphic-dompurify';
 
 interface UploadedOrder {
@@ -152,6 +153,9 @@ export default function ExcelTab() {
   const [filePasswords, setFilePasswords] = useState<Map<string, string>>(new Map());
   const [pendingFiles, setPendingFiles] = useState<FileList | null>(null);
   const [processedPreviews, setProcessedPreviews] = useState<FilePreview[]>([]);
+
+  // 집계 윈도우 상태
+  const [showSummaryWindow, setShowSummaryWindow] = useState(false);
 
   // 초기 데이터 병렬 로드 (성능 최적화)
   useEffect(() => {
@@ -1935,9 +1939,18 @@ export default function ExcelTab() {
       {/* 통계 카드 - 통합 완료 시에만 표시 */}
       {integrationStage === 'integrated' && orders.length > 0 && (
         <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-white rounded-lg border border-gray-200 p-4 relative">
           <div className="text-sm text-gray-600 mb-1">총 주문</div>
           <div className="text-2xl font-semibold text-gray-900">{stats.total.toLocaleString()}</div>
+          {/* 집계 버튼 오버레이 */}
+          <button
+            onClick={() => setShowSummaryWindow(true)}
+            className="absolute top-2 right-2 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 flex items-center gap-1 shadow-sm"
+            title="집계 창 열기"
+          >
+            <Calculator className="w-3 h-3" />
+            집계
+          </button>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1 flex items-center gap-1">
@@ -2327,6 +2340,32 @@ export default function ExcelTab() {
           setProcessedPreviews([]);
         }}
       />
+
+      {/* 집계 윈도우 */}
+      {showSummaryWindow && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowSummaryWindow(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-[95vw] h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">주문 집계</h2>
+              <button
+                onClick={() => setShowSummaryWindow(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <ExcelSummaryWindow orders={orders} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

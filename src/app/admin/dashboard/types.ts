@@ -56,7 +56,7 @@ export type Tab = '대시보드' | '발주서등록' | '건별등록' | '정산�
 
 export interface OptionMapping {
   id: number;
-  seller_id: string;
+  organization_id: string;
   user_option_name: string;
   site_option_name: string;
   created_at: string;

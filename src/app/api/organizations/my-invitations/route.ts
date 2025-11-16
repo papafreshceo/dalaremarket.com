@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-security'
+import logger from '@/lib/logger';
 
 /**
  * GET /api/organizations/my-invitations
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
         .single()
 
       if (fetchError) {
-        console.error('초대 조회 실패:', fetchError)
+        logger.error('초대 조회 실패:', fetchError);
         return NextResponse.json(
           { error: '초대를 찾을 수 없습니다' },
           { status: 404 }
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (fetchError) {
-      console.error('초대 목록 조회 실패:', fetchError)
+      logger.error('초대 목록 조회 실패:', fetchError);
       return NextResponse.json(
         { error: '초대 목록 조회에 실패했습니다' },
         { status: 500 }
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
       invitations: invitations || [],
     })
   } catch (error) {
-    console.error('초대 목록 조회 오류:', error)
+    logger.error('초대 목록 조회 오류:', error);
     return NextResponse.json(
       { error: '초대 목록 조회 중 오류가 발생했습니다' },
       { status: 500 }

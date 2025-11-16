@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-security';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/admin/promotional-images
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
       .order('display_order', { ascending: true });
 
     if (error) {
-      console.error('홍보 이미지 조회 실패:', error);
+      logger.error('홍보 이미지 조회 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('GET /api/admin/promotional-images 오류:', error);
+    logger.error('GET /api/admin/promotional-images 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('홍보 이미지 생성 실패:', error);
+      logger.error('홍보 이미지 생성 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('POST /api/admin/promotional-images 오류:', error);
+    logger.error('POST /api/admin/promotional-images 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -121,7 +122,7 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('홍보 이미지 수정 실패:', error);
+      logger.error('홍보 이미지 수정 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -133,7 +134,7 @@ export async function PUT(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('PUT /api/admin/promotional-images 오류:', error);
+    logger.error('PUT /api/admin/promotional-images 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -168,7 +169,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id);
 
     if (error) {
-      console.error('홍보 이미지 삭제 실패:', error);
+      logger.error('홍보 이미지 삭제 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -179,7 +180,7 @@ export async function DELETE(request: NextRequest) {
       success: true,
     });
   } catch (error: any) {
-    console.error('DELETE /api/admin/promotional-images 오류:', error);
+    logger.error('DELETE /api/admin/promotional-images 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

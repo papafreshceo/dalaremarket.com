@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import logger from '@/lib/logger';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
       .match(clearConditions);
 
     if (clearError) {
-      console.error('기존 대표이미지 해제 오류:', clearError);
+      logger.error('기존 대표이미지 해제 오류:', clearError);
     }
 
     // 4. 선택한 이미지를 대표이미지로 설정합니다
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('대표이미지 설정 오류:', error);
+    logger.error('대표이미지 설정 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.' },
       { status: 500 }

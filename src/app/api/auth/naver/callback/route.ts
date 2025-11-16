@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClientForRouteHandler } from '@/lib/supabase/server'
+import logger from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     const tokenData = await tokenResponse.json()
 
     if (tokenData.error || !tokenData.access_token) {
-      console.error('Token error:', tokenData)
+      logger.error('Token error:', tokenData);
       return NextResponse.redirect(new URL('/auth/login?error=token_failed', request.url))
     }
 
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     const userData = await userResponse.json()
 
     if (userData.resultcode !== '00' || !userData.response) {
-      console.error('User info error:', userData)
+      logger.error('User info error:', userData);
       return NextResponse.redirect(new URL('/auth/login?error=user_info_failed', request.url))
     }
 
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
         )
 
         if (updateError) {
-          console.error('Password update error:', updateError)
+          logger.error('Password update error:', updateError);
           return NextResponse.redirect(new URL('/auth/login?error=login_failed', request.url))
         }
 
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
         })
 
         if (retryError) {
-          console.error('Retry login error:', retryError)
+          logger.error('Retry login error:', retryError);
           return NextResponse.redirect(new URL('/auth/login?error=login_failed', request.url))
         }
       }
@@ -104,7 +105,7 @@ export async function GET(request: NextRequest) {
       })
 
       if (signUpError || !authData.user) {
-        console.error('Sign up error:', signUpError)
+        logger.error('Sign up error:', signUpError);
         return NextResponse.redirect(new URL('/auth/login?error=signup_failed', request.url))
       }
 
@@ -120,7 +121,7 @@ export async function GET(request: NextRequest) {
       })
 
       if (insertError) {
-        console.error('User insert error:', insertError)
+        logger.error('User insert error:', insertError);
         return NextResponse.redirect(new URL('/auth/login?error=user_creation_failed', request.url))
       }
 
@@ -128,7 +129,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/pending-approval', request.url))
     }
   } catch (error) {
-    console.error('Naver OAuth error:', error)
+    logger.error('Naver OAuth error:', error);
     return NextResponse.redirect(new URL('/auth/login?error=oauth_failed', request.url))
   }
 }

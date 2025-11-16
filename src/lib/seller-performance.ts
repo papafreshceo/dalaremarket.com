@@ -36,7 +36,7 @@ async function getOrCreateDailyPerformance(organizationId: string, date: string)
     return { data: existing, error: null };
   }
 
-  // 조직 정보 조회 (seller_id는 owner_id로 설정)
+  // 조직 정보 조회
   const { data: org } = await supabase
     .from('organizations')
     .select('owner_id')
@@ -47,7 +47,6 @@ async function getOrCreateDailyPerformance(organizationId: string, date: string)
   const { data: created, error: createError } = await supabase
     .from('seller_performance_daily')
     .insert({
-      seller_id: org?.owner_id,
       organization_id: organizationId,
       date: date,
       total_sales: 0,

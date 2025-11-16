@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('관리자 닉네임 조회 오류:', error);
+      logger.error('관리자 닉네임 조회 오류:', error);
       return NextResponse.json(
         { success: false, error: '관리자 닉네임을 불러올 수 없습니다.', details: error.message },
         { status: 500 }
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('관리자 닉네임 조회 오류:', error);
+    logger.error('관리자 닉네임 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error('관리자 닉네임 추가 오류:', insertError);
+      logger.error('관리자 닉네임 추가 오류:', insertError);
       return NextResponse.json(
         { success: false, error: '관리자 닉네임 추가에 실패했습니다.' },
         { status: 500 }
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('관리자 닉네임 추가 오류:', error);
+    logger.error('관리자 닉네임 추가 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }

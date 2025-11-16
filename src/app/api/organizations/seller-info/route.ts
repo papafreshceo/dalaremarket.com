@@ -6,7 +6,7 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    console.log('🔍 [seller-info GET] 인증 체크:', { userId: user?.id, authError });
+    logger.debug('🔍 [seller-info GET] 인증 체크:', { userId: user?.id, authError });
 
     if (authError || !user) {
       return NextResponse.json({ error: '인증되지 않은 사용자입니다' }, { status: 401 });
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const organizationId = searchParams.get('organizationId');
 
-    console.log('🔍 [seller-info GET] organizationId:', organizationId);
+    logger.debug('🔍 [seller-info GET] organizationId:', { data: organizationId });
 
     if (!organizationId) {
       return NextResponse.json({ error: '조직 ID가 필요합니다' }, { status: 400 });
@@ -28,10 +28,10 @@ export async function GET(request: Request) {
       .eq('id', organizationId)
       .single();
 
-    console.log('🔍 [seller-info GET] 조회 결과:', { orgData, orgError });
+    logger.debug('🔍 [seller-info GET] 조회 결과:', { orgData, orgError });
 
     if (orgError) {
-      console.error('❌ [seller-info GET] 조직 정보 조회 오류:', orgError);
+      logger.error('❌ [seller-info GET] 조직 정보 조회 오류:', orgError);
       return NextResponse.json({
         success: false,
         error: '조직 정보 조회 실패',
@@ -39,14 +39,14 @@ export async function GET(request: Request) {
       }, { status: 500 });
     }
 
-    console.log('✅ [seller-info GET] 성공');
+    logger.info('[seller-info GET] 성공');
 
     return NextResponse.json({
       success: true,
       data: orgData
     });
   } catch (error) {
-    console.error('❌ [seller-info GET] API 오류:', error);
+    logger.error('❌ [seller-info GET] API 오류:', error);
     return NextResponse.json({
       success: false,
       error: '서버 오류가 발생했습니다',
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
       .eq('id', organizationId);
 
     if (updateError) {
-      console.error('조직 정보 업데이트 오류:', updateError);
+      logger.error('조직 정보 업데이트 오류:', updateError);
       return NextResponse.json({ error: '조직 정보 업데이트 실패', details: updateError }, { status: 500 });
     }
 
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
       message: '정보가 저장되었습니다'
     });
   } catch (error) {
-    console.error('API 오류:', error);
+    logger.error('API 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 });
   }
 }

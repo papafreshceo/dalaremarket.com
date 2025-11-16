@@ -5,6 +5,7 @@ import { UpdateMemberRoleRequest } from '@/types/organization'
 import { canManageMembers, getOrganizationMembers } from '@/lib/organization-utils'
 import { autoCreateOrganizationFromUser } from '@/lib/auto-create-organization'
 import { generateUserCodes } from '@/lib/user-codes'
+import logger from '@/lib/logger';
 
 /**
  * GET /api/organizations/members?organization_id=xxx
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     // userData에서 role 확인
-    console.log('User role:', auth.userData?.role)
+    logger.debug('User role:', { data: auth.userData?.role });
     const isAdmin = auth.userData && ['super_admin', 'admin', 'employee'].includes(auth.userData.role)
 
     if (!isAdmin) {
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
       members,
     })
   } catch (error) {
-    console.error('멤버 조회 오류:', error)
+    logger.error('멤버 조회 오류:', error);
     return NextResponse.json(
       { error: '멤버 조회 중 오류가 발생했습니다' },
       { status: 500 }
@@ -145,7 +146,7 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (updateError) {
-      console.error('멤버 정보 업데이트 실패:', updateError)
+      logger.error('멤버 정보 업데이트 실패:', updateError);
       return NextResponse.json(
         { error: '멤버 정보 업데이트에 실패했습니다' },
         { status: 500 }
@@ -157,7 +158,7 @@ export async function PATCH(request: NextRequest) {
       member: updatedMember,
     })
   } catch (error) {
-    console.error('멤버 정보 수정 오류:', error)
+    logger.error('멤버 정보 수정 오류:', error);
     return NextResponse.json(
       { error: '멤버 정보 수정 중 오류가 발생했습니다' },
       { status: 500 }
@@ -217,7 +218,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', memberId)
 
     if (deleteError) {
-      console.error('멤버 제거 실패:', deleteError)
+      logger.error('멤버 제거 실패:', deleteError);
       return NextResponse.json(
         { error: '멤버 제거에 실패했습니다' },
         { status: 500 }
@@ -234,20 +235,20 @@ export async function DELETE(request: NextRequest) {
 
       if (user?.primary_organization_id === organizationId) {
         try {
-          console.log('🚀 [멤버삭제] 개인 셀러계정 생성 시작, user_id:', targetMember.user_id)
+          logger.debug('🚀 [멤버삭제] 개인 셀러계정 생성 시작, user_id:', { data: targetMember.user_id });
           // 개인 셀러계정 자동 생성
           const result = await autoCreateOrganizationFromUser(targetMember.user_id)
-          console.log('✅ [멤버삭제] 개인 셀러계정 생성 결과:', result)
+          logger.info('[멤버삭제] 개인 셀러계정 생성 결과:');
 
           if (!result.organization_id) {
             throw new Error('셀러계정 ID가 반환되지 않았습니다')
           }
 
           // users의 primary_organization_id 업데이트 (Admin Client로 RLS 우회)
-          console.log('🔄 [멤버삭제] primary_organization_id 업데이트 시작:', {
+          logger.debug('🔄 [멤버삭제] primary_organization_id 업데이트 시작:', {
             user_id: targetMember.user_id,
             new_org_id: result.organization_id
-          })
+          });
           const { data: updateData, error: updateError } = await adminSupabase
             .from('users')
             .update({ primary_organization_id: result.organization_id })
@@ -255,18 +256,18 @@ export async function DELETE(request: NextRequest) {
             .select()
 
           if (updateError) {
-            console.error('❌ [멤버삭제] primary_organization_id 업데이트 실패:', updateError)
+            logger.error('❌ [멤버삭제] primary_organization_id 업데이트 실패:', updateError);
             throw updateError
           }
-          console.log('✅ [멤버삭제] primary_organization_id 업데이트 성공:', updateData)
+          logger.info('[멤버삭제] primary_organization_id 업데이트 성공:');
 
           // 셀러코드 자동 생성
-          console.log('🔑 [멤버삭제] 셀러코드 생성 시작')
+          logger.debug('🔑 [멤버삭제] 셀러코드 생성 시작');
           await generateUserCodes(targetMember.user_id)
 
-          console.log(`✅ [멤버삭제] 완료: user_id=${targetMember.user_id}, org_id=${result.organization_id}`)
+          logger.info('[멤버삭제] 완료: user_id=${targetMember.user_id}, org_id=${result.organization_id}');
         } catch (createError) {
-          console.error('❌ [멤버삭제] 개인 셀러계정 생성 실패:', createError)
+          logger.error('❌ [멤버삭제] 개인 셀러계정 생성 실패:', createError);
           // 실패 시 최소한 primary_organization_id는 null로 (Admin Client 사용)
           await adminSupabase
             .from('users')
@@ -281,7 +282,7 @@ export async function DELETE(request: NextRequest) {
       message: '멤버가 제거되었습니다. 해당 사용자의 개인 셀러계정이 자동으로 생성되었습니다.',
     })
   } catch (error) {
-    console.error('멤버 제거 오류:', error)
+    logger.error('멤버 제거 오류:', error);
     return NextResponse.json(
       { error: '멤버 제거 중 오류가 발생했습니다' },
       { status: 500 }

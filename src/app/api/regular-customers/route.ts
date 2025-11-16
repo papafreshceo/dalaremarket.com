@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import logger from '@/lib/logger';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
       data: data || [],
     });
   } catch (error: any) {
-    console.error('단골 고객 조회 오류:', error);
+    logger.error('단골 고객 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('단골 고객 등록 오류:', error);
+    logger.error('단골 고객 등록 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

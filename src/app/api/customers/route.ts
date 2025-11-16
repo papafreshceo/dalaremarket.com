@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-security';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/customers
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('고객 조회 실패:', error);
+      logger.error('고객 조회 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
       data: data || [],
     });
   } catch (error: any) {
-    console.error('고객 조회 오류:', error);
+    logger.error('고객 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (updateError) {
-        console.error('고객 타입 업데이트 실패:', updateError);
+        logger.error('고객 타입 업데이트 실패:', updateError);
         return NextResponse.json(
           { success: false, error: updateError.message },
           { status: 500 }
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('고객 생성 실패:', error);
+      logger.error('고객 생성 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -178,7 +179,7 @@ export async function POST(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('고객 생성 오류:', error);
+    logger.error('고객 생성 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -247,7 +248,7 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('고객 수정 실패:', error);
+      logger.error('고객 수정 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -259,7 +260,7 @@ export async function PUT(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('고객 수정 오류:', error);
+    logger.error('고객 수정 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -293,7 +294,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id);
 
     if (error) {
-      console.error('고객 삭제 실패:', error);
+      logger.error('고객 삭제 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -304,7 +305,7 @@ export async function DELETE(request: NextRequest) {
       success: true,
     });
   } catch (error: any) {
-    console.error('고객 삭제 오류:', error);
+    logger.error('고객 삭제 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

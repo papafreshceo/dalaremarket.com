@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
     const { data: posts, error } = await query;
 
     if (error) {
-      console.error('게시글 조회 오류:', error);
+      logger.error('게시글 조회 오류:', error);
       return NextResponse.json(
         { success: false, error: '게시글을 불러올 수 없습니다.', details: error.message, code: error.code },
         { status: 500 }
@@ -129,7 +130,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('게시글 조회 오류:', error);
+    logger.error('게시글 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }
@@ -182,7 +183,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (postError) {
-      console.error('게시글 생성 오류:', postError);
+      logger.error('게시글 생성 오류:', postError);
       return NextResponse.json(
         { success: false, error: '게시글 작성에 실패했습니다.' },
         { status: 500 }
@@ -201,7 +202,7 @@ export async function POST(request: NextRequest) {
         .insert(tagInserts);
 
       if (tagsError) {
-        console.error('태그 생성 오류:', tagsError);
+        logger.error('태그 생성 오류:', tagsError);
       }
     }
 
@@ -217,7 +218,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('게시글 생성 오류:', error);
+    logger.error('게시글 생성 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import logger from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error fetching announcements:', error);
+    logger.error('Error fetching announcements:', error);
     return NextResponse.json(
       { error: 'Failed to fetch announcements' },
       { status: 500 }
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error creating announcement:', error);
+    logger.error('Error creating announcement:', error);
     return NextResponse.json(
       { error: 'Failed to create announcement' },
       { status: 500 }
@@ -105,7 +106,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error updating announcement:', error);
+    logger.error('Error updating announcement:', error);
     return NextResponse.json(
       { error: 'Failed to update announcement' },
       { status: 500 }
@@ -139,7 +140,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting announcement:', error);
+    logger.error('Error deleting announcement:', error);
     return NextResponse.json(
       { error: 'Failed to delete announcement' },
       { status: 500 }

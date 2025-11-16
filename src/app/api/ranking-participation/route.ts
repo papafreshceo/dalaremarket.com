@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-security';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/ranking-participation
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-      console.error('랭킹 참여 설정 조회 실패:', error);
+      logger.error('랭킹 참여 설정 조회 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, data });
 
   } catch (error: any) {
-    console.error('GET /api/ranking-participation 오류:', error);
+    logger.error('GET /api/ranking-participation 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -125,7 +126,7 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('랭킹 참여 설정 업데이트 실패:', error);
+      logger.error('랭킹 참여 설정 업데이트 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -135,7 +136,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true, data });
 
   } catch (error: any) {
-    console.error('PUT /api/ranking-participation 오류:', error);
+    logger.error('PUT /api/ranking-participation 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

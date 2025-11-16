@@ -86,7 +86,13 @@
       "Bash(if not exist \"src\\app\\api\\organizations\\[id]\" mkdir \"src\\app\\api\\organizations\\[id]\")",
       "Bash(if not exist \"src\\app\\api\\organizations\\tier\" mkdir \"src\\app\\api\\organizations\\tier\")",
       "Bash(if exist .next rmdir /s /q .next)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(del /f run-migration-remove-seller-id.js 2)",
+      "Bash(if exist check-orders-organization.js del /f check-orders-organization.js)",
+      "Bash(if exist run-migration-remove-seller-id.js del /f run-migration-remove-seller-id.js)",
+      "Bash(if not exist \"src\\app\\api\\notifications\" mkdir \"src\\app\\api\\notifications\")",
+      "Bash(del /f srclibfirebase.ts srclibnotifications.ts 2)",
+      "Bash(del databasemigrationscreate_notifications_tables.sql 2)"
     ],
     "deny": [],
     "ask": []

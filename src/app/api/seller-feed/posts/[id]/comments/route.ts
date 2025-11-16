@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -25,7 +26,7 @@ export async function GET(
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.error('댓글 조회 오류:', error);
+      logger.error('댓글 조회 오류:', error);
       return NextResponse.json(
         { success: false, error: '댓글을 불러올 수 없습니다.' },
         { status: 500 }
@@ -68,7 +69,7 @@ export async function GET(
     });
 
   } catch (error: any) {
-    console.error('댓글 조회 오류:', error);
+    logger.error('댓글 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }
@@ -137,7 +138,7 @@ export async function POST(
       .single();
 
     if (commentError) {
-      console.error('댓글 생성 오류:', commentError);
+      logger.error('댓글 생성 오류:', commentError);
       return NextResponse.json(
         { success: false, error: '댓글 작성에 실패했습니다.' },
         { status: 500 }
@@ -155,7 +156,7 @@ export async function POST(
     });
 
   } catch (error: any) {
-    console.error('댓글 생성 오류:', error);
+    logger.error('댓글 생성 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }

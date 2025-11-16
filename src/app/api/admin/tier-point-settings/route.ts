@@ -1,5 +1,6 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 export async function GET() {
   try {
@@ -13,13 +14,13 @@ export async function GET() {
       .single();
 
     if (error) {
-      console.error('누적점수 설정 조회 오류:', error);
+      logger.error('누적점수 설정 조회 오류:', error);
       return NextResponse.json({ error: '누적점수 설정을 불러올 수 없습니다.' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, settings });
   } catch (error) {
-    console.error('GET /api/admin/tier-point-settings 오류:', error);
+    logger.error('GET /api/admin/tier-point-settings 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
@@ -73,13 +74,13 @@ export async function PUT(request: Request) {
       .eq('setting_key', 'default');
 
     if (updateError) {
-      console.error('누적점수 설정 업데이트 오류:', updateError);
+      logger.error('누적점수 설정 업데이트 오류:', updateError);
       return NextResponse.json({ error: '설정 저장에 실패했습니다.' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, message: '누적점수 설정이 저장되었습니다.' });
   } catch (error) {
-    console.error('PUT /api/admin/tier-point-settings 오류:', error);
+    logger.error('PUT /api/admin/tier-point-settings 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }

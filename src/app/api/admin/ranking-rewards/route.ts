@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-security';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/admin/ranking-rewards
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
       .order('rank', { ascending: true });
 
     if (error) {
-      console.error('랭킹 보상 설정 조회 실패:', error);
+      logger.error('랭킹 보상 설정 조회 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, rewards: data });
 
   } catch (error: any) {
-    console.error('GET /api/admin/ranking-rewards 오류:', error);
+    logger.error('GET /api/admin/ranking-rewards 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -98,7 +99,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true });
 
   } catch (error: any) {
-    console.error('PUT /api/admin/ranking-rewards 오류:', error);
+    logger.error('PUT /api/admin/ranking-rewards 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

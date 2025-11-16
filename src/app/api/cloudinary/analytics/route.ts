@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/cloudinary/analytics
@@ -84,7 +85,7 @@ export async function GET() {
       },
     });
   } catch (error: any) {
-    console.error('분석 데이터 조회 오류:', error);
+    logger.error('분석 데이터 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

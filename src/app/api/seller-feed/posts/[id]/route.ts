@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -74,7 +75,7 @@ export async function GET(
     });
 
   } catch (error: any) {
-    console.error('게시글 조회 오류:', error);
+    logger.error('게시글 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }
@@ -139,7 +140,7 @@ export async function PUT(
       .single();
 
     if (updateError) {
-      console.error('게시글 수정 오류:', updateError);
+      logger.error('게시글 수정 오류:', updateError);
       return NextResponse.json(
         { success: false, error: '게시글 수정에 실패했습니다.' },
         { status: 500 }
@@ -173,7 +174,7 @@ export async function PUT(
     });
 
   } catch (error: any) {
-    console.error('게시글 수정 오류:', error);
+    logger.error('게시글 수정 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }
@@ -227,7 +228,7 @@ export async function DELETE(
       .eq('id', postId);
 
     if (deleteError) {
-      console.error('게시글 삭제 오류:', deleteError);
+      logger.error('게시글 삭제 오류:', deleteError);
       return NextResponse.json(
         { success: false, error: '게시글 삭제에 실패했습니다.' },
         { status: 500 }
@@ -240,7 +241,7 @@ export async function DELETE(
     });
 
   } catch (error: any) {
-    console.error('게시글 삭제 오류:', error);
+    logger.error('게시글 삭제 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }

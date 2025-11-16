@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -136,7 +137,7 @@ export async function GET(request: NextRequest) {
               document.getElementById('result').innerHTML = '<div class="no-result">검색 중 오류가 발생했습니다.</div>';
             }
           } catch (error) {
-            console.error('Search error:', error);
+            logger.error('Search error:', error);
             document.getElementById('result').innerHTML = '<div class="no-result">검색 중 오류가 발생했습니다.</div>';
           }
         }

@@ -2,6 +2,7 @@ import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-security';
 import { getOrganizationDataFilter } from '@/lib/organization-utils';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/integrated-orders/preparing-summary
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('🔍 집계 API 파라미터:', {
+    logger.debug('🔍 집계 API 파라미터:', {
       startDate,
       endDate,
       shippingStatus: shippingStatus || '전체',
@@ -51,29 +52,29 @@ export async function GET(request: NextRequest) {
 
     // 🔒 조직 필터: 관리자/직원이 아니면 자신의 조직만 조회
     const userRole = auth.userData?.role || auth.user?.role;
-    console.log('👤 사용자 권한:', { userRole, userId: auth.user?.id });
+    logger.debug('👤 사용자 권한:', { userRole, userId: auth.user?.id });
 
     if (userRole !== 'super_admin' && userRole !== 'admin' && userRole !== 'employee') {
       const organizationId = await getOrganizationDataFilter(auth.user.id);
-      console.log('📦 조직 필터 적용:', { organizationId });
+      logger.debug('📦 조직 필터 적용:', { organizationId });
       if (organizationId) {
         query = query.eq('organization_id', organizationId);
       } else {
-        // 조직이 없으면 본인이 등록한 주문만 조회
-        query = query.eq('seller_id', auth.user.id);
+        // 조직이 없으면 빈 결과 반환 (조직 기반 시스템으로 완전 전환)
+        query = query.eq('organization_id', '00000000-0000-0000-0000-000000000000');
       }
     }
 
     const { data: orders, error } = await query;
 
-    console.log('📊 조회된 주문:', {
+    logger.debug('📊 조회된 주문:', {
       count: orders?.length || 0,
       sample: orders?.[0],
       error: error?.message
     });
 
     if (error) {
-      console.error('주문 조회 오류:', error);
+      logger.error('주문 조회 오류:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -132,7 +133,7 @@ export async function GET(request: NextRequest) {
       .in('option_name', optionNames);
 
     if (optionError) {
-      console.error('옵션상품 조회 오류:', optionError);
+      logger.error('옵션상품 조회 오류:', optionError);
     }
 
 
@@ -151,7 +152,7 @@ export async function GET(request: NextRequest) {
       .in('option_product_id', optionProductIds);
 
     if (materialsLinksError) {
-      console.error('원물 링크 조회 오류:', materialsLinksError);
+      logger.error('원물 링크 조회 오류:', materialsLinksError);
     }
 
 
@@ -171,13 +172,13 @@ export async function GET(request: NextRequest) {
       .in('id', rawMaterialIds);
 
     if (rawMaterialsError) {
-      console.error('원물 정보 조회 오류:', rawMaterialsError);
+      logger.error('원물 정보 조회 오류:', rawMaterialsError);
     }
 
-    console.log('📦 원물 데이터:', rawMaterialsData?.map(rm => ({
+    logger.debug('📦 원물 데이터:', { data: rawMaterialsData?.map(rm => ({
       name: rm.material_name,
       standard_quantity: rm.standard_quantity
-    })));
+    } });));
 
     // 원물 ID로 매핑
     const rawMaterialsById = new Map(
@@ -258,7 +259,7 @@ export async function GET(request: NextRequest) {
       return !materials || materials.length === 0; // 원물 매핑 없음
     });
 
-    console.log('⚠️ 미매핑 옵션:', unmappedOptions.map(o => o.option_name));
+    logger.debug('⚠️ 미매핑 옵션:', { data: unmappedOptions.map(o => o.option_name }););
 
     return NextResponse.json({
       success: true,
@@ -269,7 +270,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('GET /api/integrated-orders/preparing-summary 오류:', error);
+    logger.error('GET /api/integrated-orders/preparing-summary 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

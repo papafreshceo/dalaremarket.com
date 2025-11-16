@@ -4,6 +4,7 @@ import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
 import { applyOptionMappingToOrdersServer } from '@/lib/option-mapping-utils';
 import { generateSampleOrders, convertSampleOrdersToDBFormat } from '@/lib/sample-data';
 import { getOrganizationDataFilter } from '@/lib/organization-utils';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/platform-orders
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     const effectiveUserId = impersonateUserId || user?.id;
 
     if (impersonateUserId) {
-      console.log('[GET platform-orders] Impersonate 모드:', {
+      logger.debug('[GET platform-orders] Impersonate 모드:', {
         impersonateUserId,
         adminUserId: user?.id
       });
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
         .eq('is_active', true);
 
       if (opError) {
-        console.error('[GET platform-orders] option_products 조회 실패:', opError);
+        logger.error('[GET platform-orders] option_products 조회 실패:', opError);
         return NextResponse.json(
           { success: false, error: '샘플 데이터 생성 실패' },
           { status: 500 }
@@ -80,10 +81,7 @@ export async function GET(request: NextRequest) {
       );
 
       // DB 포맷으로 변환 (조직 ID 추가)
-      const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, 'guest').map(order => ({
-        ...order,
-        organization_id: 'guest'
-      }));
+      const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, 'guest', 'guest');
 
 
       return NextResponse.json({
@@ -113,13 +111,13 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (userError) {
-      console.error('[GET platform-orders] 사용자 정보 조회 실패:', userError);
+      logger.error('[GET platform-orders] 사용자 정보 조회 실패:', userError);
     }
 
     const showSampleData = userData?.show_sample_data ?? false;
 
     // 실제 주문 데이터 조회
-    console.log('[GET platform-orders] 주문 조회 시작:', {
+    logger.debug('[GET platform-orders] 주문 조회 시작:', {
       effectiveUserId,
       isImpersonate: !!impersonateUserId,
       usingServiceRole: !!impersonateUserId,
@@ -130,7 +128,7 @@ export async function GET(request: NextRequest) {
     // 🔒 조직 필터 적용 (항상 필요)
     const organizationId = await getOrganizationDataFilter(effectiveUserId);
 
-    console.log('[GET platform-orders] 조직 필터:', {
+    logger.debug('[GET platform-orders] 조직 필터:', {
       effectiveUserId,
       organizationId
     });
@@ -168,18 +166,17 @@ export async function GET(request: NextRequest) {
     const { data: orders, error: ordersError } = await query;
 
     if (ordersError) {
-      console.error('[GET platform-orders] 주문 조회 오류:', ordersError);
+      logger.error('[GET platform-orders] 주문 조회 오류:', ordersError);
       return NextResponse.json(
         { success: false, error: ordersError.message },
         { status: 500 }
       );
     }
 
-    console.log('[GET platform-orders] 주문 조회 결과:', {
+    logger.debug('[GET platform-orders] 주문 조회 결과:', {
       effectiveUserId,
       orderCount: orders?.length || 0,
-      isImpersonate: !!impersonateUserId,
-      firstOrderSellerId: orders?.[0]?.seller_id || 'none'
+      isImpersonate: !!impersonateUserId
     });
 
     // 샘플 데이터 반환 조건: show_sample_data가 true이고 실제 주문이 없을 때
@@ -198,7 +195,7 @@ export async function GET(request: NextRequest) {
         .eq('is_active', true);
 
       if (opError) {
-        console.error('[GET platform-orders] option_products 조회 실패:', opError);
+        logger.error('[GET platform-orders] option_products 조회 실패:', opError);
         return NextResponse.json(
           { success: false, error: '샘플 데이터 생성 실패' },
           { status: 500 }
@@ -225,10 +222,7 @@ export async function GET(request: NextRequest) {
       );
 
       // DB 포맷으로 변환 (조직 ID 추가)
-      const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, effectiveUserId).map(order => ({
-        ...order,
-        organization_id: organizationId
-      }));
+      const sampleOrders = convertSampleOrdersToDBFormat(sampleOrdersData, effectiveUserId, organizationId);
 
 
       return NextResponse.json({
@@ -246,7 +240,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('GET /api/platform-orders 오류:', error);
+    logger.error('GET /api/platform-orders 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -316,7 +310,7 @@ export async function POST(request: NextRequest) {
         .select();
 
       if (error) {
-        console.error('[platform-orders] 주문 저장 실패:', error);
+        logger.error('[platform-orders] 주문 저장 실패:', error);
         return NextResponse.json(
           { success: false, error: error.message },
           { status: 500 }
@@ -333,7 +327,7 @@ export async function POST(request: NextRequest) {
       try {
         await supabase.rpc('add_order_points', { p_user_id: user.id });
       } catch (pointsError) {
-        console.error('Order points error:', pointsError);
+        logger.error('Order points error:', pointsError);
         // 점수 추가 실패해도 주문은 성공으로 처리
       }
 
@@ -355,11 +349,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // seller_id 자동 설정
-      if (!orderData.seller_id) {
-        orderData.seller_id = user.id;
-      }
-
       // 🔒 조직 ID 자동 설정
       const organizationId = await getOrganizationDataFilter(user.id);
       if (organizationId) {
@@ -378,7 +367,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (error) {
-        console.error('[platform-orders] 주문 저장 실패:', error);
+        logger.error('[platform-orders] 주문 저장 실패:', error);
         return NextResponse.json(
           { success: false, error: error.message },
           { status: 500 }
@@ -395,7 +384,7 @@ export async function POST(request: NextRequest) {
       try {
         await supabase.rpc('add_order_points', { p_user_id: user.id });
       } catch (pointsError) {
-        console.error('Order points error:', pointsError);
+        logger.error('Order points error:', pointsError);
         // 점수 추가 실패해도 주문은 성공으로 처리
       }
 
@@ -406,7 +395,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error: any) {
-    console.error('POST /api/platform-orders 오류:', error);
+    logger.error('POST /api/platform-orders 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

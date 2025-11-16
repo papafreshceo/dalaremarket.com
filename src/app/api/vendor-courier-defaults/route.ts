@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import logger from '@/lib/logger';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,13 +28,13 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('벤더 택배사 설정 조회 오류:', error);
+      logger.error('벤더 택배사 설정 조회 오류:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('벤더 택배사 설정 조회 중 오류:', error);
+    logger.error('벤더 택배사 설정 조회 중 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
@@ -72,13 +73,13 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
-      console.error('벤더 택배사 설정 추가 오류:', error);
+      logger.error('벤더 택배사 설정 추가 오류:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
-    console.error('벤더 택배사 설정 추가 중 오류:', error);
+    logger.error('벤더 택배사 설정 추가 중 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
@@ -117,13 +118,13 @@ export async function PUT(request: NextRequest) {
           { status: 409 }
         );
       }
-      console.error('벤더 택배사 설정 수정 오류:', error);
+      logger.error('벤더 택배사 설정 수정 오류:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('벤더 택배사 설정 수정 중 오류:', error);
+    logger.error('벤더 택배사 설정 수정 중 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
@@ -150,13 +151,13 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id);
 
     if (error) {
-      console.error('벤더 택배사 설정 삭제 오류:', error);
+      logger.error('벤더 택배사 설정 삭제 오류:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('벤더 택배사 설정 삭제 중 오류:', error);
+    logger.error('벤더 택배사 설정 삭제 중 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }

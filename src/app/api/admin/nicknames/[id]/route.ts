@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function PUT(
   request: NextRequest,
@@ -51,7 +52,7 @@ export async function PUT(
       .single();
 
     if (error) {
-      console.error('관리자 닉네임 수정 오류:', error);
+      logger.error('관리자 닉네임 수정 오류:', error);
       return NextResponse.json(
         { success: false, error: '수정에 실패했습니다.' },
         { status: 500 }
@@ -64,7 +65,7 @@ export async function PUT(
     });
 
   } catch (error: any) {
-    console.error('관리자 닉네임 수정 오류:', error);
+    logger.error('관리자 닉네임 수정 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }
@@ -95,7 +96,7 @@ export async function DELETE(
       .eq('id', id);
 
     if (error) {
-      console.error('관리자 닉네임 삭제 오류:', error);
+      logger.error('관리자 닉네임 삭제 오류:', error);
       return NextResponse.json(
         { success: false, error: '삭제에 실패했습니다.' },
         { status: 500 }
@@ -108,7 +109,7 @@ export async function DELETE(
     });
 
   } catch (error: any) {
-    console.error('관리자 닉네임 삭제 오류:', error);
+    logger.error('관리자 닉네임 삭제 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }

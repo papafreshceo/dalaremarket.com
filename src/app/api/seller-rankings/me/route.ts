@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { getUserPrimaryOrganization } from '@/lib/organization-utils';
 import { NextRequest, NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 /**
  * 내 조직 랭킹 조회 API
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (rankingError && rankingError.code !== 'PGRST116') {
-      console.error('My ranking fetch error:', rankingError);
+      logger.error('My ranking fetch error:', rankingError);
       return NextResponse.json(
         { success: false, error: rankingError.message },
         { status: 500 }
@@ -98,7 +99,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('API error:', error);
+    logger.error('API error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

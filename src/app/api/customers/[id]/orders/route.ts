@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-security';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/customers/[id]/orders
@@ -41,7 +42,7 @@ export async function GET(
       .order('created_at', { ascending: false });
 
     if (ordersError) {
-      console.error('주문 이력 조회 실패:', ordersError);
+      logger.error('주문 이력 조회 실패:', ordersError);
       return NextResponse.json(
         { success: false, error: ordersError.message },
         { status: 500 }
@@ -56,7 +57,7 @@ export async function GET(
       },
     });
   } catch (error: any) {
-    console.error('주문 이력 조회 오류:', error);
+    logger.error('주문 이력 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

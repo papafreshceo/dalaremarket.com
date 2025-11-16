@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('🔍 조직 티어 조회 요청:', { organizationId, userId: auth.user.id });
+    logger.debug('🔍 조직 티어 조회 요청:', { organizationId, userId: auth.user.id });
 
     const supabase = await createClientForRouteHandler();
 
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       .eq('id', organizationId)
       .single();
 
-    console.log('📊 조직 정보 조회 결과:', { orgData, orgError });
+    logger.debug('📊 조직 정보 조회 결과:', { orgData, orgError });
 
     if (orgError || !orgData) {
       console.error('❌ 조직 정보 조회 오류:', { organizationId, error: orgError });
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (criteriaError || !criteriaData) {
-      console.error('티어 기준 조회 오류:', criteriaError);
+      logger.error('티어 기준 조회 오류:', criteriaError);
       return NextResponse.json(
         { success: false, error: '티어 기준을 찾을 수 없습니다.' },
         { status: 404 }
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       }
     });
   } catch (error: any) {
-    console.error('GET /api/organizations/tier 오류:', error);
+    logger.error('GET /api/organizations/tier 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

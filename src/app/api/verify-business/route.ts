@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-security';
+import logger from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   // 🔒 보안: 인증된 사용자만 접근 가능
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error verifying business number:', error);
+    logger.error('Error verifying business number:', error);
     return NextResponse.json(
       { error: '사업자등록번호 조회에 실패했습니다.' },
       { status: 500 }

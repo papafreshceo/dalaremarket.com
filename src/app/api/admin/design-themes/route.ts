@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/api-security';
+import logger from '@/lib/logger';
 
 // 테마 목록 조회
 export async function GET(request: NextRequest) {
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Fetch themes error:', error);
+      logger.error('Fetch themes error:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
       data: themes
     });
   } catch (error: any) {
-    console.error('GET /api/admin/design-themes error:', error);
+    logger.error('GET /api/admin/design-themes error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Create theme error:', error);
+      logger.error('Create theme error:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
       data: theme
     });
   } catch (error: any) {
-    console.error('POST /api/admin/design-themes error:', error);
+    logger.error('POST /api/admin/design-themes error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

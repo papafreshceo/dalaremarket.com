@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import logger from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
       })
 
     if (signUpError || !authData.user) {
-      console.error('Sign up error:', signUpError)
+      logger.error('Sign up error:', signUpError);
       return NextResponse.json(
         { error: 'Failed to create user' },
         { status: 500 }
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (insertError) {
-      console.error('User insert error:', insertError)
+      logger.error('User insert error:', insertError);
       return NextResponse.json(
         { error: 'Failed to save user data' },
         { status: 500 }
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
       temp_password: tempPassword,
     })
   } catch (error) {
-    console.error('Naver register API error:', error)
+    logger.error('Naver register API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

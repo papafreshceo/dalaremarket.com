@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/api-security'
+import logger from '@/lib/logger';
 
 /**
  * GET /api/organizations/cleanup
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error('조직 확인 오류:', error)
+    logger.error('조직 확인 오류:', error);
     return NextResponse.json(
       { error: '서버 오류가 발생했습니다', details: error.message },
       { status: 500 }
@@ -77,7 +78,7 @@ export async function DELETE(request: NextRequest) {
       .select()
 
     if (error) {
-      console.error('서브 조직 삭제 실패:', error)
+      logger.error('서브 조직 삭제 실패:', error);
       return NextResponse.json(
         { error: '서브 조직 삭제에 실패했습니다', details: error.message },
         { status: 500 }
@@ -90,7 +91,7 @@ export async function DELETE(request: NextRequest) {
       deleted_count: deleted?.length || 0,
     })
   } catch (error: any) {
-    console.error('정리 오류:', error)
+    logger.error('정리 오류:', error);
     return NextResponse.json(
       { error: '서버 오류가 발생했습니다', details: error.message },
       { status: 500 }

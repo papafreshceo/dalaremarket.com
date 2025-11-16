@@ -1,5 +1,6 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/products/all
@@ -19,7 +20,7 @@ export async function GET() {
       .order('option_name', { ascending: true });
 
     if (error) {
-      console.error('[products/all] 상품 조회 오류:', error);
+      logger.error('[products/all] 상품 조회 오류:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -35,7 +36,7 @@ export async function GET() {
       .order('display_order');
 
     if (statusError) {
-      console.error('[products/all] 공급상태 조회 오류:', statusError);
+      logger.error('[products/all] 공급상태 조회 오류:', statusError);
     }
 
     return NextResponse.json({
@@ -45,7 +46,7 @@ export async function GET() {
     });
 
   } catch (error: any) {
-    console.error('[products/all] API 오류:', error);
+    logger.error('[products/all] API 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-security';
 import fs from 'fs';
 import path from 'path';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/admin/holidays
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
       .order('holiday_date', { ascending: true });
 
     if (error) {
-      console.error('공휴일 조회 실패:', error);
+      logger.error('공휴일 조회 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, holidays: data });
   } catch (error: any) {
-    console.error('GET /api/admin/holidays 오류:', error);
+    logger.error('GET /api/admin/holidays 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('휴무일 추가 실패:', error);
+      logger.error('휴무일 추가 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, holiday: data });
   } catch (error: any) {
-    console.error('POST /api/admin/holidays 오류:', error);
+    logger.error('POST /api/admin/holidays 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -152,7 +153,7 @@ export async function PUT(request: NextRequest) {
       .insert(holidays);
 
     if (error) {
-      console.error('공휴일 일괄 등록 실패:', error);
+      logger.error('공휴일 일괄 등록 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -164,7 +165,7 @@ export async function PUT(request: NextRequest) {
       message: `${year}년 국공휴일 ${holidays.length}개가 등록되었습니다.`
     });
   } catch (error: any) {
-    console.error('PUT /api/admin/holidays 오류:', error);
+    logger.error('PUT /api/admin/holidays 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -212,7 +213,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id);
 
     if (error) {
-      console.error('공휴일 삭제 실패:', error);
+      logger.error('공휴일 삭제 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -221,7 +222,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('DELETE /api/admin/holidays 오류:', error);
+    logger.error('DELETE /api/admin/holidays 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/standard-fields
@@ -30,8 +31,7 @@ export async function GET() {
       { value: 'special_request', label: '특이/요청사항' },   // field_15
       { value: 'shipping_request_date', label: '발송요청일' }, // field_16
       { value: 'option_code', label: '옵션코드' },            // field_17
-      { value: 'seller_id', label: '셀러ID' },                // field_18
-      { value: 'seller_supply_price', label: '셀러공급가' },  // field_19
+      { value: 'seller_supply_price', label: '셀러공급가' },  // field_18
       { value: 'shipping_source', label: '출고처' },          // field_20
       { value: 'invoice_issuer', label: '송장주체' },         // field_21
       { value: 'vendor_name', label: '벤더사' },              // field_22
@@ -95,7 +95,7 @@ export async function GET() {
       data: fields,
     });
   } catch (error: any) {
-    console.error('GET /api/standard-fields 오류:', error);
+    logger.error('GET /api/standard-fields 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

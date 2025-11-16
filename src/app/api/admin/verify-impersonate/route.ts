@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
+import logger from '@/lib/logger';
 
 export async function POST(request: Request) {
   try {
@@ -31,12 +32,12 @@ export async function POST(request: Request) {
       });
 
     } catch (error) {
-      console.error('토큰 검증 실패:', error);
+      logger.error('토큰 검증 실패:', error);
       return NextResponse.json({ error: '토큰이 만료되었거나 유효하지 않습니다.' }, { status: 401 });
     }
 
   } catch (error) {
-    console.error('POST /api/admin/verify-impersonate 오류:', error);
+    logger.error('POST /api/admin/verify-impersonate 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
       data: templates,
     });
   } catch (error: any) {
-    console.error('마켓 템플릿 조회 오류:', error);
+    logger.error('마켓 템플릿 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('마켓 템플릿 등록 오류:', error);
+    logger.error('마켓 템플릿 등록 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

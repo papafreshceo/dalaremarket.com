@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import cloudinary from '@/lib/cloudinary/config';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('이미지 업로드 오류:', error);
+    logger.error('이미지 업로드 오류:', error);
     return NextResponse.json(
       { success: false, error: '이미지 업로드 중 오류가 발생했습니다.', details: error.message },
       { status: 500 }

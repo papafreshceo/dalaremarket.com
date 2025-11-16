@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import logger from '@/lib/logger';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -39,7 +40,7 @@ export async function PUT(request: NextRequest) {
       count: records.length,
     });
   } catch (error: any) {
-    console.error('CS 기록 수정 오류:', error);
+    logger.error('CS 기록 수정 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

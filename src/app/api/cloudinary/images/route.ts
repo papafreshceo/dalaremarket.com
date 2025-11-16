@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import cloudinary from '@/lib/cloudinary/config';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/cloudinary/images
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('이미지 조회 오류:', error);
+    logger.error('이미지 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -110,7 +111,7 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (fetchError) {
-      console.error('기존 이미지 조회 실패:', fetchError);
+      logger.error('기존 이미지 조회 실패:', fetchError);
       return NextResponse.json(
         { success: false, error: fetchError.message },
         { status: 500 }
@@ -145,7 +146,7 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('현재 이미지 업데이트 실패:', error);
+      logger.error('현재 이미지 업데이트 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -164,7 +165,7 @@ export async function PUT(request: NextRequest) {
         .neq('id', id)
         .select();
 
-      if (clearError) console.error('해제 오류:', clearError);
+      if (clearError) logger.error('해제 오류:', clearError);
     }
 
     if (newRawMaterialId) {
@@ -175,7 +176,7 @@ export async function PUT(request: NextRequest) {
         .neq('id', id)
         .select();
 
-      if (clearError) console.error('해제 오류:', clearError);
+      if (clearError) logger.error('해제 오류:', clearError);
     }
 
     if (newCategory4Id) {
@@ -186,7 +187,7 @@ export async function PUT(request: NextRequest) {
         .neq('id', id)
         .select();
 
-      if (clearError) console.error('해제 오류:', clearError);
+      if (clearError) logger.error('해제 오류:', clearError);
     }
 
     // 2-2. 이전 외래 키가 있었다면 해당 엔티티의 대표이미지도 해제 (외래 키가 변경된 경우)
@@ -220,7 +221,7 @@ export async function PUT(request: NextRequest) {
         : '외래 키가 해제되고 대표이미지에서 제외되었습니다.',
     });
   } catch (error: any) {
-    console.error('이미지 수정 오류:', error);
+    logger.error('이미지 수정 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -281,7 +282,7 @@ export async function DELETE(request: NextRequest) {
       message: '이미지가 삭제되었습니다.',
     });
   } catch (error: any) {
-    console.error('이미지 삭제 오류:', error);
+    logger.error('이미지 삭제 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

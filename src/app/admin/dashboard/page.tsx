@@ -69,7 +69,7 @@ export default function AdminDashboardPage() {
     try {
       const supabase = createClient();
 
-      // 모든 주문 조회 (seller_id 필터링 없음)
+      // 모든 주문 조회 (organization_id 필터링 없음)
       const { data, error } = await supabase
         .from('integrated_orders')
         .select('*')
@@ -130,11 +130,11 @@ export default function AdminDashboardPage() {
         supplyPrice: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined,
         refundAmount: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined,
         refundedAt: order.refund_processed_at,
-        // 플랫폼 주문 구분: seller_id가 있으면 '플랫폼', 없으면 원래 market_name 사용
-        marketName: order.seller_id ? '플랫폼' : (order.market_name || '자사판매'),
+        // 플랫폼 주문 구분: organization_id가 있으면 '플랫폼', 없으면 원래 market_name 사용
+        marketName: order.organization_id ? '플랫폼' : (order.market_name || '자사판매'),
         sellerMarketName: order.seller_market_name || '미지정',
         priceUpdatedAt: order.price_updated_at,
-        ...(order.seller_id && { seller_id: order.seller_id }) // seller_id 추가
+        ...(order.organization_id && { organization_id: order.organization_id }) // organization_id 추가
       } as any));
 
       setOrders(convertedOrders);

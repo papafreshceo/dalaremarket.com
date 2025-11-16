@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/api-security';
+import logger from '@/lib/logger';
 
 // GET: 모든 도구 조회
 export async function GET(request: NextRequest) {
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
       .order('display_order', { ascending: true });
 
     if (error) {
-      console.error('Error fetching tools:', error);
+      logger.error('Error fetching tools:', error);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
       tools: tools || []
     });
   } catch (error: any) {
-    console.error('Error:', error);
+    logger.error('Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
@@ -59,7 +60,7 @@ export async function PUT(request: NextRequest) {
       .eq('id', tool.id);
 
     if (error) {
-      console.error('Error updating tool:', error);
+      logger.error('Error updating tool:', error);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
@@ -68,7 +69,7 @@ export async function PUT(request: NextRequest) {
       message: 'Tool updated successfully'
     });
   } catch (error: any) {
-    console.error('Error:', error);
+    logger.error('Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

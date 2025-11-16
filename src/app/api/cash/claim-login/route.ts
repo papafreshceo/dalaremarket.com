@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { getUserPrimaryOrganization } from '@/lib/organization-utils';
+import logger from '@/lib/logger';
 
 /**
  * POST /api/cash/claim-login
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (settingsError || !settings) {
-      console.error('[POST /api/cash/claim-login] 설정 조회 오류:', settingsError);
+      logger.error('[POST /api/cash/claim-login] 설정 조회 오류:', settingsError);
       return NextResponse.json(
         { success: false, error: '캐시 설정을 조회할 수 없습니다.' },
         { status: 500 }
@@ -115,14 +116,14 @@ export async function POST(request: NextRequest) {
           if (existingCash) {
             userCash = existingCash;
           } else {
-            console.error('[POST /api/cash/claim-login] 캐시 생성 오류:', insertError);
+            logger.error('[POST /api/cash/claim-login] 캐시 생성 오류:', insertError);
             return NextResponse.json(
               { success: false, error: '캐시 정보를 생성할 수 없습니다.' },
               { status: 500 }
             );
           }
         } else {
-          console.error('[POST /api/cash/claim-login] 캐시 생성 오류:', insertError);
+          logger.error('[POST /api/cash/claim-login] 캐시 생성 오류:', insertError);
           return NextResponse.json(
             { success: false, error: '캐시 정보를 생성할 수 없습니다.' },
             { status: 500 }
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
       .eq('organization_id', organization.id);
 
     if (updateError) {
-      console.error('[POST /api/cash/claim-login] 잔액 업데이트 오류:', updateError);
+      logger.error('[POST /api/cash/claim-login] 잔액 업데이트 오류:', updateError);
       return NextResponse.json(
         { success: false, error: '캐시 지급에 실패했습니다.' },
         { status: 500 }
@@ -163,7 +164,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (transactionError) {
-      console.error('[POST /api/cash/claim-login] 거래 이력 추가 오류:', transactionError);
+      logger.error('[POST /api/cash/claim-login] 거래 이력 추가 오류:', transactionError);
     }
 
     // 일일 보상 기록 업데이트
@@ -191,7 +192,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[POST /api/cash/claim-login] 오류:', error);
+    logger.error('[POST /api/cash/claim-login] 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message || '서버 오류가 발생했습니다.' },
       { status: 500 }

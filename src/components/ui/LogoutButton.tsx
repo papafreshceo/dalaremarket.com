@@ -11,6 +11,8 @@ export function LogoutButton() {
     try {
       const response = await fetch('/api/auth/logout', { method: 'POST' })
       if (response.ok) {
+        // 로그아웃 시 탭 상태 초기화
+        localStorage.removeItem('ordersActiveTab')
         showToast('로그아웃되었습니다.', 'success')
         router.push('/')
       }

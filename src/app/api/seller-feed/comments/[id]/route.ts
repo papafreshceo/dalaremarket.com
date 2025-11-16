@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function PUT(
   request: NextRequest,
@@ -58,7 +59,7 @@ export async function PUT(
       .single();
 
     if (updateError) {
-      console.error('댓글 수정 오류:', updateError);
+      logger.error('댓글 수정 오류:', updateError);
       return NextResponse.json(
         { success: false, error: '댓글 수정에 실패했습니다.' },
         { status: 500 }
@@ -71,7 +72,7 @@ export async function PUT(
     });
 
   } catch (error: any) {
-    console.error('댓글 수정 오류:', error);
+    logger.error('댓글 수정 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }
@@ -125,7 +126,7 @@ export async function DELETE(
       .eq('id', commentId);
 
     if (deleteError) {
-      console.error('댓글 삭제 오류:', deleteError);
+      logger.error('댓글 삭제 오류:', deleteError);
       return NextResponse.json(
         { success: false, error: '댓글 삭제에 실패했습니다.' },
         { status: 500 }
@@ -138,7 +139,7 @@ export async function DELETE(
     });
 
   } catch (error: any) {
-    console.error('댓글 삭제 오류:', error);
+    logger.error('댓글 삭제 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }

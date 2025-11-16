@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { getUserPrimaryOrganization } from '@/lib/organization-utils';
+import logger from '@/lib/logger';
 
 /**
  * POST /api/credits/daily-refill
@@ -119,14 +120,14 @@ export async function POST(request: NextRequest) {
             userCredit = existingCredit;
             // 날짜 확인 후 리필 처리는 아래 로직에서 수행
           } else {
-            console.error('[POST /api/credits/daily-refill] 크레딧 조회 실패:', insertError);
+            logger.error('[POST /api/credits/daily-refill] 크레딧 조회 실패:', insertError);
             return NextResponse.json(
               { success: false, error: '크레딧 정보를 생성할 수 없습니다.' },
               { status: 500 }
             );
           }
         } else {
-          console.error('[POST /api/credits/daily-refill] 크레딧 생성 오류:', insertError);
+          logger.error('[POST /api/credits/daily-refill] 크레딧 생성 오류:', insertError);
           return NextResponse.json(
             { success: false, error: '크레딧 정보를 생성할 수 없습니다.' },
             { status: 500 }
@@ -177,7 +178,7 @@ export async function POST(request: NextRequest) {
         .eq('organization_id', organization.id);
 
       if (updateError) {
-        console.error('[POST /api/credits/daily-refill] 크레딧 리필 오류:', updateError);
+        logger.error('[POST /api/credits/daily-refill] 크레딧 리필 오류:', updateError);
         return NextResponse.json(
           { success: false, error: '크레딧 리필에 실패했습니다.' },
           { status: 500 }
@@ -214,7 +215,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[POST /api/credits/daily-refill] 오류:', error);
+    logger.error('[POST /api/credits/daily-refill] 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message || '서버 오류가 발생했습니다.' },
       { status: 500 }

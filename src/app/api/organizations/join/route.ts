@@ -3,6 +3,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-security'
 import { getInvitationByToken, getDefaultPermissions } from '@/lib/organization-utils'
+import logger from '@/lib/logger';
 
 /**
  * GET /api/organizations/join?token=xxx
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
       invitation,
     })
   } catch (error) {
-    console.error('초대 정보 조회 오류:', error)
+    logger.error('초대 정보 조회 오류:', error);
     return NextResponse.json(
       { error: '초대 정보 조회 중 오류가 발생했습니다' },
       { status: 500 }
@@ -164,7 +165,7 @@ export async function POST(request: NextRequest) {
 
       // 본인이 소유자인 개인 조직인 경우 삭제
       if (oldOrg && oldOrg.owner_id === auth.user.id) {
-        console.log('🗑️  개인 셀러계정 삭제:', oldOrg.name)
+        logger.debug('🗑️  개인 셀러계정 삭제:', { data: oldOrg.name });
 
         // 기존 조직의 멤버 삭제
         await supabase
@@ -231,7 +232,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (memberError) {
-      console.error('멤버 추가 실패:', memberError)
+      logger.error('멤버 추가 실패:', memberError);
       return NextResponse.json(
         { error: '조직 가입에 실패했습니다' },
         { status: 500 }
@@ -262,7 +263,7 @@ export async function POST(request: NextRequest) {
       organization_id: invitation.organization_id,
     })
   } catch (error) {
-    console.error('조직 가입 오류:', error)
+    logger.error('조직 가입 오류:', error);
     return NextResponse.json(
       { error: '조직 가입 중 오류가 발생했습니다' },
       { status: 500 }
@@ -346,7 +347,7 @@ async function handleNotificationBasedInvitation(
       .eq('id', invitationId)
 
     if (rejectError) {
-      console.error('초대 거절 실패:', rejectError)
+      logger.error('초대 거절 실패:', rejectError);
       return NextResponse.json(
         { error: '초대 거절에 실패했습니다' },
         { status: 500 }
@@ -408,7 +409,7 @@ async function handleNotificationBasedInvitation(
 
     // ⭐ CRITICAL: 검증 전에 먼저 개인 조직 삭제
     // 이후 검증 로직이 실행될 때는 이미 개인 조직이 삭제된 상태여야 함
-    console.log('🔍 기존 멤버십 확인 및 삭제 시작 (검증 전)')
+    logger.debug('기존 멤버십 확인 및 삭제 시작 (검증 전)');
 
     // 현재 사용자의 모든 active 멤버십 조회 (organization_id만 가져옴)
     const { data: membershipsToDelete } = await supabase
@@ -417,7 +418,7 @@ async function handleNotificationBasedInvitation(
       .eq('user_id', userId)
       .eq('status', 'active')
 
-    console.log('📋 조회된 멤버십:', membershipsToDelete?.length || 0, membershipsToDelete)
+    logger.debug('📋 조회된 멤버십:', { data: membershipsToDelete?.length || 0, membershipsToDelete });
 
     if (membershipsToDelete && membershipsToDelete.length > 0) {
       for (const membership of membershipsToDelete) {
@@ -428,11 +429,11 @@ async function handleNotificationBasedInvitation(
           .eq('id', membership.organization_id)
           .single()
 
-        console.log('🔎 조직 정보:', org)
+        logger.debug('🔎 조직 정보:', { data: org });
 
         // 본인이 소유자인 개인 조직인 경우만 삭제
         if (org && org.owner_id === userId) {
-          console.log('🗑️  개인 셀러계정 삭제 시작:', org.business_name, org.id)
+          logger.debug('🗑️  개인 셀러계정 삭제 시작:', { data: org.business_name, org.id });
 
           // 멤버십 삭제 (admin client로 RLS 우회)
           const { error: memberDeleteError } = await adminSupabase
@@ -441,9 +442,9 @@ async function handleNotificationBasedInvitation(
             .eq('organization_id', org.id)
 
           if (memberDeleteError) {
-            console.error('❌ 멤버십 삭제 실패:', memberDeleteError)
+            logger.error('❌ 멤버십 삭제 실패:', memberDeleteError);
           } else {
-            console.log('✅ 멤버십 삭제 완료')
+            logger.info('멤버십 삭제 완료');
           }
 
           // 조직 삭제 (admin client로 RLS 우회)
@@ -453,17 +454,17 @@ async function handleNotificationBasedInvitation(
             .eq('id', org.id)
 
           if (orgDeleteError) {
-            console.error('❌ 조직 삭제 실패:', orgDeleteError)
+            logger.error('❌ 조직 삭제 실패:', orgDeleteError);
           } else {
-            console.log('✅ 조직 삭제 완료:', org.business_name)
+            logger.info('조직 삭제 완료:');
           }
         } else {
-          console.log('⏭️  스킵: 본인 소유 조직 아님 또는 조직 없음')
+          logger.debug('⏭️  스킵: 본인 소유 조직 아님 또는 조직 없음');
         }
       }
     }
 
-    console.log('✅ 기존 멤버십 정리 완료 (검증 전)')
+    logger.info('기존 멤버십 정리 완료 (검증 전)');
 
     // 이미 다른 사람의 조직 멤버인지 확인 (본인 소유 조직 제외)
     // ⭐ 이 시점에는 이미 개인 조직이 삭제된 상태
@@ -474,7 +475,7 @@ async function handleNotificationBasedInvitation(
       .eq('status', 'active')
 
     if (existingMemberships && existingMemberships.length > 0) {
-      console.log('⚠️  검증: 남아있는 멤버십 발견:', existingMemberships.length)
+      logger.debug('⚠️  검증: 남아있는 멤버십 발견:', { data: existingMemberships.length });
 
       // 본인이 소유자가 아닌 조직 중에서, 다른 소유자의 조직 멤버인지 확인
       const otherOwnerMembership = existingMemberships.find(
@@ -482,14 +483,14 @@ async function handleNotificationBasedInvitation(
       )
 
       if (otherOwnerMembership) {
-        console.error('❌ 다른 소유자의 조직 멤버십 발견')
+        logger.error('❌ 다른 소유자의 조직 멤버십 발견');
         return NextResponse.json(
           { error: '이미 다른 사람의 셀러계정 멤버입니다. 한 사람의 셀러계정에만 소속될 수 있습니다.' },
           { status: 400 }
         )
       }
     } else {
-      console.log('✅ 검증: 기존 멤버십 없음 - 새 조직 가입 가능')
+      logger.info('검증: 기존 멤버십 없음 - 새 조직 가입 가능');
     }
 
     // 기존 멤버십 확인 (suspended 포함)
@@ -543,7 +544,7 @@ async function handleNotificationBasedInvitation(
     }
 
     if (memberError) {
-      console.error('멤버 추가 실패:', memberError)
+      logger.error('멤버 추가 실패:', memberError);
       return NextResponse.json(
         { error: '조직 가입에 실패했습니다' },
         { status: 500 }

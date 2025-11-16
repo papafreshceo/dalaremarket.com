@@ -1,5 +1,6 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 export async function POST() {
   try {
@@ -88,7 +89,7 @@ export async function POST() {
       .eq('is_active', true);
 
     if (deactivateError) {
-      console.error('기존 테마 비활성화 실패:', deactivateError);
+      logger.error('기존 테마 비활성화 실패:', deactivateError);
     }
 
     // 새 기본 테마 삽입
@@ -98,7 +99,7 @@ export async function POST() {
       .select();
 
     if (error) {
-      console.error('테마 생성 실패:', error);
+      logger.error('테마 생성 실패:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
@@ -108,7 +109,7 @@ export async function POST() {
       theme: data
     });
   } catch (error) {
-    console.error('기본 테마 생성 오류:', error);
+    logger.error('기본 테마 생성 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }

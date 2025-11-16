@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/cash/transactions
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
       .range(offset, offset + limit - 1);
 
     if (transactionsError) {
-      console.error('[GET /api/cash/transactions] 이력 조회 오류:', transactionsError);
+      logger.error('[GET /api/cash/transactions] 이력 조회 오류:', transactionsError);
       return NextResponse.json(
         { success: false, error: '거래 이력을 조회할 수 없습니다.' },
         { status: 500 }
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[GET /api/cash/transactions] 오류:', error);
+    logger.error('[GET /api/cash/transactions] 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message || '서버 오류가 발생했습니다.' },
       { status: 500 }

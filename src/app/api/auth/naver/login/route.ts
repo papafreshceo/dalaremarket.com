@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import logger from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
       needs_registration: true,
     })
   } catch (error) {
-    console.error('Naver login API error:', error)
+    logger.error('Naver login API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

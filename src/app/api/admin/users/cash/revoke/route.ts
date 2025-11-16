@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { canUpdateServer } from '@/lib/permissions-server';
+import logger from '@/lib/logger';
 
 /**
  * POST /api/admin/users/cash/revoke
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      console.error('캐시 회수 오류:', error);
+      logger.error('캐시 회수 오류:', error);
 
       // 함수가 존재하지 않는 경우
       if (error.message?.includes('function') && error.message?.includes('does not exist')) {
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('POST /api/admin/users/cash/revoke 오류:', error);
+    logger.error('POST /api/admin/users/cash/revoke 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.' },
       { status: 500 }

@@ -1,5 +1,6 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/vendor-templates
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
       data: data || [],
     });
   } catch (error: any) {
-    console.error('GET /api/vendor-templates 오류:', error);
+    logger.error('GET /api/vendor-templates 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('POST /api/vendor-templates 오류:', error);
+    logger.error('POST /api/vendor-templates 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -143,7 +144,7 @@ export async function PUT(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('PUT /api/vendor-templates 오류:', error);
+    logger.error('PUT /api/vendor-templates 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -185,7 +186,7 @@ export async function DELETE(request: NextRequest) {
       message: '템플릿이 삭제되었습니다.',
     });
   } catch (error: any) {
-    console.error('DELETE /api/vendor-templates 오류:', error);
+    logger.error('DELETE /api/vendor-templates 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

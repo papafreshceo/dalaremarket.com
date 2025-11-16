@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
     if (!GEMINI_API_KEY) {
-      console.error('⚠️ Gemini API 키가 설정되지 않았습니다.');
+      logger.error('⚠️ Gemini API 키가 설정되지 않았습니다.');
       return NextResponse.json(
         { error: 'API 키가 설정되지 않았습니다.' },
         { status: 500 }
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
       .order('category_3', { ascending: true });
 
     if (error) {
-      console.error('DB 조회 오류:', error);
+      logger.error('DB 조회 오류:', error);
     }
 
     // 출하중인 원물 (원물 + 옵션상품)
@@ -114,9 +115,9 @@ ${productList}
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('❌ Gemini API 상세 오류:');
+      logger.error('❌ Gemini API 상세 오류:');
       console.error('Status:', response.status);
-      console.error('Response:', errorData);
+      logger.error('Response:', errorData);
       console.error('API Key (앞 10자):', GEMINI_API_KEY?.substring(0, 10));
       console.error('URL:', apiUrl.replace(GEMINI_API_KEY, 'KEY_HIDDEN'));
       throw new Error(`Gemini API 오류: ${response.status} - ${errorData}`);
@@ -145,7 +146,7 @@ ${productList}
     }
 
     if (!aiResponse) {
-      console.error('❌ 응답 텍스트를 찾을 수 없습니다:', data);
+      logger.error('❌ 응답 텍스트를 찾을 수 없습니다:', data);
       // 기본 응답 반환
       aiResponse = '죄송합니다. 자세한 문의는 010-2688-1388로 전화주세요.';
     }
@@ -153,7 +154,7 @@ ${productList}
     return NextResponse.json({ response: aiResponse });
 
   } catch (error) {
-    console.error('❌ API 라우트 오류:', error);
+    logger.error('❌ API 라우트 오류:', error);
     return NextResponse.json(
       {
         response: '죄송합니다. 일시적인 오류가 발생했습니다.\n기본 문의는 010-2688-1388로 전화주세요.'

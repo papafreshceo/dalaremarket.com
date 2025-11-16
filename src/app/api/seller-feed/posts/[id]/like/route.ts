@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -50,7 +51,7 @@ export async function POST(
         .eq('user_id', user.id);
 
       if (deleteError) {
-        console.error('좋아요 취소 오류:', deleteError);
+        logger.error('좋아요 취소 오류:', deleteError);
         return NextResponse.json(
           { success: false, error: '좋아요 취소에 실패했습니다.' },
           { status: 500 }
@@ -78,7 +79,7 @@ export async function POST(
         });
 
       if (insertError) {
-        console.error('좋아요 추가 오류:', insertError);
+        logger.error('좋아요 추가 오류:', insertError);
         return NextResponse.json(
           { success: false, error: '좋아요에 실패했습니다.' },
           { status: 500 }
@@ -99,7 +100,7 @@ export async function POST(
     }
 
   } catch (error: any) {
-    console.error('좋아요 처리 오류:', error);
+    logger.error('좋아요 처리 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }

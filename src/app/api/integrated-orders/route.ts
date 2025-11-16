@@ -1,9 +1,11 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
-import { requireAuth, requireStaff, auditLog } from '@/lib/api-security';
+import { requireAuth, requireStaff } from '@/lib/api-security';
 import { canCreateServer, canUpdateServer, canDeleteServer } from '@/lib/permissions-server';
 import { getOrganizationDataFilter } from '@/lib/organization-utils';
+import logger from '@/lib/logger';
+import { createAuditLog } from '@/lib/audit-log';
 
 /**
  * GET /api/integrated-orders
@@ -28,7 +30,6 @@ export async function GET(request: NextRequest) {
     const searchKeyword = searchParams.get('searchKeyword');
     const shippingStatus = searchParams.get('shippingStatus');
     const vendorName = searchParams.get('vendorName');
-    const onlyWithSeller = searchParams.get('onlyWithSeller') === 'true'; // seller_id가 있는 주문만 (레거시)
     const onlyWithOrganization = searchParams.get('onlyWithOrganization') === 'true'; // organization_id가 있는 주문만
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '100');
@@ -56,11 +57,6 @@ export async function GET(request: NextRequest) {
     // organization_id가 있는 주문만 필터링 (관리자용)
     if (onlyWithOrganization) {
       query = query.not('organization_id', 'is', null);
-    }
-
-    // seller_id가 있는 주문만 필터링 (레거시 지원)
-    if (onlyWithSeller) {
-      query = query.not('seller_id', 'is', null);
     }
 
     // 날짜 필터
@@ -96,27 +92,16 @@ export async function GET(request: NextRequest) {
 
     const { data, error, count } = await query;
 
-    console.log('🔍 [GET /api/integrated-orders] 주문 조회 결과');
-    console.log('  - User Role:', auth.userData?.role);
-    console.log('  - onlyWithOrganization:', onlyWithOrganization);
-    console.log('  - 날짜 필터:', { startDate, endDate });
-    console.log('  - 조회된 주문수:', data?.length || 0);
-    console.log('  - 전체 카운트:', count);
-    console.log('  - 에러:', error?.message || 'none');
-
-    if (data && data.length > 0) {
-      console.log('  - 샘플 주문 3개:');
-      data.slice(0, 3).forEach((o: any, idx: number) => {
-        console.log(`    ${idx + 1}. ID: ${o.id}, org: ${o.organization_id?.substring(0, 8)}, status: ${o.shipping_status}, created: ${o.created_at}`);
-      });
-    }
-
-    if (data) {
-      const marketNames = [...new Set(data.map((o: any) => o.market_name))];
-    }
+    // 개발 환경에서만 로깅
+    logger.apiResponse('GET', '/api/integrated-orders', error ? 500 : 200, {
+      role: auth.userData?.role,
+      orderCount: data?.length || 0,
+      totalCount: count,
+      hasError: !!error,
+    });
 
     if (error) {
-      console.error('주문 조회 실패:', error);
+      logger.error('주문 조회 실패', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -198,7 +183,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('GET /api/integrated-orders 오류:', error);
+    logger.error('GET /api/integrated-orders 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -267,7 +252,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('주문 생성 실패:', error);
+      logger.error('주문 생성 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -281,13 +266,13 @@ export async function POST(request: NextRequest) {
         await supabase.rpc('add_order_points', { p_user_id: user.id });
       }
     } catch (pointsError) {
-      console.error('Order points error:', pointsError);
+      logger.error('Order points error:', pointsError);
       // 점수 추가 실패해도 주문은 성공으로 처리
     }
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error('POST /api/integrated-orders 오류:', error);
+    logger.error('POST /api/integrated-orders 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -330,7 +315,7 @@ export async function PUT(request: NextRequest) {
     // 상태 변경 전 기존 주문 정보 조회
     const { data: existingOrder } = await supabase
       .from('integrated_orders')
-      .select('status, amount, seller_id')
+      .select('status, amount, created_by')
       .eq('id', id)
       .single();
 
@@ -342,7 +327,7 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('주문 수정 실패:', error);
+      logger.error('주문 수정 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -352,12 +337,12 @@ export async function PUT(request: NextRequest) {
     // 발송완료 상태로 변경된 경우 랭킹 집계
     if (existingOrder && existingOrder.status !== 'shipped' && updateData.status === 'shipped') {
       const { trackOrderShipped } = await import('@/lib/seller-performance');
-      await trackOrderShipped(data.seller_id, data.amount || 0);
+      await trackOrderShipped(data.created_by, data.amount || 0);
     }
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error('PUT /api/integrated-orders 오류:', error);
+    logger.error('PUT /api/integrated-orders 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -399,7 +384,7 @@ export async function DELETE(request: NextRequest) {
     // 삭제할 주문 정보 조회 (감사 로그용)
     const { data: order } = await supabase
       .from('integrated_orders')
-      .select('order_number, market_name')
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -409,7 +394,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id);
 
     if (error) {
-      console.error('주문 삭제 실패:', error);
+      logger.error('주문 삭제 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -418,16 +403,24 @@ export async function DELETE(request: NextRequest) {
 
     // 🔒 감사 로그: 주문 삭제 기록
     if (order) {
-      auditLog('주문 삭제', auth.userData, {
-        order_id: id,
-        order_number: order.order_number,
-        market_name: order.market_name
-      });
+      await createAuditLog({
+        action: 'delete_order',
+        actionCategory: 'data_deletion',
+        resourceType: 'order',
+        resourceId: id,
+        beforeData: order,
+        details: {
+          order_number: order.order_number,
+          market_name: order.market_name,
+          amount: order.amount
+        },
+        severity: 'warning'
+      }, request, auth);
     }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('DELETE /api/integrated-orders 오류:', error);
+    logger.error('DELETE /api/integrated-orders 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

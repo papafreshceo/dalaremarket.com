@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { getUserPrimaryOrganization } from '@/lib/organization-utils';
 import { NextRequest, NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 /**
  * 조직 랭킹 조회 API
@@ -96,7 +97,7 @@ export async function GET(request: NextRequest) {
     const { data: allRankings, error } = await query;
 
     if (error) {
-      console.error('Rankings fetch error:', error);
+      logger.error('Rankings fetch error:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -130,7 +131,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('API error:', error);
+    logger.error('API error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

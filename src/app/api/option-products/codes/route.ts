@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       .in('option_name', option_names);
 
     if (error) {
-      console.error('옵션코드 조회 오류:', error);
+      logger.error('옵션코드 조회 오류:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       data: data || [],
     });
   } catch (error: any) {
-    console.error('POST /api/option-products/codes 오류:', error);
+    logger.error('POST /api/option-products/codes 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

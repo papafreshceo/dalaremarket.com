@@ -30,7 +30,7 @@ export async function GET(
       .limit(50);
 
     if (error) {
-      console.error('캐시 히스토리 조회 오류:', error);
+      logger.error('캐시 히스토리 조회 오류:', error);
       return NextResponse.json(
         { success: false, error: '히스토리 조회에 실패했습니다.' },
         { status: 500 }
@@ -43,7 +43,7 @@ export async function GET(
     });
 
   } catch (error: any) {
-    console.error('GET /api/admin/organizations/[id]/cash/history 오류:', error);
+    logger.error('GET /api/admin/organizations/[id]/cash/history 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.' },
       { status: 500 }

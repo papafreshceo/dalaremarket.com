@@ -1,5 +1,6 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 export async function POST() {
   try {
@@ -67,7 +68,7 @@ ON CONFLICT (display_order) DO NOTHING;
       `,
     });
   } catch (error: any) {
-    console.error('Migration error:', error);
+    logger.error('Migration error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

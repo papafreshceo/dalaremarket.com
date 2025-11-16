@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import logger from '@/lib/logger';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -17,7 +18,7 @@ export async function GET() {
       .order('option_name', { ascending: true });
 
     if (error) {
-      console.error('Supabase error:', error);
+      logger.error('Supabase error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
@@ -48,7 +49,7 @@ export async function GET() {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('API error:', error);
+    logger.error('API error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch category products' },
       { status: 500 }

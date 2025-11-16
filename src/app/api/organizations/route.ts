@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-security'
 import { CreateOrganizationRequest, UpdateOrganizationRequest } from '@/types/organization'
 import { getDefaultPermissions } from '@/lib/organization-utils'
+import logger from '@/lib/logger';
 
 /**
  * GET /api/organizations
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
       .eq('status', 'active')
 
     if (memberError) {
-      console.error('조직 조회 실패:', memberError)
+      logger.error('조직 조회 실패:', memberError);
       return NextResponse.json(
         { error: '조직 조회에 실패했습니다' },
         { status: 500 }
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
       organizations,
     })
   } catch (error) {
-    console.error('조직 조회 오류:', error)
+    logger.error('조직 조회 오류:', error);
     return NextResponse.json(
       { error: '조직 조회 중 오류가 발생했습니다' },
       { status: 500 }
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (orgError) {
-      console.error('조직 생성 실패:', orgError)
+      logger.error('조직 생성 실패:', orgError);
       return NextResponse.json(
         { error: '조직 생성에 실패했습니다' },
         { status: 500 }
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
       })
 
     if (memberError) {
-      console.error('소유자 멤버 추가 실패:', memberError)
+      logger.error('소유자 멤버 추가 실패:', memberError);
       // 조직 삭제 (롤백)
       await supabase.from('organizations').delete().eq('id', organization.id)
       return NextResponse.json(
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
       organization,
     })
   } catch (error) {
-    console.error('조직 생성 오류:', error)
+    logger.error('조직 생성 오류:', error);
     return NextResponse.json(
       { error: '조직 생성 중 오류가 발생했습니다' },
       { status: 500 }
@@ -191,7 +192,7 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (updateError) {
-      console.error('조직 정보 업데이트 실패:', updateError)
+      logger.error('조직 정보 업데이트 실패:', updateError);
       return NextResponse.json(
         { error: '조직 정보 업데이트에 실패했습니다' },
         { status: 500 }
@@ -203,7 +204,7 @@ export async function PATCH(request: NextRequest) {
       organization,
     })
   } catch (error) {
-    console.error('조직 정보 수정 오류:', error)
+    logger.error('조직 정보 수정 오류:', error);
     return NextResponse.json(
       { error: '조직 정보 수정 중 오류가 발생했습니다' },
       { status: 500 }

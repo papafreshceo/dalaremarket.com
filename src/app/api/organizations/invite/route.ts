@@ -2,6 +2,7 @@ import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-security'
 import { InviteMemberRequest } from '@/types/organization'
+import logger from '@/lib/logger';
 import {
   canManageMembers,
   canAddMember,
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (inviteError) {
-        console.error('초대 생성 실패:', inviteError)
+        logger.error('초대 생성 실패:', inviteError);
         return NextResponse.json(
           { error: '초대 생성에 실패했습니다' },
           { status: 500 }
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (notificationError) {
-        console.error('알림 생성 실패:', notificationError)
+        logger.error('알림 생성 실패:', notificationError);
       }
 
       // 3. 초대에 notification_id 업데이트
@@ -193,7 +194,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (inviteError) {
-        console.error('초대 생성 실패:', inviteError)
+        logger.error('초대 생성 실패:', inviteError);
         return NextResponse.json(
           { error: '초대 생성에 실패했습니다' },
           { status: 500 }
@@ -208,7 +209,7 @@ export async function POST(request: NextRequest) {
       })
     }
   } catch (error) {
-    console.error('초대 생성 오류:', error)
+    logger.error('초대 생성 오류:', error);
     return NextResponse.json(
       { error: '초대 생성 중 오류가 발생했습니다' },
       { status: 500 }
@@ -260,7 +261,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (fetchError) {
-      console.error('초대 목록 조회 실패:', fetchError)
+      logger.error('초대 목록 조회 실패:', fetchError);
       return NextResponse.json(
         { error: '초대 목록 조회에 실패했습니다' },
         { status: 500 }
@@ -272,7 +273,7 @@ export async function GET(request: NextRequest) {
       invitations,
     })
   } catch (error) {
-    console.error('초대 목록 조회 오류:', error)
+    logger.error('초대 목록 조회 오류:', error);
     return NextResponse.json(
       { error: '초대 목록 조회 중 오류가 발생했습니다' },
       { status: 500 }
@@ -342,7 +343,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', invitationId)
 
     if (cancelError) {
-      console.error('초대 취소 실패:', cancelError)
+      logger.error('초대 취소 실패:', cancelError);
       return NextResponse.json(
         { error: '초대 취소에 실패했습니다' },
         { status: 500 }
@@ -359,7 +360,7 @@ export async function DELETE(request: NextRequest) {
         .eq('id', fullInvitation.notification_id)
 
       if (notificationError) {
-        console.error('알림 업데이트 실패:', notificationError)
+        logger.error('알림 업데이트 실패:', notificationError);
         // 알림 업데이트 실패는 무시 (초대 취소는 성공했으므로)
       }
     }
@@ -369,7 +370,7 @@ export async function DELETE(request: NextRequest) {
       message: '초대가 취소되었습니다',
     })
   } catch (error) {
-    console.error('초대 취소 오류:', error)
+    logger.error('초대 취소 오류:', error);
     return NextResponse.json(
       { error: '초대 취소 중 오류가 발생했습니다' },
       { status: 500 }

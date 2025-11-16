@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('정산 내역 조회 실패:', error);
+      logger.error('정산 내역 조회 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
       summary
     });
   } catch (error: any) {
-    console.error('GET /api/settlements 오류:', error);
+    logger.error('GET /api/settlements 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

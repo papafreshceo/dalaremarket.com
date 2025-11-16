@@ -12,7 +12,6 @@ import TierBadge from '@/components/TierBadge';
 interface Order {
   id: number;
   order_number?: string;
-  seller_id?: string; // 레거시 지원
   organization_id?: string; // 조직 기반
   sub_account_id?: string; // 서브계정 ID
   sub_account_name?: string; // 서브계정 사업자명 (조회 후 추가)
@@ -1010,7 +1009,7 @@ export default function OrderPlatformPage() {
       const updatedOrder = {
         id: order.id,
         order_number: order.order_number,
-        seller_id: order.seller_id,
+        organization_id: order.organization_id,
         option_name: order.option_name,
         shipping_status: '취소완료',
         quantity: order.quantity,
@@ -1064,7 +1063,7 @@ export default function OrderPlatformPage() {
       const updatedOrder = {
         id: order.id,
         order_number: order.order_number,
-        seller_id: order.seller_id,
+        organization_id: order.organization_id,
         option_name: order.option_name,
         shipping_status: '상품준비중',
         quantity: order.quantity,
@@ -1116,7 +1115,7 @@ export default function OrderPlatformPage() {
       const updatedOrder = {
         id: order.id,
         order_number: order.order_number,
-        seller_id: order.seller_id,
+        organization_id: order.organization_id,
         option_name: order.option_name,
         shipping_status: '환불완료',  // 상태를 refunded로 변경
         quantity: order.quantity,

@@ -70,6 +70,11 @@ export default function ProfilePage() {
   const [additionalAccounts, setAdditionalAccounts] = useState<any[]>([]);
   const [savingSubAccounts, setSavingSubAccounts] = useState<Record<string, boolean>>({});
 
+  // 회원탈퇴 state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
   /**
    * ============================================================
    * 서브계정 추가 한도 설정
@@ -117,6 +122,7 @@ export default function ProfilePage() {
   const canAddAccount = isOwner && currentAccountCount < maxAccounts;
 
   const supabase = createClient();
+  const router = useRouter();
 
   useEffect(() => {
     setIsMounted(true);
@@ -520,6 +526,43 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error('서브 계정 목록 조회 오류:', error);
+    }
+  };
+
+  // 회원 탈퇴 처리
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== '회원탈퇴') {
+      toast.error('"회원탈퇴"를 정확히 입력해주세요.');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      // API 호출로 auth.users 삭제 (CASCADE로 모든 데이터 자동 삭제)
+      const response = await fetch('/api/user/delete-account', {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '회원 탈퇴 중 오류가 발생했습니다.');
+      }
+
+      toast.success('회원 탈퇴가 완료되었습니다.');
+
+      // 로그아웃 처리
+      await supabase.auth.signOut();
+      localStorage.removeItem('ordersActiveTab');
+
+      // 메인 페이지로 이동
+      setTimeout(() => {
+        router.push('/');
+      }, 1000);
+    } catch (error: any) {
+      console.error('회원 탈퇴 오류:', error);
+      toast.error(error.message || '회원 탈퇴 중 오류가 발생했습니다.');
+      setDeleting(false);
     }
   };
 
@@ -2208,9 +2251,186 @@ export default function ProfilePage() {
                 </div>
               </div>
             )}
+
+            {/* 회원 탈퇴 섹션 */}
+            <div style={{
+              background: '#fff',
+              borderRadius: '16px',
+              padding: isMounted && window.innerWidth <= 768 ? '20px' : '32px',
+              marginTop: '24px',
+              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.05)',
+              border: '2px solid #fee',
+            }}>
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                marginBottom: '16px',
+                color: '#dc3545'
+              }}>회원 탈퇴</h3>
+
+              <div style={{
+                background: '#fff3cd',
+                border: '1px solid #ffc107',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '20px',
+                fontSize: '13px',
+                lineHeight: '1.6'
+              }}>
+                <strong style={{ color: '#856404', display: 'block', marginBottom: '8px' }}>
+                  ⚠️ 회원 탈퇴 시 주의사항
+                </strong>
+                <ul style={{
+                  margin: 0,
+                  paddingLeft: '20px',
+                  color: '#856404'
+                }}>
+                  <li>조직 및 서브계정이 모두 삭제됩니다</li>
+                  <li>캐시, 크레딧 등 모든 포인트가 삭제됩니다</li>
+                  <li>멤버 정보 및 초대 내역이 삭제됩니다</li>
+                  <li>알림 및 활동 이력이 삭제됩니다</li>
+                  <li>주문 기록은 정산 목적으로 보존되며, 조직명만 기록에 남습니다</li>
+                  <li><strong>이 작업은 되돌릴 수 없습니다</strong></li>
+                </ul>
+              </div>
+
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                style={{
+                  padding: '12px 24px',
+                  background: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#c82333'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#dc3545'}
+              >
+                회원 탈퇴
+              </button>
+            </div>
           </>
         )}
       </div>
+
+      {/* 회원 탈퇴 확인 모달 */}
+      {showDeleteConfirm && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}
+          onClick={() => {
+            setShowDeleteConfirm(false);
+            setDeleteConfirmText('');
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '32px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{
+              fontSize: '20px',
+              fontWeight: '600',
+              marginBottom: '16px',
+              color: '#dc3545'
+            }}>
+              정말 탈퇴하시겠습니까?
+            </h3>
+
+            <p style={{
+              fontSize: '14px',
+              color: '#6c757d',
+              marginBottom: '24px',
+              lineHeight: '1.6'
+            }}>
+              회원 탈퇴를 진행하시려면 아래 입력란에 <strong>"회원탈퇴"</strong>를 입력해주세요.
+              <br />
+              <strong style={{ color: '#dc3545' }}>이 작업은 되돌릴 수 없습니다.</strong>
+            </p>
+
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="회원탈퇴"
+              disabled={deleting}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '2px solid #dee2e6',
+                borderRadius: '8px',
+                fontSize: '14px',
+                marginBottom: '20px',
+                outline: 'none',
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#dc3545'}
+              onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
+            />
+
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeleteConfirmText('');
+                }}
+                disabled={deleting}
+                style={{
+                  padding: '10px 20px',
+                  background: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  opacity: deleting ? 0.5 : 1,
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting || deleteConfirmText !== '회원탈퇴'}
+                style={{
+                  padding: '10px 20px',
+                  background: deleteConfirmText === '회원탈퇴' && !deleting ? '#dc3545' : '#ccc',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: deleteConfirmText === '회원탈퇴' && !deleting ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {deleting ? '탈퇴 처리 중...' : '탈퇴하기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

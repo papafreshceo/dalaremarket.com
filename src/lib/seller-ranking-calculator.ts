@@ -1,5 +1,5 @@
 /**
- * 셀러 랭킹 점수 계산 로직
+ * 조직 랭킹 점수 계산 로직
  *
  * 발주확정 금액, 건수, 활동점수로 순위를 산출합니다.
  * 점수는 실적에 비례하여 무제한 증가합니다.
@@ -7,14 +7,14 @@
  */
 
 export interface SellerPerformanceData {
-  seller_id: string;
+  organization_id: string;
   total_sales: number;
   order_count: number;
   activity_score?: number;  // 활동점수 (연속발주, 게시글, 답글, 로그인)
 }
 
 export interface SellerScore {
-  seller_id: string;
+  organization_id: string;
   sales_score: number;  // 발주확정 금액 점수
   order_count_score: number;  // 발주확정 건수 점수
   activity_score: number;  // 활동점수
@@ -65,7 +65,7 @@ export function calculateSellerScore(
   const totalScore = salesScore + orderCountScore + activityScore;
 
   return {
-    seller_id: performance.seller_id,
+    organization_id: performance.organization_id,
     sales_score: salesScore,
     order_count_score: orderCountScore,
     activity_score: activityScore,

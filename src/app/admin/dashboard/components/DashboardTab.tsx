@@ -586,10 +586,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
         if (orderSource === 'direct' && isPlatform) return false;
       }
 
-      // 셀러 필터 (플랫폼용)
+      // 조직 필터 (플랫폼용)
       if (selectedSeller) {
-        const sellerId = (order as any).seller_id || '미지정';
-        if (sellerId !== selectedSeller) return false;
+        const organizationId = (order as any).organization_id || '미지정';
+        if (organizationId !== selectedSeller) return false;
       }
 
       // 마켓 필터 (자사판매용)
@@ -788,9 +788,9 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     };
   }, [orders, startDate, endDate]);
 
-  // 셀러별 통계 (날짜 + 상태 + 출처 + 품목 + 옵션 필터 적용)
+  // 조직별 통계 (날짜 + 상태 + 출처 + 품목 + 옵션 필터 적용)
   const sellerStats = useMemo(() => {
-    // seller_id로 그룹화
+    // organization_id로 그룹화
     const sellerMap = new Map<string, {
       sellerId: string;
       count: number;
@@ -823,10 +823,10 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     });
 
     filteredForSeller.forEach(order => {
-      const sellerId = (order as any).seller_id || '미지정';
-      if (!sellerMap.has(sellerId)) {
-        sellerMap.set(sellerId, {
-          sellerId,
+      const organizationId = (order as any).organization_id || '미지정';
+      if (!sellerMap.has(organizationId)) {
+        sellerMap.set(organizationId, {
+          sellerId: organizationId,
           count: 0,
           amount: 0,
           confirmed: 0,
@@ -835,7 +835,7 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
         });
       }
 
-      const stat = sellerMap.get(sellerId)!;
+      const stat = sellerMap.get(organizationId)!;
       stat.count++;
       stat.amount += order.supplyPrice || 0;
 
@@ -869,17 +869,17 @@ export default function DashboardTab({ isMobile, orders, statusConfig }: Dashboa
     }>();
 
     platformOrders.forEach(order => {
-      const sellerId = (order as any).seller_id || '미지정';
+      const organizationId = (order as any).organization_id || '미지정';
 
-      if (!sellerMap.has(sellerId)) {
-        sellerMap.set(sellerId, {
-          sellerId,
+      if (!sellerMap.has(organizationId)) {
+        sellerMap.set(organizationId, {
+          sellerId: organizationId,
           count: 0,
           amount: 0
         });
       }
 
-      const stat = sellerMap.get(sellerId)!;
+      const stat = sellerMap.get(organizationId)!;
       stat.count++;
       stat.amount += order.supplyPrice || 0;
     });

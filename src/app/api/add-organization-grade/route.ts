@@ -18,7 +18,7 @@ export async function GET() {
     })
 
     if (alterError && !alterError.message?.includes('already exists')) {
-      console.error('컬럼 추가 오류:', alterError)
+      logger.error('컬럼 추가 오류:', alterError);
     }
 
     // 2. 기존 데이터 업데이트
@@ -28,7 +28,7 @@ export async function GET() {
       .is('grade', null)
 
     if (updateError) {
-      console.error('기본값 설정 오류:', updateError)
+      logger.error('기본값 설정 오류:', updateError);
     }
 
     return NextResponse.json({
@@ -36,7 +36,7 @@ export async function GET() {
       message: 'grade 컬럼이 추가되었습니다'
     })
   } catch (error) {
-    console.error('마이그레이션 오류:', error)
+    logger.error('마이그레이션 오류:', error);
     return NextResponse.json(
       { error: '마이그레이션 실패', details: error },
       { status: 500 }

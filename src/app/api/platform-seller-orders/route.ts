@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { getUserPrimaryOrganization } from '@/lib/organization-utils';
+import logger from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,23 +11,21 @@ export async function POST(request: NextRequest) {
     // 사용자 인증 확인
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      console.error('❌ 인증 오류:', authError);
+      logger.error('플랫폼 주문 등록 인증 실패', authError);
       return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
     }
 
-
     const { orders } = await request.json();
 
-
     if (!orders || !Array.isArray(orders) || orders.length === 0) {
-      console.error('❌ 유효하지 않은 주문 데이터');
+      logger.warn('유효하지 않은 주문 데이터', { orderCount: orders?.length });
       return NextResponse.json({ error: '유효한 주문 데이터가 없습니다.' }, { status: 400 });
     }
 
     // 🔒 사용자의 조직 정보 가져오기
     const organization = await getUserPrimaryOrganization(user.id);
     if (!organization) {
-      console.error('❌ 조직 정보 없음');
+      logger.error('조직 정보 없음');
       return NextResponse.json({ error: '조직 정보를 찾을 수 없습니다.' }, { status: 404 });
     }
 
@@ -50,8 +49,8 @@ export async function POST(request: NextRequest) {
       }
 
       return {
-        seller_id: user.id,
-        organization_id: organization.id, // 🔒 조직 ID 추가
+        organization_id: organization.id, // 🔒 조직 ID
+        created_by: user.id, // 생성자
         order_number: order.orderNumber || null,
         orderer: order.orderer || null,
         orderer_phone: order.ordererPhone || null,
@@ -75,10 +74,11 @@ export async function POST(request: NextRequest) {
       .select();
 
     if (error) {
-      console.error('❌ 주문 삽입 오류:', error);
-      console.error('❌ 오류 상세:', JSON.stringify(error, null, 2));
+      logger.error('주문 삽입 오류', error);
       return NextResponse.json({ error: '주문 등록에 실패했습니다.', details: error.message }, { status: 500 });
     }
+
+    logger.info('플랫폼 주문 등록 성공', { count: data.length });
 
     return NextResponse.json({
       success: true,
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('API 오류:', error);
+    logger.error('플랫폼 주문 등록 API 오류', error as Error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }

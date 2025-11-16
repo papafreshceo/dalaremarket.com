@@ -1,5 +1,6 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/product-mapping
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query;
 
     if (error) {
-      console.error('제품 매핑 조회 실패:', error);
+      logger.error('제품 매핑 조회 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('GET /api/product-mapping 오류:', error);
+    logger.error('GET /api/product-mapping 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('제품 매핑 생성 실패:', error);
+      logger.error('제품 매핑 생성 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error('POST /api/product-mapping 오류:', error);
+    logger.error('POST /api/product-mapping 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -135,7 +136,7 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('제품 매핑 수정 실패:', error);
+      logger.error('제품 매핑 수정 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -144,7 +145,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error('PUT /api/product-mapping 오류:', error);
+    logger.error('PUT /api/product-mapping 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -172,7 +173,7 @@ export async function DELETE(request: NextRequest) {
     const { error } = await supabase.from('product_mapping').delete().eq('id', id);
 
     if (error) {
-      console.error('제품 매핑 삭제 실패:', error);
+      logger.error('제품 매핑 삭제 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -181,7 +182,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('DELETE /api/product-mapping 오류:', error);
+    logger.error('DELETE /api/product-mapping 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import logger from '@/lib/logger';
 
 // GET: 활성화된 도구 목록 조회
 export async function GET() {
@@ -15,7 +16,7 @@ export async function GET() {
       .order('display_order', { ascending: true });
 
     if (error) {
-      console.error('Error fetching tools:', error);
+      logger.error('Error fetching tools:', error);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
@@ -24,7 +25,7 @@ export async function GET() {
       tools: tools || []
     });
   } catch (error: any) {
-    console.error('Error:', error);
+    logger.error('Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

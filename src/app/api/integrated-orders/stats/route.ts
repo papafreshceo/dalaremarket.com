@@ -2,6 +2,7 @@ import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-security';
 import { getOrganizationDataFilter } from '@/lib/organization-utils';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/integrated-orders/stats
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
       organizationId = await getOrganizationDataFilter(auth.user.id);
     }
 
-    console.log('📊 통계 조회 파라미터:', {
+    logger.debug('📊 통계 조회 파라미터:', {
       startDate,
       endDate,
       dateType,
@@ -67,14 +68,14 @@ export async function GET(request: NextRequest) {
     });
 
     if (error) {
-      console.error('❌ RPC 함수 호출 실패:', error);
+      logger.error('❌ RPC 함수 호출 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
       );
     }
 
-    console.log('✅ 통계 조회 성공:', {
+    logger.debug('✅ 통계 조회 성공:', {
       total: data?.status_stats?.total || 0,
       vendorCount: data?.vendor_stats?.length || 0,
       sellerCount: data?.seller_stats?.length || 0,
@@ -173,7 +174,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('❌ GET /api/integrated-orders/stats 오류:', error);
+    logger.error('❌ GET /api/integrated-orders/stats 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

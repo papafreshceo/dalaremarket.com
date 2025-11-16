@@ -2,6 +2,7 @@ import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import logger from '@/lib/logger';
 
 /**
  * 셀러 랭킹 시스템 마이그레이션 API
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
 
         if (error) {
           // RPC가 없으면 직접 실행 시도
-          console.error('RPC error, trying direct execution:', error);
+          logger.error('RPC error, trying direct execution:', error);
           results.push({
             success: false,
             statement: statement.substring(0, 100) + '...',
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Migration error:', error);
+    logger.error('Migration error:', error);
     return NextResponse.json(
       {
         success: false,

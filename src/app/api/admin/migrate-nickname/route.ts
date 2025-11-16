@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (addColumnError) {
-      console.error('컬럼 추가 오류:', addColumnError);
+      logger.error('컬럼 추가 오류:', addColumnError);
 
       // 대체 방법: 직접 SQL 실행 시도
       return NextResponse.json({
@@ -51,7 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_users_nickname ON users(nickname);
     });
 
   } catch (error: any) {
-    console.error('마이그레이션 오류:', error);
+    logger.error('마이그레이션 오류:', error);
     return NextResponse.json(
       {
         success: false,

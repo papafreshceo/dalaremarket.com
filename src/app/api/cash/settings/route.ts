@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/api-security';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/cash/settings
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (settingsError || !settings) {
-      console.error('[GET /api/cash/settings] 설정 조회 오류:', settingsError);
+      logger.error('[GET /api/cash/settings] 설정 조회 오류:', settingsError);
       return NextResponse.json(
         { success: false, error: '캐시 설정을 조회할 수 없습니다.' },
         { status: 500 }
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[GET /api/cash/settings] 오류:', error);
+    logger.error('[GET /api/cash/settings] 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message || '서버 오류가 발생했습니다.' },
       { status: 500 }
@@ -87,7 +88,7 @@ export async function PUT(request: NextRequest) {
         .eq('id', existingSettings.id);
 
       if (updateError) {
-        console.error('[PUT /api/cash/settings] 설정 업데이트 오류:', updateError);
+        logger.error('[PUT /api/cash/settings] 설정 업데이트 오류:', updateError);
         return NextResponse.json(
           { success: false, error: '설정 업데이트에 실패했습니다.' },
           { status: 500 }
@@ -105,7 +106,7 @@ export async function PUT(request: NextRequest) {
         });
 
       if (insertError) {
-        console.error('[PUT /api/cash/settings] 설정 생성 오류:', insertError);
+        logger.error('[PUT /api/cash/settings] 설정 생성 오류:', insertError);
         return NextResponse.json(
           { success: false, error: '설정 생성에 실패했습니다.' },
           { status: 500 }
@@ -124,7 +125,7 @@ export async function PUT(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[PUT /api/cash/settings] 오류:', error);
+    logger.error('[PUT /api/cash/settings] 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message || '서버 오류가 발생했습니다.' },
       { status: 500 }

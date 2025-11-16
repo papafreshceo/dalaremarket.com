@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 // 활성화된 테마 조회 (public)
 export async function GET(request: NextRequest) {
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      console.error('Fetch active theme error:', error);
+      logger.error('Fetch active theme error:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
       data: theme
     });
   } catch (error: any) {
-    console.error('GET /api/design-theme/active error:', error);
+    logger.error('GET /api/design-theme/active error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

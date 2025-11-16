@@ -4,6 +4,7 @@ import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
+import logger from '@/lib/logger';
 
 const execAsync = promisify(exec);
 
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error: any) {
-    console.error('API 오류:', error);
+    logger.error('API 오류:', error);
 
     // 임시 파일 삭제
     if (inputFilePath) await fs.unlink(inputFilePath).catch(() => {});

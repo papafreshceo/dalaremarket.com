@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import logger from '@/lib/logger';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,7 +41,7 @@ COMMENT ON COLUMN category_settings.season_end_date IS '시즌 종료일 (MM-DD 
     });
 
   } catch (error: any) {
-    console.error('마이그레이션 실행 중 오류:', error);
+    logger.error('마이그레이션 실행 중 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

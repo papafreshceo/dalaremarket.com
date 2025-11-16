@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('프로필 이름 확인 오류:', error);
+    logger.error('프로필 이름 확인 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }

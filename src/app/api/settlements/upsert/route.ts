@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      console.error('정산 레코드 생성 실패:', error);
+      logger.error('정산 레코드 생성 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       message: '정산 레코드가 생성/업데이트되었습니다.'
     });
   } catch (error: any) {
-    console.error('POST /api/settlements/upsert 오류:', error);
+    logger.error('POST /api/settlements/upsert 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

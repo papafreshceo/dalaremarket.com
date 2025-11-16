@@ -3,6 +3,7 @@ import cloudinary from '@/lib/cloudinary/config';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import crypto from 'crypto';
 import { requireAuth } from '@/lib/api-security';
+import logger from '@/lib/logger';
 
 /**
  * POST /api/cloudinary/upload
@@ -267,7 +268,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('DB 저장 오류:', error);
+      logger.error('DB 저장 오류:', error);
       console.error('에러 상세:', JSON.stringify(error, null, 2));
       console.error('저장하려던 데이터:', JSON.stringify(insertData, null, 2));
       // Cloudinary에서 삭제 (롤백)
@@ -286,7 +287,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('업로드 오류:', error);
+    logger.error('업로드 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

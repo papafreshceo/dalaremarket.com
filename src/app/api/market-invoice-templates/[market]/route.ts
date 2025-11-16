@@ -1,5 +1,6 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/market-invoice-templates/[market]
@@ -39,7 +40,7 @@ export async function GET(
       data,
     });
   } catch (error: any) {
-    console.error('GET /api/market-invoice-templates/[market] 오류:', error);
+    logger.error('GET /api/market-invoice-templates/[market] 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

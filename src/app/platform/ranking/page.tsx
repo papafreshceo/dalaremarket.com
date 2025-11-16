@@ -8,7 +8,7 @@ import TierBadge, { TierRow } from '@/components/TierBadge';
 
 interface SellerRanking {
   id: number;
-  seller_id: string;
+  organization_id: string;
   period_type: string;
   period_start: string;
   period_end: string;
@@ -896,7 +896,7 @@ export default function RankingPage() {
                       </tr>
                     )}
                     {rankings.map((ranking, index) => {
-                      const isMe = myRanking?.seller_id === ranking.seller_id;
+                      const isMe = myRanking?.organization_id === ranking.organization_id;
                       return (
                         <tr
                           key={ranking.id}

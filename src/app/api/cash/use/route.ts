@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
+import { createAuditLog } from '@/lib/audit-log';
 
 /**
  * POST /api/cash/use
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (cashError || !userCash) {
-      console.error('[POST /api/cash/use] 캐시 조회 오류:', cashError);
+      logger.error('[POST /api/cash/use] 캐시 조회 오류:', cashError);
       return NextResponse.json(
         { success: false, error: '캐시 정보를 조회할 수 없습니다.' },
         { status: 500 }
@@ -73,7 +75,7 @@ export async function POST(request: NextRequest) {
       .eq('organization_id', organization.id);
 
     if (updateError) {
-      console.error('[POST /api/cash/use] 잔액 업데이트 오류:', updateError);
+      logger.error('[POST /api/cash/use] 잔액 업데이트 오류:', updateError);
       return NextResponse.json(
         { success: false, error: '캐시 사용에 실패했습니다.' },
         { status: 500 }
@@ -94,9 +96,26 @@ export async function POST(request: NextRequest) {
       });
 
     if (transactionError) {
-      console.error('[POST /api/cash/use] 거래 이력 추가 오류:', transactionError);
+      logger.error('[POST /api/cash/use] 거래 이력 추가 오류:', transactionError);
       // 이력 추가 실패는 치명적이지 않으므로 계속 진행
     }
+
+    // 🔒 감사 로그: 캐시 사용 기록
+    await createAuditLog({
+      action: 'use_cash',
+      actionCategory: 'payment',
+      resourceType: 'cash',
+      resourceId: organization.id,
+      beforeData: { balance: userCash.balance },
+      afterData: { balance: newBalance },
+      details: {
+        amount,
+        description,
+        balance_before: userCash.balance,
+        balance_after: newBalance
+      },
+      severity: 'info'
+    }, request, { user, userData: { id: user.id, organization_id: organization.id } });
 
     return NextResponse.json({
       success: true,
@@ -106,7 +125,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[POST /api/cash/use] 오류:', error);
+    logger.error('[POST /api/cash/use] 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message || '서버 오류가 발생했습니다.' },
       { status: 500 }

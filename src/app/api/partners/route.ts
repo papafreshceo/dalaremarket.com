@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-security';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/partners
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('거래처 조회 실패:', error);
+      logger.error('거래처 조회 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
       data: data || [],
     });
   } catch (error: any) {
-    console.error('거래처 조회 오류:', error);
+    logger.error('거래처 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

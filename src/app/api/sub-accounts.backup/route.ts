@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (createError) {
-      console.error('서브 계정 생성 실패:', createError)
+      logger.error('서브 계정 생성 실패:', createError);
       return NextResponse.json(
         { error: '서브 계정 생성에 실패했습니다', details: createError.message },
         { status: 500 }
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       message: '서브 계정이 생성되었습니다',
     })
   } catch (error: any) {
-    console.error('서브 계정 생성 오류:', error)
+    logger.error('서브 계정 생성 오류:', error);
     return NextResponse.json(
       { error: '서버 오류가 발생했습니다', details: error.message },
       { status: 500 }
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: true })
 
     if (error) {
-      console.error('서브 계정 조회 실패:', error)
+      logger.error('서브 계정 조회 실패:', error);
       return NextResponse.json(
         { error: '서브 계정 조회에 실패했습니다' },
         { status: 500 }
@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
       main_organization: org,
     })
   } catch (error: any) {
-    console.error('서브 계정 조회 오류:', error)
+    logger.error('서브 계정 조회 오류:', error);
     return NextResponse.json(
       { error: '서버 오류가 발생했습니다', details: error.message },
       { status: 500 }
@@ -218,7 +218,7 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (updateError) {
-      console.error('서브 계정 수정 실패:', updateError)
+      logger.error('서브 계정 수정 실패:', updateError);
       return NextResponse.json(
         { error: '서브 계정 수정에 실패했습니다', details: updateError.message },
         { status: 500 }
@@ -231,7 +231,7 @@ export async function PATCH(request: NextRequest) {
       message: '서브 계정이 수정되었습니다',
     })
   } catch (error: any) {
-    console.error('서브 계정 수정 오류:', error)
+    logger.error('서브 계정 수정 오류:', error);
     return NextResponse.json(
       { error: '서버 오류가 발생했습니다', details: error.message },
       { status: 500 }
@@ -293,7 +293,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', subAccountId)
 
     if (deleteError) {
-      console.error('서브 계정 삭제 실패:', deleteError)
+      logger.error('서브 계정 삭제 실패:', deleteError);
       return NextResponse.json(
         { error: '서브 계정 삭제에 실패했습니다', details: deleteError.message },
         { status: 500 }
@@ -305,7 +305,7 @@ export async function DELETE(request: NextRequest) {
       message: '서브 계정이 삭제되었습니다',
     })
   } catch (error: any) {
-    console.error('서브 계정 삭제 오류:', error)
+    logger.error('서브 계정 삭제 오류:', error);
     return NextResponse.json(
       { error: '서버 오류가 발생했습니다', details: error.message },
       { status: 500 }

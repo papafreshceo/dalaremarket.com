@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 // 테마 활성화
 export async function POST(
@@ -17,7 +18,7 @@ export async function POST(
       .neq('id', id);
 
     if (deactivateError) {
-      console.error('Deactivate themes error:', deactivateError);
+      logger.error('Deactivate themes error:', deactivateError);
     }
 
     // 선택한 테마 활성화
@@ -29,7 +30,7 @@ export async function POST(
       .single();
 
     if (error) {
-      console.error('Activate theme error:', error);
+      logger.error('Activate theme error:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -42,7 +43,7 @@ export async function POST(
       message: '테마가 활성화되었습니다.'
     });
   } catch (error: any) {
-    console.error('POST /api/admin/design-themes/[id]/activate error:', error);
+    logger.error('POST /api/admin/design-themes/[id]/activate error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

@@ -47,7 +47,7 @@ export async function POST(
         .single();
 
       if (insertError) {
-        console.error('크레딧 레코드 생성 오류:', insertError);
+        logger.error('크레딧 레코드 생성 오류:', insertError);
         return NextResponse.json(
           { success: false, error: '크레딧 레코드 생성에 실패했습니다.' },
           { status: 500 }
@@ -56,7 +56,7 @@ export async function POST(
 
       creditsRecord = newRecord;
     } else if (fetchError) {
-      console.error('크레딧 조회 오류:', fetchError);
+      logger.error('크레딧 조회 오류:', fetchError);
       return NextResponse.json(
         { success: false, error: '크레딧 조회에 실패했습니다.' },
         { status: 500 }
@@ -81,7 +81,7 @@ export async function POST(
       .eq('organization_id', organizationId);
 
     if (updateError) {
-      console.error('크레딧 업데이트 오류:', updateError);
+      logger.error('크레딧 업데이트 오류:', updateError);
       return NextResponse.json(
         { success: false, error: '크레딧 업데이트에 실패했습니다.' },
         { status: 500 }
@@ -102,7 +102,7 @@ export async function POST(
       });
 
     if (historyError) {
-      console.error('히스토리 기록 오류:', historyError);
+      logger.error('히스토리 기록 오류:', historyError);
       // 히스토리 실패는 치명적이지 않으므로 계속 진행
     }
 
@@ -118,7 +118,7 @@ export async function POST(
     });
 
   } catch (error: any) {
-    console.error('POST /api/admin/organizations/[id]/credits 오류:', error);
+    logger.error('POST /api/admin/organizations/[id]/credits 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.' },
       { status: 500 }

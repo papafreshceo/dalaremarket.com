@@ -1,5 +1,6 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 export async function GET(request: Request) {
   try {
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ notices });
   } catch (error: any) {
-    console.error('Error fetching notices:', error);
+    logger.error('Error fetching notices:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to fetch notices' },
       { status: 500 }
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ notice });
   } catch (error: any) {
-    console.error('Error creating notice:', error);
+    logger.error('Error creating notice:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to create notice' },
       { status: 500 }
@@ -126,7 +127,7 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({ notice });
   } catch (error: any) {
-    console.error('Error updating notice:', error);
+    logger.error('Error updating notice:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to update notice' },
       { status: 500 }
@@ -170,7 +171,7 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Error deleting notice:', error);
+    logger.error('Error deleting notice:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to delete notice' },
       { status: 500 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 // 특정 테마 조회
 export async function GET(
@@ -17,7 +18,7 @@ export async function GET(
       .single();
 
     if (error) {
-      console.error('Fetch theme error:', error);
+      logger.error('Fetch theme error:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -29,7 +30,7 @@ export async function GET(
       data: theme
     });
   } catch (error: any) {
-    console.error('GET /api/admin/design-themes/[id] error:', error);
+    logger.error('GET /api/admin/design-themes/[id] error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -63,7 +64,7 @@ export async function PATCH(
       .single();
 
     if (error) {
-      console.error('Update theme error:', error);
+      logger.error('Update theme error:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -75,7 +76,7 @@ export async function PATCH(
       data: theme
     });
   } catch (error: any) {
-    console.error('PATCH /api/admin/design-themes/[id] error:', error);
+    logger.error('PATCH /api/admin/design-themes/[id] error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -112,7 +113,7 @@ export async function DELETE(
       .eq('id', id);
 
     if (error) {
-      console.error('Delete theme error:', error);
+      logger.error('Delete theme error:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -124,7 +125,7 @@ export async function DELETE(
       message: '테마가 삭제되었습니다.'
     });
   } catch (error: any) {
-    console.error('DELETE /api/admin/design-themes/[id] error:', error);
+    logger.error('DELETE /api/admin/design-themes/[id] error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

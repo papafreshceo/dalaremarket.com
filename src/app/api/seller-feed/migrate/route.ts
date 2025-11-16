@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('셀러피드 마이그레이션 오류:', error);
+    logger.error('셀러피드 마이그레이션 오류:', error);
     return NextResponse.json(
       {
         success: false,

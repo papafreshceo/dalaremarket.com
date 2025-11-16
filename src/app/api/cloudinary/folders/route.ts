@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import cloudinary from '@/lib/cloudinary/config';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/cloudinary/folders
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
       data: folderTrees, // 배열로 반환
     });
   } catch (error: any) {
-    console.error('폴더 조회 오류:', error);
+    logger.error('폴더 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

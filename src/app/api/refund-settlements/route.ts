@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (orderError || !order) {
-      console.error('❌ 주문 조회 실패:', orderError);
+      logger.error('❌ 주문 조회 실패:', orderError);
       return NextResponse.json(
         { success: false, error: '주문을 찾을 수 없습니다.' },
         { status: 404 }
@@ -95,14 +95,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (settlementError) {
-      console.error('❌ 환불 정산 데이터 저장 실패:', settlementError);
+      logger.error('❌ 환불 정산 데이터 저장 실패:', settlementError);
       return NextResponse.json(
         { success: false, error: '환불 정산 데이터 저장에 실패했습니다.' },
         { status: 500 }
       );
     }
 
-    console.log('✅ 환불 정산 데이터 저장 성공:', {
+    logger.debug('✅ 환불 정산 데이터 저장 성공:', {
       settlement_id: settlement.id,
       order_id: orderId,
       organization: organization?.business_name,
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
       data: settlement,
     });
   } catch (error: any) {
-    console.error('❌ POST /api/refund-settlements 오류:', error);
+    logger.error('❌ POST /api/refund-settlements 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('❌ 환불 정산 데이터 조회 실패:', error);
+      logger.error('❌ 환불 정산 데이터 조회 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('❌ GET /api/refund-settlements 오류:', error);
+    logger.error('❌ GET /api/refund-settlements 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

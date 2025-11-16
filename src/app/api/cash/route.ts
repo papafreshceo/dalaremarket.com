@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { getUserPrimaryOrganization } from '@/lib/organization-utils';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/cash
@@ -104,7 +105,7 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        console.error('[GET /api/cash] 캐시 생성 오류:', insertError);
+        logger.error('[GET /api/cash] 캐시 생성 오류:', insertError);
         return NextResponse.json(
           { success: false, error: '캐시 정보를 생성할 수 없습니다.' },
           { status: 500 }
@@ -120,7 +121,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (cashError) {
-      console.error('[GET /api/cash] 캐시 조회 오류:', cashError);
+      logger.error('[GET /api/cash] 캐시 조회 오류:', cashError);
       return NextResponse.json(
         { success: false, error: '캐시 정보를 조회할 수 없습니다.' },
         { status: 500 }
@@ -135,7 +136,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[GET /api/cash] 오류:', error);
+    logger.error('[GET /api/cash] 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message || '서버 오류가 발생했습니다.' },
       { status: 500 }

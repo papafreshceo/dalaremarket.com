@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import logger from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     const userData = await userResponse.json()
 
     if (userData.resultcode !== '00' || !userData.response) {
-      console.error('User info error:', userData)
+      logger.error('User info error:', userData);
       return NextResponse.json({ error: 'Failed to get user info' }, { status: 400 })
     }
 
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
       naver_id: naverUser.id,
     })
   } catch (error) {
-    console.error('User info fetch error:', error)
+    logger.error('User info fetch error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (cashError || !orgCash) {
-      console.error('❌ 조직 캐시 조회 실패:', cashError);
+      logger.error('❌ 조직 캐시 조회 실패:', cashError);
       return NextResponse.json(
         { success: false, error: '조직의 캐시 정보를 찾을 수 없습니다.' },
         { status: 404 }
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       .eq('organization_id', organizationId);
 
     if (updateError) {
-      console.error('❌ 캐시 환불 실패:', updateError);
+      logger.error('❌ 캐시 환불 실패:', updateError);
       return NextResponse.json(
         { success: false, error: '캐시 환불에 실패했습니다.' },
         { status: 500 }
@@ -77,11 +77,11 @@ export async function POST(request: NextRequest) {
       });
 
     if (txError) {
-      console.error('❌ 캐시 거래 내역 저장 실패:', txError);
+      logger.error('❌ 캐시 거래 내역 저장 실패:', txError);
       // 거래 내역 저장 실패해도 환불은 완료된 상태
     }
 
-    console.log('✅ 캐시 환불 성공:', {
+    logger.debug('✅ 캐시 환불 성공:', {
       organization_id: organizationId,
       refund_amount: refundAmount,
       previous_cash: currentCash,
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('❌ POST /api/cash/refund 오류:', error);
+    logger.error('❌ POST /api/cash/refund 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

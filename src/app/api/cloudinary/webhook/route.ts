@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import crypto from 'crypto';
+import logger from '@/lib/logger';
 
 /**
  * POST /api/cloudinary/webhook
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
         .digest('hex');
 
       if (signature !== expectedSignature) {
-        console.error('Invalid webhook signature');
+        logger.error('Invalid webhook signature');
         return NextResponse.json(
           { success: false, error: 'Invalid signature' },
           { status: 401 }
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
 
       if (findError) {
-        console.error('DB 조회 오류:', findError);
+        logger.error('DB 조회 오류:', findError);
         return NextResponse.json(
           { success: false, error: 'Database error' },
           { status: 500 }
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
           .eq('id', image.id);
 
         if (deleteError) {
-          console.error('DB 삭제 오류:', deleteError);
+          logger.error('DB 삭제 오류:', deleteError);
           return NextResponse.json(
             { success: false, error: 'Failed to delete from database' },
             { status: 500 }
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Webhook 처리 오류:', error);
+    logger.error('Webhook 처리 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

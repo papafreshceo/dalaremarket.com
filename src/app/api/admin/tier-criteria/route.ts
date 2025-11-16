@@ -1,5 +1,6 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 export async function GET() {
   try {
@@ -12,13 +13,13 @@ export async function GET() {
       .order('min_total_sales', { ascending: false });
 
     if (criteriaError) {
-      console.error('티어 기준 조회 오류:', criteriaError);
+      logger.error('티어 기준 조회 오류:', criteriaError);
       return NextResponse.json({ error: '티어 기준을 불러올 수 없습니다.' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, criteria });
   } catch (error) {
-    console.error('GET /api/admin/tier-criteria 오류:', error);
+    logger.error('GET /api/admin/tier-criteria 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
@@ -64,14 +65,14 @@ export async function PUT(request: Request) {
         .eq('tier', tier);
 
       if (updateError) {
-        console.error(`티어 ${tier} 업데이트 오류:`, updateError);
+        logger.error('티어 ${tier} 업데이트 오류:', updateError);
         return NextResponse.json({ error: `${tier} 등급 업데이트에 실패했습니다.` }, { status: 500 });
       }
     }
 
     return NextResponse.json({ success: true, message: '티어 기준이 저장되었습니다.' });
   } catch (error) {
-    console.error('PUT /api/admin/tier-criteria 오류:', error);
+    logger.error('PUT /api/admin/tier-criteria 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }

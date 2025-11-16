@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-security'
 import { autoCreateOrganizationFromUser } from '@/lib/auto-create-organization'
+import logger from '@/lib/logger';
 
 /**
  * POST /api/organizations/auto-create
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
       organization_name: result.organization_name,
     })
   } catch (error) {
-    console.error('조직 자동 생성 오류:', error)
+    logger.error('조직 자동 생성 오류:', error);
     return NextResponse.json(
       { error: '조직 생성 중 오류가 발생했습니다' },
       { status: 500 }

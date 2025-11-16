@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/cloudinary/categories
@@ -26,7 +27,7 @@ export async function GET() {
       data: data || [],
     });
   } catch (error: any) {
-    console.error('카테고리 조회 오류:', error);
+    logger.error('카테고리 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

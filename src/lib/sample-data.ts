@@ -279,7 +279,7 @@ export function generateSampleOrders(optionProducts: OptionProduct[], organizati
 /**
  * 샘플 데이터를 DB 주문 형식으로 변환
  */
-export function convertSampleOrdersToDBFormat(sampleOrders: SampleOrder[], sellerId: string) {
+export function convertSampleOrdersToDBFormat(sampleOrders: SampleOrder[], sellerId: string, organizationId: string) {
   const cancelReasons = [
     '고객 단순 변심',
     '배송 지연',
@@ -360,7 +360,8 @@ export function convertSampleOrdersToDBFormat(sampleOrders: SampleOrder[], selle
       shipping_company: order.shippingCompany,
       courier_company: order.shippingCompany, // 택배사 (courier_company도 설정)
       tracking_number: order.invoiceNumber, // 송장번호 (tracking_number도 설정)
-      seller_id: sellerId, // 사용자 ID 추가
+      organization_id: organizationId, // 조직 ID
+      created_by: sellerId, // 생성자 (사용자 ID)
       created_at: orderDateTime,
       confirmed_at: confirmedDateTime, // 발주확정일시 (캘린더 표시용)
       shipped_date: shippedDateTime, // 발송일 (배송완료/배송중인 경우만)

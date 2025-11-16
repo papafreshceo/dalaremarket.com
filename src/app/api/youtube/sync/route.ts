@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     if (!channelResponse.ok) {
       const errorData = await channelResponse.json();
-      console.error('YouTube API 오류:', errorData);
+      logger.error('YouTube API 오류:', errorData);
       throw new Error(`채널 정보를 가져올 수 없습니다: ${errorData.error?.message || channelResponse.statusText}`);
     }
 
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (error) {
-        console.error('영상 저장 오류:', error);
+        logger.error('영상 저장 오류:', error);
       } else {
         savedVideos.push(data);
       }
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('YouTube 동기화 오류:', error);
+    logger.error('YouTube 동기화 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message || '동기화 중 오류가 발생했습니다.' },
       { status: 500 }

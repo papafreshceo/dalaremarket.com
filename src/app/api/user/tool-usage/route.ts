@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import logger from '@/lib/logger';
 
 // GET: 사용자의 도구별 사용 횟수 조회
 export async function GET() {
@@ -20,7 +21,7 @@ export async function GET() {
     });
 
     if (error) {
-      console.error('Error fetching tool usage:', error);
+      logger.error('Error fetching tool usage:', error);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
@@ -35,7 +36,7 @@ export async function GET() {
       usageCounts
     });
   } catch (error: any) {
-    console.error('Error:', error);
+    logger.error('Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (error) {
-      console.error('Error recording tool usage:', error);
+      logger.error('Error recording tool usage:', error);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
       message: 'Tool usage recorded successfully'
     });
   } catch (error: any) {
-    console.error('Error:', error);
+    logger.error('Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

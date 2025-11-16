@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/courier-templates/[courier]
@@ -27,7 +28,7 @@ export async function GET(
         return NextResponse.json({ success: true, data: null });
       }
 
-      console.error('택배사 템플릿 조회 오류:', error);
+      logger.error('택배사 템플릿 조회 오류:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -36,7 +37,7 @@ export async function GET(
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error('GET /api/courier-templates/[courier] 오류:', error);
+    logger.error('GET /api/courier-templates/[courier] 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

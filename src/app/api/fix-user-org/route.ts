@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
     const adminSupabase = createAdminClient(supabaseUrl, supabaseServiceKey)
 
-    console.log('🔍 사용자 조회:', email)
+    logger.debug('🔍 사용자 조회:', { data: email });
 
     // 사용자 조회
     const { data: user, error: userError } = await adminSupabase
@@ -34,20 +34,20 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (userError || !user) {
-      console.error('❌ 사용자를 찾을 수 없습니다:', userError)
+      logger.error('❌ 사용자를 찾을 수 없습니다:', userError);
       return NextResponse.json(
         { error: '사용자를 찾을 수 없습니다' },
         { status: 404 }
       )
     }
 
-    console.log('✅ 사용자 발견:', {
+    logger.debug('✅ 사용자 발견:', {
       id: user.id,
       email: user.email,
       name: user.name,
       primary_organization_id: user.primary_organization_id,
       role: user.role
-    })
+    });
 
     // 이미 primary_organization_id가 있고 유효한지 확인
     if (user.primary_organization_id) {
@@ -58,14 +58,14 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (org) {
-        console.log('✅ 유효한 조직이 이미 존재합니다:', org.business_name)
+        logger.info('유효한 조직이 이미 존재합니다:');
         return NextResponse.json({
           success: true,
           message: '이미 유효한 조직이 존재합니다',
           organization: org
         })
       } else {
-        console.log('⚠️  조직이 존재하지 않습니다. 새로 생성합니다...')
+        logger.warn('조직이 존재하지 않습니다. 새로 생성합니다...');
       }
     }
 
@@ -76,12 +76,12 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .eq('status', 'active')
 
-    console.log('📋 기존 active 멤버십:', activeMemberships?.length || 0)
+    logger.debug('📋 기존 active 멤버십:', { data: activeMemberships?.length || 0 });
 
     // 개인 셀러계정명
     const orgName = `${user.name || user.email} 셀러계정`
 
-    console.log('🏢 개인 셀러계정 생성 중:', orgName)
+    logger.debug('🏢 개인 셀러계정 생성 중:', { data: orgName });
 
     // 새 조직 생성
     const { data: newOrg, error: orgError } = await adminSupabase
@@ -96,14 +96,14 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (orgError) {
-      console.error('❌ 조직 생성 실패:', orgError)
+      logger.error('❌ 조직 생성 실패:', orgError);
       return NextResponse.json(
         { error: '조직 생성에 실패했습니다', details: orgError },
         { status: 500 }
       )
     }
 
-    console.log('✅ 조직 생성 완료:', newOrg.id, newOrg.business_name)
+    logger.info('조직 생성 완료:');
 
     // 멤버로 추가
     const { data: newMember, error: memberError } = await adminSupabase
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (memberError) {
-      console.error('❌ 멤버 추가 실패:', memberError)
+      logger.error('❌ 멤버 추가 실패:', memberError);
       // 롤백: 조직 삭제
       await adminSupabase.from('organizations').delete().eq('id', newOrg.id)
       return NextResponse.json(
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('✅ 멤버 추가 완료:', newMember.id)
+    logger.info('멤버 추가 완료:');
 
     // primary_organization_id 업데이트
     const { error: updateError } = await adminSupabase
@@ -141,14 +141,14 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
 
     if (updateError) {
-      console.error('❌ primary_organization_id 업데이트 실패:', updateError)
+      logger.error('❌ primary_organization_id 업데이트 실패:', updateError);
       return NextResponse.json(
         { error: 'primary_organization_id 업데이트에 실패했습니다', details: updateError },
         { status: 500 }
       )
     }
 
-    console.log('✅ primary_organization_id 업데이트 완료')
+    logger.info('primary_organization_id 업데이트 완료');
 
     return NextResponse.json({
       success: true,
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
       member: newMember
     })
   } catch (error) {
-    console.error('❌ 오류 발생:', error)
+    logger.error('❌ 오류 발생:', error);
     return NextResponse.json(
       { error: '처리 중 오류가 발생했습니다', details: String(error) },
       { status: 500 }

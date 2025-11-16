@@ -4,6 +4,7 @@ import { enrichOrdersWithOptionInfo } from '@/lib/order-utils';
 import { requireStaff } from '@/lib/api-security';
 import { canCreateServer, canUpdateServer, canDeleteServer } from '@/lib/permissions-server';
 import { getOrganizationDataFilter } from '@/lib/organization-utils';
+import logger from '@/lib/logger';
 
 /**
  * POST /api/integrated-orders/bulk
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
       .eq('is_deleted', false);
 
     if (fetchError) {
-      console.error('기존 주문 조회 실패:', fetchError);
+      logger.error('기존 주문 조회 실패:', fetchError);
     }
 
     // 중복 체크를 위한 Set 생성
@@ -235,7 +236,7 @@ export async function POST(request: NextRequest) {
 
 
     if (error) {
-      console.error('대량 주문 생성 실패:', error);
+      logger.error('대량 주문 생성 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -257,7 +258,7 @@ export async function POST(request: NextRequest) {
         await supabase.rpc('add_order_points', { p_user_id: user.id });
       }
     } catch (pointsError) {
-      console.error('Order points error:', pointsError);
+      logger.error('Order points error:', pointsError);
       // 점수 추가 실패해도 주문은 성공으로 처리
     }
 
@@ -269,7 +270,7 @@ export async function POST(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('POST /api/integrated-orders/bulk 오류:', error);
+    logger.error('POST /api/integrated-orders/bulk 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -335,7 +336,7 @@ export async function PUT(request: NextRequest) {
       'sheet_date', 'market_name', 'sequence_number', 'payment_date', 'order_number',
       'buyer_name', 'buyer_phone', 'recipient_name', 'recipient_phone', 'recipient_address',
       'delivery_message', 'option_name', 'quantity', 'option_price', 'delivery_fee',
-      'total_amount', 'settlement_amount', 'seller_id', 'courier_company', 'tracking_number',
+      'total_amount', 'settlement_amount', 'courier_company', 'tracking_number',
       'shipping_date', 'shipped_date', 'order_status', 'shipping_status', 'payment_method', 'market_fee', 'pg_fee',
       'delivery_fee_paid_by_seller', 'other_fees', 'payment_confirmed_at', 'shipped_at',
       'delivered_at', 'cancelled_at', 'refunded_at', 'refund_processed_at', 'cancel_reason',
@@ -375,7 +376,7 @@ export async function PUT(request: NextRequest) {
     const errors = results.filter((r) => r.error);
 
     if (errors.length > 0) {
-      console.error('일부 주문 수정 실패:', errors);
+      logger.error('일부 주문 수정 실패:', errors);
       return NextResponse.json(
         {
           success: false,
@@ -394,7 +395,7 @@ export async function PUT(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('PUT /api/integrated-orders/bulk 오류:', error);
+    logger.error('PUT /api/integrated-orders/bulk 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -460,7 +461,7 @@ export async function DELETE(request: NextRequest) {
       .in('id', ids);
 
     if (error) {
-      console.error('대량 주문 삭제 실패:', error);
+      logger.error('대량 주문 삭제 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -472,7 +473,7 @@ export async function DELETE(request: NextRequest) {
       count: ids.length,
     });
   } catch (error: any) {
-    console.error('DELETE /api/integrated-orders/bulk 오류:', error);
+    logger.error('DELETE /api/integrated-orders/bulk 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

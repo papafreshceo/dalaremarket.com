@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { autoCreateOrganizationFromUser, syncOrganizationFromUser } from '@/lib/auto-create-organization';
+import logger from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('사용자 정보 조회 오류:', error);
+      logger.error('사용자 정보 조회 오류:', error);
       return NextResponse.json(
         { success: false, error: '사용자 정보를 불러올 수 없습니다.' },
         { status: 500 }
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('프로필 조회 오류:', error);
+    logger.error('프로필 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }
@@ -157,7 +158,7 @@ export async function PUT(request: NextRequest) {
       .eq('id', user.id);
 
     if (userUpdateError) {
-      console.error('사용자 정보 업데이트 오류:', userUpdateError);
+      logger.error('사용자 정보 업데이트 오류:', userUpdateError);
       return NextResponse.json(
         { success: false, error: '프로필 업데이트에 실패했습니다.', details: userUpdateError.message },
         { status: 500 }
@@ -195,7 +196,7 @@ export async function PUT(request: NextRequest) {
             userData.primary_organization_id = newUserData.primary_organization_id;
           }
         } catch (error) {
-          console.error('조직 자동 생성 오류:', error);
+          logger.error('조직 자동 생성 오류:', error);
           return NextResponse.json(
             { success: false, error: '조직 생성에 실패했습니다.' },
             { status: 500 }
@@ -227,7 +228,7 @@ export async function PUT(request: NextRequest) {
           .eq('id', userData.primary_organization_id);
 
         if (orgUpdateError) {
-          console.error('조직 정보 업데이트 오류:', orgUpdateError);
+          logger.error('조직 정보 업데이트 오류:', orgUpdateError);
           return NextResponse.json(
             { success: false, error: '셀러계정 정보 업데이트에 실패했습니다.', details: orgUpdateError.message },
             { status: 500 }
@@ -242,7 +243,7 @@ export async function PUT(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('프로필 업데이트 오류:', error);
+    logger.error('프로필 업데이트 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }

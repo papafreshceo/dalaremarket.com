@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-security'
+import logger from '@/lib/logger';
 
 /**
  * GET /api/notifications
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
     const { data: notifications, error: fetchError, count } = await query
 
     if (fetchError) {
-      console.error('알림 조회 실패:', fetchError)
+      logger.error('알림 조회 실패:', fetchError);
       return NextResponse.json(
         { error: '알림 조회에 실패했습니다' },
         { status: 500 }
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
       total_count: count || 0,
     })
   } catch (error) {
-    console.error('알림 조회 오류:', error)
+    logger.error('알림 조회 오류:', error);
     return NextResponse.json(
       { error: '알림 조회 중 오류가 발생했습니다' },
       { status: 500 }
@@ -96,7 +97,7 @@ export async function PATCH(request: NextRequest) {
         .eq('read', false)
 
       if (updateError) {
-        console.error('알림 읽음 처리 실패:', updateError)
+        logger.error('알림 읽음 처리 실패:', updateError);
         return NextResponse.json(
           { error: '알림 읽음 처리에 실패했습니다' },
           { status: 500 }
@@ -114,7 +115,7 @@ export async function PATCH(request: NextRequest) {
         .eq('user_id', auth.user.id)
 
       if (updateError) {
-        console.error('알림 읽음 처리 실패:', updateError)
+        logger.error('알림 읽음 처리 실패:', updateError);
         return NextResponse.json(
           { error: '알림 읽음 처리에 실패했습니다' },
           { status: 500 }
@@ -132,7 +133,7 @@ export async function PATCH(request: NextRequest) {
       message: '알림이 읽음 처리되었습니다',
     })
   } catch (error) {
-    console.error('알림 읽음 처리 오류:', error)
+    logger.error('알림 읽음 처리 오류:', error);
     return NextResponse.json(
       { error: '알림 읽음 처리 중 오류가 발생했습니다' },
       { status: 500 }
@@ -168,7 +169,7 @@ export async function DELETE(request: NextRequest) {
       .eq('user_id', auth.user.id)
 
     if (deleteError) {
-      console.error('알림 삭제 실패:', deleteError)
+      logger.error('알림 삭제 실패:', deleteError);
       return NextResponse.json(
         { error: '알림 삭제에 실패했습니다' },
         { status: 500 }
@@ -180,7 +181,7 @@ export async function DELETE(request: NextRequest) {
       message: '알림이 삭제되었습니다',
     })
   } catch (error) {
-    console.error('알림 삭제 오류:', error)
+    logger.error('알림 삭제 오류:', error);
     return NextResponse.json(
       { error: '알림 삭제 중 오류가 발생했습니다' },
       { status: 500 }

@@ -27,7 +27,7 @@ export async function GET() {
     })
 
     if (addColumnError) {
-      console.error('SQL 실행 오류:', addColumnError)
+      logger.error('SQL 실행 오류:', addColumnError);
       return NextResponse.json({ error: addColumnError.message }, { status: 500 })
     }
 
@@ -36,7 +36,7 @@ export async function GET() {
       message: 'tier 컬럼이 추가되었습니다'
     })
   } catch (error: any) {
-    console.error('마이그레이션 오류:', error)
+    logger.error('마이그레이션 오류:', error);
     return NextResponse.json({
       error: '마이그레이션 실패',
       details: error.message

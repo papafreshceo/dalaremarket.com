@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 
 interface SellerRanking {
   id: number;
-  seller_id: string;
+  organization_id: string;
   period_type: string;
   period_start: string;
   period_end: string;

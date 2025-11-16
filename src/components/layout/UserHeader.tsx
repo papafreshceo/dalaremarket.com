@@ -106,6 +106,18 @@ export default function UserHeader() {
     const fetchOrders = async () => {
       if (!user) return;
 
+      // 사용자의 조직 ID 가져오기
+      const { data: userData } = await supabase
+        .from('users')
+        .select('primary_organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.primary_organization_id) {
+        setOrders([]);
+        return;
+      }
+
       // 최근 7일 주문 가져오기
       const now = new Date();
       const startDate = new Date();
@@ -115,7 +127,7 @@ export default function UserHeader() {
       const { data, error } = await supabase
         .from('integrated_orders')
         .select('id, shipping_status, created_at')
-        .eq('seller_id', user.id)
+        .eq('organization_id', userData.primary_organization_id)
         .gte('created_at', startDate.toISOString());
 
       if (error) {
@@ -346,6 +358,8 @@ export default function UserHeader() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    // 로그아웃 시 탭 상태 초기화
+    localStorage.removeItem('ordersActiveTab');
     showToast('로그아웃되었습니다.', 'success');
     router.push('/platform');
   };

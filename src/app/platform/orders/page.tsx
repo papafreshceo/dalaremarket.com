@@ -931,7 +931,6 @@ function OrdersPageContent() {
           // DB 저장용 메타데이터 (검증 후 사용)
           _metadata: {
             sheet_date: utcTime.split('T')[0],
-            seller_id: user.id,
             created_by: user.id,
             market_name: '플랫폼',
             payment_date: utcTime.split('T')[0],
@@ -1103,7 +1102,6 @@ function OrdersPageContent() {
           sheet_date: order._metadata.sheet_date,
           payment_date: order._metadata.payment_date,
           shipping_status: order._metadata.shipping_status,
-          seller_id: order._metadata.seller_id,
           created_by: order._metadata.created_by,
           sub_account_id: order._metadata.sub_account_id,
           created_at: getCurrentTimeUTC(),

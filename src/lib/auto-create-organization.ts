@@ -176,12 +176,12 @@ export async function autoCreateOrganizationFromUser(userId: string) {
     console.log('✅ primary_organization_id 업데이트 성공')
   }
 
-  // 8. 기존 주문에 셀러계정 ID 매핑 (Service Role로 RLS 우회)
+  // 8. 기존 주문에 조직 ID 매핑 (created_by 기준으로 변경)
   console.log('📦 기존 주문 매핑 시작')
   await supabase
     .from('integrated_orders')
     .update({ organization_id: organization.id })
-    .eq('seller_id', userId)
+    .eq('created_by', userId)
     .is('organization_id', null)
 
   console.log('✅ 기존 주문 매핑 완료')

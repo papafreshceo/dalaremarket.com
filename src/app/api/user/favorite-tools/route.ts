@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 // GET: 즐겨찾기 도구 목록 조회
 export async function GET() {
@@ -21,7 +22,7 @@ export async function GET() {
       .single();
 
     if (error) {
-      console.error('Error fetching favorite tools:', error);
+      logger.error('Error fetching favorite tools:', error);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
@@ -30,7 +31,7 @@ export async function GET() {
       favoriteTools: data?.favorite_tools || []
     });
   } catch (error: any) {
-    console.error('Error:', error);
+    logger.error('Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id);
 
     if (error) {
-      console.error('Error updating favorite tools:', error);
+      logger.error('Error updating favorite tools:', error);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
       favoriteTools
     });
   } catch (error: any) {
-    console.error('Error:', error);
+    logger.error('Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

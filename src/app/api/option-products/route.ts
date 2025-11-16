@@ -1,5 +1,6 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/option-products
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('옵션 상품 조회 실패:', error);
+      logger.error('옵션 상품 조회 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: processedData });
   } catch (error: any) {
-    console.error('GET /api/option-products 오류:', error);
+    logger.error('GET /api/option-products 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

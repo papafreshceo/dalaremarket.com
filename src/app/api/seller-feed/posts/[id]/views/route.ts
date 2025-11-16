@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -33,7 +34,7 @@ export async function POST(
       .single();
 
     if (updateError) {
-      console.error('조회수 증가 오류:', updateError);
+      logger.error('조회수 증가 오류:', updateError);
       return NextResponse.json(
         { success: false, error: '조회수 증가에 실패했습니다.' },
         { status: 500 }
@@ -46,7 +47,7 @@ export async function POST(
     });
 
   } catch (error: any) {
-    console.error('조회수 증가 오류:', error);
+    logger.error('조회수 증가 오류:', error);
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.', details: error.message },
       { status: 500 }

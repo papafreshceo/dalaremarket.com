@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 // 네이버 데이터랩 API 엔드포인트
 const DATALAB_API_URL = 'https://openapi.naver.com/v1/datalab/search';
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     // API 키 확인
     if (!clientId || !clientSecret) {
-      console.log('API keys not configured, using mock data');
+      logger.debug('API keys not configured, using mock data');
       const mockData = generateMockData(keywords, period);
       return NextResponse.json(mockData);
     }
@@ -143,10 +144,10 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('Naver API Error:', errorData);
+      logger.error('Naver API Error:', errorData);
 
       // API 에러 시 Mock 데이터로 폴백
-      console.log('Falling back to mock data due to API error');
+      logger.debug('Falling back to mock data due to API error');
       const mockData = generateMockData(keywords, period);
       return NextResponse.json(mockData);
     }
@@ -155,7 +156,7 @@ export async function POST(request: NextRequest) {
 
     // 빈 데이터인 경우 Mock 데이터로 폴백
     if (!data.results || data.results.length === 0 || !data.results[0].data || data.results[0].data.length === 0) {
-      console.log('Falling back to mock data due to empty response');
+      logger.debug('Falling back to mock data due to empty response');
       const mockData = generateMockData(keywords, period);
       return NextResponse.json(mockData);
     }
@@ -163,7 +164,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data);
 
   } catch (error) {
-    console.error('Trend API Error:', error);
+    logger.error('Trend API Error:', error);
 
     // 에러 시 Mock 데이터로 폴백
     try {

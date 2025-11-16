@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import logger from '@/lib/logger';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,7 +35,7 @@ export async function PUT(request: NextRequest) {
       count: customers.length,
     });
   } catch (error: any) {
-    console.error('단골 고객 수정 오류:', error);
+    logger.error('단골 고객 수정 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

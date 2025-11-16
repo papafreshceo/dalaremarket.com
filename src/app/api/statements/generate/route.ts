@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 import QRCode from 'qrcode';
 import puppeteer from 'puppeteer';
 import { generateStatementHTML } from '@/lib/statement-template';
+import logger from '@/lib/logger';
 
 /**
  * POST /api/statements/generate
@@ -20,9 +21,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // 요청 데이터 검증
-    if (!body.buyerInfo || !body.items || !Array.isArray(body.items) || body.items.length === 0) {
+    if (!body.buyerSubAccountId || !body.items || !Array.isArray(body.items) || body.items.length === 0) {
       return NextResponse.json(
-        { success: false, error: '필수 데이터가 누락되었습니다.' },
+        { success: false, error: '필수 데이터가 누락되었습니다. (buyerSubAccountId 필요)' },
         { status: 400 }
       );
     }
@@ -62,20 +63,15 @@ export async function POST(request: NextRequest) {
         .insert({
           id: docId,
           doc_number: docNumber,
-          seller_id: user.id,
-          buyer_id: body.buyerId || null,
+          platform_admin_id: user.id, // 거래명세서 발급한 관리자 (우리 회사)
+          buyer_sub_account_id: body.buyerSubAccountId, // 구매 사업자의 서브계정 ID (buyer 정보는 트리거가 자동 입력)
           seller_name: body.sellerInfo?.name || '달래마켓',
           seller_business_number: body.sellerInfo?.businessNumber || '107-30-96371',
           seller_representative: body.sellerInfo?.representative || '대표자',
           seller_address: body.sellerInfo?.address || '주소',
           seller_phone: body.sellerInfo?.phone || '02-1234-5678',
           seller_email: body.sellerInfo?.email || 'contact@dalraemarket.com',
-          buyer_name: body.buyerInfo.name,
-          buyer_business_number: body.buyerInfo.businessNumber || '',
-          buyer_representative: body.buyerInfo.representative || '',
-          buyer_address: body.buyerInfo.address || '',
-          buyer_phone: body.buyerInfo.phone || '',
-          buyer_email: body.buyerInfo.email || '',
+          // buyer 필드들은 트리거가 자동으로 채움 (buyer_sub_account_id 기반)
           items: JSON.stringify(items),
           supply_amount: supplyAmount,
           vat_amount: vatAmount,
@@ -85,7 +81,7 @@ export async function POST(request: NextRequest) {
         });
 
       if (insertError) {
-        console.error('[statements/generate] DB 저장 실패:', insertError);
+        logger.error('[statements/generate] DB 저장 실패:', insertError);
         return NextResponse.json(
           { success: false, error: 'DB 저장 실패' },
           { status: 500 }
@@ -100,7 +96,7 @@ export async function POST(request: NextRequest) {
       (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : '');
 
     if (!baseUrl) {
-      console.error('[statements/generate] NEXT_PUBLIC_SITE_URL 환경변수가 설정되지 않았습니다.');
+      logger.error('[statements/generate] NEXT_PUBLIC_SITE_URL 환경변수가 설정되지 않았습니다.');
       return NextResponse.json(
         { success: false, error: '서버 설정 오류: 사이트 URL이 설정되지 않았습니다.' },
         { status: 500 }
@@ -187,7 +183,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error: any) {
-    console.error('[statements/generate] 오류:', error);
+    logger.error('[statements/generate] 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message || '서버 오류가 발생했습니다.' },
       { status: 500 }

@@ -1,5 +1,6 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/market-invoice-templates
@@ -26,7 +27,7 @@ export async function GET() {
       data: data || [],
     });
   } catch (error: any) {
-    console.error('GET /api/market-invoice-templates 오류:', error);
+    logger.error('GET /api/market-invoice-templates 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('POST /api/market-invoice-templates 오류:', error);
+    logger.error('POST /api/market-invoice-templates 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -126,7 +127,7 @@ export async function PUT(request: NextRequest) {
       data,
     });
   } catch (error: any) {
-    console.error('PUT /api/market-invoice-templates 오류:', error);
+    logger.error('PUT /api/market-invoice-templates 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -167,7 +168,7 @@ export async function DELETE(request: NextRequest) {
       success: true,
     });
   } catch (error: any) {
-    console.error('DELETE /api/market-invoice-templates 오류:', error);
+    logger.error('DELETE /api/market-invoice-templates 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

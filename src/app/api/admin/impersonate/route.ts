@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { SignJWT } from 'jose';
+import logger from '@/lib/logger';
 
 export async function POST(request: Request) {
   try {
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
     });
 
   } catch (error) {
-    console.error('POST /api/admin/impersonate 오류:', error);
+    logger.error('POST /api/admin/impersonate 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }

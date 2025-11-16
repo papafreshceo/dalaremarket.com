@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   const supabase = await createClientForRouteHandler();
@@ -34,7 +35,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error('저장 오류:', error);
+    logger.error('저장 오류:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

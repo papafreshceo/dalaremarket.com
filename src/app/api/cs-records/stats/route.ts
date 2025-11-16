@@ -1,5 +1,6 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/cs-records/stats
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('CS 통계 조회 실패:', error);
+      logger.error('CS 통계 조회 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('GET /api/cs-records/stats 오류:', error);
+    logger.error('GET /api/cs-records/stats 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

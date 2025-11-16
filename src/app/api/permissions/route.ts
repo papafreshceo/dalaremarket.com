@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth-middleware'
+import logger from '@/lib/logger';
 
 // GET: 역할별 권한 조회 (관리자 이상만 가능)
 export async function GET(request: NextRequest) {
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
-    console.error('권한 조회 오류:', error)
+    logger.error('권한 조회 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
-    console.error('권한 생성 오류:', error)
+    logger.error('권한 생성 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -104,7 +105,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
-    console.error('권한 수정 오류:', error)
+    logger.error('권한 수정 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -145,7 +146,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error('권한 삭제 오류:', error)
+    logger.error('권한 삭제 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

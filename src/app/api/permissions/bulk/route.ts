@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth-middleware'
+import logger from '@/lib/logger';
 
 // POST: 권한 대량 업데이트 (최고관리자만 가능)
 export async function POST(request: NextRequest) {
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: [] })
   } catch (error: any) {
-    console.error('권한 대량 업데이트 오류:', error)
+    logger.error('권한 대량 업데이트 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

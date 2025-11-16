@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { getUserPrimaryOrganization } from '@/lib/organization-utils';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/credits
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
         .single();
 
       if (insertError) {
-        console.error('[GET /api/credits] 크레딧 생성 오류:', insertError);
+        logger.error('[GET /api/credits] 크레딧 생성 오류:', insertError);
         return NextResponse.json(
           { success: false, error: '크레딧 정보를 생성할 수 없습니다.', balance: 0 },
           { status: 500 }
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[GET /api/credits] 오류:', error);
+    logger.error('[GET /api/credits] 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message || '서버 오류가 발생했습니다.', balance: 0 },
       { status: 500 }

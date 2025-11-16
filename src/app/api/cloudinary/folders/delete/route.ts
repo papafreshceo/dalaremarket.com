@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import cloudinary from '@/lib/cloudinary/config';
+import logger from '@/lib/logger';
 
 /**
  * DELETE /api/cloudinary/folders/delete
@@ -44,7 +45,7 @@ export async function DELETE(request: NextRequest) {
       // 폴더 자체도 삭제
       await cloudinary.api.delete_folder(folderPath);
     } catch (cloudinaryError: any) {
-      console.error('Cloudinary 폴더 삭제 오류:', cloudinaryError);
+      logger.error('Cloudinary 폴더 삭제 오류:', cloudinaryError);
       // Cloudinary 오류는 계속 진행 (DB는 정리)
     }
 
@@ -76,7 +77,7 @@ export async function DELETE(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('폴더 삭제 오류:', error);
+    logger.error('폴더 삭제 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

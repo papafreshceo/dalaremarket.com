@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 /**
  * GET /api/courier-templates
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
       .order('courier_name');
 
     if (error) {
-      console.error('택배사 템플릿 조회 오류:', error);
+      logger.error('택배사 템플릿 조회 오류:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: data || [] });
   } catch (error: any) {
-    console.error('GET /api/courier-templates 오류:', error);
+    logger.error('GET /api/courier-templates 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('택배사 템플릿 생성 오류:', error);
+      logger.error('택배사 템플릿 생성 오류:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error('POST /api/courier-templates 오류:', error);
+    logger.error('POST /api/courier-templates 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -125,7 +126,7 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('택배사 템플릿 수정 오류:', error);
+      logger.error('택배사 템플릿 수정 오류:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -134,7 +135,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error('PUT /api/courier-templates 오류:', error);
+    logger.error('PUT /api/courier-templates 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -166,7 +167,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id);
 
     if (error) {
-      console.error('택배사 템플릿 삭제 오류:', error);
+      logger.error('택배사 템플릿 삭제 오류:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -175,7 +176,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('DELETE /api/courier-templates 오류:', error);
+    logger.error('DELETE /api/courier-templates 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

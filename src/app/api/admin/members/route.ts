@@ -1,6 +1,7 @@
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-security';
+import logger from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   // 🔒 보안: 관리자만 회원 목록 조회 가능
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (orgError) {
-      console.error('조직 목록 조회 오류:', orgError);
+      logger.error('조직 목록 조회 오류:', orgError);
       return NextResponse.json({ error: '조직 목록을 불러올 수 없습니다.' }, { status: 500 });
     }
 
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
       .order('role', { ascending: true }); // owner가 먼저 오도록
 
     if (membersError) {
-      console.error('조직 멤버 조회 오류:', membersError);
+      logger.error('조직 멤버 조회 오류:', membersError);
       return NextResponse.json({ error: '멤버 목록을 불러올 수 없습니다.' }, { status: 500 });
     }
 
@@ -71,8 +72,8 @@ export async function GET(request: NextRequest) {
     const creditMap = new Map(creditBalances?.map(c => [c.organization_id, c.balance]) || []);
 
     // 6. 조직 멤버 데이터 병합
-    console.log('조직 수:', organizations?.length);
-    console.log('조직 멤버 수:', orgMembers?.length);
+    logger.debug('조직 수:', { data: organizations?.length });
+    logger.debug('조직 멤버 수:', { data: orgMembers?.length });
 
     const processedMembers = (orgMembers || []).map(member => {
       const org = orgMap.get(member.organization_id);
@@ -124,7 +125,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, members: processedMembers });
   } catch (error) {
-    console.error('GET /api/admin/members 오류:', error);
+    logger.error('GET /api/admin/members 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
@@ -150,13 +151,13 @@ export async function PATCH(request: NextRequest) {
       .eq('id', memberId);
 
     if (error) {
-      console.error('회원 상태 업데이트 오류:', error);
+      logger.error('회원 상태 업데이트 오류:', error);
       return NextResponse.json({ error: '회원 상태를 업데이트할 수 없습니다.' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('PATCH /api/admin/members 오류:', error);
+    logger.error('PATCH /api/admin/members 오류:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }

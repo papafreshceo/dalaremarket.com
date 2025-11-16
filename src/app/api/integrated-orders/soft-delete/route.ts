@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireStaff } from '@/lib/api-security';
 import { canDeleteServer } from '@/lib/permissions-server';
 import { getOrganizationDataFilter } from '@/lib/organization-utils';
+import logger from '@/lib/logger';
 
 /**
  * POST /api/integrated-orders/soft-delete
@@ -50,15 +51,18 @@ export async function POST(request: NextRequest) {
       if (organizationId) {
         query = query.eq('organization_id', organizationId);
       } else {
-        // 조직이 없으면 본인이 등록한 주문만 삭제 가능
-        query = query.eq('seller_id', auth.user.id);
+        // 조직이 없으면 삭제 권한 없음 (조직 기반 시스템으로 완전 전환)
+        return NextResponse.json(
+          { success: false, error: '조직이 없는 사용자는 주문을 삭제할 수 없습니다.' },
+          { status: 403 }
+        );
       }
     }
 
     const { data, error } = await query.select();
 
     if (error) {
-      console.error('소프트 삭제 실패:', error);
+      logger.error('소프트 삭제 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -70,7 +74,7 @@ export async function POST(request: NextRequest) {
       count: data?.length || 0,
     });
   } catch (error: any) {
-    console.error('POST /api/integrated-orders/soft-delete 오류:', error);
+    logger.error('POST /api/integrated-orders/soft-delete 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

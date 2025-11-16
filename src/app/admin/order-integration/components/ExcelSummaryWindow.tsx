@@ -370,16 +370,16 @@ export default function ExcelSummaryWindow({ orders }: ExcelSummaryWindowProps) 
                       <>
                         {rawMaterials.map((item, index) => {
                           const standardUnitCount = item.standard_quantity > 0
-                            ? (item.total_usage / item.standard_quantity)
+                            ? Math.ceil(item.total_usage / item.standard_quantity)
                             : 0;
 
                           return (
                             <tr key={item.id} className="hover:bg-gray-50">
                               <td className="px-2 py-2 text-gray-500">{index + 1}</td>
                               <td className="px-2 py-2 text-gray-900 font-medium">{item.name}</td>
-                              <td className="px-2 py-2 text-right font-medium text-blue-600">{item.total_usage.toFixed(2)}</td>
+                              <td className="px-2 py-2 text-right font-medium text-blue-600">{Math.ceil(item.total_usage).toLocaleString()}</td>
                               <td className="px-2 py-2 text-center text-gray-700">{item.unit}</td>
-                              <td className="px-2 py-2 text-right font-medium text-purple-600">{standardUnitCount.toFixed(2)}</td>
+                              <td className="px-2 py-2 text-right font-medium text-purple-600">{standardUnitCount.toLocaleString()}</td>
                             </tr>
                           );
                         })}
@@ -391,7 +391,7 @@ export default function ExcelSummaryWindow({ orders }: ExcelSummaryWindowProps) 
                               <span className="ml-2 text-xs text-red-500">(원물 연결 없음)</span>
                             </td>
                             <td className="px-2 py-2 text-right font-medium text-red-600">
-                              {item.total_quantity.toFixed(2)}
+                              {Math.ceil(item.total_quantity).toLocaleString()}
                               <span className="ml-1 text-xs text-red-500">개</span>
                             </td>
                             <td className="px-2 py-2 text-center text-red-500">-</td>

@@ -2,6 +2,7 @@ import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, auditLog } from '@/lib/api-security';
 import { getOrganizationDataFilter } from '@/lib/organization-utils';
+import logger from '@/lib/logger';
 
 /**
  * POST /api/integrated-orders/hard-delete
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
     const { data: ordersToDelete, error: fetchError } = await fetchQuery;
 
     if (fetchError) {
-      console.error('주문 조회 실패:', fetchError);
+      logger.error('주문 조회 실패:', fetchError);
       return NextResponse.json(
         { success: false, error: fetchError.message },
         { status: 500 }
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
     const { error: deleteError, count } = await deleteQuery;
 
     if (deleteError) {
-      console.error('완전 삭제 실패:', deleteError);
+      logger.error('완전 삭제 실패:', deleteError);
       return NextResponse.json(
         { success: false, error: deleteError.message },
         { status: 500 }
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
       count: count || ordersToDelete?.length || 0,
     });
   } catch (error: any) {
-    console.error('POST /api/integrated-orders/hard-delete 오류:', error);
+    logger.error('POST /api/integrated-orders/hard-delete 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import logger from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -17,13 +18,13 @@ export async function GET(request: NextRequest) {
     const tokenData = await tokenResponse.json()
 
     if (tokenData.error || !tokenData.access_token) {
-      console.error('Token error:', tokenData)
+      logger.error('Token error:', tokenData);
       return NextResponse.json({ error: 'Failed to get access token' }, { status: 400 })
     }
 
     return NextResponse.json(tokenData)
   } catch (error) {
-    console.error('Token exchange error:', error)
+    logger.error('Token exchange error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 /**
  * POST /api/cloudinary/download
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
         .eq('id', imageId);
 
       if (directUpdateError) {
-        console.error('다운로드 카운트 증가 실패:', directUpdateError);
+        logger.error('다운로드 카운트 증가 실패:', directUpdateError);
       }
     }
 
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       message: '다운로드 기록 완료',
     });
   } catch (error: any) {
-    console.error('다운로드 기록 오류:', error);
+    logger.error('다운로드 기록 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

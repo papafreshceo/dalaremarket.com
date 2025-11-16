@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🔍 원물 계산 요청:', { optionCount: options.length });
+    logger.debug('🔍 원물 계산 요청:', { optionCount: options.length });
 
     // 옵션상품 ID 조회 (option_code 포함)
     const optionNames = options.map(o => o.option_name);
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
     const inputTotal = options.reduce((sum: number, o: any) => sum + Number(o.quantity || 0), 0);
     const outputTotal = optionSummary.reduce((sum: number, o: any) => sum + Number(o.quantity || 0), 0);
 
-    console.log('📊 원물 계산 결과:', {
+    logger.debug('📊 원물 계산 결과:', {
       optionCount: options.length,
       rawMaterialCount: rawMaterialSummary.length,
       unmappedCount: unmappedOptions.length,
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('POST /api/raw-materials/calculate 오류:', error);
+    logger.error('POST /api/raw-materials/calculate 오류:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
