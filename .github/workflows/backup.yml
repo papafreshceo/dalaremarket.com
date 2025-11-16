@@ -1,0 +1,99 @@
+name: Daily Backup to Google Drive
+
+on:
+  schedule:
+    - cron: '0 17 * * *'  # 매일 한국시간 새벽 2시
+  workflow_dispatch:  # 수동 실행 버튼
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install PostgreSQL Client
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client-14
+    
+    - name: Backup Database
+      env:
+        DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+      run: |
+        # 백업 생성
+        FILENAME="backup_$(date +%Y%m%d_%H%M%S).sql"
+        pg_dump "$DATABASE_URL" --clean --no-owner --no-acl > $FILENAME
+        
+        # 압축
+        gzip $FILENAME
+        echo "BACKUP_FILE=${FILENAME}.gz" >> $GITHUB_ENV
+        
+        # 파일 크기 확인
+        ls -lh ${FILENAME}.gz
+    
+    - name: Upload to Google Drive
+      run: |
+        # 서비스 계정 파일 생성
+        echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}' > service-account.json
+        
+        # Python 스크립트 생성 및 실행
+        cat > upload.py << 'SCRIPT'
+        import os
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        from googleapiclient.http import MediaFileUpload
+        from datetime import datetime, timedelta
+        
+        # 설정
+        SCOPES = ['https://www.googleapis.com/auth/drive.file']
+        SERVICE_ACCOUNT_FILE = 'service-account.json'
+        FOLDER_ID = '${{ secrets.DRIVE_FOLDER_ID }}'
+        BACKUP_FILE = os.environ['BACKUP_FILE']
+        
+        # 인증
+        credentials = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        service = build('drive', 'v3', credentials=credentials)
+        
+        # 파일 업로드
+        file_metadata = {
+            'name': BACKUP_FILE,
+            'parents': [FOLDER_ID]
+        }
+        media = MediaFileUpload(BACKUP_FILE, mimetype='application/gzip')
+        
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id,name,size'
+        ).execute()
+        
+        size_mb = int(file.get('size', 0)) / 1024 / 1024
+        print(f"✅ 백업 완료: {file.get('name')} ({size_mb:.2f} MB)")
+        
+        # 30일 이상 된 백업 삭제
+        cutoff = (datetime.now() - timedelta(days=30)).isoformat() + 'Z'
+        
+        response = service.files().list(
+            q=f"'{FOLDER_ID}' in parents and createdTime < '{cutoff}' and name contains 'backup_'",
+            fields='files(id, name)'
+        ).execute()
+        
+        for old_file in response.get('files', []):
+            service.files().delete(fileId=old_file['id']).execute()
+            print(f"🗑️ 삭제: {old_file['name']}")
+        SCRIPT
+        
+        # Python 패키지 설치
+        pip install --quiet google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+        
+        # 스크립트 실행
+        python upload.py
+        
+        # 정리
+        rm -f service-account.json upload.py
+    
+    - name: Cleanup
+      if: always()
+      run: rm -f *.sql *.gz *.json *.py
