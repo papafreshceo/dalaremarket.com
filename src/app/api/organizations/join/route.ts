@@ -433,7 +433,7 @@ async function handleNotificationBasedInvitation(
 
         // 본인이 소유자인 개인 조직인 경우만 삭제
         if (org && org.owner_id === userId) {
-          logger.debug('🗑️  개인 셀러계정 삭제 시작:', { data: org.business_name, org.id });
+          logger.debug('🗑️  개인 셀러계정 삭제 시작:', { business_name: org.business_name, org_id: org.id });
 
           // 멤버십 삭제 (admin client로 RLS 우회)
           const { error: memberDeleteError } = await adminSupabase

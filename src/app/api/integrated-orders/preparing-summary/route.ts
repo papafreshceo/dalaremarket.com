@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
     logger.debug('📦 원물 데이터:', { data: rawMaterialsData?.map(rm => ({
       name: rm.material_name,
       standard_quantity: rm.standard_quantity
-    } });));
+    })) });
 
     // 원물 ID로 매핑
     const rawMaterialsById = new Map(

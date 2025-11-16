@@ -5,6 +5,7 @@ import { applyOptionMappingToOrdersServer } from '@/lib/option-mapping-utils';
 import { generateSampleOrders, convertSampleOrdersToDBFormat } from '@/lib/sample-data';
 import { getOrganizationDataFilter } from '@/lib/organization-utils';
 import logger from '@/lib/logger';
+import { notifyAdminNewOrder } from '@/lib/onesignal-notifications';
 
 /**
  * GET /api/platform-orders
@@ -317,6 +318,21 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // 🔔 관리자에게 신규 발주서 알림 전송
+      try {
+        for (const order of data) {
+          await notifyAdminNewOrder({
+            orderId: order.id,
+            orderNumber: order.order_number || `주문-${order.id.substring(0, 8)}`,
+            sellerName: order.seller_name || '셀러',
+            totalAmount: order.amount || 0
+          });
+        }
+      } catch (notificationError) {
+        logger.error('신규 발주서 알림 전송 실패:', notificationError);
+        // 알림 실패해도 주문은 성공으로 처리
+      }
+
       // 첫 주문 업로드 시 show_sample_data를 false로 변경
       await supabase
         .from('users')
@@ -372,6 +388,19 @@ export async function POST(request: NextRequest) {
           { success: false, error: error.message },
           { status: 500 }
         );
+      }
+
+      // 🔔 관리자에게 신규 발주서 알림 전송
+      try {
+        await notifyAdminNewOrder({
+          orderId: data.id,
+          orderNumber: data.order_number || `주문-${data.id.substring(0, 8)}`,
+          sellerName: data.seller_name || '셀러',
+          totalAmount: data.amount || 0
+        });
+      } catch (notificationError) {
+        logger.error('신규 발주서 알림 전송 실패:', notificationError);
+        // 알림 실패해도 주문은 성공으로 처리
       }
 
       // 첫 주문 업로드 시 show_sample_data를 false로 변경
