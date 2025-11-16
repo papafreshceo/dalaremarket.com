@@ -238,7 +238,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-6">
       {/* 헤더 */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">알림</h1>
@@ -283,7 +283,7 @@ export default function NotificationsPage() {
       </div>
 
       {/* 알림 목록 */}
-      <div className="space-y-4">
+      <div className="space-y-2">
         {loading ? (
           <div className="text-center py-12 text-gray-500">
             로딩 중...
@@ -301,92 +301,78 @@ export default function NotificationsPage() {
             const icon = CATEGORY_ICONS[notification.category] || '🔔'
             const label = CATEGORY_LABELS[notification.category] || '알림'
 
-            // 일반 알림 카드
+            // 컴팩트한 1줄 알림 카드
             return (
               <div
                 key={notification.id}
                 id={`notification-${notification.id}`}
                 onClick={() => handleNotificationClick(notification)}
-                className={`border rounded-lg p-4 transition-all cursor-pointer hover:shadow-lg ${
+                className={`border rounded-lg px-4 py-3 transition-all cursor-pointer hover:shadow-md ${
                   !notification.is_read
-                    ? `${colors.bg} ${colors.border} border-2 hover:scale-[1.01]`
+                    ? `${colors.bg} border-l-4 ${colors.border}`
                     : 'bg-white border-gray-200 hover:bg-gray-50'
                 }`}
               >
-                <div className="flex items-start gap-4">
+                <div className="flex items-center gap-3">
                   {/* 아이콘 */}
-                  <div className="flex-shrink-0">
-                    <span className="text-4xl">{icon}</span>
+                  <span className="text-2xl flex-shrink-0">{icon}</span>
+
+                  {/* 읽음 표시 */}
+                  {!notification.is_read && (
+                    <span className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"></span>
+                  )}
+
+                  {/* 카테고리 뱃지 */}
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors.bg} ${colors.text} flex-shrink-0`}>
+                    {label}
+                  </span>
+
+                  {/* 제목 + 내용 */}
+                  <div className="flex-1 min-w-0 flex items-center gap-3">
+                    <span className="font-semibold text-gray-900 truncate">
+                      {notification.title}
+                    </span>
+                    {notification.body && (
+                      <>
+                        <span className="text-gray-400">·</span>
+                        <span className="text-sm text-gray-600 truncate">
+                          {notification.body}
+                        </span>
+                      </>
+                    )}
                   </div>
 
-                  {/* 내용 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="text-lg font-bold text-gray-900">
-                            {notification.title}
-                          </h3>
-                          {!notification.is_read && (
-                            <span className="flex items-center gap-1">
-                              <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
-                              <span className="text-xs font-semibold text-blue-600">NEW</span>
-                            </span>
-                          )}
-                        </div>
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${colors.bg} ${colors.text} border ${colors.border}`}>
-                          {label}
-                        </span>
-                      </div>
+                  {/* 시간 */}
+                  <span className="text-xs text-gray-500 flex-shrink-0">
+                    {formatTime(notification.created_at)}
+                  </span>
+
+                  {/* 액션 버튼들 */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {!notification.is_read && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          deleteNotification(notification.id)
+                          markAsRead(notification.id)
                         }}
-                        className="text-gray-400 hover:text-red-600 transition-colors p-1 rounded hover:bg-red-50"
-                        title="삭제"
+                        className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                        title="읽음 처리"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        읽음
                       </button>
-                    </div>
-
-                    {notification.body && (
-                      <p className="text-sm text-gray-700 mb-3 leading-relaxed">
-                        {notification.body}
-                      </p>
                     )}
-
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                      <span className="text-xs text-gray-500 flex items-center gap-1">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {formatTime(notification.created_at)}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {!notification.is_read && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              markAsRead(notification.id)
-                            }}
-                            className="text-xs text-blue-600 hover:text-blue-700 font-semibold px-3 py-1 rounded-full hover:bg-blue-50 transition-colors"
-                          >
-                            읽음 처리
-                          </button>
-                        )}
-                        {notification.action_url && (
-                          <span className="text-xs text-gray-500 flex items-center gap-1">
-                            상세 보기
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteNotification(notification.id)
+                      }}
+                      className="text-gray-400 hover:text-red-600 transition-colors"
+                      title="삭제"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               </div>
