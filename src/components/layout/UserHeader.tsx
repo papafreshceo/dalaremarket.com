@@ -27,7 +27,7 @@ export default function UserHeader() {
   const [showSubmenu, setShowSubmenu] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [userTier, setUserTier] = useState<'light' | 'standard' | 'advance' | 'elite' | 'legend' | null>(null);
+  const [organizationTier, setOrganizationTier] = useState<'light' | 'standard' | 'advance' | 'elite' | 'legend' | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
   const [isMobile, setIsMobile] = useState<boolean>(false);
@@ -212,16 +212,16 @@ export default function UserHeader() {
           // tier 설정 (조직 기준, NULL 허용)
           const validTiers = ['light', 'standard', 'advance', 'elite', 'legend'];
           const tier = orgData?.tier?.toLowerCase();
-          setUserTier(tier && validTiers.includes(tier) ? tier : null);
+          setOrganizationTier(tier && validTiers.includes(tier) ? tier : null);
         } else {
           setContributionPoints(0);
           setOrganizationName('');
           setSellerCode('');
-          setUserTier(null);
+          setOrganizationTier(null);
         }
       } else {
         setUserRole(null);
-        setUserTier(null);
+        setOrganizationTier(null);
         setContributionPoints(0);
         setOrganizationName('');
         setSellerCode('');
@@ -236,7 +236,7 @@ export default function UserHeader() {
       } else {
         setUser(null);
         setUserRole(null);
-        setUserTier(null);
+        setOrganizationTier(null);
         setContributionPoints(0);
         setOrganizationName('');
         setSellerCode('');
@@ -893,7 +893,7 @@ export default function UserHeader() {
                 <NotificationBell />
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {userTier && <TierBadge tier={userTier as 'light' | 'standard' | 'advance' | 'elite' | 'legend'} iconOnly glow={0} />}
+                  {organizationTier && <TierBadge tier={organizationTier as 'light' | 'standard' | 'advance' | 'elite' | 'legend'} iconOnly glow={0} />}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     {organizationName && (
                       <div style={{ fontSize: '13px', fontWeight: '600', color: '#212529' }}>
@@ -1207,7 +1207,7 @@ export default function UserHeader() {
 
                   <div style={{ marginBottom: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      {userTier && <TierBadge tier={userTier as 'light' | 'standard' | 'advance' | 'elite' | 'legend'} iconOnly glow={0} />}
+                      {organizationTier && <TierBadge tier={organizationTier as 'light' | 'standard' | 'advance' | 'elite' | 'legend'} iconOnly glow={0} />}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         {organizationName && (
                           <div style={{ fontSize: '13px', fontWeight: '600', color: '#212529' }}>

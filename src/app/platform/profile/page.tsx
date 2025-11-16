@@ -194,12 +194,6 @@ export default function ProfilePage() {
 
       console.log('🏢 Organization 로드 - userData:', userData);
 
-      // 관리자는 셀러계정 시스템 적용 안 함
-      if (userData?.role === 'admin' || userData?.role === 'super_admin') {
-        console.log('⚠️ 관리자 계정 - 셀러계정 시스템 스킵');
-        return;
-      }
-
       if (!userData?.primary_organization_id) {
         console.warn('⚠️ primary_organization_id 없음');
         return;

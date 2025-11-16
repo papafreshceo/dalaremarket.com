@@ -18,17 +18,28 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 모든 사용자 조회 (본인 제외)
+    // 모든 사용자 조회 (본인 제외) - 조직 티어 포함
     const { data: users, error } = await supabase
       .from('users')
-      .select('id, email, name, nickname, profile_name')
+      .select(`
+        id,
+        email,
+        name,
+        profile_name,
+        primary_organization_id,
+        organizations!users_primary_organization_id_fkey(tier)
+      `)
       .neq('id', user.id)
       .order('email', { ascending: true });
 
     if (error) {
       logger.error('사용자 목록 조회 실패:', error);
       return NextResponse.json(
-        { success: false, error: '사용자 목록을 불러올 수 없습니다.' },
+        {
+          success: false,
+          error: '사용자 목록을 불러올 수 없습니다.',
+          details: error.message || error
+        },
         { status: 500 }
       );
     }

@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
       .from('organization_cash_transactions')
       .insert({
         organization_id: organization.id,
-        used_by_user_id: user.id,
+        transaction_by: user.id,
         type: 'login',
         amount: loginReward,
         balance_after: newBalance,

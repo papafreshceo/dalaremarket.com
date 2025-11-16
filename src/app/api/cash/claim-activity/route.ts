@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
       .from('organization_cash_transactions')
       .insert({
         organization_id: organization.id,
-        used_by_user_id: user.id,
+        transaction_by: user.id,
         type: 'activity',
         amount: pointsToGive,
         balance_after: newBalance,

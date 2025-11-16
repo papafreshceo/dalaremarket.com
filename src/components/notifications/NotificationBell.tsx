@@ -4,14 +4,18 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Notification, NOTIFICATION_TYPE_ICONS } from '@/types/notification'
+import { createClient } from '@/lib/supabase/client'
 
 export default function NotificationBell() {
   const router = useRouter()
+  const supabase = createClient()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [showDropdown, setShowDropdown] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const channelRef = useRef<any>(null)
 
   // 알림 조회
   const fetchNotifications = async () => {
@@ -31,11 +35,90 @@ export default function NotificationBell() {
     }
   }
 
-  // 30초마다 자동 갱신
+  // 사용자 정보 가져오기
   useEffect(() => {
-    fetchNotifications()
-    const interval = setInterval(fetchNotifications, 30000)
-    return () => clearInterval(interval)
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUserId(user?.id || null)
+    }
+    getUser()
+  }, [])
+
+  // 초기 알림 조회
+  useEffect(() => {
+    if (currentUserId) {
+      fetchNotifications()
+    }
+  }, [currentUserId])
+
+  // Realtime 구독: 새 알림 실시간 수신
+  useEffect(() => {
+    if (!currentUserId) return
+
+    // 기존 채널 구독 해제
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current)
+    }
+
+    // 새 채널 구독
+    const channel = supabase
+      .channel('notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${currentUserId}`
+        },
+        (payload) => {
+          console.log('🔔 새 알림 실시간 수신:', payload)
+
+          // 새 알림을 목록 맨 위에 추가
+          setNotifications(prev => [payload.new as Notification, ...prev.slice(0, 4)])
+          setUnreadCount(prev => prev + 1)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${currentUserId}`
+        },
+        (payload) => {
+          console.log('✓ 알림 읽음 표시 업데이트:', payload)
+
+          // 알림 읽음 상태 업데이트
+          setNotifications(prev => prev.map(notif =>
+            notif.id === payload.new.id
+              ? { ...notif, read: payload.new.read }
+              : notif
+          ))
+
+          // 읽지 않은 알림 개수 다시 계산
+          if (payload.new.read && !payload.old.read) {
+            setUnreadCount(prev => Math.max(0, prev - 1))
+          }
+        }
+      )
+      .subscribe()
+
+    channelRef.current = channel
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [currentUserId])
+
+  // 컴포넌트 언마운트 시 정리
+  useEffect(() => {
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+      }
+    }
   }, [])
 
   // 드롭다운 외부 클릭 감지
@@ -108,23 +191,24 @@ export default function NotificationBell() {
         aria-label="알림"
       >
         <svg
-          className="w-6 h-6"
+          className="w-5 h-5"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
         >
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+            strokeWidth={1.5}
+            d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
           />
         </svg>
 
         {/* 읽지 않은 알림 뱃지 */}
         {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full min-w-[20px]">
-            {unreadCount > 99 ? '99+' : unreadCount}
+          <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-red-500 rounded-full">
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>

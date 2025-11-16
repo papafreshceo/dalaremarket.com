@@ -206,7 +206,7 @@ export async function isMainOrganization(organizationId: string): Promise<boolea
  */
 export async function canCreateSubOrganization(
   userId: string,
-  userTier: string | null
+  organizationTier: string | null
 ): Promise<{ canCreate: boolean; currentCount: number; maxCount: number }> {
   const orgs = await getUserOrganizations(userId)
   const currentCount = orgs.length
@@ -229,7 +229,7 @@ export async function canCreateSubOrganization(
     }
   }
 
-  const maxCount = getMaxAccounts(userTier)
+  const maxCount = getMaxAccounts(organizationTier)
   const canCreate = currentCount < maxCount
 
   return { canCreate, currentCount, maxCount }

@@ -341,35 +341,54 @@ export async function PUT(request: NextRequest) {
       await trackOrderShipped(data.created_by, data.amount || 0);
     }
 
-    // 🔔 상태 변경 시 셀러에게 알림 전송
+    // 🔔 상태 변경 시 조직의 소유자와 멤버 전체에게 알림 전송
     if (existingOrder && updateData.shipping_status && existingOrder.shipping_status !== updateData.shipping_status) {
       try {
-        // organization_id로 조직의 대표 user_id 조회
         if (data.organization_id) {
+          // 조직의 소유자 조회
           const { data: org } = await supabase
             .from('organizations')
             .select('created_by')
             .eq('id', data.organization_id)
             .single();
 
-          if (org?.created_by) {
-            // 상태 변경 알림
-            const statusMap: Record<string, string> = {
-              '접수': '접수',
-              '입금확인': '입금확인',
-              '상품준비중': '상품준비중',
-              '발송완료': '발송완료',
-            };
+          // 조직의 멤버 조회
+          const { data: members } = await supabase
+            .from('organization_members')
+            .select('user_id')
+            .eq('organization_id', data.organization_id)
+            .eq('status', 'active');
 
-            await notifyOrderStatusChange({
-              userId: org.created_by,
+          // 소유자 + 멤버 리스트 생성 (중복 제거)
+          const userIds = new Set<string>();
+          if (org?.created_by) {
+            userIds.add(org.created_by);
+          }
+          if (members) {
+            members.forEach(member => userIds.add(member.user_id));
+          }
+
+          // 상태 변경 알림
+          const statusMap: Record<string, string> = {
+            '접수': '접수',
+            '입금확인': '입금확인',
+            '상품준비중': '상품준비중',
+            '발송완료': '발송완료',
+          };
+
+          // 모든 사용자에게 알림 전송
+          const notificationPromises = Array.from(userIds).map(userId =>
+            notifyOrderStatusChange({
+              userId: userId,
               orderId: data.id,
               orderNumber: data.order_number || `주문-${data.id.substring(0, 8)}`,
               oldStatus: statusMap[existingOrder.shipping_status] || existingOrder.shipping_status,
               newStatus: statusMap[updateData.shipping_status] || updateData.shipping_status,
               trackingNumber: updateData.tracking_number
-            });
-          }
+            })
+          );
+
+          await Promise.allSettled(notificationPromises);
         }
       } catch (notificationError) {
         logger.error('발주서 상태 변경 알림 전송 실패:', notificationError);

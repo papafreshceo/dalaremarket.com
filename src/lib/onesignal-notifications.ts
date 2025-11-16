@@ -26,6 +26,7 @@ export type NotificationType =
   | 'announcement'          // 공지사항
   | 'comment_reply'         // 댓글 답글
   | 'deposit_confirm'       // 예치금 입금 확인
+  | 'new_message'           // 새 메시지
   // 관리자 알림
   | 'admin_new_order'       // 신규 발주서
   | 'admin_support_post'    // 질문/건의 게시글
@@ -224,6 +225,7 @@ export async function createNotification(params: CreateNotificationParams): Prom
         if (type === 'announcement' && !settings.announcements_enabled) continue;
         if (type === 'comment_reply' && !settings.comment_reply_enabled) continue;
         if (type === 'deposit_confirm' && !settings.deposit_confirm_enabled) continue;
+        if (type === 'new_message' && !settings.new_message_enabled) continue;
       }
 
       if (category === 'admin' && settings) {
@@ -477,6 +479,34 @@ export async function notifyDepositConfirm(params: {
       deposit_id: params.depositId,
       amount: params.amount,
       new_balance: params.newBalance,
+    },
+    priority: 'normal',
+  });
+}
+
+/**
+ * 새 메시지 알림
+ */
+export async function notifyNewMessage(params: {
+  receiverId: string;
+  senderId: string;
+  senderName: string;
+  messagePreview: string;
+  threadId: string;
+}) {
+  return createNotification({
+    userId: params.receiverId,
+    type: 'new_message',
+    category: 'seller',
+    title: `💬 ${params.senderName}님의 메시지`,
+    body: params.messagePreview,
+    resourceType: 'message_thread',
+    resourceId: params.threadId,
+    actionUrl: '/messages',
+    data: {
+      sender_id: params.senderId,
+      sender_name: params.senderName,
+      thread_id: params.threadId,
     },
     priority: 'normal',
   });

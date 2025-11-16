@@ -57,19 +57,9 @@ export async function GET(request: NextRequest) {
           console.error('Failed to create user profile:', insertError)
           // 프로필 생성 실패해도 로그인은 진행
         } else {
-          // ✅ 신규 사용자: 기본 조직 자동 생성 (관리자 제외)
+          // ✅ 신규 사용자: 기본 조직 자동 생성 (모든 역할)
           try {
-            // 사용자 role 확인
-            const { data: newUserData } = await supabase
-              .from('users')
-              .select('role')
-              .eq('id', session.user.id)
-              .single()
-
-            // 관리자가 아닌 경우만 셀러계정 생성
-            if (newUserData?.role !== 'admin' && newUserData?.role !== 'super_admin') {
-              await autoCreateOrganizationFromUser(session.user.id)
-            }
+            await autoCreateOrganizationFromUser(session.user.id)
           } catch (error) {
             console.error('❌ 조직 자동 생성 실패:', error)
             // 조직 생성 실패해도 로그인은 진행
@@ -82,18 +72,16 @@ export async function GET(request: NextRequest) {
           .update({ last_login_provider: provider })
           .eq('id', session.user.id)
 
-        // ✅ 기존 사용자: 조직이 없으면 자동 생성 (관리자 제외)
+        // ✅ 기존 사용자: 조직이 없으면 자동 생성 (모든 역할)
         try {
           const { data: userData } = await supabase
             .from('users')
-            .select('primary_organization_id, role')
+            .select('primary_organization_id')
             .eq('id', session.user.id)
             .single()
 
-          // 관리자가 아니고 셀러계정이 없는 경우만 생성
-          if (!userData?.primary_organization_id &&
-              userData?.role !== 'admin' &&
-              userData?.role !== 'super_admin') {
+          // 조직이 없으면 자동 생성
+          if (!userData?.primary_organization_id) {
             await autoCreateOrganizationFromUser(session.user.id)
           }
         } catch (error) {

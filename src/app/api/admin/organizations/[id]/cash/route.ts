@@ -108,24 +108,43 @@ export async function POST(
       // 히스토리 실패는 치명적이지 않으므로 계속 진행
     }
 
-    // 🔔 셀러에게 예치금 입금확인 알림 (지급 시에만)
+    // 🔔 조직의 소유자와 멤버 전체에게 예치금 입금확인 알림 (지급 시에만)
     if (cash > 0) {
       try {
-        // 조직의 소유자 ID 조회
+        // 조직의 소유자 조회
         const { data: org } = await adminClient
           .from('organizations')
           .select('created_by')
           .eq('id', organizationId)
           .single();
 
+        // 조직의 멤버 조회
+        const { data: members } = await adminClient
+          .from('organization_members')
+          .select('user_id')
+          .eq('organization_id', organizationId)
+          .eq('status', 'active');
+
+        // 소유자 + 멤버 리스트 생성 (중복 제거)
+        const userIds = new Set<string>();
         if (org?.created_by) {
-          await notifyDepositConfirm({
-            userId: org.created_by,
+          userIds.add(org.created_by);
+        }
+        if (members) {
+          members.forEach(member => userIds.add(member.user_id));
+        }
+
+        // 모든 사용자에게 알림 전송
+        const notificationPromises = Array.from(userIds).map(userId =>
+          notifyDepositConfirm({
+            userId: userId,
             depositId: organizationId,
             amount: cash,
             newBalance: newBalance
-          });
-        }
+          })
+        );
+
+        await Promise.allSettled(notificationPromises);
       } catch (notificationError) {
         logger.error('예치금 입금확인 알림 전송 실패:', notificationError);
         // 알림 실패해도 입금확인은 성공으로 처리

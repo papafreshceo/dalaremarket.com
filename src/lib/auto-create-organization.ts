@@ -30,6 +30,7 @@ export async function autoCreateOrganizationFromUser(userId: string) {
     id: user.id,
     email: user.email,
     name: user.name,
+    role: user.role,
     primary_organization_id: user.primary_organization_id
   })
 
@@ -118,11 +119,8 @@ export async function autoCreateOrganizationFromUser(userId: string) {
   const { data: newOrganization, error: orgError } = await supabase
     .from('organizations')
     .insert({
-      business_name: null,
-      email: user.email,
       owner_id: userId,
       is_active: true,
-      max_members: 10,
     })
     .select()
     .single()
@@ -136,7 +134,7 @@ export async function autoCreateOrganizationFromUser(userId: string) {
 
   const organization = newOrganization
 
-  // 6. 소유자로 조직 멤버로 추가 (Service Role로 RLS 우회)
+  // 5. 소유자로 조직 멤버 추가 (Service Role로 RLS 우회)
   const ownerPermissions = getDefaultPermissions('owner')
   console.log('👤 멤버 추가 시작')
 
@@ -186,6 +184,17 @@ export async function autoCreateOrganizationFromUser(userId: string) {
 
   console.log('✅ 기존 주문 매핑 완료')
 
+  // 9. 셀러코드 생성
+  try {
+    console.log('🔑 셀러코드 생성 시작')
+    const { generateUserCodes } = await import('@/lib/user-codes')
+    await generateUserCodes(userId)
+    console.log('✅ 셀러코드 생성 완료')
+  } catch (codeError) {
+    console.error('셀러코드 생성 실패:', codeError)
+    // 셀러코드 생성 실패해도 조직 생성은 성공으로 처리
+  }
+
   return {
     success: true,
     organization_id: organization.id,
@@ -214,7 +223,7 @@ export async function syncOrganizationFromUser(userId: string) {
   const { error: updateError } = await supabase
     .from('organizations')
     .update({
-      email: user.email,
+      business_email: user.email,
     })
     .eq('id', user.primary_organization_id)
     .eq('owner_id', userId) // 소유자만 업데이트 가능

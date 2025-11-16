@@ -37,7 +37,7 @@ function OrdersPageContent() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
-  const [userTier, setUserTier] = useState<'light' | 'standard' | 'advance' | 'elite' | 'legend'>('light');
+  const [organizationTier, setOrganizationTier] = useState<'light' | 'standard' | 'advance' | 'elite' | 'legend' | null>(null);
   const [organizationId, setOrganizationId] = useState<string>('');
   const [organizationName, setOrganizationName] = useState<string>('');
   const [sellerCode, setSellerCode] = useState<string>('');
@@ -263,14 +263,9 @@ function OrdersPageContent() {
 
           setUserId(profileUser.id);
           setUserEmail(profileUser.email || '');
-
-          const validTiers = ['light', 'standard', 'advance', 'elite', 'legend'];
-          const tier = profileUser.tier;
-          setUserTier(validTiers.includes(tier) ? tier : 'light');
           setUserRole(profileUser.role || '');
 
           console.log('👤 사용자 정보:', {
-            tier: profileUser.tier,
             role: profileUser.role,
             primary_organization_id: profileUser.primary_organization_id
           });
@@ -309,6 +304,8 @@ function OrdersPageContent() {
             }
 
             if (orgData) {
+              const validTiers = ['light', 'standard', 'advance', 'elite', 'legend'];
+
               console.log('🏢 조직 정보 로드:', {
                 id: orgData.id,
                 business_name: orgData.business_name,
@@ -320,11 +317,14 @@ function OrdersPageContent() {
               setOrganizationId(orgData.id); // organizationId 설정
               setOrganizationName(orgData.business_name || '');
 
-              // 조직의 tier 설정 (user tier가 아닌 organization tier 사용)
+              // 조직의 tier 설정
               const orgTier = orgData.tier?.toLowerCase();
               if (orgTier && validTiers.includes(orgTier)) {
-                setUserTier(orgTier as any);
+                setOrganizationTier(orgTier as any);
                 console.log('🎯 조직 티어 설정:', orgTier);
+              } else {
+                setOrganizationTier(null);
+                console.log('🎯 조직 티어 없음');
               }
 
               // role에 따라 적절한 코드 표시
@@ -381,7 +381,7 @@ function OrdersPageContent() {
           // 비회원 사용자
           setUserId('guest');
           setUserEmail('');
-          setUserTier('light');
+          setOrganizationTier('light');
           setOrganizationName('');
           setSellerCode('');
           setUserRole('');
@@ -391,7 +391,7 @@ function OrdersPageContent() {
         console.error('❌ 사용자 정보 로드 실패:', error);
         setUserId('guest');
         setUserEmail('');
-        setUserTier('light');
+        setOrganizationTier('light');
         setOrganizationName('');
         setSellerCode('');
         setUserRole('');
@@ -1387,9 +1387,11 @@ function OrdersPageContent() {
                   color: 'var(--color-primary)'
                 }}>
                   {/* 등급 배지 */}
-                  <div style={{ transform: 'scale(0.8)', display: 'flex', alignItems: 'center' }}>
-                    <TierBadge tier={userTier} iconOnly glow={0} />
-                  </div>
+                  {organizationTier && (
+                    <div style={{ transform: 'scale(0.8)', display: 'flex', alignItems: 'center' }}>
+                      <TierBadge tier={organizationTier} iconOnly glow={0} />
+                    </div>
+                  )}
 
                   {/* 셀러계정명 + 코드 */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -2055,7 +2057,7 @@ function OrdersPageContent() {
               isSampleMode={isSampleMode}
               subAccounts={subAccounts}
               organizationName={organizationName}
-              organizationTier={userTier}
+              organizationTier={organizationTier}
             />
           </div>
         )}

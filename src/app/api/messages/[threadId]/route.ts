@@ -53,7 +53,7 @@ export async function GET(
       .from('messages')
       .select(`
         *,
-        sender:sender_id(id, email, name, nickname)
+        sender:sender_id(id, email, name, profile_name)
       `)
       .eq('thread_id', threadId)
       .order('created_at', { ascending: true })

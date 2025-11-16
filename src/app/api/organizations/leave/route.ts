@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-security'
 import { autoCreateOrganizationFromUser } from '@/lib/auto-create-organization'
 import { generateUserCodes } from '@/lib/user-codes'
+import logger from '@/lib/logger'
 
 /**
  * POST /api/organizations/leave

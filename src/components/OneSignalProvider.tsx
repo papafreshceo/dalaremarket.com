@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import logger from '@/lib/logger';
 
 // OneSignal 타입 정의
@@ -15,7 +15,8 @@ declare global {
 
 export default function OneSignalProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const supabase = createClientComponentClient();
+  // 싱글톤 Supabase 클라이언트 사용
+  const supabase = createClient();
 
   useEffect(() => {
     // OneSignal 초기화
@@ -34,11 +35,18 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
         }
 
         window.OneSignalDeferred.push(async function (OneSignal: any) {
-          // OneSignal 대시보드 설정만 사용 (코드에서 아무것도 오버라이드 안 함)
+          // OneSignal 초기화 및 아이콘 설정
           await OneSignal.init({
             appId: appId,
             allowLocalhostAsSecureOrigin: true,
+            notifyButton: {
+              enable: false,
+            },
           });
+
+          // 알림 기본 설정
+          await OneSignal.Notifications.setDefaultUrl(window.location.origin);
+          await OneSignal.Notifications.setDefaultTitle('달래마켓');
 
           logger.info('OneSignal SDK 초기화 완료');
 
@@ -92,6 +100,16 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
                 }
               } else {
                 logger.info('푸시 알림 구독 대기 중', { userId: user.id });
+
+                // 5초 지연 후 알림 권한 요청 (브라우저 차단 방지)
+                setTimeout(async () => {
+                  try {
+                    await OneSignal.Slidedown.promptPush();
+                    logger.info('알림 권한 요청 팝업 표시됨');
+                  } catch (error) {
+                    logger.error('알림 권한 요청 팝업 표시 실패', error);
+                  }
+                }, 5000);
               }
             } catch (error) {
               logger.error('OneSignal 사용자 연결 오류', error);

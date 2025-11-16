@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       .from('organization_cash_transactions')
       .insert({
         organization_id: organization.id,
-        used_by_user_id: user.id,
+        transaction_by: user.id,
         type: 'usage',
         amount: -amount, // 음수로 저장
         balance_after: newBalance,

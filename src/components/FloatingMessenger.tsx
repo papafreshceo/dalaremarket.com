@@ -2,13 +2,17 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import TierBadge from '@/components/TierBadge'
 
 interface User {
   id: string
   email: string
   name?: string
-  nickname?: string
   profile_name?: string
+  primary_organization_id?: string
+  organizations?: {
+    tier: string
+  } | null
 }
 
 interface Message {
@@ -47,8 +51,7 @@ export default function FloatingMessenger() {
   const [unreadCount, setUnreadCount] = useState(0)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const lastMessageTimeRef = useRef<string>('')
+  const channelRef = useRef<any>(null)
 
   // 로그인 사용자 확인
   useEffect(() => {
@@ -86,27 +89,14 @@ export default function FloatingMessenger() {
     }
   }
 
-  // 메시지 조회
-  const fetchMessages = async (threadId: string, isPolling = false) => {
+  // 메시지 조회 (초기 로드용)
+  const fetchMessages = async (threadId: string) => {
     try {
-      const url = isPolling && lastMessageTimeRef.current
-        ? `/api/messages/${threadId}?after=${lastMessageTimeRef.current}`
-        : `/api/messages/${threadId}`
-
-      const response = await fetch(url)
+      const response = await fetch(`/api/messages/${threadId}`)
       const data = await response.json()
 
       if (data.success) {
-        if (isPolling && data.messages.length > 0) {
-          setMessages(prev => [...prev, ...data.messages])
-        } else if (!isPolling) {
-          setMessages(data.messages)
-        }
-
-        if (data.messages.length > 0) {
-          const lastMsg = data.messages[data.messages.length - 1]
-          lastMessageTimeRef.current = lastMsg.created_at
-        }
+        setMessages(data.messages)
       }
     } catch (error) {
       console.error('메시지 조회 실패:', error)
@@ -117,42 +107,67 @@ export default function FloatingMessenger() {
   const selectThread = (thread: Thread) => {
     setSelectedThread(thread)
     setMessages([])
-    lastMessageTimeRef.current = ''
     setShowUserList(false)
 
-    fetchMessages(thread.id, false)
-
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current)
-    }
-    pollingIntervalRef.current = setInterval(() => {
-      fetchMessages(thread.id, true)
-    }, 3000)
+    // 초기 메시지 로드
+    fetchMessages(thread.id)
   }
 
   // 메시지 전송
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedThread || sending) return
 
+    const messageContent = newMessage.trim()
+    setNewMessage('') // 즉시 입력창 비우기
     setSending(true)
+
+    // 낙관적 업데이트: 전송 전에 UI에 먼저 표시
+    const optimisticMessage = {
+      id: `temp-${Date.now()}`,
+      thread_id: selectedThread.id,
+      sender_id: currentUser?.id || '',
+      content: messageContent,
+      created_at: new Date().toISOString(),
+      is_read: false,
+      read_at: null
+    }
+    setMessages(prev => [...prev, optimisticMessage])
+
     try {
       const response = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           receiver_id: selectedThread.partner?.id,
-          content: newMessage.trim(),
+          content: messageContent,
         }),
       })
 
       const data = await response.json()
       if (data.success) {
-        setNewMessage('')
-        fetchMessages(selectedThread.id, true)
-        fetchThreads()
+        // 새 대화방인 경우 실제 thread_id로 업데이트
+        if (selectedThread.id === 'new' && data.thread_id) {
+          const updatedThread = {
+            ...selectedThread,
+            id: data.thread_id
+          }
+          setSelectedThread(updatedThread)
+          fetchThreads()
+        } else {
+          // 낙관적 메시지를 실제 메시지로 교체 (Realtime으로 받을 것임)
+          setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
+          fetchThreads()
+        }
+      } else {
+        // 실패 시 낙관적 메시지 제거
+        setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
+        setNewMessage(messageContent) // 입력창에 다시 복원
       }
     } catch (error) {
       console.error('메시지 전송 실패:', error)
+      // 실패 시 낙관적 메시지 제거
+      setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
+      setNewMessage(messageContent) // 입력창에 다시 복원
     } finally {
       setSending(false)
     }
@@ -160,15 +175,25 @@ export default function FloatingMessenger() {
 
   // 사용자 목록 조회
   const fetchUsers = async () => {
+    if (!currentUser) return
+
     try {
       const response = await fetch('/api/user/list')
       const data = await response.json()
       console.log('사용자 목록 응답:', data)
       if (data.success) {
         console.log('사용자 목록:', data.users)
+        // 티어 정보 확인
+        data.users.forEach((u: User) => {
+          console.log(`User ${u.profile_name}:`, {
+            has_org: !!u.organizations,
+            tier: u.organizations?.tier
+          })
+        })
         setUsers(data.users)
       } else {
         console.error('사용자 목록 조회 실패:', data.error)
+        console.error('에러 상세:', data.details)
       }
     } catch (error) {
       console.error('사용자 목록 조회 실패:', error)
@@ -223,17 +248,105 @@ export default function FloatingMessenger() {
     }
   }, [currentUser])
 
+  // Realtime 구독: 선택된 대화방의 새 메시지 실시간 수신
+  useEffect(() => {
+    if (!selectedThread || !currentUser || selectedThread.id === 'new') return
+
+    // 기존 채널 구독 해제
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current)
+    }
+
+    // 새 채널 구독
+    const channel = supabase
+      .channel(`thread:${selectedThread.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `thread_id=eq.${selectedThread.id}`
+        },
+        async (payload) => {
+          console.log('📨 새 메시지 실시간 수신:', payload)
+
+          // sender 정보 가져오기
+          const { data: senderData } = await supabase
+            .from('users')
+            .select('id, email, name, profile_name')
+            .eq('id', payload.new.sender_id)
+            .single()
+
+          const newMessage = {
+            ...payload.new,
+            sender: senderData
+          } as Message
+
+          setMessages(prev => {
+            // 중복 방지 (낙관적 업데이트 메시지 제거)
+            const filtered = prev.filter(m => !m.id.toString().startsWith('temp-'))
+            // 이미 존재하는 메시지인지 확인
+            if (filtered.some(m => m.id === newMessage.id)) {
+              return prev
+            }
+            return [...filtered, newMessage]
+          })
+
+          // 대화방 목록 갱신
+          fetchThreads()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `thread_id=eq.${selectedThread.id}`
+        },
+        (payload) => {
+          console.log('✓ 메시지 읽음 표시 업데이트:', payload)
+
+          // 읽음 표시 업데이트
+          setMessages(prev => prev.map(msg =>
+            msg.id === payload.new.id
+              ? { ...msg, is_read: payload.new.is_read, read_at: payload.new.read_at }
+              : msg
+          ))
+        }
+      )
+      .subscribe()
+
+    channelRef.current = channel
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [selectedThread, currentUser])
+
+  // 컴포넌트 언마운트 시 정리
   useEffect(() => {
     return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
       }
     }
   }, [])
 
   const getDisplayName = (user?: User) => {
     if (!user) return '알 수 없음'
-    return user.profile_name || user.nickname || user.name || user.email?.split('@')[0] || '사용자'
+    return user.profile_name || '사용자'
+  }
+
+  const getTierBadge = (user?: User) => {
+    const tier = user?.organizations?.tier?.toLowerCase() as 'light' | 'standard' | 'advance' | 'elite' | 'legend' | undefined
+    if (!tier) return null
+
+    const validTiers = ['light', 'standard', 'advance', 'elite', 'legend']
+    if (!validTiers.includes(tier)) return null
+
+    return <TierBadge tier={tier} iconOnly glow={0} />
   }
 
   const formatTime = (dateString: string) => {
@@ -325,6 +438,15 @@ export default function FloatingMessenger() {
               /* 사용자 목록 */
               <div className="flex-1 flex flex-col bg-gray-50">
                 <div className="p-4 bg-white border-b">
+                  <button
+                    onClick={() => setShowUserList(false)}
+                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 transition-colors mb-3"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>대화 목록으로</span>
+                  </button>
                   <input
                     type="text"
                     value={searchQuery}
@@ -338,12 +460,7 @@ export default function FloatingMessenger() {
                     .filter(user => {
                       if (!searchQuery.trim()) return true
                       const query = searchQuery.toLowerCase().trim()
-                      return (
-                        user.email?.toLowerCase().includes(query) ||
-                        user.name?.toLowerCase().includes(query) ||
-                        user.nickname?.toLowerCase().includes(query) ||
-                        user.profile_name?.toLowerCase().includes(query)
-                      )
+                      return user.profile_name?.toLowerCase().includes(query)
                     })
                     .map(user => (
                       <div
@@ -351,15 +468,22 @@ export default function FloatingMessenger() {
                         onClick={() => startNewConversation(user.id)}
                         className="px-4 py-3 hover:bg-white cursor-pointer border-b border-gray-100 transition-colors group"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                            {getDisplayName(user).charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-sm text-gray-900 group-hover:text-blue-600 transition-colors">
-                              {getDisplayName(user)}
+                        <div className="flex items-center gap-2">
+                          {/* tier가 없으면 글자 아이콘 표시 */}
+                          {!user.organizations?.tier && (
+                            <div className="w-7 h-7 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                              {getDisplayName(user).charAt(0).toUpperCase()}
                             </div>
-                            <div className="text-xs text-gray-500 truncate">{user.email}</div>
+                          )}
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              {/* tier가 있으면 배지만 표시 */}
+                              {getTierBadge(user)}
+                              <span className="font-semibold text-xs text-gray-900 group-hover:text-blue-600 transition-colors">
+                                {getDisplayName(user)}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -367,12 +491,7 @@ export default function FloatingMessenger() {
                   {users.filter(user => {
                     if (!searchQuery.trim()) return true
                     const query = searchQuery.toLowerCase().trim()
-                    return (
-                      user.email?.toLowerCase().includes(query) ||
-                      user.name?.toLowerCase().includes(query) ||
-                      user.nickname?.toLowerCase().includes(query) ||
-                      user.profile_name?.toLowerCase().includes(query)
-                    )
+                    return user.profile_name?.toLowerCase().includes(query)
                   }).length === 0 && (
                     <div className="flex flex-col items-center justify-center h-64 text-gray-400">
                       <svg className="w-16 h-16 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -388,11 +507,14 @@ export default function FloatingMessenger() {
               <>
                 <div className="px-4 py-3 border-b bg-white">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
                       {getDisplayName(selectedThread.partner).charAt(0).toUpperCase()}
                     </div>
-                    <div className="font-semibold text-gray-900">
-                      {getDisplayName(selectedThread.partner)}
+                    <div className="flex items-center gap-2">
+                      {getTierBadge(selectedThread.partner)}
+                      <span className="font-semibold text-gray-900">
+                        {getDisplayName(selectedThread.partner)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -482,14 +604,17 @@ export default function FloatingMessenger() {
                       className="px-4 py-3 border-b border-gray-100 cursor-pointer hover:bg-white transition-colors group"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
+                        <div className="w-11 h-11 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
                           {getDisplayName(thread.partner).charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-semibold text-sm text-gray-900 group-hover:text-blue-600 transition-colors">
-                              {getDisplayName(thread.partner)}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {getTierBadge(thread.partner)}
+                              <span className="font-semibold text-sm text-gray-900 group-hover:text-blue-600 transition-colors">
+                                {getDisplayName(thread.partner)}
+                              </span>
+                            </div>
                             {thread.last_message_at && (
                               <span className="text-xs text-gray-400 ml-2">
                                 {formatTime(thread.last_message_at)}

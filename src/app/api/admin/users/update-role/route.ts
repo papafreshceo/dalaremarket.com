@@ -1,9 +1,10 @@
-import { createClientForRouteHandler } from '@/lib/supabase/server'
+import { createClientForRouteHandler, createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/api-security'
 import { generateSellerCode } from '@/lib/user-codes'
 import logger from '@/lib/logger';
 import { createAuditLog } from '@/lib/audit-log';
+import { autoCreateOrganizationFromUser } from '@/lib/auto-create-organization';
 
 export async function POST(request: NextRequest) {
   // 🔒 보안: 관리자만 역할 변경 가능
@@ -11,9 +12,14 @@ export async function POST(request: NextRequest) {
   if (!auth.authorized) return auth.error
 
   try {
-    const supabase = await createClientForRouteHandler()
     const body = await request.json()
     const { userId, newRole, oldRole } = body
+
+    logger.info('역할 변경 요청:', { userId, newRole, oldRole });
+
+    // Service Role Key 사용 (RLS 우회하여 users 테이블 업데이트 가능)
+    const supabase = createAdminClient()
+    const userSupabase = await createClientForRouteHandler()
 
     if (!userId || !newRole || !oldRole) {
       return NextResponse.json(
@@ -24,31 +30,14 @@ export async function POST(request: NextRequest) {
 
     const updateData: any = { role: newRole }
 
-    // 일반 회원 → 관리자 그룹으로 변경 시 셀러계정 연결 해제
-    const isBecomingStaff = ['admin', 'super_admin', 'employee'].includes(newRole) &&
-                            !['admin', 'super_admin', 'employee'].includes(oldRole)
-
-    if (isBecomingStaff) {
-      updateData.primary_organization_id = null
-    }
-
-    // 셀러로 변경 시 코드 생성
-    if (newRole === 'seller' && oldRole !== 'seller') {
-      try {
-        const code = await generateSellerCode()
-        updateData.seller_code = code
-      } catch (error) {
-        logger.error('Failed to generate seller code:', error);
-      }
-    }
-    // 파트너 코드는 관리자가 수동으로 생성/할당
-
     // 변경 전 사용자 정보 조회 (감사 로그용)
     const { data: beforeUser } = await supabase
       .from('users')
       .select('name, email, role')
       .eq('id', userId)
       .single()
+
+    logger.info(`역할 변경 시도: userId=${userId}, updateData=`, updateData);
 
     const { data, error } = await supabase
       .from('users')
@@ -57,10 +46,45 @@ export async function POST(request: NextRequest) {
       .select()
 
     if (error) {
+      logger.error('역할 변경 실패:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
       )
+    }
+
+    logger.info('역할 변경 성공:', data);
+
+    // 역할 변경 후 조직이 없으면 자동 생성 (모든 역할에 적용)
+    if (data && data.length > 0) {
+      const updatedUser = data[0];
+      if (!updatedUser.primary_organization_id) {
+        try {
+          logger.info(`조직이 없는 사용자 ${userId}, 조직 자동 생성 시작`);
+          const orgResult = await autoCreateOrganizationFromUser(userId)
+          if (orgResult.success && orgResult.organization_id) {
+            logger.info('조직 자동 생성 성공:', orgResult);
+
+            // primary_organization_id 명시적 업데이트 (Admin Client로 RLS 우회)
+            const { data: updateData, error: updateError } = await supabase
+              .from('users')
+              .update({ primary_organization_id: orgResult.organization_id })
+              .eq('id', userId)
+              .select()
+
+            if (updateError) {
+              logger.error('primary_organization_id 업데이트 실패:', updateError);
+            } else {
+              logger.info('primary_organization_id 업데이트 성공:', updateData);
+            }
+          } else {
+            logger.error('조직 자동 생성 실패:', orgResult.error);
+          }
+        } catch (orgCreateError: any) {
+          logger.error('조직 자동 생성 중 예외 발생:', orgCreateError);
+          // 조직 생성 실패해도 역할 변경은 완료된 상태로 진행
+        }
+      }
     }
 
     // 🔒 감사 로그: 권한 변경 기록
@@ -78,8 +102,7 @@ export async function POST(request: NextRequest) {
           target_user_name: beforeUser.name,
           target_user_email: beforeUser.email,
           old_role: oldRole,
-          new_role: newRole,
-          is_becoming_staff: isBecomingStaff
+          new_role: newRole
         },
         severity: isAdminChange ? 'critical' : 'warning'
       }, request, auth)
@@ -87,14 +110,18 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data,
-      isBecomingStaff
+      data
     })
 
   } catch (error: any) {
     logger.error('POST /api/admin/users/update-role 오류:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: error.message || '알 수 없는 오류가 발생했습니다.',
+        details: error.toString(),
+        stack: error.stack
+      },
       { status: 500 }
     )
   }

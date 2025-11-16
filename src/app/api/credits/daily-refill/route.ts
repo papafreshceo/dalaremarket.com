@@ -99,7 +99,6 @@ export async function POST(request: NextRequest) {
       const { data: newCredit, error: insertError } = await dbClient
         .from('organization_credits')
         .insert({
-          user_id: effectiveUserId,
           organization_id: organization.id,
           balance: DAILY_CREDIT_LIMIT,
           last_refill_date: today
@@ -138,7 +137,7 @@ export async function POST(request: NextRequest) {
         await dbClient
           .from('organization_credit_transactions')
           .insert({
-            user_id: effectiveUserId,
+            transaction_by: effectiveUserId,
             organization_id: organization.id,
             type: 'daily_refill',
             amount: DAILY_CREDIT_LIMIT,
@@ -189,7 +188,7 @@ export async function POST(request: NextRequest) {
       await dbClient
         .from('organization_credit_transactions')
         .insert({
-          user_id: effectiveUserId,
+          transaction_by: effectiveUserId,
           organization_id: organization.id,
           type: 'daily_refill',
           amount: DAILY_CREDIT_LIMIT - userCredit.balance,

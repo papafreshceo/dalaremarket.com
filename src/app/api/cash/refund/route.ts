@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       .from('organization_cash_transactions')
       .insert({
         organization_id: organizationId,
-        used_by_user_id: auth.user.id,
+        transaction_by: auth.user.id,
         type: 'refund',
         amount: refundAmount,
         balance_after: newCash,

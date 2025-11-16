@@ -185,22 +185,22 @@ export default function UsersPage() {
       })
 
       const result = await response.json()
+      console.log('API 응답:', result)
 
       if (!result.success) {
+        console.error('역할 변경 실패:', result)
         showToast(`역할 변경에 실패했습니다: ${result.error}`, 'error')
         fetchUsers() // 오류 시 롤백
         return
       }
 
-      if (result.isBecomingStaff) {
-        showToast('역할이 변경되었습니다. 셀러계정 연결이 해제되었습니다.', 'success')
-      } else {
-        showToast('역할이 변경되었습니다.', 'success')
-      }
+      console.log('역할 변경 성공:', result.data)
+
+      showToast('역할이 변경되었습니다.', 'success')
       fetchUsers()
     } catch (error: any) {
+      console.error('역할 변경 오류:', error)
       showToast(`역할 변경에 실패했습니다: ${error.message}`, 'error')
-      console.error(error)
       fetchUsers() // 오류 시 롤백
     }
   }

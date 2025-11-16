@@ -72,7 +72,7 @@ export default function OrderRegistrationTab({
   selectedSubAccount,
   subAccounts = [],
   organizationName = '',
-  organizationTier = 'LIGHT'
+  organizationTier = null
 }: OrderRegistrationTabProps) {
 
   // 사용자 정보 (내부에서 조회)
@@ -123,8 +123,7 @@ export default function OrderRegistrationTab({
   const [isUpdatingPrice, setIsUpdatingPrice] = useState<boolean>(false);
 
   // 티어 할인율 관련 state
-  const [userTier, setUserTier] = useState<string>('LIGHT');
-  const [discountRate, setDiscountRate] = useState<number>(0);
+  const [discountRate, setDiscountRate] = useState<number | null>(null);
 
   // organizationId prop 변경 시 state 업데이트
   useEffect(() => {
@@ -197,14 +196,11 @@ export default function OrderRegistrationTab({
   // 조직의 tier와 할인율 조회 (prop에서 받은 tier 사용)
   useEffect(() => {
     const fetchDiscountRate = async () => {
-      const tier = organizationTier?.toUpperCase() || 'LIGHT';
-      setUserTier(tier);
-
-      if (!tier) {
-        console.log('⚠️ organizationTier 없음 - 기본값 적용 (LIGHT, 0.5%)');
-        setDiscountRate(0.5);
+      if (!organizationTier) {
         return;
       }
+
+      const tier = organizationTier.toUpperCase();
 
       try {
         console.log('🔍 티어 할인율 조회 시작:', { tier });
@@ -221,8 +217,6 @@ export default function OrderRegistrationTab({
 
         if (criteriaError) {
           console.error('❌ 티어 기준 조회 오류:', criteriaError);
-          // tier_criteria 조회 실패 시 기본 할인율 0.5 설정
-          setDiscountRate(0.5);
           return;
         }
 
@@ -238,8 +232,6 @@ export default function OrderRegistrationTab({
         }
       } catch (error) {
         console.error('❌ 티어 할인율 조회 중 오류:', error);
-        // 오류 발생 시 기본값 설정
-        setDiscountRate(0.5);
       }
     };
 
@@ -2326,8 +2318,10 @@ export default function OrderRegistrationTab({
       return sum + (isNaN(price) ? 0 : price);
     }, 0);
 
-    // 할인 금액 계산 후 10원 단위 절사
-    const discountAmount = Math.floor((totalSupplyPrice * discountRate / 100) / 10) * 10;
+    // 할인 금액 계산 후 10원 단위 절사 (할인율이 없으면 0)
+    const discountAmount = discountRate !== null && discountRate > 0
+      ? Math.floor((totalSupplyPrice * discountRate / 100) / 10) * 10
+      : 0;
     // 할인 후 공급가 = 원래 공급가 - 절사된 할인금액
     const discountedTotalSupplyPrice = totalSupplyPrice - discountAmount;
 
@@ -2914,9 +2908,9 @@ export default function OrderRegistrationTab({
             )}
 
             {/* 등급할인적용 */}
-            {discountRate > 0 && (
+            {discountRate !== null && discountRate > 0 && (
               <div>
-                <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>등급할인적용 ({userTier} {discountRate}%)</span>
+                <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>등급할인적용 ({organizationTier?.toUpperCase()} {discountRate}%)</span>
                 <span style={{ fontSize: '18px', fontWeight: '700', color: '#f87171' }}>
                   -{orderSummary.discountAmount.toLocaleString()}원
                 </span>
@@ -2924,14 +2918,14 @@ export default function OrderRegistrationTab({
             )}
 
             {/* 화살표 */}
-            {discountRate > 0 && (
+            {discountRate !== null && discountRate > 0 && (
               <svg width="32" height="24" viewBox="0 0 32 24" fill="none" style={{ flexShrink: 0 }}>
                 <path d="M6 8L10 12L6 16M14 8L18 12L14 16" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             )}
 
             {/* 할인 후 금액 */}
-            {discountRate > 0 && (
+            {discountRate !== null && discountRate > 0 && (
               <div>
                 <span style={{ fontSize: '18px', fontWeight: '700', color: '#10b981' }}>
                   {orderSummary.discountedTotalSupplyPrice.toLocaleString()}원

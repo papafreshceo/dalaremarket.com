@@ -72,7 +72,6 @@ export async function GET(request: NextRequest) {
           success: true,
           balance: 0,
           organization_id: organization.id,
-          user_id: effectiveUserId,
           isImpersonate: true
         });
       }
@@ -99,8 +98,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({
               success: true,
               balance: existingCash.balance,
-              organization_id: organization.id,
-              user_id: effectiveUserId
+              organization_id: organization.id
             });
           }
         }
@@ -115,8 +113,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         balance: 0,
-        organization_id: organization.id,
-        user_id: effectiveUserId
+        organization_id: organization.id
       });
     }
 
@@ -131,8 +128,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       balance: userCash.balance,
-      organization_id: organization.id,
-      user_id: effectiveUserId
+      organization_id: organization.id
     });
 
   } catch (error: any) {
