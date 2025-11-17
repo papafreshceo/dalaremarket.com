@@ -336,7 +336,7 @@ export default function UserHeader() {
       text: '공급상품',
       hasSubmenu: true,
       submenu: [
-        { path: '/platform/all', text: '전체상품' },
+        { path: '/platform/products/all', text: '전체상품' },
         { path: '/platform/calendar', text: '상품캘린더' },
         { path: '/gallery', text: '이미지다운로드' }
       ]

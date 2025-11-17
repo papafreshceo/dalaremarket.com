@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { AuthModal } from '@/components/auth/AuthModal';
 import ToolModal from '@/components/tools/ToolModal';
@@ -62,6 +62,7 @@ interface CalendarDay {
 
 function ProductsPageInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [isMounted, setIsMounted] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -91,11 +92,22 @@ function ProductsPageInner() {
     }
   }, []);
 
-  // URL 파라미터로 로그인 모달 열기
+  // URL 파라미터로 로그인 모달 열기 (로그인되어 있지 않을 때만)
   useEffect(() => {
-    if (searchParams.get('login') === 'true') {
-      setShowLoginModal(true);
-    }
+    const checkLoginAndOpenModal = async () => {
+      if (searchParams.get('login') === 'true') {
+        // 로그인 상태 확인
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        // 로그인되어 있지 않을 때만 모달 열기
+        if (!user) {
+          setShowLoginModal(true);
+        }
+      }
+    };
+
+    checkLoginAndOpenModal();
   }, [searchParams]);
 
   // 통계 데이터 가져오기
@@ -646,7 +658,13 @@ function ProductsPageInner() {
       {/* 로그인 모달 */}
       <AuthModal
         isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
+        onClose={() => {
+          setShowLoginModal(false);
+          // URL에서 login=true 파라미터 제거
+          if (searchParams.get('login') === 'true') {
+            router.replace('/platform');
+          }
+        }}
         initialMode="login"
       />
     </div>

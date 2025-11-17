@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import TierBadge from '@/components/TierBadge';
 import './chatbot.css';
@@ -83,6 +84,7 @@ interface ApiUsage {
 }
 
 export default function AgriChatbot() {
+  const pathname = usePathname();
   const supabase = createClient();
 
   // 탭 및 UI state
@@ -455,6 +457,11 @@ export default function AgriChatbot() {
 
   // 설정이 로드되지 않았거나 비활성화된 경우 렌더링하지 않음
   if (!settings || !settings.is_enabled) {
+    return null
+  }
+
+  // 랜딩 페이지와 회원가입 페이지에서는 챗봇 숨김
+  if (pathname === '/' || pathname.startsWith('/register')) {
     return null
   }
 
