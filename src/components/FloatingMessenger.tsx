@@ -56,6 +56,7 @@ export default function FloatingMessenger() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const channelRef = useRef<any>(null)
+  const messagesCacheRef = useRef<{ [threadId: string]: Message[] }>({})
 
   // 로그인 사용자 확인
   useEffect(() => {
@@ -95,47 +96,117 @@ export default function FloatingMessenger() {
 
   // 메시지 조회 (초기 로드용)
   const fetchMessages = async (threadId: string) => {
+    if (!threadId || threadId === 'new') {
+      console.log('⚠️ [모달] setMessages([]) - threadId가 new이거나 없음')
+      setMessages([])
+      messagesCacheRef.current[threadId] = []
+      return
+    }
+
+    // 캐시에서 먼저 로드
+    if (messagesCacheRef.current[threadId]) {
+      console.log('💾 [모달] 캐시에서 메시지 로드:', messagesCacheRef.current[threadId].length, '개')
+      console.log('💾 [모달] setMessages() - 캐시에서 로드')
+      setMessages(messagesCacheRef.current[threadId])
+    }
+
     try {
+      console.log('📥 [모달] 메시지 조회 시작:', threadId)
       const response = await fetch(`/api/messages/${threadId}`)
       const data = await response.json()
+      console.log('📥 [모달] 메시지 API 응답:', data.success ? '성공' : '실패', data.messages?.length || 0, '개')
 
       if (data.success) {
-        setMessages(data.messages)
+        const msgs = data.messages || []
+        console.log('📝 [모달] 받은 메시지:', msgs.map((m: any) => m.id.substring(0, 8)).join(', '))
+
+        // 캐시와 state 모두 업데이트
+        messagesCacheRef.current[threadId] = msgs
+        console.log('✅ [모달] setMessages() - 서버에서 받은 메시지:', msgs.length, '개')
+        setMessages(msgs)
+        console.log('✅ [모달] 메시지 설정 완료:', msgs.length, '개 (캐시 저장됨)')
+      } else {
+        console.error('❌ [모달] 메시지 조회 실패:', data.error)
+        console.log('❌ [모달] setMessages([]) - 조회 실패')
+        setMessages([])
+        messagesCacheRef.current[threadId] = []
       }
     } catch (error) {
-      console.error('메시지 조회 실패:', error)
+      console.error('❌ [모달] 메시지 조회 오류:', error)
+      console.log('❌ [모달] setMessages([]) - 조회 오류')
+      setMessages([])
+      messagesCacheRef.current[threadId] = []
     }
   }
 
   // 대화방 선택
   const selectThread = (thread: Thread) => {
+    console.log('🎯 [모달] 대화방 선택:', thread.id)
     setSelectedThread(thread)
-    setMessages([])
     setActiveTab('chats')
 
-    // 초기 메시지 로드
+    // 캐시에 메시지가 있으면 즉시 표시
+    if (messagesCacheRef.current[thread.id]) {
+      console.log('💾 [모달] 캐시에서 즉시 로드:', messagesCacheRef.current[thread.id].length, '개')
+      console.log('💾 [모달] setMessages() - selectThread에서 캐시 로드')
+      setMessages(messagesCacheRef.current[thread.id])
+    } else {
+      // 캐시가 없으면 빈 배열로 시작
+      console.log('⚠️ [모달] setMessages([]) - selectThread에서 캐시 없음')
+      setMessages([])
+    }
+
+    // 초기 메시지 로드 (서버에서 최신 데이터 가져오기)
     fetchMessages(thread.id)
   }
 
   // 메시지 전송
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedThread || sending) return
+    console.log('🚀 [모달] sendMessage 함수 시작!')
+    console.log('🚀 [모달] newMessage:', newMessage)
+    console.log('🚀 [모달] selectedThread:', selectedThread?.id)
+    console.log('🚀 [모달] sending:', sending)
+    console.log('🚀 [모달] messages.length BEFORE:', messages.length)
+
+    if (!newMessage.trim() || !selectedThread || sending) {
+      console.log('⛔ [모달] 전송 조건 미충족!')
+      return
+    }
 
     const messageContent = newMessage.trim()
     setNewMessage('') // 즉시 입력창 비우기
     setSending(true)
 
-    // 낙관적 업데이트: 전송 전에 UI에 먼저 표시
-    const optimisticMessage = {
-      id: `temp-${Date.now()}`,
+    console.log('📤 [모달] 메시지 전송 중...')
+
+    // 낙관적 업데이트: 즉시 화면에 표시
+    const optimisticMessage: Message = {
+      id: 'temp-' + Date.now(),
       thread_id: selectedThread.id,
       sender_id: currentUser?.id || '',
       content: messageContent,
-      created_at: new Date().toISOString(),
       is_read: false,
-      read_at: null
+      created_at: new Date().toISOString(),
+      sender: {
+        id: currentUser?.id || '',
+        email: currentUser?.email || '',
+        name: currentUser?.name,
+        profile_name: currentUser?.profile_name
+      }
     }
-    setMessages(prev => [...prev, optimisticMessage])
+
+    // 즉시 화면에 추가
+    console.log('⚡ [모달] 낙관적 메시지 추가:', optimisticMessage.id)
+    setMessages(prev => {
+      console.log('⚡ [모달] 이전 메시지:', prev.length, '개')
+      const updated = [...prev, optimisticMessage]
+      console.log('⚡ [모달] 업데이트 후:', updated.length, '개')
+      if (selectedThread.id !== 'new') {
+        messagesCacheRef.current[selectedThread.id] = updated
+        console.log('⚡ [모달] 캐시 저장됨')
+      }
+      return updated
+    })
 
     try {
       const response = await fetch('/api/messages', {
@@ -148,30 +219,78 @@ export default function FloatingMessenger() {
       })
 
       const data = await response.json()
+      console.log('📥 [모달] 서버 응답:', data)
+
       if (data.success) {
-        // 새 대화방인 경우 실제 thread_id로 업데이트
+        console.log('✅ [모달] 메시지 전송 성공:', data.message?.id)
+
+        // 실제 thread_id 확인
+        const actualThreadId = data.thread_id || selectedThread.id
+        console.log('🔄 [모달] 실제 thread ID:', actualThreadId)
+
+        // 임시 메시지를 실제 메시지로 교체
+        console.log('🔄 [모달] 임시 메시지를 실제 메시지로 교체 중...')
+        console.log('🔄 [모달] 제거할 임시 ID:', optimisticMessage.id)
+        console.log('🔄 [모달] 추가할 실제 ID:', data.message?.id)
+
+        const realMessage: Message = {
+          ...data.message,
+          sender: optimisticMessage.sender
+        }
+
+        setMessages(prev => {
+          console.log('🔄 [모달] 교체 전 메시지:', prev.length, '개')
+          const filtered = prev.filter(m => m.id !== optimisticMessage.id)
+          const updated = [...filtered, realMessage]
+          console.log('🔄 [모달] 교체 후 메시지:', updated.length, '개')
+
+          // 캐시 저장
+          messagesCacheRef.current[actualThreadId] = updated
+          console.log('🔄 [모달] 캐시 저장 완료')
+
+          return updated
+        })
+
+        // 새 대화방인 경우 마지막에 thread_id 업데이트
         if (selectedThread.id === 'new' && data.thread_id) {
-          const updatedThread = {
+          console.log('🆕 [모달] selectedThread 업데이트:', data.thread_id)
+          setSelectedThread({
             ...selectedThread,
             id: data.thread_id
-          }
-          setSelectedThread(updatedThread)
-          fetchThreads()
-        } else {
-          // 낙관적 메시지를 실제 메시지로 교체 (Realtime으로 받을 것임)
-          setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
-          fetchThreads()
+          })
         }
+
+        // 대화방 목록 갱신
+        fetchThreads()
       } else {
-        // 실패 시 낙관적 메시지 제거
-        setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
-        setNewMessage(messageContent) // 입력창에 다시 복원
+        console.error('❌ [모달] 전송 실패:', data.error)
+
+        // 낙관적 메시지 제거
+        setMessages(prev => {
+          const updated = prev.filter(m => m.id !== optimisticMessage.id)
+          if (selectedThread.id !== 'new') {
+            messagesCacheRef.current[selectedThread.id] = updated
+          }
+          return updated
+        })
+
+        setNewMessage(messageContent)
+        alert('메시지 전송 실패: ' + data.error)
       }
     } catch (error) {
-      console.error('메시지 전송 실패:', error)
-      // 실패 시 낙관적 메시지 제거
-      setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
-      setNewMessage(messageContent) // 입력창에 다시 복원
+      console.error('❌ [모달] 전송 오류:', error)
+
+      // 낙관적 메시지 제거
+      setMessages(prev => {
+        const updated = prev.filter(m => m.id !== optimisticMessage.id)
+        if (selectedThread.id !== 'new') {
+          messagesCacheRef.current[selectedThread.id] = updated
+        }
+        return updated
+      })
+
+      setNewMessage(messageContent)
+      alert('메시지 전송 중 오류 발생')
     } finally {
       setSending(false)
     }
@@ -250,18 +369,23 @@ export default function FloatingMessenger() {
     }
   }, [currentUser])
 
-  // Realtime 구독: 선택된 대화방의 새 메시지 실시간 수신
+  // Realtime 구독
   useEffect(() => {
-    if (!selectedThread || !currentUser || selectedThread.id === 'new') return
-
     // 기존 채널 구독 해제
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current)
+      channelRef.current = null
     }
 
-    // 새 채널 구독
+    // 대화방이 선택되고 사용자가 로그인한 경우에만 구독
+    if (!selectedThread || selectedThread.id === 'new' || !currentUser) {
+      return
+    }
+
+    console.log('📡 [모달] Realtime 구독 시작:', selectedThread.id)
+
     const channel = supabase
-      .channel(`thread:${selectedThread.id}`)
+      .channel(`modal-messages:${selectedThread.id}`)
       .on(
         'postgres_changes',
         {
@@ -270,62 +394,66 @@ export default function FloatingMessenger() {
           table: 'messages',
           filter: `thread_id=eq.${selectedThread.id}`
         },
-        async (payload) => {
-          console.log('📨 새 메시지 실시간 수신:', payload)
+        async (payload: any) => {
+          console.log('✅ [모달] Realtime 새 메시지 수신:', payload.new.id)
 
-          // sender 정보 가져오기
-          const { data: senderData } = await supabase
+          // 보낸 사람 정보 가져오기
+          const { data: sender } = await supabase
             .from('users')
             .select('id, email, name, profile_name')
             .eq('id', payload.new.sender_id)
             .single()
 
-          const newMessage = {
+          const newMsg = {
             ...payload.new,
-            sender: senderData
-          } as Message
+            sender
+          }
 
+          // 메시지 목록에 추가 (중복 체크)
           setMessages(prev => {
-            // 중복 방지 (낙관적 업데이트 메시지 제거)
-            const filtered = prev.filter(m => !m.id.toString().startsWith('temp-'))
-            // 이미 존재하는 메시지인지 확인
-            if (filtered.some(m => m.id === newMessage.id)) {
+            const exists = prev.some(m => m.id === newMsg.id)
+            if (exists) {
+              console.log('⚠️ [모달] 메시지 중복, 무시:', newMsg.id)
               return prev
             }
-            return [...filtered, newMessage]
+            console.log('✅ [모달] 메시지 추가:', newMsg.id)
+            const updated = [...prev, newMsg]
+            // 캐시도 업데이트
+            if (selectedThread) {
+              messagesCacheRef.current[selectedThread.id] = updated
+            }
+            return updated
           })
 
           // 대화방 목록 갱신
           fetchThreads()
         }
       )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-          filter: `thread_id=eq.${selectedThread.id}`
-        },
-        (payload) => {
-          console.log('✓ 메시지 읽음 표시 업데이트:', payload)
-
-          // 읽음 표시 업데이트
-          setMessages(prev => prev.map(msg =>
-            msg.id === payload.new.id
-              ? { ...msg, is_read: payload.new.is_read, read_at: payload.new.read_at }
-              : msg
-          ))
-        }
-      )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('📡 [모달] Realtime 구독 상태:', status)
+      })
 
     channelRef.current = channel
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [selectedThread, currentUser])
+  }, [selectedThread?.id, currentUser?.id])
+
+  // 메시지 state 변경 추적 - 비활성화
+  // useEffect(() => {
+  //   console.log('🔍 [모달] messages 상태 변경됨:', messages.length, '개')
+  //   console.log('🔍 [모달] 메시지 ID들:', messages.map(m => m.id.substring(0, 8)).join(', '))
+  //   console.log('🔍 [모달] 현재 selectedThread:', selectedThread?.id)
+  // }, [messages])
+
+  // selectedThread 변경 추적 - 비활성화
+  // useEffect(() => {
+  //   console.log('🔍 [모달] selectedThread 변경됨:', selectedThread?.id)
+  //   if (selectedThread && selectedThread.id !== 'new') {
+  //     console.log('🔍 [모달] 캐시 확인:', messagesCacheRef.current[selectedThread.id]?.length || 0, '개')
+  //   }
+  // }, [selectedThread])
 
   // 컴포넌트 언마운트 시 정리
   useEffect(() => {
@@ -469,10 +597,15 @@ export default function FloatingMessenger() {
                     <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
                       {getDisplayName(selectedThread.partner).charAt(0).toUpperCase()}
                     </div>
-                    <div className="flex items-center gap-2">
-                      {getTierBadge(selectedThread.partner)}
-                      <span className="font-semibold text-gray-900">
-                        {getDisplayName(selectedThread.partner)}
+                    <div className="flex-1 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {getTierBadge(selectedThread.partner)}
+                        <span className="font-semibold text-gray-900">
+                          {getDisplayName(selectedThread.partner)}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-500">
+                        메시지: {messages.length}개
                       </span>
                     </div>
                   </div>
@@ -516,24 +649,23 @@ export default function FloatingMessenger() {
                   <div ref={messagesEndRef} />
                 </div>
                 <div className="p-4 bg-white border-t">
-                  <div className="flex gap-2">
+                  <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="flex gap-2">
                     <input
                       type="text"
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
                       placeholder="메시지를 입력하세요..."
                       className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                       disabled={sending}
                     />
                     <button
-                      onClick={sendMessage}
+                      type="submit"
                       disabled={!newMessage.trim() || sending}
                       className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-sm text-sm font-medium"
                     >
                       {sending ? '...' : '전송'}
                     </button>
-                  </div>
+                  </form>
                 </div>
               </>
             ) : activeTab === 'chats' ? (

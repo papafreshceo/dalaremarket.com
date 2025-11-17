@@ -22,6 +22,7 @@ interface ChatMessage {
   sender_id: string
   content: string
   is_read: boolean
+  read_at?: string
   created_at: string
   sender?: User
 }
@@ -161,6 +162,99 @@ export default function AgriChatbot() {
     loadSettings();
   }, []);
 
+  // 대화창 열기 헬퍼 함수
+  const openChatWithUser = async (senderId: string) => {
+    if (!senderId) return;
+
+    // 챗봇 열기
+    setIsOpen(true);
+
+    // 메시지 탭으로 전환
+    setActiveTab('messages');
+
+    // 약간의 지연 후 대화 시작 (챗봇이 열리고 사용자 목록이 로드될 시간 확보)
+    setTimeout(async () => {
+      // 사용자 목록 조회
+      const response = await fetch('/api/user/list');
+      const data = await response.json();
+
+      if (data.success) {
+        const regularUsers = data.users.filter((u: any) =>
+          u.role !== 'admin' && u.role !== 'super_admin' && u.role !== 'employee'
+        );
+
+        const selectedUser = regularUsers.find((u: any) => u.id === senderId);
+
+        if (selectedUser) {
+          // 기존 스레드가 있는지 확인
+          const threadsResponse = await fetch('/api/messages');
+          const threadsData = await threadsResponse.json();
+
+          if (threadsData.success) {
+            const existingThread = threadsData.threads.find((t: any) => t.partner?.id === senderId);
+
+            if (existingThread) {
+              // 기존 스레드 선택
+              setSelectedThread(existingThread);
+              const messagesResponse = await fetch(`/api/messages?thread_id=${existingThread.id}`);
+              const messagesData = await messagesResponse.json();
+              if (messagesData.success) {
+                setChatMessages(messagesData.messages);
+              }
+            } else {
+              // 새 대화 시작
+              setSelectedThread({
+                id: 'new',
+                participant_1: '',
+                participant_2: senderId,
+                created_at: new Date().toISOString(),
+                partner: selectedUser,
+                unread_count: 0
+              });
+              setChatMessages([]);
+            }
+          }
+        }
+      }
+    }, 300);
+  };
+
+  // 푸시 알림에서 localStorage를 통해 대화창 열기
+  useEffect(() => {
+    // 페이지 로드 시 localStorage 확인
+    const pendingSenderId = localStorage.getItem('openChatWithUser');
+    if (pendingSenderId && currentUser) {
+      // localStorage 클리어
+      localStorage.removeItem('openChatWithUser');
+      // 대화창 열기
+      openChatWithUser(pendingSenderId);
+    }
+  }, [currentUser]);
+
+  // 외부에서 대화창 열기 이벤트 리스너
+  useEffect(() => {
+    const handleOpenChat = async (event: CustomEvent) => {
+      const { senderId } = event.detail;
+      openChatWithUser(senderId);
+    };
+
+    window.addEventListener('openChat' as any, handleOpenChat);
+
+    return () => {
+      window.removeEventListener('openChat' as any, handleOpenChat);
+    };
+  }, []);
+
+  // 컴포넌트 언마운트 시 Realtime 구독 해제
+  useEffect(() => {
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+    }
+  }, [])
+
   // 대화방 목록 조회
   const fetchThreads = async () => {
     if (!currentUser) return
@@ -188,6 +282,19 @@ export default function AgriChatbot() {
 
       if (data.success) {
         setChatMessages(data.messages)
+
+        // 화면에 메시지가 표시되었으므로 읽음 처리
+        const unreadMessageIds = data.messages
+          .filter((msg: any) => msg.sender_id !== currentUser?.id && !msg.is_read)
+          .map((msg: any) => msg.id)
+
+        if (unreadMessageIds.length > 0) {
+          console.log('📖 [AgriChatbot] 기존 메시지 읽음 처리:', unreadMessageIds.length, '개')
+          await supabase
+            .from('messages')
+            .update({ is_read: true, read_at: new Date().toISOString() })
+            .in('id', unreadMessageIds)
+        }
       }
     } catch (error) {
       console.error('메시지 조회 실패:', error)
@@ -199,6 +306,92 @@ export default function AgriChatbot() {
     setSelectedThread(thread)
     setChatMessages([])
     fetchChatMessages(thread.id)
+
+    // 기존 구독 해제
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current)
+      channelRef.current = null
+    }
+
+    // Realtime 구독 시작
+    if (thread.id && thread.id !== 'new') {
+      const channel = supabase
+        .channel(`chatbot-messages:${thread.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `thread_id=eq.${thread.id}`
+          },
+          async (payload: any) => {
+            console.log('✅ [AgriChatbot] Realtime 새 메시지 수신:', payload.new.id)
+
+            // 보낸 사람 정보 가져오기
+            const { data: sender } = await supabase
+              .from('users')
+              .select('id, email, name, profile_name')
+              .eq('id', payload.new.sender_id)
+              .single()
+
+            const newMsg: ChatMessage = {
+              ...payload.new,
+              sender
+            }
+
+            // 메시지 목록에 추가 (중복 체크)
+            setChatMessages(prev => {
+              const exists = prev.some(m => m.id === newMsg.id)
+              if (exists) {
+                console.log('⚠️ [AgriChatbot] 메시지 중복, 무시:', newMsg.id)
+                return prev
+              }
+              console.log('✅ [AgriChatbot] 메시지 추가:', newMsg.id)
+              return [...prev, newMsg]
+            })
+
+            // 대화창이 열려있고, 상대방이 보낸 메시지면 즉시 읽음 처리
+            if (payload.new.sender_id !== currentUser?.id && !payload.new.is_read) {
+              console.log('📖 [AgriChatbot] 대화창 열려있음, 메시지 읽음 처리:', payload.new.id)
+              await supabase
+                .from('messages')
+                .update({ is_read: true, read_at: new Date().toISOString() })
+                .eq('id', payload.new.id)
+            }
+
+            // 대화방 목록 갱신
+            fetchThreads()
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+            filter: `thread_id=eq.${thread.id}`
+          },
+          (payload: any) => {
+            console.log('📖 [AgriChatbot] 메시지 읽음 상태 업데이트:', payload.new.id, payload.new.is_read)
+
+            // 메시지 읽음 상태 업데이트
+            setChatMessages(prev => prev.map(msg =>
+              msg.id === payload.new.id
+                ? { ...msg, is_read: payload.new.is_read, read_at: payload.new.read_at }
+                : msg
+            ))
+
+            // 대화방 목록 갱신
+            fetchThreads()
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 [AgriChatbot] Realtime 구독 상태:', status, 'thread:', thread.id)
+        })
+
+      channelRef.current = channel
+    }
   }
 
   // 메시지 전송
@@ -231,18 +424,109 @@ export default function AgriChatbot() {
 
       const data = await response.json()
       if (data.success) {
+        // 임시 메시지를 실제 메시지로 교체
+        setChatMessages(prev => {
+          const filtered = prev.filter(m => m.id !== optimisticMessage.id)
+          const realMessage = {
+            ...data.message,
+            sender: {
+              id: currentUser?.id,
+              email: currentUser?.email,
+              profile_name: currentUser?.profile_name,
+              name: currentUser?.name
+            }
+          }
+          return [...filtered, realMessage]
+        })
+
         if (selectedThread.id === 'new' && data.thread_id) {
           const updatedThread = {
             ...selectedThread,
             id: data.thread_id
           }
           setSelectedThread(updatedThread)
-          fetchThreads()
-        } else {
-          setChatMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
-          fetchThreads()
+
+          // 새 대화방에 대한 Realtime 구독 시작
+          console.log('🔔 [AgriChatbot] 새 대화방 Realtime 구독 시작:', data.thread_id)
+          const channel = supabase
+            .channel(`chatbot-messages:${data.thread_id}`)
+            .on(
+              'postgres_changes',
+              {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages',
+                filter: `thread_id=eq.${data.thread_id}`
+              },
+              async (payload: any) => {
+                console.log('✅ [AgriChatbot] Realtime 새 메시지 수신:', payload.new.id)
+
+                // 보낸 사람 정보 가져오기
+                const { data: sender } = await supabase
+                  .from('users')
+                  .select('id, email, name, profile_name')
+                  .eq('id', payload.new.sender_id)
+                  .single()
+
+                const newMsg: ChatMessage = {
+                  ...payload.new,
+                  sender
+                }
+
+                // 메시지 목록에 추가 (중복 체크)
+                setChatMessages(prev => {
+                  const exists = prev.some(m => m.id === newMsg.id)
+                  if (exists) {
+                    console.log('⚠️ [AgriChatbot] 메시지 중복, 무시:', newMsg.id)
+                    return prev
+                  }
+                  console.log('✅ [AgriChatbot] 메시지 추가:', newMsg.id)
+                  return [...prev, newMsg]
+                })
+
+                // 대화창이 열려있고, 상대방이 보낸 메시지면 즉시 읽음 처리
+                if (payload.new.sender_id !== currentUser?.id && !payload.new.is_read) {
+                  console.log('📖 [AgriChatbot] 대화창 열려있음, 메시지 읽음 처리:', payload.new.id)
+                  await supabase
+                    .from('messages')
+                    .update({ is_read: true, read_at: new Date().toISOString() })
+                    .eq('id', payload.new.id)
+                }
+
+                fetchThreads()
+              }
+            )
+            .on(
+              'postgres_changes',
+              {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'messages',
+                filter: `thread_id=eq.${data.thread_id}`
+              },
+              (payload: any) => {
+                console.log('📖 [AgriChatbot] 메시지 읽음 상태 업데이트:', payload.new.id, payload.new.is_read)
+
+                // 메시지 읽음 상태 업데이트
+                setChatMessages(prev => prev.map(msg =>
+                  msg.id === payload.new.id
+                    ? { ...msg, is_read: payload.new.is_read, read_at: payload.new.read_at }
+                    : msg
+                ))
+
+                fetchThreads()
+              }
+            )
+            .subscribe((status) => {
+              console.log('📡 [AgriChatbot] 새 대화방 구독 상태:', status, 'thread:', data.thread_id)
+            })
+
+          channelRef.current = channel
         }
+
+        fetchThreads()
       } else {
+        // 실패 시 임시 메시지 제거
         setChatMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
         setNewMessage(messageContent)
       }
@@ -634,7 +918,18 @@ export default function AgriChatbot() {
                         >
                           {message.content}
                         </div>
-                        <div className="message-time">{formatTime(message.created_at)}</div>
+                        <div className="message-time" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          {formatTime(message.created_at)}
+                          {isMine && (
+                            <span style={{
+                              fontSize: '10px',
+                              color: message.is_read ? '#10b981' : '#9ca3af',
+                              fontWeight: '500'
+                            }}>
+                              {message.is_read ? '읽음' : '안읽음'}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )
                   })

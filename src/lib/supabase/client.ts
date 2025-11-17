@@ -16,12 +16,18 @@ export function createClient() {
     {
       cookies: {
         get(name: string) {
+          // 서버 사이드에서는 document가 없으므로 체크
+          if (typeof document === 'undefined') return null
+
           const cookies = document.cookie.split(';')
           const cookie = cookies.find(c => c.trim().startsWith(`${name}=`))
           if (!cookie) return null
           return decodeURIComponent(cookie.split('=')[1])
         },
         set(name: string, value: string, options: any) {
+          // 서버 사이드에서는 document가 없으므로 체크
+          if (typeof document === 'undefined') return
+
           let cookie = `${name}=${encodeURIComponent(value)}`
 
           if (options?.maxAge) {

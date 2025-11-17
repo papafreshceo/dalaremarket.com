@@ -5,13 +5,15 @@ import BroadcastTab from './components/BroadcastTab'
 import StatsTab from './components/StatsTab'
 import UserSettingsTab from './components/UserSettingsTab'
 import OneSignalTab from './components/OneSignalTab'
+import ReceivedTab from './components/ReceivedTab'
 
-type TabType = 'broadcast' | 'stats' | 'users' | 'onesignal'
+type TabType = 'received' | 'broadcast' | 'stats' | 'users' | 'onesignal'
 
 export default function NotificationsManagementPage() {
-  const [activeTab, setActiveTab] = useState<TabType>('broadcast')
+  const [activeTab, setActiveTab] = useState<TabType>('received')
 
   const tabs = [
+    { id: 'received', label: '받은 알림', icon: '📬' },
     { id: 'broadcast', label: '전체 공지 발송', icon: '📢' },
     { id: 'stats', label: '알림 통계', icon: '📊' },
     { id: 'users', label: '사용자 설정', icon: '👥' },
@@ -59,6 +61,7 @@ export default function NotificationsManagementPage() {
 
       {/* 탭 컨텐츠 */}
       <div>
+        {activeTab === 'received' && <ReceivedTab />}
         {activeTab === 'broadcast' && <BroadcastTab />}
         {activeTab === 'stats' && <StatsTab />}
         {activeTab === 'users' && <UserSettingsTab />}

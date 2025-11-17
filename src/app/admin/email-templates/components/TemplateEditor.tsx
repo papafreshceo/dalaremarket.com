@@ -29,7 +29,6 @@ export default function TemplateEditor({ template, onClose, onSave }: TemplateEd
   const [description, setDescription] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [loading, setLoading] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
 
   useEffect(() => {
     if (template) {
@@ -144,9 +143,11 @@ export default function TemplateEditor({ template, onClose, onSave }: TemplateEd
         background: '#fff',
         borderRadius: '8px',
         width: '100%',
-        maxWidth: '1000px',
+        maxWidth: '1400px',
         maxHeight: '90vh',
-        overflow: 'auto'
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
       }}>
         {/* 헤더 */}
         <div style={{
@@ -155,10 +156,7 @@ export default function TemplateEditor({ template, onClose, onSave }: TemplateEd
           alignItems: 'center',
           padding: '20px',
           borderBottom: '1px solid #e5e7eb',
-          position: 'sticky',
-          top: 0,
-          background: '#fff',
-          zIndex: 10
+          background: '#fff'
         }}>
           <h2 style={{ fontSize: '18px', fontWeight: '600' }}>
             {template ? '템플릿 수정' : '새 템플릿 만들기'}
@@ -177,8 +175,15 @@ export default function TemplateEditor({ template, onClose, onSave }: TemplateEd
           </button>
         </div>
 
-        {/* 폼 */}
-        <form onSubmit={handleSubmit} style={{ padding: '20px' }}>
+        {/* 메인 컨텐츠: 좌우 분할 */}
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          {/* 왼쪽: 편집 폼 */}
+          <div style={{
+            flex: '0 0 50%',
+            overflow: 'auto',
+            borderRight: '1px solid #e5e7eb'
+          }}>
+            <form onSubmit={handleSubmit} style={{ padding: '20px', height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
             {/* 템플릿 이름 */}
             <div>
@@ -233,12 +238,10 @@ export default function TemplateEditor({ template, onClose, onSave }: TemplateEd
                   cursor: 'pointer'
                 }}
               >
-                <option value="broadcast">전체 공지</option>
-                <option value="welcome">가입 환영</option>
+                <option value="transactional">트랜잭션</option>
+                <option value="marketing">마케팅</option>
                 <option value="notification">알림</option>
-                <option value="order">주문 확인</option>
-                <option value="shipping">배송 안내</option>
-                <option value="custom">커스텀</option>
+                <option value="broadcast">공지사항</option>
               </select>
             </div>
           </div>
@@ -391,93 +394,92 @@ export default function TemplateEditor({ template, onClose, onSave }: TemplateEd
           </div>
 
           {/* 버튼 */}
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            paddingTop: '16px',
-            borderTop: '1px solid #e5e7eb'
-          }}>
-            <button
-              type="button"
-              onClick={() => setShowPreview(!showPreview)}
-              style={{
-                padding: '8px 16px',
-                background: '#f3f4f6',
-                color: '#374151',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: '500',
-                cursor: 'pointer',
+              <div style={{
                 display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <Eye size={14} />
-              {showPreview ? '미리보기 숨기기' : '미리보기'}
-            </button>
-            <div style={{ flex: 1 }} />
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: '8px 16px',
-                background: '#f3f4f6',
-                color: '#374151',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                padding: '8px 16px',
-                background: loading ? '#9ca3af' : '#000',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: '500',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <Save size={14} />
-              {loading ? '저장 중...' : '저장'}
-            </button>
+                gap: '8px',
+                paddingTop: '16px',
+                marginTop: 'auto',
+                borderTop: '1px solid #e5e7eb'
+              }}>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: 'pointer'
+                  }}
+                >
+                  취소
+                </button>
+                <div style={{ flex: 1 }} />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    padding: '8px 16px',
+                    background: loading ? '#9ca3af' : '#000',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Save size={14} />
+                  {loading ? '저장 중...' : '저장'}
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
 
-        {/* 미리보기 */}
-        {showPreview && (
+          {/* 오른쪽: 실시간 미리보기 */}
           <div style={{
-            padding: '20px',
-            borderTop: '1px solid #e5e7eb',
-            background: '#f9fafb'
+            flex: '0 0 50%',
+            background: '#f9fafb',
+            overflow: 'auto',
+            padding: '20px'
           }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>
-              미리보기
-            </h3>
+            <div style={{
+              position: 'sticky',
+              top: 0,
+              marginBottom: '12px',
+              paddingBottom: '12px',
+              background: '#f9fafb',
+              zIndex: 1
+            }}>
+              <h3 style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: '#374151'
+              }}>
+                <Eye size={16} />
+                실시간 미리보기
+              </h3>
+            </div>
             <div style={{
               background: '#fff',
               border: '1px solid #e5e7eb',
               borderRadius: '6px',
               overflow: 'auto',
-              maxHeight: '400px'
+              minHeight: '400px'
             }}>
               <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   )

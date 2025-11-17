@@ -97,12 +97,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // 서브 계정 목록 조회 (메인 계정 제외)
+    // 서브 계정 목록 조회 (메인 계정 제외, 삭제되지 않은 것만)
     const { data: subAccounts, error } = await supabase
       .from('sub_accounts')
       .select('*')
       .eq('organization_id', org.id)
       .eq('is_main', false)
+      .eq('is_deleted', false)
       .order('created_at', { ascending: true })
 
     if (error) {
@@ -264,10 +265,13 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // 서브 계정 삭제
+    // 서브 계정 삭제 (Soft Delete - 정산 이력 보존)
     const { error: deleteError } = await supabase
       .from('sub_accounts')
-      .delete()
+      .update({
+        deleted_at: new Date().toISOString(),
+        is_deleted: true,
+      })
       .eq('id', subAccountId)
 
     if (deleteError) {
@@ -277,6 +281,8 @@ export async function DELETE(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    logger.info('서브 계정 soft delete 완료:', { subAccountId });
 
     return NextResponse.json({
       success: true,

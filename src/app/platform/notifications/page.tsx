@@ -14,6 +14,7 @@ interface Notification {
   resource_type?: string
   resource_id?: string
   action_url?: string
+  image_url?: string
   is_read: boolean
   created_at: string
   data?: any
@@ -146,6 +147,7 @@ export default function NotificationsPage() {
   const [activeTab, setActiveTab] = useState<NotificationTab>('all')
   const [readFilter, setReadFilter] = useState<'all' | 'unread'>('all')
   const [unreadCount, setUnreadCount] = useState(0)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [tabCounts, setTabCounts] = useState<Record<NotificationTab, number>>({
     all: 0,
     orders: 0,
@@ -341,13 +343,40 @@ export default function NotificationsPage() {
     }
   }
 
-  // 알림 클릭 처리 (읽음 처리 + 페이지 이동)
+  // 알림 펼치기/접기 토글
+  const toggleExpanded = (notificationId: string) => {
+    setExpandedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(notificationId)) {
+        newSet.delete(notificationId)
+      } else {
+        newSet.add(notificationId)
+      }
+      return newSet
+    })
+  }
+
+  // 알림 클릭 처리 (읽음 처리 + 펼치기 또는 액션)
   const handleNotificationClick = (notification: Notification) => {
     // 읽지 않은 알림이면 읽음 처리
     if (!notification.is_read) {
       markAsRead(notification.id)
     }
 
+    // 메시지 알림인 경우 대화창 바로 열기
+    if (notification.type === 'new_message' && notification.data?.sender_id) {
+      window.dispatchEvent(new CustomEvent('openChat', {
+        detail: { senderId: notification.data.sender_id }
+      }))
+      return
+    }
+
+    // 그 외의 알림은 카드 펼치기/접기
+    toggleExpanded(notification.id)
+  }
+
+  // 상세 페이지로 이동
+  const navigateToDetail = (notification: Notification) => {
     // action_url이 있으면 해당 URL로 이동
     if (notification.action_url) {
       router.push(notification.action_url)
@@ -375,10 +404,14 @@ export default function NotificationsPage() {
         break
 
       case 'new_message':
-        // 메시지 알림
-        if (notification.resource_id) {
-          router.push(`/platform/messages?thread_id=${notification.resource_id}`)
+        // 메시지 알림 - 챗봇 대화창 열기
+        if (notification.data && notification.data.sender_id) {
+          // 챗봇에 이벤트 발송하여 대화창 열기
+          window.dispatchEvent(new CustomEvent('openChat', {
+            detail: { senderId: notification.data.sender_id }
+          }))
         } else {
+          // sender_id가 없으면 기본 메시지 페이지로 이동
           router.push('/platform/messages')
         }
         break
@@ -618,19 +651,23 @@ export default function NotificationsPage() {
             const icon = getCategoryIcon(notification.type)
             const label = CATEGORY_LABELS[notification.type] || '알림'
 
-            // 컴팩트한 1줄 알림 카드
+            const isExpanded = expandedIds.has(notification.id)
+
             return (
               <div
                 key={notification.id}
                 id={`notification-${notification.id}`}
-                onClick={() => handleNotificationClick(notification)}
-                className={`border rounded-lg px-4 py-3 transition-all cursor-pointer hover:shadow-md ${
+                className={`border rounded-lg px-4 py-3 transition-all ${
                   !notification.is_read
                     ? `${colors.bg} border-l-4 ${colors.border}`
                     : 'bg-white border-gray-200 hover:bg-gray-50'
                 }`}
               >
-                <div className="flex items-center gap-3">
+                {/* 상단: 클릭 가능한 헤더 영역 */}
+                <div
+                  onClick={() => handleNotificationClick(notification)}
+                  className="flex items-center gap-3 cursor-pointer"
+                >
                   {/* 아이콘 */}
                   <div className={`flex-shrink-0 ${colors.text}`}>{icon}</div>
 
@@ -645,18 +682,20 @@ export default function NotificationsPage() {
                   </span>
 
                   {/* 제목 + 내용 */}
-                  <div className="flex-1 min-w-0 flex items-center gap-3">
-                    <span className="font-semibold text-gray-900 truncate">
-                      {notification.title}
-                    </span>
-                    {notification.body && (
-                      <>
-                        <span className="text-gray-400">·</span>
-                        <span className="text-sm text-gray-600 truncate">
-                          {notification.body}
-                        </span>
-                      </>
-                    )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="font-semibold text-gray-900 flex-shrink-0">
+                        {notification.title}
+                      </span>
+                      {notification.body && !isExpanded && (
+                        <>
+                          <span className="text-gray-400 flex-shrink-0">·</span>
+                          <span className="text-sm text-gray-600 line-clamp-1 flex-1 min-w-0">
+                            {notification.body}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {/* 시간 */}
@@ -664,34 +703,86 @@ export default function NotificationsPage() {
                     {formatTime(notification.created_at)}
                   </span>
 
-                  {/* 액션 버튼들 */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {!notification.is_read && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          markAsRead(notification.id)
-                        }}
-                        className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                        title="읽음 처리"
-                      >
-                        읽음
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        deleteNotification(notification.id)
-                      }}
-                      className="text-gray-400 hover:text-red-600 transition-colors"
-                      title="삭제"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
+                  {/* 펼침 아이콘 */}
+                  <svg
+                    className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${
+                      isExpanded ? 'rotate-180' : ''
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+
+                  {/* 삭제 버튼 (X) */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      deleteNotification(notification.id)
+                    }}
+                    className="flex-shrink-0 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    title="삭제"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
+
+                {/* 펼쳐진 내용 */}
+                {isExpanded && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    {/* 전체 내용 */}
+                    {notification.body && (
+                      <p className="text-sm text-gray-700 mb-3 whitespace-pre-wrap">
+                        {notification.body}
+                      </p>
+                    )}
+
+                    {/* 이미지 */}
+                    {notification.image_url && (
+                      <div className="mb-3">
+                        <img
+                          src={notification.image_url}
+                          alt={notification.title}
+                          className="w-full max-w-md rounded-lg border border-gray-200"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none'
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* 액션 버튼들 */}
+                    <div className="flex items-center gap-2">
+                      {(notification.action_url || notification.resource_id) &&
+                       notification.action_url !== '/platform/notifications' &&
+                       notification.action_url !== 'platform/notifications' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigateToDetail(notification)
+                          }}
+                          className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                        >
+                          자세히 보기 →
+                        </button>
+                      )}
+                      {!notification.is_read && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            markAsRead(notification.id)
+                          }}
+                          className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                        >
+                          읽음 처리
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })

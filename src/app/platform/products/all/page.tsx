@@ -411,7 +411,7 @@ export default function AllProductsPage() {
                     </div>
 
                     {/* 상태별 품목 그리드 */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                       {(() => {
                         // 4개씩 chunk로 나누기
                         const chunkSize = 4;
@@ -433,7 +433,7 @@ export default function AllProductsPage() {
                               return (
                                 <div key={itemName} className="col-span-1 flex">
                               <div
-                                className={`rounded-lg transition-all duration-300 ease-out p-4 flex flex-col gap-3 cursor-pointer hover:shadow-lg w-full ${
+                                className={`rounded-lg transition-all duration-300 ease-out p-3 flex flex-col gap-2 cursor-pointer hover:shadow-lg w-full ${
                                   isExpanded ? 'scale-105' : ''
                                 }`}
                                 style={isShipping ? {
@@ -474,7 +474,7 @@ export default function AllProductsPage() {
                                 })()}
 
                                 {/* 품목 정보 */}
-                                <div className="flex flex-col gap-2">
+                                <div className="flex flex-col gap-1">
                                 <div>
                                   <h3 className="font-semibold text-gray-900 text-base">
                                     {category3 && (

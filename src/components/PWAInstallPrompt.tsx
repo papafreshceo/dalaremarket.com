@@ -90,44 +90,37 @@ export default function PWAInstallPrompt() {
   }
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4 z-50 animate-slide-up">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">
+    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 z-50 animate-slide-up">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-sm">
             달
           </div>
-          <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">달래마켓 앱 설치</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">홈 화면에 추가하기</p>
-          </div>
+          <h3 className="font-medium text-sm text-gray-900 dark:text-white">달래마켓 앱 설치</h3>
         </div>
         <button
           onClick={handleClose}
           className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           aria-label="닫기"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        앱을 설치하면 더 빠르고 편리하게 이용할 수 있습니다.
-      </p>
-
       <div className="flex space-x-2">
         <button
           onClick={handleInstallClick}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded transition-colors"
         >
-          설치하기
+          설치
         </button>
         <button
           onClick={handleClose}
-          className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium"
+          className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium"
         >
-          나중에
+          닫기
         </button>
       </div>
     </div>

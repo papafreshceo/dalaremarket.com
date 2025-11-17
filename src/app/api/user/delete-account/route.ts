@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 
 export async function DELETE() {
   try {
@@ -17,123 +18,152 @@ export async function DELETE() {
 
     const adminClient = createAdminClient();
 
-    // 1. 사용자가 소유한 조직들 조회
+    logger.info('🗑️ 회원 탈퇴 시작 (Soft Delete):', { userId: user.id });
+
+    const now = new Date().toISOString();
+
+    // 1. 소유한 조직 확인
     const { data: ownedOrgs, error: orgsError } = await adminClient
       .from('organizations')
       .select('id')
-      .eq('owner_id', user.id);
+      .eq('owner_id', user.id)
+      .eq('is_deleted', false);
 
     if (orgsError) {
-      logger.error('조직 조회 오류:', orgsError);
+      logger.error('❌ 조직 조회 오류:', orgsError);
       return NextResponse.json(
-        { error: '조직 정보 조회 중 오류가 발생했습니다.' },
+        { error: '조직 조회 중 오류가 발생했습니다.', details: orgsError.message },
         { status: 500 }
       );
     }
 
-    // 2. 각 조직의 멤버들에게 새 개인 조직 생성
+    // 2. 소유한 조직이 있으면 조직 및 모든 하위 데이터 삭제
     if (ownedOrgs && ownedOrgs.length > 0) {
-      for (const org of ownedOrgs) {
-        // 해당 조직의 멤버들 조회 (소유자 제외)
-        const { data: members, error: membersError } = await adminClient
-          .from('organization_members')
-          .select('user_id, users!organization_members_user_id_fkey(id, name, email, phone)')
-          .eq('organization_id', org.id)
-          .neq('user_id', user.id);
+      const orgIds = ownedOrgs.map(org => org.id);
+      logger.info('🏢 소유 조직 삭제:', { orgIds });
 
-        if (membersError) {
-          logger.error('멤버 조회 오류:', membersError);
-          continue;
-        }
+      // 2-1. 조직의 모든 서브계정 삭제
+      const { error: subAccountsError } = await adminClient
+        .from('sub_accounts')
+        .update({ deleted_at: now, is_deleted: true })
+        .in('organization_id', orgIds)
+        .eq('is_deleted', false);
 
-        // 각 멤버에게 새 개인 조직 생성
-        if (members && members.length > 0) {
-          for (const member of members) {
-            const memberData = member.users as any;
-            if (!memberData) continue;
+      if (subAccountsError) {
+        logger.error('❌ 서브계정 삭제 오류:', subAccountsError);
+      } else {
+        logger.info('✅ 서브계정 삭제 완료');
+      }
 
-            // 셀러 코드 & 파트너 코드 생성
-            const sellerCode = 'S' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
-            const partnerCode = 'P' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+      // 2-2. 조직 캐시 삭제
+      const { error: cashError } = await adminClient
+        .from('organization_cash')
+        .update({ deleted_at: now, is_deleted: true })
+        .in('organization_id', orgIds)
+        .eq('is_deleted', false);
 
-            // 새 조직 생성
-            const { data: newOrg, error: createOrgError } = await adminClient
-              .from('organizations')
-              .insert({
-                owner_id: member.user_id,
-                business_name: `${memberData.name || '새 조직'}의 조직`,
-                business_registration_number: '',
-                representative_name: memberData.name || '대표자',
-                business_type: '',
-                business_category: '',
-                postal_code: '',
-                address: '',
-                detailed_address: '',
-                phone_number: memberData.phone || '',
-                email: memberData.email || '',
-                bank_name: '',
-                account_number: '',
-                account_holder: '',
-                seller_code: sellerCode,
-                partner_code: partnerCode
-              })
-              .select()
-              .single();
+      if (cashError) {
+        logger.error('❌ 조직 캐시 삭제 오류:', cashError);
+      } else {
+        logger.info('✅ 조직 캐시 삭제 완료');
+      }
 
-            if (createOrgError || !newOrg) {
-              logger.error('조직 생성 오류:', createOrgError);
-              continue;
-            }
+      // 2-3. 조직 크레딧 삭제
+      const { error: creditsError } = await adminClient
+        .from('organization_credits')
+        .update({ deleted_at: now, is_deleted: true })
+        .in('organization_id', orgIds)
+        .eq('is_deleted', false);
 
-            // 멤버의 primary_organization_id 업데이트
-            await adminClient
-              .from('users')
-              .update({ primary_organization_id: newOrg.id })
-              .eq('id', member.user_id);
+      if (creditsError) {
+        logger.error('❌ 조직 크레딧 삭제 오류:', creditsError);
+      } else {
+        logger.info('✅ 조직 크레딧 삭제 완료');
+      }
 
-            logger.info('멤버 ${memberData.email}에게 새 조직 생성 완료:');
-          }
-        }
+      // 2-4. 조직의 모든 멤버 삭제
+      const { error: membersError } = await adminClient
+        .from('organization_members')
+        .update({ deleted_at: now, is_deleted: true })
+        .in('organization_id', orgIds)
+        .eq('is_deleted', false);
+
+      if (membersError) {
+        logger.error('❌ 조직 멤버 삭제 오류:', membersError);
+      } else {
+        logger.info('✅ 조직 멤버 삭제 완료');
+      }
+
+      // 2-5. 조직 삭제
+      const { error: deleteOrgsError } = await adminClient
+        .from('organizations')
+        .update({ deleted_at: now, is_deleted: true })
+        .in('id', orgIds);
+
+      if (deleteOrgsError) {
+        logger.error('❌ 조직 삭제 오류:', deleteOrgsError);
+      } else {
+        logger.info('✅ 소유 조직 삭제 완료');
       }
     }
 
-    // 3. public.users 삭제 (CASCADE로 조직 및 관련 데이터 자동 삭제)
-    logger.debug('🗑️ public.users 삭제 시작:', { data: user.id });
-    const { error: deletePublicUserError } = await adminClient
+    // 3. 멤버로 속한 조직에서 탈퇴
+    const { error: leaveMembersError } = await adminClient
+      .from('organization_members')
+      .update({ deleted_at: now, is_deleted: true })
+      .eq('user_id', user.id)
+      .eq('is_deleted', false);
+
+    if (leaveMembersError) {
+      logger.error('❌ 조직 멤버 탈퇴 오류:', leaveMembersError);
+    } else {
+      logger.info('✅ 조직 멤버 탈퇴 완료');
+    }
+
+    // 4. 사용자 계정 탈퇴 처리 (public.users soft delete)
+    const { error: updateError } = await adminClient
       .from('users')
-      .delete()
+      .update({
+        deleted_at: now,
+        is_deleted: true,
+        primary_organization_id: null,
+      })
       .eq('id', user.id);
 
-    if (deletePublicUserError) {
-      logger.error('❌ public.users 삭제 오류:', deletePublicUserError);
+    if (updateError) {
+      logger.error('❌ 회원 탈퇴 오류:', updateError);
       return NextResponse.json(
-        { error: 'public.users 삭제 중 오류가 발생했습니다.' },
+        {
+          error: '회원 탈퇴 중 오류가 발생했습니다.',
+          details: updateError.message,
+        },
         { status: 500 }
       );
     }
 
-    logger.info('public.users 삭제 완료:');
+    // 5. auth.users에서 삭제 (재가입 가능하도록)
+    const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(user.id);
 
-    // 4. auth.users 삭제
-    logger.debug('🗑️ auth.users 삭제 시작:', { data: user.id });
-    const { error: deleteAuthUserError } = await adminClient.auth.admin.deleteUser(user.id);
-
-    if (deleteAuthUserError) {
-      logger.error('❌ auth.users 삭제 오류:', deleteAuthUserError);
-      // auth.users 삭제 실패해도 public.users는 이미 삭제됨
-      // 에러를 반환하지만 치명적이진 않음
+    if (authDeleteError) {
+      logger.error('❌ Auth 사용자 삭제 오류:', authDeleteError);
+      // Auth 삭제 실패는 치명적이지 않으므로 로그만 남김
+    } else {
+      logger.info('✅ Auth 사용자 삭제 완료');
     }
 
-    logger.info('auth.users 삭제 완료:');
+    logger.info('✅ 회원 탈퇴 완료:', { userId: user.id, deletedAt: now });
 
     return NextResponse.json({
       success: true,
       message: '회원 탈퇴가 완료되었습니다.'
     });
   } catch (error: any) {
-    logger.error('회원 탈퇴 처리 오류:', error);
+    logger.error('❌ 회원 탈퇴 처리 오류:', error);
     return NextResponse.json(
-      { error: error.message || '회원 탈퇴 중 오류가 발생했습니다.' },
+      {
+        error: error.message || '회원 탈퇴 중 오류가 발생했습니다.',
+        details: error.toString()
+      },
       { status: 500 }
     );
   }

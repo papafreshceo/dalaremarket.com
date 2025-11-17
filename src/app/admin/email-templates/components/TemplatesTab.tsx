@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
-import { Plus, Edit, Trash2, Eye, Mail } from 'lucide-react'
+import { Plus, Trash2, Mail } from 'lucide-react'
 import TemplateEditor from './TemplateEditor'
-import TemplatePreview from './TemplatePreview'
 
 interface EmailTemplate {
   id: number
@@ -24,7 +23,6 @@ export default function TemplatesTab() {
   const [loading, setLoading] = useState(true)
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null)
   const [showEditor, setShowEditor] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
   const [filterType, setFilterType] = useState<string>('all')
 
   useEffect(() => {
@@ -88,11 +86,6 @@ export default function TemplatesTab() {
     setShowEditor(true)
   }
 
-  const handlePreview = (template: EmailTemplate) => {
-    setSelectedTemplate(template)
-    setShowPreview(true)
-  }
-
   const handleSaveSuccess = () => {
     setShowEditor(false)
     setSelectedTemplate(null)
@@ -101,24 +94,20 @@ export default function TemplatesTab() {
 
   const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      broadcast: '전체 공지',
-      welcome: '가입 환영',
+      transactional: '트랜잭션',
+      marketing: '마케팅',
       notification: '알림',
-      order: '주문 확인',
-      shipping: '배송 안내',
-      custom: '커스텀'
+      broadcast: '공지사항'
     }
     return labels[type] || type
   }
 
   const getTypeBadgeColor = (type: string) => {
     const colors: Record<string, string> = {
-      broadcast: '#2563eb',
-      welcome: '#059669',
+      transactional: '#2563eb',
+      marketing: '#10b981',
       notification: '#f59e0b',
-      order: '#8b5cf6',
-      shipping: '#ec4899',
-      custom: '#6b7280'
+      broadcast: '#8b5cf6'
     }
     return colors[type] || '#6b7280'
   }
@@ -149,11 +138,11 @@ export default function TemplatesTab() {
             전체
           </button>
           <button
-            onClick={() => setFilterType('broadcast')}
+            onClick={() => setFilterType('transactional')}
             style={{
               padding: '6px 12px',
-              background: filterType === 'broadcast' ? '#000' : '#f3f4f6',
-              color: filterType === 'broadcast' ? '#fff' : '#374151',
+              background: filterType === 'transactional' ? '#000' : '#f3f4f6',
+              color: filterType === 'transactional' ? '#fff' : '#374151',
               border: 'none',
               borderRadius: '6px',
               fontSize: '13px',
@@ -161,14 +150,14 @@ export default function TemplatesTab() {
               cursor: 'pointer'
             }}
           >
-            전체 공지
+            트랜잭션
           </button>
           <button
-            onClick={() => setFilterType('welcome')}
+            onClick={() => setFilterType('marketing')}
             style={{
               padding: '6px 12px',
-              background: filterType === 'welcome' ? '#000' : '#f3f4f6',
-              color: filterType === 'welcome' ? '#fff' : '#374151',
+              background: filterType === 'marketing' ? '#000' : '#f3f4f6',
+              color: filterType === 'marketing' ? '#fff' : '#374151',
               border: 'none',
               borderRadius: '6px',
               fontSize: '13px',
@@ -176,7 +165,7 @@ export default function TemplatesTab() {
               cursor: 'pointer'
             }}
           >
-            가입 환영
+            마케팅
           </button>
           <button
             onClick={() => setFilterType('notification')}
@@ -192,6 +181,21 @@ export default function TemplatesTab() {
             }}
           >
             알림
+          </button>
+          <button
+            onClick={() => setFilterType('broadcast')}
+            style={{
+              padding: '6px 12px',
+              background: filterType === 'broadcast' ? '#000' : '#f3f4f6',
+              color: filterType === 'broadcast' ? '#fff' : '#374151',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            공지사항
           </button>
         </div>
 
@@ -277,20 +281,67 @@ export default function TemplatesTab() {
           {templates.map((template) => (
             <div
               key={template.id}
+              onClick={() => handleEdit(template)}
               style={{
                 background: '#fff',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
                 padding: '16px',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                cursor: 'pointer',
+                position: 'relative'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#2563eb'
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.1)'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb'
+                e.currentTarget.style.boxShadow = 'none'
+                e.currentTarget.style.transform = 'translateY(0)'
               }}
             >
+              {/* 삭제 버튼 - 우측 상단 */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDelete(template)
+                }}
+                style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '12px',
+                  padding: '4px',
+                  background: 'transparent',
+                  color: '#9ca3af',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#fef2f2'
+                  e.currentTarget.style.color = '#dc2626'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color = '#9ca3af'
+                }}
+              >
+                <Trash2 size={14} />
+              </button>
+
               {/* 헤더 */}
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'start',
-                marginBottom: '12px'
+                marginBottom: '12px',
+                paddingRight: '28px'
               }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -307,6 +358,15 @@ export default function TemplatesTab() {
                     }}>
                       {getTypeLabel(template.type)}
                     </span>
+                    {template.is_active && (
+                      <span style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        background: '#10b981',
+                        flexShrink: 0
+                      }} />
+                    )}
                   </div>
                   {template.description && (
                     <p style={{ fontSize: '12px', color: '#6b7280' }}>
@@ -314,14 +374,6 @@ export default function TemplatesTab() {
                     </p>
                   )}
                 </div>
-                <div style={{
-                  width: '12px',
-                  height: '12px',
-                  borderRadius: '50%',
-                  background: template.is_active ? '#10b981' : '#9ca3af',
-                  flexShrink: 0,
-                  marginLeft: '8px'
-                }} />
               </div>
 
               {/* 제목 */}
@@ -362,78 +414,9 @@ export default function TemplatesTab() {
               )}
 
               {/* 날짜 */}
-              <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '12px' }}>
+              <p style={{ fontSize: '11px', color: '#9ca3af' }}>
                 생성일: {new Date(template.created_at).toLocaleDateString('ko-KR')}
               </p>
-
-              {/* 액션 버튼 */}
-              <div style={{
-                display: 'flex',
-                gap: '6px',
-                paddingTop: '12px',
-                borderTop: '1px solid #e5e7eb'
-              }}>
-                <button
-                  onClick={() => handlePreview(template)}
-                  style={{
-                    flex: 1,
-                    padding: '6px 12px',
-                    background: '#f3f4f6',
-                    color: '#374151',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <Eye size={14} />
-                  미리보기
-                </button>
-                <button
-                  onClick={() => handleEdit(template)}
-                  style={{
-                    flex: 1,
-                    padding: '6px 12px',
-                    background: '#f3f4f6',
-                    color: '#374151',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <Edit size={14} />
-                  수정
-                </button>
-                <button
-                  onClick={() => handleDelete(template)}
-                  style={{
-                    padding: '6px 12px',
-                    background: '#fef2f2',
-                    color: '#dc2626',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
             </div>
           ))}
         </div>
@@ -448,17 +431,6 @@ export default function TemplatesTab() {
             setSelectedTemplate(null)
           }}
           onSave={handleSaveSuccess}
-        />
-      )}
-
-      {/* 미리보기 모달 */}
-      {showPreview && selectedTemplate && (
-        <TemplatePreview
-          template={selectedTemplate}
-          onClose={() => {
-            setShowPreview(false)
-            setSelectedTemplate(null)
-          }}
         />
       )}
     </div>

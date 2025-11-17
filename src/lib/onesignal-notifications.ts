@@ -92,15 +92,13 @@ async function sendOneSignalPush(params: {
   }
 
   try {
-    const payload = {
+    const payload: any = {
       app_id: ONESIGNAL_APP_ID,
       include_player_ids: playerIds,
       headings: { en: title },
       contents: { en: body },
-      url: actionUrl || '/',
       data: {
         ...data,
-        actionUrl: actionUrl || '/',
         timestamp: new Date().toISOString(),
       },
       priority: priority === 'high' ? 10 : 5,
@@ -108,6 +106,12 @@ async function sendOneSignalPush(params: {
       ios_badgeType: 'Increase',
       ios_badgeCount: 1,
     };
+
+    // actionUrl이 있을 때만 URL 설정 (사용자 간 채팅은 URL 없음)
+    if (actionUrl) {
+      payload.url = actionUrl;
+      payload.data.actionUrl = actionUrl;
+    }
 
     const response = await fetch(`${ONESIGNAL_API_URL}/notifications`, {
       method: 'POST',
@@ -502,7 +506,7 @@ export async function notifyNewMessage(params: {
     body: params.messagePreview,
     resourceType: 'message_thread',
     resourceId: params.threadId,
-    actionUrl: '/messages',
+    actionUrl: `/platform/messages?userId=${params.senderId}`, // 채팅 페이지 열기
     data: {
       sender_id: params.senderId,
       sender_name: params.senderName,

@@ -13,6 +13,9 @@ declare global {
   }
 }
 
+// OneSignal 초기화 상태 추적 (전역)
+let isOneSignalInitialized = false;
+
 export default function OneSignalProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   // 싱글톤 Supabase 클라이언트 사용
@@ -21,6 +24,12 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
   useEffect(() => {
     // OneSignal 초기화
     const initOneSignal = async () => {
+      // 이미 초기화되었으면 스킵
+      if (isOneSignalInitialized) {
+        logger.info('OneSignal은 이미 초기화되었습니다.');
+        return;
+      }
+
       const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
 
       if (!appId) {
@@ -34,86 +43,136 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
           window.OneSignalDeferred = [];
         }
 
+        // 회원가입 페이지에서는 알림 버튼 비활성화
+        const shouldShowNotifyButton = !pathname.startsWith('/register');
+
         window.OneSignalDeferred.push(async function (OneSignal: any) {
-          // OneSignal 초기화 및 아이콘 설정
-          await OneSignal.init({
-            appId: appId,
-            allowLocalhostAsSecureOrigin: true,
-            notifyButton: {
-              enable: false,
-            },
-          });
+          try {
+            // 초기화 상태 플래그 설정
+            isOneSignalInitialized = true;
 
-          // 알림 기본 설정
-          await OneSignal.Notifications.setDefaultUrl(window.location.origin);
-          await OneSignal.Notifications.setDefaultTitle('달래마켓');
+            // OneSignal 초기화 및 아이콘 설정
+            await OneSignal.init({
+              appId: appId,
+              allowLocalhostAsSecureOrigin: true,
+              notifyButton: {
+                enable: shouldShowNotifyButton,  // Subscription Bell 조건부 활성화
+                text: {
+                  'tip.state.unsubscribed': '알림 받기',
+                  'tip.state.subscribed': '알림 받는 중',
+                  'tip.state.blocked': '알림 차단됨 - 브라우저 설정에서 허용해주세요',
+                  'message.prenotify': '알림을 받으시겠습니까?',
+                  'message.action.subscribed': '알림을 받고 있습니다!',
+                  'message.action.resubscribed': '다시 알림을 받습니다!',
+                  'message.action.unsubscribed': '더 이상 알림을 받지 않습니다.',
+                  'dialog.main.title': '알림 설정',
+                  'dialog.main.button.subscribe': '구독하기',
+                  'dialog.main.button.unsubscribe': '구독 취소',
+                  'dialog.blocked.title': '알림이 차단되었습니다',
+                  'dialog.blocked.message': '브라우저 설정에서 알림을 허용해주세요.\n\n1. 주소창 왼쪽 아이콘 클릭 (또는 F12 → Application → Notifications)\n2. 알림 → 허용으로 변경\n3. 페이지 새로고침',
+                },
+                size: 'medium',
+                position: 'bottom-right',
+                offset: {
+                  bottom: '20px',
+                  right: '20px',
+                },
+                showCredit: false,
+              },
+            });
 
-          logger.info('OneSignal SDK 초기화 완료');
+            // 알림 기본 설정
+            await OneSignal.Notifications.setDefaultUrl(window.location.origin);
+            await OneSignal.Notifications.setDefaultTitle('달래마켓');
 
-          // 알림 클릭 이벤트 핸들러
-          OneSignal.Notifications.addEventListener('click', (event: any) => {
-            logger.info('알림 클릭', event);
+            logger.info('OneSignal SDK 초기화 완료');
 
-            // 알림에 포함된 URL로 이동
-            if (event.notification?.data?.actionUrl) {
-              window.location.href = event.notification.data.actionUrl;
-            }
-          });
+            // 권한 변경 감지 (차단 → 허용 등)
+            OneSignal.Notifications.addEventListener('permissionChange', (permission: boolean) => {
+              logger.info('알림 권한 변경:', permission ? '허용됨' : '거부됨');
+            });
 
-          // 푸시 구독 상태 변경 이벤트
-          OneSignal.User.PushSubscription.addEventListener('change', async (event: any) => {
-            logger.info('푸시 구독 상태 변경', event);
+            // 알림 클릭 이벤트 핸들러
+            OneSignal.Notifications.addEventListener('click', (event: any) => {
+              logger.info('알림 클릭', event);
 
-            const { data: { user } } = await supabase.auth.getUser();
+              const notificationData = event.notification?.data;
 
-            if (user && event.current?.id) {
-              try {
-                await OneSignal.login(user.id);
-                await savePlayerIdToDatabase(user.id, event.current.id);
-                logger.info('사용자 연결 완료', { userId: user.id });
-              } catch (error) {
-                logger.error('사용자 연결 실패', error);
+              // 메시지 알림인 경우 localStorage에 저장 (채팅 페이지에서 사용)
+              if (notificationData?.sender_id) {
+                localStorage.setItem('openChatWithUser', notificationData.sender_id);
               }
+
+              // actionUrl이 있으면 해당 URL로 이동 (OneSignal 기본 동작 사용)
+              if (notificationData?.actionUrl && notificationData.actionUrl !== '#') {
+                window.location.href = notificationData.actionUrl;
+              }
+            });
+
+            // 푸시 구독 상태 변경 이벤트
+            OneSignal.User.PushSubscription.addEventListener('change', async (event: any) => {
+              logger.info('푸시 구독 상태 변경', event);
+
+              const { data: { user } } = await supabase.auth.getUser();
+
+              if (user && event.current?.id) {
+                try {
+                  await OneSignal.login(user.id);
+                  await savePlayerIdToDatabase(user.id, event.current.id);
+                  logger.info('사용자 연결 완료', { userId: user.id });
+                } catch (error) {
+                  logger.error('사용자 연결 실패', error);
+                }
+              }
+            });
+          } catch (error: any) {
+            // OneSignal 초기화 중 에러 발생 시
+            logger.error('OneSignal 초기화 에러:', error);
+
+            // 이미 초기화된 에러가 아니면 플래그 리셋 (재시도 가능하게)
+            if (!error.message?.includes('already initialized')) {
+              isOneSignalInitialized = false;
             }
-          });
+
+            // 권한 차단 에러일 경우 사용자에게 안내
+            if (error.message?.includes('Permission') || error.message?.includes('blocked')) {
+              logger.warn('알림 권한이 차단되었습니다. 브라우저 설정에서 허용해주세요.');
+            }
+          }
 
           // 로그인한 사용자 확인 및 연결
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
+          try {
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
 
-          if (user) {
-            // 푸시 구독 상태 확인 후 사용자 연결
-            try {
-              const isSubscribed = await OneSignal.User.PushSubscription.optedIn;
+            if (user) {
+              // 푸시 구독 상태 확인 후 사용자 연결
+              try {
+                const isSubscribed = await OneSignal.User.PushSubscription.optedIn;
 
-              if (isSubscribed) {
-                const playerId = await OneSignal.User.PushSubscription.id;
+                if (isSubscribed) {
+                  const playerId = await OneSignal.User.PushSubscription.id;
 
-                if (playerId) {
-                  await OneSignal.login(user.id);
-                  await savePlayerIdToDatabase(user.id, playerId);
-                  logger.info('OneSignal 사용자 연결 완료', {
-                    userId: user.id,
-                    playerId: playerId.substring(0, 20) + '...',
-                  });
-                }
-              } else {
-                logger.info('푸시 알림 구독 대기 중', { userId: user.id });
-
-                // 5초 지연 후 알림 권한 요청 (브라우저 차단 방지)
-                setTimeout(async () => {
-                  try {
-                    await OneSignal.Slidedown.promptPush();
-                    logger.info('알림 권한 요청 팝업 표시됨');
-                  } catch (error) {
-                    logger.error('알림 권한 요청 팝업 표시 실패', error);
+                  if (playerId) {
+                    await OneSignal.login(user.id);
+                    await savePlayerIdToDatabase(user.id, playerId);
+                    logger.info('OneSignal 사용자 연결 완료', {
+                      userId: user.id,
+                      playerId: playerId.substring(0, 20) + '...',
+                    });
                   }
-                }, 5000);
+                } else {
+                  logger.info('푸시 알림 구독 대기 중 (Subscription Bell 사용)', { userId: user.id });
+                  // Push Slide Prompt 대신 Subscription Bell 사용
+                  // 사용자가 직접 벨 아이콘을 클릭해서 구독
+                }
+              } catch (error) {
+                logger.error('OneSignal 사용자 연결 오류', error);
               }
-            } catch (error) {
-              logger.error('OneSignal 사용자 연결 오류', error);
             }
+          } catch (error) {
+            logger.error('사용자 정보 조회 오류', error);
           }
         });
 
@@ -131,7 +190,7 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
     };
 
     initOneSignal();
-  }, []);
+  }, [pathname]);
 
   // 사용자 로그인/로그아웃 시 OneSignal 상태 업데이트
   useEffect(() => {

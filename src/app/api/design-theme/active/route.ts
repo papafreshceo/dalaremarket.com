@@ -7,10 +7,23 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createClientForRouteHandler();
 
+    // URL에서 scope 파라미터 추출 (기본값: 'admin')
+    const { searchParams } = new URL(request.url);
+    const scope = searchParams.get('scope') || 'admin';
+
+    // scope 값 검증
+    if (!['admin', 'platform', 'orders'].includes(scope)) {
+      return NextResponse.json(
+        { success: false, error: '유효하지 않은 scope입니다.' },
+        { status: 400 }
+      );
+    }
+
     const { data: theme, error } = await supabase
       .from('design_themes')
       .select('*')
       .eq('is_active', true)
+      .eq('theme_scope', scope)
       .single();
 
     if (error) {

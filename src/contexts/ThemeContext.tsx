@@ -33,8 +33,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // DB에서 활성 테마의 CSS 변수 불러와서 적용 (admin/settings 경로에서만)
   useEffect(() => {
     const loadActiveTheme = async () => {
-      // admin/settings 경로 체크
-      const isSettingsPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin/settings')
+      // 현재 경로 확인
+      const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
+      const isSettingsPage = pathname.startsWith('/admin/settings')
 
       if (!isSettingsPage) {
         // settings 페이지가 아니면 theme-enabled 클래스 제거하고 종료
@@ -46,8 +47,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       // settings 페이지면 theme-enabled 클래스 추가
       document.documentElement.classList.add('theme-enabled')
 
+      // 현재 경로에 따라 scope 결정
+      let scope = 'admin'
+      if (pathname.startsWith('/platform/orders')) {
+        scope = 'orders'
+      } else if (pathname.startsWith('/platform')) {
+        scope = 'platform'
+      } else if (pathname.startsWith('/admin')) {
+        scope = 'admin'
+      }
+
       try {
-        const response = await fetch('/api/design-theme/active')
+        const response = await fetch(`/api/design-theme/active?scope=${scope}`)
         const result = await response.json()
 
         if (result.success && result.data?.css_variables) {

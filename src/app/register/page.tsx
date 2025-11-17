@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -15,14 +15,32 @@ function RegisterContent() {
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // 이메일 인증
+  const [emailVerified, setEmailVerified] = useState(false)
+  const [verificationCode, setVerificationCode] = useState('')
+  const [isCodeSent, setIsCodeSent] = useState(false)
+  const [codeSendLoading, setCodeSendLoading] = useState(false)
   // SMS 인증 기능 제거됨
   const [agreeTerms, setAgreeTerms] = useState(false)
   const [agreePrivacy, setAgreePrivacy] = useState(false)
   const [agreeMarketing, setAgreeMarketing] = useState(false)
-  const [agreePush, setAgreePush] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const { showToast } = useToast()
+  const nameInputRef = useRef<HTMLInputElement>(null)
+  const emailInputRef = useRef<HTMLInputElement>(null)
+  const verificationCodeInputRef = useRef<HTMLInputElement>(null)
+  const phoneInputRef = useRef<HTMLInputElement>(null)
+  const passwordInputRef = useRef<HTMLInputElement>(null)
+  const confirmPasswordInputRef = useRef<HTMLInputElement>(null)
+  const [nameBlurred, setNameBlurred] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  // 이메일 가입 시작 여부
+  const [startEmailSignup, setStartEmailSignup] = useState(false)
+  // 스텝바이스텝 표시를 위한 state
+  const [showStep, setShowStep] = useState(0)
 
   // 네이버 OAuth 정보
   const [naverInfo, setNaverInfo] = useState<{
@@ -51,6 +69,128 @@ function RegisterContent() {
     }
   }, [searchParams])
 
+  // 이메일로 가입하기 클릭 시 이메일 입력란 표시
+  useEffect(() => {
+    if (startEmailSignup && !naverInfo.naver_id) {
+      setShowStep(1) // 이메일 입력란
+    }
+  }, [startEmailSignup, naverInfo.naver_id])
+
+  // 인증코드 발송 후 인증 입력란 표시
+  useEffect(() => {
+    if (isCodeSent && showStep < 2) {
+      setShowStep(2)
+    }
+  }, [isCodeSent, showStep])
+
+  // 이메일 인증 완료 → 이름 입력란
+  useEffect(() => {
+    if (emailVerified && showStep < 3) {
+      setShowStep(3)
+    }
+  }, [emailVerified, showStep])
+
+  // 이름 입력 완료 체크 (수동 트리거용)
+  const checkNameComplete = () => {
+    return name && name.trim().length >= 2 && !/[^가-힣\s]/.test(name)
+  }
+
+  // 전화번호 입력 완료 체크
+  const checkPhoneComplete = () => {
+    const phoneDigits = phone.replace(/[^\d]/g, '')
+    return phoneDigits.length >= 11
+  }
+
+  // 비밀번호 입력 완료 체크
+  const checkPasswordComplete = () => {
+    return password.length >= 6
+  }
+
+  // 비밀번호 확인 완료 체크
+  const checkConfirmPasswordComplete = () => {
+    return confirmPassword && password === confirmPassword && password.length >= 6
+  }
+
+  // 자동 스텝 진행 (선택적 - 사용자가 입력 완료하면 자동으로 다음 단계)
+
+  // 전화번호 완료 → 비밀번호 또는 약관
+  useEffect(() => {
+    if (checkPhoneComplete() && showStep === 4) {
+      if (naverInfo.naver_id) {
+        setShowStep(7) // 네이버 사용자는 약관으로
+      } else {
+        setShowStep(5) // 일반 사용자는 비밀번호로
+      }
+    }
+  }, [phone, showStep, naverInfo.naver_id])
+
+  // 비밀번호 완료 → 비밀번호 확인
+  useEffect(() => {
+    if (!naverInfo.naver_id && checkPasswordComplete() && showStep === 5) {
+      setShowStep(6)
+    }
+  }, [password, showStep, naverInfo.naver_id])
+
+  // 비밀번호 확인 완료 → 약관
+  useEffect(() => {
+    if (!naverInfo.naver_id && checkConfirmPasswordComplete() && showStep === 6) {
+      setShowStep(7)
+    }
+  }, [confirmPassword, password, showStep, naverInfo.naver_id])
+
+  // 이용약관 체크 → 개인정보처리방침
+  useEffect(() => {
+    if (agreeTerms && showStep < 8) {
+      setShowStep(8)
+    }
+  }, [agreeTerms, showStep])
+
+  // 개인정보처리방침 체크 → 마케팅 동의
+  useEffect(() => {
+    if (agreePrivacy && showStep < 9) {
+      setShowStep(9)
+    }
+  }, [agreePrivacy, showStep])
+
+  // 필수 약관 모두 체크 → 회원가입 버튼
+  useEffect(() => {
+    if (agreeTerms && agreePrivacy && showStep < 10) {
+      setShowStep(10)
+    }
+  }, [agreeTerms, agreePrivacy, showStep])
+
+  // 키보드 이벤트 핸들러
+  const handleKeyDown = (e: React.KeyboardEvent, currentStep: number, nextStep: number, validator?: () => boolean) => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault()
+      if (validator ? validator() : true) {
+        setShowStep(nextStep)
+      }
+    }
+  }
+
+  // 자동 포커스 관리
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (showStep === 1 && emailInputRef.current && !naverInfo.naver_id) {
+        emailInputRef.current.focus()
+      } else if (showStep === 2 && verificationCodeInputRef.current) {
+        verificationCodeInputRef.current.focus()
+      } else if (showStep === 3 && nameInputRef.current) {
+        nameInputRef.current.focus()
+      } else if (showStep === 4 && phoneInputRef.current) {
+        phoneInputRef.current.focus()
+      } else if (showStep === 5 && passwordInputRef.current) {
+        passwordInputRef.current.focus()
+      } else if (showStep === 6 && confirmPasswordInputRef.current) {
+        confirmPasswordInputRef.current.focus()
+      }
+    }, 400) // 애니메이션 후 포커스
+
+    return () => clearTimeout(timer)
+  }, [showStep, naverInfo.naver_id])
+
+
 
   const handleNaverLogin = () => {
     const state = Math.random().toString(36).substring(7)
@@ -61,9 +201,117 @@ function RegisterContent() {
     window.location.href = naverAuthUrl
   }
 
+  // 인증 코드 발송
+  const handleSendCode = async () => {
+    if (!email) {
+      setError('이메일을 입력해주세요')
+      return
+    }
+
+    setCodeSendLoading(true)
+    setError(null)
+
+    try {
+      console.log('[Register] ===== 이메일 중복 확인 시작 =====')
+      console.log('[Register] 입력된 이메일:', email)
+
+      // 먼저 이메일 중복 확인
+      const duplicateCheckResponse = await fetch('/api/email/check-duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+
+      console.log('[Register] API 응답 상태:', duplicateCheckResponse.status, duplicateCheckResponse.statusText)
+
+      if (!duplicateCheckResponse.ok) {
+        console.log('[Register] API 요청 실패')
+      }
+
+      const duplicateCheckData = await duplicateCheckResponse.json()
+      console.log('[Register] API 응답 데이터:', JSON.stringify(duplicateCheckData, null, 2))
+      console.log('[Register] isDuplicate 값:', duplicateCheckData.isDuplicate)
+      console.log('[Register] success 값:', duplicateCheckData.success)
+
+      // 이미 가입된 이메일인 경우
+      if (duplicateCheckData.isDuplicate === true) {
+        console.log('[Register] ❌ 중복된 이메일 감지!')
+        setError(duplicateCheckData.error || '이미 가입된 이메일입니다. 로그인 페이지로 이동해주세요.')
+        setCodeSendLoading(false)
+        return
+      }
+
+      console.log('[Register] ✅ 사용 가능한 이메일, 인증 코드 발송 진행...')
+
+      // 중복이 아니면 인증 코드 발송
+      const response = await fetch('/api/email/send-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        setError(data.error || '인증 코드 발송 실패')
+        setCodeSendLoading(false)
+        return
+      }
+
+      setIsCodeSent(true)
+      showToast('인증 코드가 발송되었습니다', 'success')
+      setCodeSendLoading(false)
+    } catch (error) {
+      console.error('인증 코드 발송 오류:', error)
+      setError('인증 코드 발송 중 오류가 발생했습니다')
+      setCodeSendLoading(false)
+    }
+  }
+
+  // 인증 코드 확인
+  const handleVerifyCode = async () => {
+    if (!verificationCode) {
+      setError('인증 코드를 입력해주세요')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/email/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code: verificationCode }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        setError(data.error || '인증 코드가 일치하지 않습니다')
+        setLoading(false)
+        return
+      }
+
+      setEmailVerified(true)
+      showToast('이메일 인증이 완료되었습니다!', 'success')
+      setLoading(false)
+    } catch (error) {
+      console.error('인증 코드 확인 오류:', error)
+      setError('인증 코드 확인 중 오류가 발생했습니다')
+      setLoading(false)
+    }
+  }
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    // 이메일 인증 확인 (네이버 사용자 제외)
+    if (!naverInfo.naver_id && !emailVerified) {
+      setError('이메일 인증을 완료해주세요')
+      return
+    }
 
     // 네이버 사용자가 아닌 경우에만 비밀번호 확인
     if (!naverInfo.naver_id) {
@@ -97,7 +345,6 @@ function RegisterContent() {
             phone,
             naver_id: naverInfo.naver_id,
             agree_marketing: agreeMarketing,
-            agree_push: agreePush,
           }),
         })
 
@@ -136,6 +383,7 @@ function RegisterContent() {
             phone,
             role: 'seller',
             approved: true,
+            marketing_consent: agreeMarketing,
           },
         },
       })
@@ -147,24 +395,111 @@ function RegisterContent() {
       }
 
       if (authData.user) {
-        // users 테이블은 Supabase Auth 트리거로 자동 생성됨
-        // 추가 정보 업데이트
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({
-            name,
-            phone,
-            role: 'seller',
-            approved: true,
-          })
-          .eq('id', authData.user.id)
+        // Database trigger가 users와 organization을 자동 생성
+        // 생성 확인 (최대 5초 대기)
+        let userCreated = false
+        for (let i = 0; i < 10; i++) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', authData.user.id)
+            .single()
 
-        if (updateError) {
-          console.error('프로필 업데이트 오류:', updateError)
+          if (userData) {
+            userCreated = true
+            break
+          }
+          await new Promise(resolve => setTimeout(resolve, 500))
         }
 
-        showToast('회원가입이 완료되었습니다. 로그인해주세요.', 'success')
-        router.push('/')
+        if (!userCreated) {
+          // Trigger 실패 시 수동으로 생성
+          const { error: insertError } = await supabase
+            .from('users')
+            .insert({
+              id: authData.user.id,
+              email,
+              name,
+              phone,
+              role: 'seller',
+              approved: true,
+              marketing_consent: agreeMarketing,
+            })
+
+          if (insertError) {
+            console.error('사용자 생성 오류:', insertError)
+            setError('회원가입 중 오류가 발생했습니다.')
+            setLoading(false)
+            return
+          }
+
+          // 조직도 수동으로 생성 (필수값만)
+          const sellerCode = 'S' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0')
+          const partnerCode = 'P' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0')
+
+          const { data: orgData, error: orgError } = await supabase
+            .from('organizations')
+            .insert({
+              owner_id: authData.user.id,
+              seller_code: sellerCode,
+              partner_code: partnerCode,
+            })
+            .select('id')
+            .single()
+
+          if (!orgError && orgData) {
+            // 조직 멤버 연결
+            await supabase
+              .from('organization_members')
+              .insert({
+                organization_id: orgData.id,
+                user_id: authData.user.id,
+                role: 'owner',
+                status: 'active',
+              })
+
+            // primary_organization_id 업데이트
+            await supabase
+              .from('users')
+              .update({ primary_organization_id: orgData.id })
+              .eq('id', authData.user.id)
+          }
+        }
+
+        // 환영 이메일 발송
+        try {
+          await fetch('/api/email/send-welcome', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: authData.user.id,
+              email: authData.user.email,
+              name: name || '고객',
+            }),
+          })
+        } catch (emailError) {
+          console.error('환영 이메일 발송 실패:', emailError)
+          // 이메일 발송 실패는 회원가입 성공에 영향 없음
+        }
+
+        // 관리자에게 신규 회원 가입 알림
+        try {
+          await fetch('/api/notifications/admin-new-member', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: authData.user.id,
+              email: authData.user.email,
+              name: name || '신규회원',
+            }),
+          })
+        } catch (notifError) {
+          console.error('관리자 알림 발송 실패:', notifError)
+          // 알림 발송 실패는 회원가입 성공에 영향 없음
+        }
+
+        showToast('회원가입이 완료되었습니다!', 'success')
+        router.push('/platform')
         setLoading(false)
       }
     } catch (err) {
@@ -173,13 +508,8 @@ function RegisterContent() {
     }
   }
 
-  // 소셜 로그인 처리
+  // 소셜 로그인 처리 (약관 동의는 자동으로 간주)
   const handleSocialLogin = async (provider: 'google' | 'kakao' | 'naver') => {
-    if (!agreeTerms || !agreePrivacy) {
-      setError('이용약관과 개인정보처리방침에 동의해주세요.')
-      return
-    }
-
     try {
       setLoading(true)
       setError(null)
@@ -207,10 +537,6 @@ function RegisterContent() {
     }
   }
 
-  const handleNameChange = (value: string) => {
-    const koreanOnly = value.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣ]/g, '')
-    setName(koreanOnly)
-  }
 
   const handlePhoneChange = (value: string) => {
     const numbers = value.replace(/[^\d]/g, '')
@@ -320,7 +646,7 @@ function RegisterContent() {
           </div>
         )}
 
-        <form onSubmit={handleRegister}>
+        <form onSubmit={handleRegister} style={{ minHeight: '400px' }}>
           {/* 네이버 로그인 안내 */}
           {naverInfo.naver_id && (
             <div
@@ -338,183 +664,541 @@ function RegisterContent() {
             </div>
           )}
 
-          {/* 이메일, 이름, 전화번호 가로 배치 */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', maxWidth: '700px' }}>
-            <input
-              type="email"
-              placeholder="* 이메일"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={!!naverInfo.naver_id}
-              style={{
-                flex: 1.2,
-                padding: '10px 12px',
-                border: '1px solid transparent',
-                background: naverInfo.naver_id ? '#e5e7eb' : '#f8f9fa',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                transition: 'all 0.3s',
-                cursor: naverInfo.naver_id ? 'not-allowed' : 'text',
-              }}
-              onFocus={(e) => {
-                if (!naverInfo.naver_id) {
-                  e.currentTarget.style.borderColor = '#2563eb'
-                  e.currentTarget.style.background = '#ffffff'
-                }
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'transparent'
-                e.currentTarget.style.background = naverInfo.naver_id
-                  ? '#e5e7eb'
-                  : '#f8f9fa'
-              }}
-            />
+          {/* 이메일로 가입하기 버튼 */}
+          {!naverInfo.naver_id && !startEmailSignup && (
+            <div style={{
+              opacity: !startEmailSignup ? 1 : 0,
+              transform: !startEmailSignup ? 'translateY(0)' : 'translateY(-10px)',
+              transition: 'all 0.3s ease-out',
+              position: startEmailSignup ? 'absolute' : 'relative',
+              width: '100%',
+              pointerEvents: startEmailSignup ? 'none' : 'auto'
+            }}>
+              <button
+                type="button"
+                onClick={() => setStartEmailSignup(true)}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  marginBottom: '16px',
+                  boxShadow: '0 4px 15px rgba(37, 99, 235, 0.3)',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#1d4ed8'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#2563eb'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                이메일로 가입하기
+              </button>
+            </div>
+          )}
 
-            <input
-              type="text"
-              placeholder="* 이름"
-              value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              required
-              disabled={!!naverInfo.naver_id}
-              style={{
-                flex: 0.6,
-                padding: '10px 12px',
-                border: '1px solid transparent',
-                background: naverInfo.naver_id ? '#e5e7eb' : '#f8f9fa',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                transition: 'all 0.3s',
-                cursor: naverInfo.naver_id ? 'not-allowed' : 'text',
-              }}
-              onFocus={(e) => {
-                if (!naverInfo.naver_id) {
-                  e.currentTarget.style.borderColor = '#2563eb'
-                  e.currentTarget.style.background = '#ffffff'
-                }
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'transparent'
-                e.currentTarget.style.background = naverInfo.naver_id
-                  ? '#e5e7eb'
-                  : '#f8f9fa'
-              }}
-            />
-
-            <input
-              type="tel"
-              placeholder="* 010-1234-5678"
-              value={phone}
-              onChange={(e) => handlePhoneChange(e.target.value)}
-              required
-              disabled={!!naverInfo.naver_id}
-              style={{
-                flex: 1.2,
-                padding: '10px 12px',
-                border: '1px solid transparent',
-                background: naverInfo.naver_id ? '#e5e7eb' : '#f8f9fa',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                transition: 'all 0.3s',
-                cursor: naverInfo.naver_id ? 'not-allowed' : 'text',
-              }}
-              onFocus={(e) => {
-                if (!naverInfo.naver_id) {
-                  e.currentTarget.style.borderColor = '#2563eb'
-                  e.currentTarget.style.background = '#ffffff'
-                }
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'transparent'
-                e.currentTarget.style.background = naverInfo.naver_id
-                  ? '#e5e7eb'
-                  : '#f8f9fa'
-              }}
-            />
-          </div>
-
-
-          {/* 비밀번호, 비밀번호 확인 가로 배치 - 네이버 사용자에게는 숨김 */}
+          {/* 이메일 인증 - 일반 사용자만 */}
           {!naverInfo.naver_id && (
-            <div
-              style={{
+            <div style={{
+              position: 'relative',
+              minHeight: startEmailSignup ? '0' : '0'
+            }}>
+              {/* 이메일 입력란 + 인증코드발송 버튼 */}
+              {startEmailSignup && showStep >= 1 && (
+              <div style={{
                 display: 'flex',
                 gap: '8px',
-                marginBottom: '16px',
+                marginBottom: '8px',
                 maxWidth: '700px',
-              }}
-            >
-              <input
-                type="password"
-                placeholder="* 비밀번호 (최소 6자)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                style={{
-                  flex: 1,
-                  padding: '10px 12px',
-                  border: '1px solid transparent',
-                  background: '#f8f9fa',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  outline: 'none',
-                  transition: 'all 0.3s',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#2563eb'
-                  e.currentTarget.style.background = '#ffffff'
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'transparent'
-                  e.currentTarget.style.background = '#f8f9fa'
-                }}
-              />
+                opacity: showStep >= 1 ? 1 : 0,
+                transform: showStep >= 1 ? 'translateY(0)' : 'translateY(-10px)',
+                transition: 'all 0.3s ease-out'
+              }}>
+                <input
+                  ref={emailInputRef}
+                  type="email"
+                  placeholder="* 이메일"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && email) {
+                      e.preventDefault()
+                      handleSendCode()
+                    }
+                  }}
+                  required
+                  disabled={emailVerified}
+                  style={{
+                    width: '200px',
+                    padding: '10px 12px',
+                    border: '1px solid transparent',
+                    background: emailVerified ? '#e5e7eb' : '#f8f9fa',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                    cursor: emailVerified ? 'not-allowed' : 'text',
+                  }}
+                  onFocus={(e) => {
+                    if (!emailVerified) {
+                      e.currentTarget.style.borderColor = '#2563eb'
+                      e.currentTarget.style.background = '#ffffff'
+                    }
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'transparent'
+                    e.currentTarget.style.background = emailVerified ? '#e5e7eb' : '#f8f9fa'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleSendCode}
+                  disabled={codeSendLoading || !email || emailVerified}
+                  style={{
+                    padding: '10px 16px',
+                    background: email && !codeSendLoading && !emailVerified ? '#667eea' : '#e5e7eb',
+                    color: email && !codeSendLoading && !emailVerified ? 'white' : '#9ca3af',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: email && !codeSendLoading && !emailVerified ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.3s',
+                    whiteSpace: 'nowrap',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (email && !codeSendLoading && !emailVerified) {
+                      e.currentTarget.style.background = '#5568d3'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (email && !codeSendLoading && !emailVerified) {
+                      e.currentTarget.style.background = '#667eea'
+                    }
+                  }}
+                >
+                  {codeSendLoading ? '전송 중...' : '인증코드발송'}
+                </button>
+              </div>
+              )}
 
+              {/* 인증코드 입력란 */}
+              {showStep >= 2 && isCodeSent && !emailVerified && (
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  marginBottom: '8px',
+                  maxWidth: '700px',
+                  opacity: showStep >= 2 ? 1 : 0,
+                  transform: showStep >= 2 ? 'translateY(0)' : 'translateY(-10px)',
+                  transition: 'all 0.3s ease-out'
+                }}>
+                  <input
+                    ref={verificationCodeInputRef}
+                    type="text"
+                    placeholder="인증코드"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && verificationCode.length === 6) {
+                        e.preventDefault()
+                        handleVerifyCode()
+                      }
+                    }}
+                    maxLength={6}
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      border: '1px solid transparent',
+                      background: '#f8f9fa',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                      textAlign: 'center',
+                      letterSpacing: '2px',
+                      fontWeight: '600',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#2563eb'
+                      e.currentTarget.style.background = '#ffffff'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'transparent'
+                      e.currentTarget.style.background = '#f8f9fa'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyCode}
+                    disabled={verificationCode.length !== 6}
+                    style={{
+                      padding: '10px 20px',
+                      background: verificationCode.length === 6 ? '#667eea' : '#e5e7eb',
+                      color: verificationCode.length === 6 ? 'white' : '#9ca3af',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      cursor: verificationCode.length === 6 ? 'pointer' : 'not-allowed',
+                      transition: 'all 0.3s',
+                      whiteSpace: 'nowrap',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (verificationCode.length === 6) {
+                        e.currentTarget.style.background = '#5568d3'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (verificationCode.length === 6) {
+                        e.currentTarget.style.background = '#667eea'
+                      }
+                    }}
+                  >
+                    확인
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSendCode}
+                    disabled={codeSendLoading}
+                    style={{
+                      padding: '10px 20px',
+                      background: 'white',
+                      color: '#667eea',
+                      border: '1px solid #667eea',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      cursor: codeSendLoading ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.3s',
+                      whiteSpace: 'nowrap',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!codeSendLoading) {
+                        e.currentTarget.style.background = '#f8f9fa'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!codeSendLoading) {
+                        e.currentTarget.style.background = 'white'
+                      }
+                    }}
+                  >
+                    재발송
+                  </button>
+                </div>
+              )}
+
+              {/* 인증 완료 메시지 */}
+              {emailVerified && (
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    background: '#d1fae5',
+                    border: '1px solid #34d399',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#065f46',
+                    textAlign: 'center',
+                    marginBottom: '8px',
+                    maxWidth: '700px',
+                  }}
+                >
+                  ✓ 이메일 인증 완료
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 네이버 사용자 이메일 표시 */}
+          {naverInfo.naver_id && (
+            <div style={{ marginBottom: '8px', maxWidth: '700px' }}>
               <input
-                type="password"
-                placeholder="* 비밀번호 확인"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
+                type="email"
+                placeholder="* 이메일"
+                value={email}
+                disabled
                 style={{
-                  flex: 1,
+                  width: '100%',
                   padding: '10px 12px',
                   border: '1px solid transparent',
-                  background: '#f8f9fa',
+                  background: '#e5e7eb',
                   borderRadius: '8px',
                   fontSize: '14px',
                   outline: 'none',
-                  transition: 'all 0.3s',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#2563eb'
-                  e.currentTarget.style.background = '#ffffff'
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'transparent'
-                  e.currentTarget.style.background = '#f8f9fa'
+                  cursor: 'not-allowed',
                 }}
               />
             </div>
           )}
 
-          {/* 약관 동의 영역 - 가로 배치 */}
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            marginBottom: '12px'
-          }}>
-            {/* 이용약관 동의 */}
+          {/* 이름 + 전화번호 + 비밀번호 + 비밀번호 확인 (한 줄 배치) */}
+          {showStep >= 3 && (
             <div style={{
-              flex: 1,
-              background: '#f8f9fa',
-              borderRadius: '8px',
-              padding: '10px'
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '8px',
+              maxWidth: '700px',
+              opacity: showStep >= 3 ? 1 : 0,
+              transform: showStep >= 3 ? 'translateY(0)' : 'translateY(-10px)',
+              transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
             }}>
+              {/* 이름 입력란 */}
+              <input
+                ref={nameInputRef}
+                type="text"
+                placeholder="* 이름"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, 3, 4, checkNameComplete)}
+                required
+                disabled={!!naverInfo.naver_id}
+                style={{
+                  flex: 1,
+                  padding: '10px 12px',
+                  border: '1px solid transparent',
+                  background: naverInfo.naver_id ? '#e5e7eb' : '#f8f9fa',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                  cursor: naverInfo.naver_id ? 'not-allowed' : 'text',
+                }}
+                onFocus={(e) => {
+                  setNameBlurred(false)
+                  if (!naverInfo.naver_id) {
+                    e.currentTarget.style.borderColor = '#2563eb'
+                    e.currentTarget.style.background = '#ffffff'
+                  }
+                }}
+                onBlur={(e) => {
+                  setNameBlurred(true)
+                  e.currentTarget.style.borderColor = 'transparent'
+                  e.currentTarget.style.background = naverInfo.naver_id ? '#e5e7eb' : '#f8f9fa'
+                }}
+              />
+
+              {/* 전화번호 입력란 */}
+              {showStep >= 4 && (
+                <input
+                  ref={phoneInputRef}
+                  type="tel"
+                  placeholder="* 010-1234-5678"
+                  value={phone}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, 4, 5, checkPhoneComplete)}
+                  required
+                  disabled={!!naverInfo.naver_id}
+                  style={{
+                    flex: showStep >= 4 ? 1 : 0,
+                    padding: '10px 12px',
+                    border: '1px solid transparent',
+                    background: naverInfo.naver_id ? '#e5e7eb' : '#f8f9fa',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    transition: 'all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    cursor: naverInfo.naver_id ? 'not-allowed' : 'text',
+                    opacity: showStep >= 4 ? 1 : 0,
+                    transform: showStep >= 4 ? 'translateX(0) scale(1)' : 'translateX(-20px) scale(0.8)',
+                    maxWidth: showStep >= 4 ? '100%' : '0',
+                    overflow: 'hidden',
+                  }}
+                  onFocus={(e) => {
+                    if (!naverInfo.naver_id) {
+                      e.currentTarget.style.borderColor = '#2563eb'
+                      e.currentTarget.style.background = '#ffffff'
+                    }
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'transparent'
+                    e.currentTarget.style.background = naverInfo.naver_id ? '#e5e7eb' : '#f8f9fa'
+                  }}
+                />
+              )}
+
+              {/* 비밀번호 입력란 */}
+              {!naverInfo.naver_id && showStep >= 5 && (
+                <div style={{
+                  position: 'relative',
+                  flex: showStep >= 5 ? 1 : 0,
+                  opacity: showStep >= 5 ? 1 : 0,
+                  transform: showStep >= 5 ? 'translateX(0) scale(1)' : 'translateX(-20px) scale(0.8)',
+                  maxWidth: showStep >= 5 ? '100%' : '0',
+                  transition: 'all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  overflow: 'hidden',
+                }}>
+                  <input
+                    ref={passwordInputRef}
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="* 비밀번호 (최소 6자)"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, 5, 6, checkPasswordComplete)}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '10px 36px 10px 12px',
+                      border: '1px solid transparent',
+                      background: '#f8f9fa',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'all 0.3s',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#2563eb'
+                      e.currentTarget.style.background = '#ffffff'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'transparent'
+                      e.currentTarget.style.background = '#f8f9fa'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#9ca3af',
+                      transition: 'color 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#2563eb'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
+                  >
+                    {showPassword ? (
+                      // 눈 가림 (비밀번호 표시 중)
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M3 3l18 18M10.5 10.7a2.5 2.5 0 0 0 3.5 3.5" />
+                        <path d="M9.4 5.4A9 9 0 0 1 12 5c7 0 11 7 11 7a19 19 0 0 1-2 3M6.6 6.6C4 8.3 2 12 2 12s4 7 10 7c1.3 0 2.5-.3 3.6-.8" />
+                      </svg>
+                    ) : (
+                      // 눈 (비밀번호 숨김)
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                        <circle cx="12" cy="12" r="2.5" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* 비밀번호 확인 입력란 */}
+              {!naverInfo.naver_id && showStep >= 6 && (
+                <div style={{
+                  position: 'relative',
+                  flex: showStep >= 6 ? 1 : 0,
+                  opacity: showStep >= 6 ? 1 : 0,
+                  transform: showStep >= 6 ? 'translateX(0) scale(1)' : 'translateX(-20px) scale(0.8)',
+                  maxWidth: showStep >= 6 ? '100%' : '0',
+                  transition: 'all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  overflow: 'hidden',
+                }}>
+                  <input
+                    ref={confirmPasswordInputRef}
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="* 비밀번호 확인"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, 6, 7, checkConfirmPasswordComplete)}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '10px 36px 10px 12px',
+                      border: '1px solid transparent',
+                      background: '#f8f9fa',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'all 0.3s',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#2563eb'
+                      e.currentTarget.style.background = '#ffffff'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'transparent'
+                      e.currentTarget.style.background = '#f8f9fa'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#9ca3af',
+                      transition: 'color 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#2563eb'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
+                  >
+                    {showConfirmPassword ? (
+                      // 눈 가림 (비밀번호 표시 중)
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M3 3l18 18M10.5 10.7a2.5 2.5 0 0 0 3.5 3.5" />
+                        <path d="M9.4 5.4A9 9 0 0 1 12 5c7 0 11 7 11 7a19 19 0 0 1-2 3M6.6 6.6C4 8.3 2 12 2 12s4 7 10 7c1.3 0 2.5-.3 3.6-.8" />
+                      </svg>
+                    ) : (
+                      // 눈 (비밀번호 숨김)
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                        <circle cx="12" cy="12" r="2.5" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 이름 입력 경고 메시지 */}
+          {showStep >= 3 && nameBlurred && name && /[^가-힣\s]/.test(name) && (
+            <p style={{ fontSize: '12px', color: '#dc2626', marginTop: '-4px', marginBottom: '8px', maxWidth: '700px' }}>
+              완성된 한글만 입력해주세요
+            </p>
+          )}
+
+          {/* 이용약관 동의 */}
+          {showStep >= 7 && (
+          <div style={{
+            flex: 1,
+            background: '#f8f9fa',
+            borderRadius: '8px',
+            padding: '10px',
+            marginBottom: '12px',
+            opacity: showStep >= 7 ? 1 : 0,
+            transform: showStep >= 7 ? 'translateY(0)' : 'translateY(-10px)',
+            transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}>
             <div style={{
               marginBottom: '8px',
               fontSize: '13px',
@@ -618,15 +1302,21 @@ function RegisterContent() {
                 이용약관을 읽었으며 이에 동의합니다
               </span>
             </label>
-            </div>
+          </div>
+          )}
 
-            {/* 개인정보처리방침 동의 */}
-            <div style={{
-              flex: 1,
-              background: '#f8f9fa',
-              borderRadius: '8px',
-              padding: '10px'
-            }}>
+          {/* 개인정보처리방침 동의 */}
+          {showStep >= 8 && (
+          <div style={{
+            flex: 1,
+            background: '#f8f9fa',
+            borderRadius: '8px',
+            padding: '10px',
+            marginBottom: '12px',
+            opacity: showStep >= 8 ? 1 : 0,
+            transform: showStep >= 8 ? 'translateY(0)' : 'translateY(-10px)',
+            transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}>
             <div style={{
               marginBottom: '8px',
               fontSize: '13px',
@@ -739,15 +1429,19 @@ function RegisterContent() {
                 개인정보처리방침을 읽었으며 이에 동의합니다
               </span>
             </label>
-            </div>
           </div>
+          )}
 
           {/* 마케팅 정보 수신 동의 (선택) */}
+          {showStep >= 9 && (
           <div style={{
             marginBottom: '12px',
             background: '#f8f9fa',
             borderRadius: '8px',
-            padding: '10px'
+            padding: '10px',
+            opacity: showStep >= 9 ? 1 : 0,
+            transform: showStep >= 9 ? 'translateY(0)' : 'translateY(-10px)',
+            transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
           }}>
             <div style={{
               marginBottom: '8px',
@@ -794,64 +1488,16 @@ function RegisterContent() {
               </span>
             </label>
           </div>
+          )}
 
-          {/* 푸시 알림 수신 동의 (선택) */}
-          <div style={{
-            marginBottom: '12px',
-            background: '#f8f9fa',
-            borderRadius: '8px',
-            padding: '10px'
-          }}>
-            <div style={{
-              marginBottom: '8px',
-              fontSize: '13px',
-              fontWeight: '600',
-              color: '#212529'
-            }}>
-              푸시 알림 수신 동의 <span style={{ color: '#2563eb' }}>(선택)</span>
-            </div>
-
-            <div style={{
-              padding: '10px',
-              background: 'white',
-              border: '1px solid #e0e0e0',
-              borderRadius: '6px',
-              marginBottom: '8px',
-              fontSize: '11px',
-              lineHeight: '1.6',
-              color: '#2563eb'
-            }}>
-              입금확인 알림, 상품 발송상태 알림, 배송일정 안내 등의 푸시 알림을 수신하는 것에 동의합니다.
-            </div>
-
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              color: '#495057'
-            }}>
-              <input
-                type="checkbox"
-                checked={agreePush}
-                onChange={(e) => setAgreePush(e.target.checked)}
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  cursor: 'pointer'
-                }}
-              />
-              <span style={{ fontWeight: '500' }}>
-                푸시 알림 수신에 동의합니다
-              </span>
-            </label>
-          </div>
-
+          {showStep >= 10 && (
           <button
             type="submit"
             disabled={loading || !agreeTerms || !agreePrivacy}
             style={{
+              opacity: showStep >= 10 ? 1 : 0,
+              transform: showStep >= 10 ? 'translateY(0)' : 'translateY(-10px)',
+              transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
               width: '100%',
               padding: '10px',
               background: (loading || !agreeTerms || !agreePrivacy) ? '#9ca3af' : '#2563eb',
@@ -874,6 +1520,7 @@ function RegisterContent() {
           >
             {loading ? '처리 중...' : '회원가입'}
           </button>
+          )}
 
           {/* 소셜 로그인 구분선 */}
           <div style={{
@@ -1100,16 +1747,6 @@ export default function RegisterPage() {
               }}
             ></div>
             <p style={{ fontSize: '16px', color: '#6b7280' }}>로딩 중...</p>
-            <style jsx>{`
-              @keyframes spin {
-                0% {
-                  transform: rotate(0deg);
-                }
-                100% {
-                  transform: rotate(360deg);
-                }
-              }
-            `}</style>
           </div>
         </div>
       }

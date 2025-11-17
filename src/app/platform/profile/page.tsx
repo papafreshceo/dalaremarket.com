@@ -540,7 +540,9 @@ export default function ProfilePage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || '회원 탈퇴 중 오류가 발생했습니다.');
+        console.error('회원 탈퇴 API 오류:', data);
+        const errorMsg = data.details ? `${data.error}\n상세: ${data.details}` : data.error;
+        throw new Error(errorMsg || '회원 탈퇴 중 오류가 발생했습니다.');
       }
 
       toast.success('회원 탈퇴가 완료되었습니다.');

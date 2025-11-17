@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { NoticePopup } from '@/components/NoticePopup'
 import Link from 'next/link'
 import Image from 'next/image'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
 interface CloudinaryImage {
   id: string
@@ -32,24 +34,34 @@ export default function PlatformHome() {
   const [tab2Images, setTab2Images] = useState<PromotionalImage[]>([])
   const [tab3Images, setTab3Images] = useState<PromotionalImage[]>([])
   const [tab4Images, setTab4Images] = useState<PromotionalImage[]>([])
+  const router = useRouter()
+  const supabase = createClient()
 
   // 플랫폼 화면 파비콘 설정
   useEffect(() => {
     const updateFavicon = () => {
-      // 기존 파비콘 모두 제거
-      const existingFavicons = document.querySelectorAll("link[rel*='icon']");
-      existingFavicons.forEach(el => el.remove());
+      try {
+        // 기존 파비콘 모두 제거 (안전하게)
+        const existingFavicons = document.querySelectorAll("link[rel*='icon']");
+        existingFavicons.forEach(el => {
+          if (el && el.parentNode) {
+            el.parentNode.removeChild(el);
+          }
+        });
 
-      // 플랫폼용 파비콘 추가
-      const timestamp = Date.now();
-      const link = document.createElement('link');
-      link.rel = 'icon';
-      link.type = 'image/png';
-      link.href = `/platform-favicon.png?v=${timestamp}`;
-      document.head.appendChild(link);
+        // 플랫폼용 파비콘 추가
+        const timestamp = Date.now();
+        const link = document.createElement('link');
+        link.rel = 'icon';
+        link.type = 'image/png';
+        link.href = `/platform-favicon.png?v=${timestamp}`;
+        document.head.appendChild(link);
 
-      // 타이틀 변경
-      document.title = '달래마켓';
+        // 타이틀 변경
+        document.title = '달래마켓';
+      } catch (error) {
+        console.error('파비콘 업데이트 실패:', error);
+      }
     };
 
     updateFavicon();
@@ -164,8 +176,20 @@ export default function PlatformHome() {
                 달래마켓은 농가와 소비자를 직접 연결하여<br />
                 더 신선하고 더 저렴한 농산물을 제공합니다
               </p>
-              <Link href="/platform?login=true">
-                <button style={{
+              <button
+                onClick={async () => {
+                  // 로그인 상태 확인
+                  const { data: { user } } = await supabase.auth.getUser()
+
+                  if (user) {
+                    // 로그인되어 있으면 바로 /platform으로 이동
+                    router.push('/platform')
+                  } else {
+                    // 로그인되어 있지 않으면 로그인 모달과 함께 /platform으로 이동
+                    router.push('/platform?login=true')
+                  }
+                }}
+                style={{
                   padding: '18px 56px',
                   background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
                   color: '#ffffff',
@@ -177,17 +201,16 @@ export default function PlatformHome() {
                   boxShadow: '0 8px 24px rgba(59, 130, 246, 0.3)',
                   transition: 'all 0.3s'
                 }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-4px)'
-                    e.currentTarget.style.boxShadow = '0 12px 32px rgba(59, 130, 246, 0.4)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.3)'
-                  }}>
-                  지금 시작하기
-                </button>
-              </Link>
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)'
+                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(59, 130, 246, 0.4)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.3)'
+                }}>
+                지금 시작하기
+              </button>
             </div>
           </div>
 

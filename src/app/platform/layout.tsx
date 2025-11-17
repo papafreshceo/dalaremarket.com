@@ -32,29 +32,27 @@ export default function PlatformLayout({
       // document.head가 있는지 확인 (null 체크)
       if (!document.head) return;
 
-      // 기존 파비콘 모두 제거 (안전하게)
-      const existingFavicons = Array.from(document.querySelectorAll("link[rel*='icon']"));
-      existingFavicons.forEach(el => {
-        try {
-          // parentNode가 존재하고 실제로 DOM에 있는지 확인
-          if (el.parentNode && document.head.contains(el)) {
-            document.head.removeChild(el);
-          }
-        } catch (e) {
-          // 이미 제거된 경우 무시
+      try {
+        // 기존 파비콘 찾기
+        let faviconLink = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+
+        if (!faviconLink) {
+          // 파비콘이 없으면 새로 생성
+          faviconLink = document.createElement('link');
+          faviconLink.rel = 'icon';
+          faviconLink.type = 'image/png';
+          document.head.appendChild(faviconLink);
         }
-      });
 
-      // 플랫폼용 파비콘 추가 (캐시 무효화)
-      const timestamp = Date.now();
-      const link = document.createElement('link');
-      link.rel = 'icon';
-      link.type = 'image/png';
-      link.href = `/platform-favicon.png?v=${timestamp}`;
-      document.head.appendChild(link);
+        // 플랫폼용 파비콘으로 변경 (캐시 무효화)
+        const timestamp = Date.now();
+        faviconLink.href = `/platform-favicon.png?v=${timestamp}`;
 
-      // 타이틀 변경
-      document.title = '달래마켓';
+        // 타이틀 변경
+        document.title = '달래마켓';
+      } catch (error) {
+        console.error('Favicon update error:', error);
+      }
     };
 
     // 즉시 실행

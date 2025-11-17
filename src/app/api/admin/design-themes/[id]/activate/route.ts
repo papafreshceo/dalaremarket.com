@@ -11,11 +11,27 @@ export async function POST(
     const { id } = await params;
     const supabase = await createClientForRouteHandler();
 
-    // 트리거가 자동으로 다른 테마들을 비활성화하지만, 명시적으로 처리
+    // 먼저 활성화할 테마의 scope 조회
+    const { data: targetTheme, error: fetchError } = await supabase
+      .from('design_themes')
+      .select('theme_scope')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      logger.error('Fetch theme error:', fetchError);
+      return NextResponse.json(
+        { success: false, error: '테마를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    // 같은 scope의 다른 테마들만 비활성화 (트리거가 처리하지만 명시적으로 처리)
     const { error: deactivateError } = await supabase
       .from('design_themes')
       .update({ is_active: false })
-      .neq('id', id);
+      .neq('id', id)
+      .eq('theme_scope', targetTheme.theme_scope);
 
     if (deactivateError) {
       logger.error('Deactivate themes error:', deactivateError);

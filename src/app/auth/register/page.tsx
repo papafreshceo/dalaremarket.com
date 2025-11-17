@@ -13,9 +13,17 @@ function RegisterForm() {
     name: '',
     phone: '',
   })
+  const [agreeMarketing, setAgreeMarketing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [inviteData, setInviteData] = useState<{ email: string; role: string; token: string } | null>(null)
+
+  // 이메일 인증 상태
+  const [emailVerified, setEmailVerified] = useState(false)
+  const [verificationCode, setVerificationCode] = useState('')
+  const [isCodeSent, setIsCodeSent] = useState(false)
+  const [codeSendLoading, setCodeSendLoading] = useState(false)
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -52,6 +60,73 @@ function RegisterForm() {
 
     setInviteData({ email: data.email, role: data.role, token })
     setFormData(prev => ({ ...prev, email: data.email }))
+  }
+
+  // 인증 코드 발송
+  const handleSendCode = async () => {
+    if (!formData.email) {
+      setError('이메일을 먼저 입력해주세요')
+      return
+    }
+
+    setCodeSendLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/email/send-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || '인증 코드 발송에 실패했습니다')
+        setCodeSendLoading(false)
+        return
+      }
+
+      setIsCodeSent(true)
+      alert('인증 코드가 이메일로 발송되었습니다. (5분간 유효)')
+    } catch (err) {
+      setError('인증 코드 발송 중 오류가 발생했습니다')
+    } finally {
+      setCodeSendLoading(false)
+    }
+  }
+
+  // 인증 코드 확인
+  const handleVerifyCode = async () => {
+    if (verificationCode.length !== 6) {
+      setError('6자리 인증 코드를 입력해주세요')
+      return
+    }
+
+    setError(null)
+
+    try {
+      const response = await fetch('/api/email/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          code: verificationCode,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || '인증 코드가 일치하지 않습니다')
+        return
+      }
+
+      setEmailVerified(true)
+      alert('이메일 인증이 완료되었습니다!')
+    } catch (err) {
+      setError('인증 확인 중 오류가 발생했습니다')
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,6 +176,12 @@ function RegisterForm() {
       return
     }
 
+    // 초대가 없는 경우 이메일 인증 필수
+    if (!inviteData && !emailVerified) {
+      setError('이메일 인증을 완료해주세요')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -108,6 +189,15 @@ function RegisterForm() {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
+        options: {
+          data: {
+            name: formData.name,
+            phone: formData.phone,
+            role: inviteData ? inviteData.role : 'seller',
+            approved: inviteData ? false : true,
+            marketing_consent: agreeMarketing,
+          },
+        },
       })
 
       if (authError) {
@@ -129,6 +219,7 @@ function RegisterForm() {
             phone: formData.phone,
             role: roleToInsert, // 일반 회원가입 = 셀러
             approved: inviteData ? false : true, // 초대 링크는 승인 대기, 일반 셀러는 자동 승인
+            marketing_consent: agreeMarketing,
           })
 
         if (profileError) {
@@ -139,25 +230,71 @@ function RegisterForm() {
           return
         }
 
+        // 2-1. 셀러인 경우 조직 생성 (필수값만)
+        if (roleToInsert === 'seller') {
+          const sellerCode = 'S' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0')
+          const partnerCode = 'P' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0')
+
+          const { data: orgData, error: orgError } = await supabase
+            .from('organizations')
+            .insert({
+              owner_id: authData.user.id,
+              seller_code: sellerCode,
+              partner_code: partnerCode,
+            })
+            .select('id')
+            .single()
+
+          if (!orgError && orgData) {
+            // 조직 멤버 연결
+            await supabase
+              .from('organization_members')
+              .insert({
+                organization_id: orgData.id,
+                user_id: authData.user.id,
+                role: 'owner',
+                status: 'active',
+              })
+
+            // primary_organization_id 업데이트
+            await supabase
+              .from('users')
+              .update({ primary_organization_id: orgData.id })
+              .eq('id', authData.user.id)
+          }
+        }
+
         // 3. 초대 링크로 가입한 경우 초대 상태 업데이트
         if (inviteData) {
-          // 한국 시간 (서울 시간대: UTC+9)
-          const utcNow = new Date();
-          const koreaTime = new Date(utcNow.getTime() + (9 * 60 * 60 * 1000));
-
           await supabase
             .from('invitations')
-            .update({ used: true, used_at: koreaTime.toISOString() })
+            .update({ used: true, used_at: new Date().toISOString() })
             .eq('token', inviteData.token)
         }
 
-        // 4. 성공 - 로그인 페이지로 이동
+        // 4. 환영 이메일 발송
+        try {
+          await fetch('/api/email/send-welcome', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: authData.user.id,
+              email: formData.email,
+              name: formData.name || '고객',
+            }),
+          })
+        } catch (emailError) {
+          console.error('환영 이메일 발송 실패:', emailError)
+        }
+
+        // 5. 성공 - 플랫폼 페이지로 이동
         if (inviteData) {
           alert('회원가입이 완료되었습니다. 관리자 승인 후 로그인이 가능합니다.')
+          router.push('/platform')
         } else {
-          alert('회원가입이 완료되었습니다. 로그인해주세요.')
+          alert('회원가입이 완료되었습니다.')
+          router.push('/platform')
         }
-        router.push('/auth/login')
       }
     } catch (err) {
       setError('회원가입 중 오류가 발생했습니다.')
@@ -338,6 +475,149 @@ function RegisterForm() {
             }}
           />
 
+          {/* 이메일 인증 - 초대가 없는 경우만 */}
+          {!inviteData && (
+            <div style={{ marginBottom: '12px' }}>
+              {!isCodeSent ? (
+                <button
+                  type="button"
+                  onClick={handleSendCode}
+                  disabled={codeSendLoading || !formData.email}
+                  style={{
+                    width: '100%',
+                    padding: '14px 16px',
+                    background: formData.email && !codeSendLoading ? '#667eea' : '#e5e7eb',
+                    color: formData.email && !codeSendLoading ? 'white' : '#9ca3af',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: formData.email && !codeSendLoading ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.3s',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (formData.email && !codeSendLoading) {
+                      e.currentTarget.style.background = '#5568d3'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (formData.email && !codeSendLoading) {
+                      e.currentTarget.style.background = '#667eea'
+                    }
+                  }}
+                >
+                  {codeSendLoading ? '전송 중...' : '이메일 인증 코드 발송'}
+                </button>
+              ) : !emailVerified ? (
+                <div>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="인증 코드 6자리"
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      maxLength={6}
+                      style={{
+                        flex: 1,
+                        padding: '14px 16px',
+                        border: '2px solid transparent',
+                        background: '#f8f9fa',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        transition: 'all 0.3s',
+                        textAlign: 'center',
+                        letterSpacing: '4px',
+                        fontWeight: '600',
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#2563eb'
+                        e.currentTarget.style.background = '#ffffff'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'transparent'
+                        e.currentTarget.style.background = '#f8f9fa'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleVerifyCode}
+                      disabled={verificationCode.length !== 6}
+                      style={{
+                        padding: '14px 20px',
+                        background: verificationCode.length === 6 ? '#667eea' : '#e5e7eb',
+                        color: verificationCode.length === 6 ? 'white' : '#9ca3af',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: verificationCode.length === 6 ? 'pointer' : 'not-allowed',
+                        transition: 'all 0.3s',
+                        whiteSpace: 'nowrap',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (verificationCode.length === 6) {
+                          e.currentTarget.style.background = '#5568d3'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (verificationCode.length === 6) {
+                          e.currentTarget.style.background = '#667eea'
+                        }
+                      }}
+                    >
+                      인증 확인
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSendCode}
+                    disabled={codeSendLoading}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      background: 'white',
+                      color: '#667eea',
+                      border: '1px solid #667eea',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      cursor: codeSendLoading ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.3s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!codeSendLoading) {
+                        e.currentTarget.style.background = '#f8f9fa'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!codeSendLoading) {
+                        e.currentTarget.style.background = 'white'
+                      }
+                    }}
+                  >
+                    인증 코드 재발송
+                  </button>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: '14px 16px',
+                    background: '#d1fae5',
+                    border: '2px solid #34d399',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#065f46',
+                    textAlign: 'center',
+                  }}
+                >
+                  ✓ 이메일 인증 완료
+                </div>
+              )}
+            </div>
+          )}
+
           <input
             type="password"
             name="password"
@@ -380,7 +660,7 @@ function RegisterForm() {
               background: '#f8f9fa',
               borderRadius: '12px',
               fontSize: '14px',
-              marginBottom: '24px',
+              marginBottom: '16px',
               outline: 'none',
               transition: 'all 0.3s'
             }}
@@ -393,6 +673,46 @@ function RegisterForm() {
               e.currentTarget.style.background = '#f8f9fa'
             }}
           />
+
+          {/* 마케팅 정보 수신 동의 (선택) */}
+          <div style={{
+            marginBottom: '24px',
+            background: '#f8f9fa',
+            borderRadius: '12px',
+            padding: '12px'
+          }}>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              color: '#495057'
+            }}>
+              <input
+                type="checkbox"
+                checked={agreeMarketing}
+                onChange={(e) => setAgreeMarketing(e.target.checked)}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  cursor: 'pointer'
+                }}
+              />
+              <span>
+                마케팅 정보 수신 동의 <span style={{ color: '#2563eb', fontSize: '12px' }}>(선택)</span>
+              </span>
+            </label>
+            <div style={{
+              marginTop: '4px',
+              marginLeft: '24px',
+              fontSize: '11px',
+              color: '#6b7280',
+              lineHeight: '1.5'
+            }}>
+              상품 출하 정보, 배송일정, 공급가 변경 등을 이메일/SMS로 받으실 수 있습니다.
+            </div>
+          </div>
 
           <button
             type="submit"

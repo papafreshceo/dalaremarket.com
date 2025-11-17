@@ -136,19 +136,28 @@ export async function POST(request: NextRequest) {
         const uniqueUserIds = [...new Set(users.map(u => u.user_id))];
 
         // 각 사용자에 대한 알림 레코드 생성
-        const notificationRecords = uniqueUserIds.map(userId => ({
-          user_id: userId,
-          type: 'announcement',
-          category: category || 'seller',
-          title,
-          body,
-          action_url: url || '/platform/notifications',
-          sent_by_user_id: auth.user.id,
-          onesignal_notification_id: oneSignalData.id,
-          is_sent: true,
-          sent_at: new Date().toISOString(),
-          priority: 'normal',
-        }));
+        const notificationRecords = uniqueUserIds.map(userId => {
+          const record: any = {
+            user_id: userId,
+            type: 'announcement',
+            category: category || 'seller',
+            title,
+            body,
+            action_url: url || '/platform/notifications',
+            sent_by_user_id: auth.user.id,
+            onesignal_notification_id: oneSignalData.id,
+            is_sent: true,
+            sent_at: new Date().toISOString(),
+            priority: 'normal',
+          };
+
+          // 이미지 URL이 있으면 추가
+          if (imageUrl) {
+            record.image_url = imageUrl;
+          }
+
+          return record;
+        });
 
         const { error: notificationsError } = await adminClient
           .from('notifications')

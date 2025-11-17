@@ -5,12 +5,13 @@ CREATE TABLE IF NOT EXISTS design_themes (
   description TEXT,
   css_variables JSONB NOT NULL,
   is_active BOOLEAN DEFAULT FALSE,
+  theme_scope VARCHAR(20) NOT NULL DEFAULT 'admin', -- 'admin' | 'platform' | 'orders'
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- 기본 네오브루탈리즘 테마 삽입/업데이트 (UPSERT)
-INSERT INTO design_themes (name, description, css_variables, is_active) VALUES
+INSERT INTO design_themes (name, description, css_variables, is_active, theme_scope) VALUES
 (
   'Neobrutalism Default',
   '기본 네오브루탈리즘 디자인 시스템',
@@ -38,14 +39,16 @@ INSERT INTO design_themes (name, description, css_variables, is_active) VALUES
     "--shadow-lg": "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
     "--radius": "0.5rem"
   }'::jsonb,
-  true
+  true,
+  'admin'
 )
 ON CONFLICT (name) DO UPDATE SET
   description = EXCLUDED.description,
   css_variables = EXCLUDED.css_variables,
+  theme_scope = EXCLUDED.theme_scope,
   updated_at = NOW();
 
-INSERT INTO design_themes (name, description, css_variables, is_active) VALUES
+INSERT INTO design_themes (name, description, css_variables, is_active, theme_scope) VALUES
 (
   'Soft Neobrutalism',
   '부드러운 네오브루탈리즘 스타일',
@@ -73,14 +76,16 @@ INSERT INTO design_themes (name, description, css_variables, is_active) VALUES
     "--shadow-lg": "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
     "--radius": "0.75rem"
   }'::jsonb,
-  false
+  false,
+  'admin'
 )
 ON CONFLICT (name) DO UPDATE SET
   description = EXCLUDED.description,
   css_variables = EXCLUDED.css_variables,
+  theme_scope = EXCLUDED.theme_scope,
   updated_at = NOW();
 
-INSERT INTO design_themes (name, description, css_variables, is_active) VALUES
+INSERT INTO design_themes (name, description, css_variables, is_active, theme_scope) VALUES
 (
   'Dark Modern',
   '다크 모던 테마',
@@ -108,21 +113,26 @@ INSERT INTO design_themes (name, description, css_variables, is_active) VALUES
     "--shadow-lg": "0 10px 15px -3px rgba(0, 0, 0, 0.5)",
     "--radius": "0.5rem"
   }'::jsonb,
-  false
+  false,
+  'admin'
 )
 ON CONFLICT (name) DO UPDATE SET
   description = EXCLUDED.description,
   css_variables = EXCLUDED.css_variables,
+  theme_scope = EXCLUDED.theme_scope,
   updated_at = NOW();
 
--- 활성 테마는 하나만 가능하도록 트리거 생성
+-- 같은 scope 내에서 활성 테마는 하나만 가능하도록 트리거 생성
 CREATE OR REPLACE FUNCTION ensure_single_active_theme()
 RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.is_active = TRUE THEN
+    -- 같은 theme_scope 내에서만 다른 테마를 비활성화
     UPDATE design_themes
     SET is_active = FALSE
-    WHERE id != NEW.id AND is_active = TRUE;
+    WHERE id != NEW.id
+      AND is_active = TRUE
+      AND theme_scope = NEW.theme_scope;
   END IF;
   RETURN NEW;
 END;
