@@ -1,10 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/api-security'
-import { Resend } from 'resend'
+import { resend } from '@/lib/email/resend'
 import logger from '@/lib/logger'
-
-const resend = new Resend(process.env.RESEND_API_KEY)
 
 // 템플릿 변수 치환 함수
 function replaceTemplateVariables(template: string, variables: Record<string, string>): string {

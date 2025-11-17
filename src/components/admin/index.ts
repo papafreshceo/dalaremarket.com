@@ -9,5 +9,5 @@ export {
   InfoBanner
 } from './PageLayout'
 
-export { default as CalendarPopup } from './CalendarPopup'
-export { default as FloatingHtmlBuilder } from './FloatingHtmlBuilder'
+export { CalendarPopup } from './CalendarPopup'
+export { FloatingHtmlBuilder } from './FloatingHtmlBuilder'
