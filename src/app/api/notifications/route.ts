@@ -150,34 +150,55 @@ export async function DELETE(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const notificationId = searchParams.get('id')
+    const deleteAll = searchParams.get('delete_all') === 'true'
     const supabase = await createClientForRouteHandler()
 
-    if (!notificationId) {
+    if (deleteAll) {
+      // 모든 알림 삭제
+      const { error: deleteError } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', auth.user.id)
+
+      if (deleteError) {
+        logger.error('알림 전체 삭제 실패:', deleteError);
+        return NextResponse.json(
+          { error: '알림 삭제에 실패했습니다' },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: '모든 알림이 삭제되었습니다',
+      })
+    } else if (notificationId) {
+      // 개별 알림 삭제
+      // 본인의 알림만 삭제 가능
+      const { error: deleteError } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId)
+        .eq('user_id', auth.user.id)
+
+      if (deleteError) {
+        logger.error('알림 삭제 실패:', deleteError);
+        return NextResponse.json(
+          { error: '알림 삭제에 실패했습니다' },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: '알림이 삭제되었습니다',
+      })
+    } else {
       return NextResponse.json(
-        { error: '알림 ID가 필요합니다' },
+        { error: '알림 ID 또는 delete_all 파라미터가 필요합니다' },
         { status: 400 }
       )
     }
-
-    // 본인의 알림만 삭제 가능
-    const { error: deleteError } = await supabase
-      .from('notifications')
-      .delete()
-      .eq('id', notificationId)
-      .eq('user_id', auth.user.id)
-
-    if (deleteError) {
-      logger.error('알림 삭제 실패:', deleteError);
-      return NextResponse.json(
-        { error: '알림 삭제에 실패했습니다' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: '알림이 삭제되었습니다',
-    })
   } catch (error) {
     logger.error('알림 삭제 오류:', error);
     return NextResponse.json(

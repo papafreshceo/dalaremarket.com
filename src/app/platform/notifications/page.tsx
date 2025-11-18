@@ -293,6 +293,39 @@ export default function NotificationsPage() {
     }
   }
 
+  // 모두 삭제
+  const deleteAllNotifications = async () => {
+    if (!confirm('모든 알림을 삭제하시겠습니까?\n삭제된 알림은 복구할 수 없습니다.')) return
+
+    try {
+      const response = await fetch('/api/notifications?delete_all=true', {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('삭제 실패')
+      }
+
+      // 로컬 state 초기화
+      setNotifications([])
+      setUnreadCount(0)
+      setTabCounts({
+        all: 0,
+        orders: 0,
+        announcements: 0,
+        payments: 0,
+        products: 0,
+        messages: 0,
+        others: 0,
+      })
+
+      alert('모든 알림이 삭제되었습니다.')
+    } catch (error) {
+      console.error('알림 삭제 실패:', error)
+      alert('알림 삭제에 실패했습니다.')
+    }
+  }
+
   // 알림 삭제
   const deleteNotification = async (notificationId: string) => {
     if (!confirm('이 알림을 삭제하시겠습니까?')) return
@@ -620,14 +653,24 @@ export default function NotificationsPage() {
           </button>
         </div>
 
-        {unreadCount > 0 && (
-          <button
-            onClick={markAllAsRead}
-            className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-          >
-            모두 읽음 처리
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllAsRead}
+              className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              모두 읽음 처리
+            </button>
+          )}
+          {notifications.length > 0 && (
+            <button
+              onClick={deleteAllNotifications}
+              className="px-4 py-2 text-sm text-red-600 hover:text-red-700 font-medium"
+            >
+              모두 삭제
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 알림 목록 */}
