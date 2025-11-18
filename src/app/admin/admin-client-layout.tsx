@@ -1,7 +1,7 @@
 // app/admin/layout.tsx
 'use client'
 
-import { useState, useEffect, useLayoutEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import Head from 'next/head'
@@ -84,8 +84,8 @@ export default function AdminClientLayout({
     return () => clearInterval(interval)
   }, [])
 
-  // 관리자 화면 파비콘 및 배경색 설정 (useLayoutEffect로 렌더링 전에 실행)
-  useLayoutEffect(() => {
+  // 관리자 화면 파비콘 및 배경색 설정
+  useEffect(() => {
     // 타이틀 변경
     document.title = '달래마켓 관리자';
 
@@ -93,7 +93,7 @@ export default function AdminClientLayout({
     const originalBackground = document.body.style.background;
     document.body.style.background = 'var(--color-background)';
 
-    // 파비콘 변경 (href만 변경, DOM 조작 최소화)
+    // 파비콘 변경 (캐싱 허용)
     let faviconLink = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
 
     if (!faviconLink) {
@@ -104,21 +104,18 @@ export default function AdminClientLayout({
     }
 
     const originalFavicon = faviconLink.href;
-    faviconLink.href = `/admin-favicon.png?v=${Date.now()}`;
+    faviconLink.href = '/admin-favicon.png'; // 캐시 버스팅 제거
 
     return () => {
       // 페이지 떠날 때 원래 배경과 파비콘 복원
-      // DOM이 아직 존재하는지 확인 후 복원
       try {
         if (document.body) {
           document.body.style.background = originalBackground;
         }
-        // faviconLink가 여전히 DOM에 연결되어 있는지 확인
         if (faviconLink && originalFavicon && document.head.contains(faviconLink)) {
           faviconLink.href = originalFavicon;
         }
       } catch (error) {
-        // DOM이 이미 정리된 경우 무시
         console.log('Favicon cleanup skipped: DOM already unmounted');
       }
     };
@@ -150,7 +147,10 @@ export default function AdminClientLayout({
   }, [])
 
   // 모든 메뉴 아이템을 플랫하게 만들기 (권한 체크용)
-  const menuItems = menuGroups.flatMap(group => group.items);
+  const menuItems = useMemo(
+    () => menuGroups.flatMap(group => group.items),
+    [] // menuGroups는 정적 데이터이므로 빈 배열
+  );
 
   // 현재 경로에 따라 활성 그룹 및 카테고리 자동 선택
   useEffect(() => {
@@ -183,26 +183,38 @@ export default function AdminClientLayout({
   }
 
   // 권한 기반 메뉴 필터링 (그룹 단위)
-  const filteredMenuGroups = menuGroups.map(group => ({
-    ...group,
-    items: group.items.filter(item => {
-      // super_admin은 모든 메뉴 표시
-      if (accessiblePages.includes('*')) return true
-      // 접근 가능한 페이지 목록에 있는지 확인
-      return accessiblePages.includes(item.href)
-    })
-  })).filter(group => group.items.length > 0); // 아이템이 없는 그룹은 제외
+  const filteredMenuGroups = useMemo(
+    () => menuGroups.map(group => ({
+      ...group,
+      items: group.items.filter(item => {
+        // super_admin은 모든 메뉴 표시
+        if (accessiblePages.includes('*')) return true
+        // 접근 가능한 페이지 목록에 있는지 확인
+        return accessiblePages.includes(item.href)
+      })
+    })).filter(group => group.items.length > 0), // 아이템이 없는 그룹은 제외
+    [accessiblePages] // accessiblePages 변경 시에만 재계산
+  );
 
   // 현재 선택된 카테고리의 그룹들
-  const currentCategoryGroups = filteredMenuGroups.filter(g => g.category === selectedCategory);
+  const currentCategoryGroups = useMemo(
+    () => filteredMenuGroups.filter(g => g.category === selectedCategory),
+    [filteredMenuGroups, selectedCategory]
+  );
 
   // 현재 선택된 그룹의 메뉴 아이템들
-  const selectedGroupData = filteredMenuGroups.find(g => g.id === selectedGroup);
+  const selectedGroupData = useMemo(
+    () => filteredMenuGroups.find(g => g.id === selectedGroup),
+    [filteredMenuGroups, selectedGroup]
+  );
   const currentItems = selectedGroupData?.items || [];
 
   // 카테고리별 필터링 (적어도 하나의 그룹이 있는 카테고리만)
-  const filteredCategories = menuCategories.filter(category =>
-    filteredMenuGroups.some(group => group.category === category.id)
+  const filteredCategories = useMemo(
+    () => menuCategories.filter(category =>
+      filteredMenuGroups.some(group => group.category === category.id)
+    ),
+    [filteredMenuGroups]
   );
 
   return (

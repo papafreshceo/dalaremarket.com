@@ -18,11 +18,15 @@ import { useRouter } from 'next/navigation';
 import DashboardTab from './components/DashboardTab';
 import { Order, StatusConfig } from './types';
 
+const ITEMS_PER_PAGE = 50; // 페이지당 주문 수
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [isMobile, setIsMobile] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -53,30 +57,48 @@ export default function AdminDashboardPage() {
     };
 
     checkAuth();
-    fetchOrders();
+    fetchOrders(1);
   }, [router]);
 
+  // 페이지 변경 시 주문 조회
+  useEffect(() => {
+    if (currentPage > 1) {
+      fetchOrders(currentPage);
+    }
+  }, [currentPage]);
+
   /**
-   * 관리자 대시보드 통계 데이터 조회
+   * 관리자 대시보드 통계 데이터 조회 (페이지네이션 적용)
    *
-   * integrated_orders 테이블의 모든 주문 데이터를 조회합니다:
+   * integrated_orders 테이블의 주문 데이터를 페이지 단위로 조회합니다:
    * 1. 플랫폼 주문 (판매자들이 발주확정한 주문)
    * 2. 관리자 직접 판매 주문 (오픈마켓에서 판매한 주문)
    *
    * ※ 개별 셀러 필터링 없이 전체 주문 통계를 제공합니다.
    */
-  const fetchOrders = async () => {
+  const fetchOrders = async (page: number) => {
     try {
+      setLoading(true);
       const supabase = createClient();
 
-      // 모든 주문 조회 (organization_id 필터링 없음)
-      const { data, error } = await supabase
+      // 시작/끝 인덱스 계산
+      const start = (page - 1) * ITEMS_PER_PAGE;
+      const end = start + ITEMS_PER_PAGE - 1;
+
+      // 페이지네이션 적용하여 주문 조회
+      const { data, error, count } = await supabase
         .from('integrated_orders')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('is_deleted', false)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(start, end);
 
       if (error) throw error;
+
+      // 총 개수 저장
+      if (count !== null) {
+        setTotalCount(count);
+      }
 
       // shipping_status를 Order status로 매핑
       const mapShippingStatus = (shippingStatus: string | null): Order['status'] => {
@@ -169,6 +191,8 @@ export default function AdminDashboardPage() {
     );
   }
 
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+
   return (
     <div style={{ width: '100%', padding: '0 20px' }}>
       <DashboardTab
@@ -176,6 +200,95 @@ export default function AdminDashboardPage() {
         orders={orders}
         statusConfig={statusConfig}
       />
+
+      {/* 페이지네이션 */}
+      {totalPages > 1 && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '8px',
+          marginTop: '32px',
+          paddingBottom: '32px'
+        }}>
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: '1px solid var(--color-border)',
+              background: currentPage === 1 ? 'var(--color-surface)' : 'var(--color-background)',
+              color: currentPage === 1 ? 'var(--color-text-tertiary)' : 'var(--color-text)',
+              cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            이전
+          </button>
+
+          <div style={{
+            display: 'flex',
+            gap: '4px'
+          }}>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--color-border)',
+                    background: currentPage === pageNum ? 'var(--color-primary)' : 'var(--color-background)',
+                    color: currentPage === pageNum ? 'white' : 'var(--color-text)',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: currentPage === pageNum ? '600' : '400'
+                  }}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: '1px solid var(--color-border)',
+              background: currentPage === totalPages ? 'var(--color-surface)' : 'var(--color-background)',
+              color: currentPage === totalPages ? 'var(--color-text-tertiary)' : 'var(--color-text)',
+              cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            다음
+          </button>
+
+          <div style={{
+            marginLeft: '16px',
+            color: 'var(--color-text-secondary)',
+            fontSize: '14px'
+          }}>
+            {currentPage} / {totalPages} 페이지 (총 {totalCount.toLocaleString()}건)
+          </div>
+        </div>
+      )}
     </div>
   );
 }
