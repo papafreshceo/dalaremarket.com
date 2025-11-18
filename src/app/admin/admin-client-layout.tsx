@@ -99,28 +99,37 @@ export default function AdminClientLayout({
 
     // 파비콘 변경 (캐싱 허용)
     let faviconLink = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+    let createdNewFavicon = false;
 
     if (!faviconLink) {
       faviconLink = document.createElement('link');
       faviconLink.rel = 'icon';
       faviconLink.type = 'image/png';
       document.head.appendChild(faviconLink);
+      createdNewFavicon = true;
     }
 
     const originalFavicon = faviconLink.href;
-    faviconLink.href = '/admin-favicon.png'; // 캐시 버스팅 제거
+    faviconLink.href = '/admin-favicon.png';
 
     return () => {
       // 페이지 떠날 때 원래 배경과 파비콘 복원
       try {
-        if (document.body) {
+        // document와 document.body가 아직 존재하는지 확인
+        if (typeof document !== 'undefined' && document.body) {
           document.body.style.background = originalBackground;
         }
-        if (faviconLink && originalFavicon && document.head.contains(faviconLink)) {
-          faviconLink.href = originalFavicon;
+
+        // 파비콘 복원 (새로 생성한 경우 제거, 기존 것은 원래대로)
+        if (typeof document !== 'undefined' && document.head && faviconLink) {
+          if (createdNewFavicon && document.head.contains(faviconLink)) {
+            document.head.removeChild(faviconLink);
+          } else if (!createdNewFavicon && originalFavicon && document.head.contains(faviconLink)) {
+            faviconLink.href = originalFavicon;
+          }
         }
       } catch (error) {
-        console.log('Favicon cleanup skipped: DOM already unmounted');
+        // DOM 정리 중 에러 발생 시 무시 (페이지 전환 등)
       }
     };
   }, []);
