@@ -968,14 +968,24 @@ export default function AdminClientLayout({
   // 현재 경로에 따라 활성 그룹 및 카테고리 자동 선택
   useEffect(() => {
     if (pathname) {
+      let bestMatch = { group: '', category: '', matchLength: 0 };
+
+      // 가장 구체적인(긴) 경로와 매칭되는 메뉴 찾기
       for (const group of menuGroups) {
         for (const item of group.items) {
-          if (pathname.startsWith(item.href)) {
-            setSelectedGroup(group.id);
-            setSelectedCategory(group.category);
-            return;
+          if (pathname.startsWith(item.href) && item.href.length > bestMatch.matchLength) {
+            bestMatch = {
+              group: group.id,
+              category: group.category,
+              matchLength: item.href.length
+            };
           }
         }
+      }
+
+      if (bestMatch.group) {
+        setSelectedGroup(bestMatch.group);
+        setSelectedCategory(bestMatch.category);
       }
     }
   }, [pathname]);
