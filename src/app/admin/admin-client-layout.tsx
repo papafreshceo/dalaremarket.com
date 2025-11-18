@@ -1233,7 +1233,7 @@ export default function AdminClientLayout({
           </aside>
 
           {/* 3단 사이드바: 선택된 그룹의 메뉴 */}
-          <aside className="w-56 h-full bg-gradient-to-b from-surface to-background border-r border-border/50 shadow-lg flex flex-col">
+          <aside className="w-48 h-full bg-gradient-to-b from-surface to-background border-r border-border/50 shadow-lg flex flex-col">
             {/* 메뉴 목록 */}
             <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar">
               <div className="px-3 space-y-1">
