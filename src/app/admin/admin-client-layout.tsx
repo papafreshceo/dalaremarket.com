@@ -1129,6 +1129,16 @@ export default function AdminClientLayout({
               <span className="font-medium">플랫폼</span>
             </Link>
 
+            <div className="w-px h-5 bg-border" />
+
+            {/* 테마 토글 */}
+            <ThemeToggle />
+
+            <div className="w-px h-5 bg-border" />
+
+            {/* 로그아웃 버튼 */}
+            <LogoutButton />
+
           </div>
         </div>
       </header>
@@ -1187,13 +1197,6 @@ export default function AdminClientLayout({
                 })}
               </div>
             </nav>
-
-            {/* 하단 아이콘 */}
-            <div className="p-2 border-t border-border space-y-2">
-              <div className="flex justify-center">
-                <ThemeToggle />
-              </div>
-            </div>
           </aside>
 
           {/* 2단 사이드바: 선택된 카테고리의 그룹들 */}
@@ -1278,10 +1281,7 @@ export default function AdminClientLayout({
             </nav>
 
             {/* 하단 정보 */}
-            <div className="p-3 border-t border-border space-y-2">
-              <div className="flex justify-center">
-                <LogoutButton />
-              </div>
+            <div className="p-3 border-t border-border">
               <div className="text-[10px] text-text-tertiary text-center space-y-0.5">
                 <p>© 2025 달래마켓</p>
                 <p>Version 2.0</p>
