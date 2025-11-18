@@ -45,6 +45,7 @@ export default function AdminClientLayout({
   const [showCalendarPopup, setShowCalendarPopup] = useState(false)
   const [themeLoaded, setThemeLoaded] = useState(false)
   const [accessiblePages, setAccessiblePages] = useState<string[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const [selectedCategory, setSelectedCategory] = useState<string>('operation')
   const [selectedGroup, setSelectedGroup] = useState<string>('dashboard')
   const supabase = createClient()
@@ -60,27 +61,28 @@ export default function AdminClientLayout({
     return () => window.removeEventListener('resize', checkScreenSize)
   }, [])
 
-  // React Query로 읽지 않은 알림 개수 조회 (폴링 제거, 캐싱 활용)
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ['unreadNotifications'],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('category', 'admin')
-        .eq('is_read', false)
+  // 읽지 않은 알림 개수 조회 (폴링 간격 최적화: 30초 → 60초)
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const { count } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('category', 'admin')
+          .eq('is_read', false)
 
-      if (error) {
+        setUnreadCount(count || 0)
+      } catch (error) {
         console.error('읽지 않은 알림 개수 조회 실패:', error)
-        return 0
       }
+    }
 
-      return count || 0
-    },
-    staleTime: 60000,        // 60초간 캐시 사용 (폴링 대신)
-    refetchInterval: false,  // 자동 폴링 비활성화
-    refetchOnWindowFocus: true, // 창 포커스 시에만 새로고침
-  })
+    fetchUnreadCount()
+
+    // 60초마다 업데이트 (기존 30초에서 최적화)
+    const interval = setInterval(fetchUnreadCount, 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   // 관리자 화면 파비콘 및 배경색 설정 (useLayoutEffect로 렌더링 전에 실행)
   useLayoutEffect(() => {
@@ -452,13 +454,6 @@ export default function AdminClientLayout({
                       `}>
                         {item.name}
                       </span>
-
-                      {/* 화살표 (활성 시) */}
-                      {active && (
-                        <svg className="w-4 h-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                        </svg>
-                      )}
                     </Link>
                   );
                 })}
