@@ -199,7 +199,7 @@ export default function AgriChatbot() {
               const messagesResponse = await fetch(`/api/messages?thread_id=${existingThread.id}`);
               const messagesData = await messagesResponse.json();
               if (messagesData.success) {
-                setChatMessages(messagesData.messages);
+                setChatMessages(messagesData.messages || []);
               }
             } else {
               // 새 대화 시작
@@ -281,10 +281,10 @@ export default function AgriChatbot() {
       const data = await response.json()
 
       if (data.success) {
-        setChatMessages(data.messages)
+        setChatMessages(data.messages || [])
 
         // 화면에 메시지가 표시되었으므로 읽음 처리
-        const unreadMessageIds = data.messages
+        const unreadMessageIds = (data.messages || [])
           .filter((msg: any) => msg.sender_id !== currentUser?.id && !msg.is_read)
           .map((msg: any) => msg.id)
 
@@ -900,7 +900,7 @@ export default function AgriChatbot() {
               </div>
 
               <div className="chatbot-messages">
-                {chatMessages.length === 0 ? (
+                {(!chatMessages || chatMessages.length === 0) ? (
                   <div style={{ textAlign: 'center', padding: '60px 20px', color: '#9ca3af' }}>
                     <p style={{ fontSize: '14px' }}>메시지를 보내보세요!</p>
                   </div>
