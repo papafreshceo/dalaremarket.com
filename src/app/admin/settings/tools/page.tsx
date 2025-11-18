@@ -167,13 +167,13 @@ export default function ToolsManagementPage() {
   }
 
   return (
-    <div style={{ padding: '40px' }}>
-      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ padding: '24px' }}>
+      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '8px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>
             도구 관리
           </h1>
-          <p style={{ fontSize: '14px', color: '#6c757d' }}>
+          <p style={{ fontSize: '14px', color: '#6b7280' }}>
             테이블에서 직접 수정하고 저장 버튼을 클릭하세요.
           </p>
         </div>
@@ -181,11 +181,11 @@ export default function ToolsManagementPage() {
           <button
             onClick={handleSaveAll}
             style={{
-              padding: '12px 24px',
-              background: '#2563eb',
-              color: '#ffffff',
+              padding: '8px 16px',
+              background: '#000',
+              color: '#fff',
               border: 'none',
-              borderRadius: '8px',
+              borderRadius: '6px',
               fontSize: '15px',
               fontWeight: '600',
               cursor: 'pointer',

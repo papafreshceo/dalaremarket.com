@@ -68,11 +68,11 @@ export default function PaymentSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ padding: '24px' }}>
       {/* 헤더 */}
-      <div>
-        <h1 className="text-2xl font-bold text-text">결제 설정</h1>
-        <p className="mt-1 text-sm text-text-secondary">결제 수단 및 PG 연동 설정을 관리합니다.</p>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>결제 설정</h1>
+        <p style={{ fontSize: '14px', color: '#6b7280' }}>결제 수단 및 PG 연동 설정을 관리합니다.</p>
       </div>
 
       {/* 결제 수단 설정 */}

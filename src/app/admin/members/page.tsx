@@ -569,7 +569,7 @@ export default function MembersPage() {
   };
 
   return (
-    <div>
+    <div style={{ padding: '24px' }}>
       {/* 헤더 */}
       <div style={{
         display: 'flex',

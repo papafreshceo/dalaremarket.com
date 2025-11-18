@@ -112,9 +112,9 @@ export default function CashSettingsPage() {
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '24px' }}>
       {/* 헤더 */}
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>
-          💰 달래캐시 설정
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>
+          달래캐시 설정
         </h1>
         <p style={{ fontSize: '14px', color: '#6b7280' }}>
           사용자에게 지급되는 캐시 보상 금액을 설정합니다.

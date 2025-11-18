@@ -82,19 +82,33 @@ export default function BannersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ padding: '24px' }}>
       {/* 헤더 */}
-      <div className="flex items-center justify-between">
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '24px'
+      }}>
         <div>
-          <h1 className="text-2xl font-bold text-text">배너 관리</h1>
-          <p className="mt-1 text-sm text-text-secondary">메인 배너 및 프로모션 배너를 관리합니다.</p>
+          <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>배너 관리</h1>
+          <p style={{ fontSize: '14px', color: '#6b7280' }}>메인 배너 및 프로모션 배너를 관리합니다.</p>
         </div>
-        <Button
+        <button
           onClick={handleAdd}
-          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover"
+          style={{
+            padding: '8px 16px',
+            background: '#000',
+            color: '#fff',
+            borderRadius: '6px',
+            border: 'none',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: 'pointer'
+          }}
         >
-          + 배너 추가
-        </Button>
+          배너 추가
+        </button>
       </div>
 
       {/* 배너 목록 */}
@@ -322,6 +336,7 @@ export default function BannersPage() {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }

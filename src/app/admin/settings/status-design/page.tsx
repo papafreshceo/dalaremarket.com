@@ -268,12 +268,14 @@ export default function AdminStatusDesignPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div style={{ padding: '24px' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>상태 디자인 관리</h1>
+        <p style={{ fontSize: '14px', color: '#6b7280' }}>각 상태별로 원하는 애니메이션 디자인을 선택하세요.</p>
+      </div>
+
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold mb-2">상태 디자인 관리</h1>
-          <p className="text-gray-600">각 상태별로 원하는 애니메이션 디자인을 선택하세요.</p>
-        </div>
+        <div>
 
         {statusOptions.map((status) => {
           const currentDesign = statusDesigns.find(d => d.status_name === status.name);

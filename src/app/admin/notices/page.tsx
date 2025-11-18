@@ -102,6 +102,7 @@ export default function AdminNoticesPage() {
   };
 
   return (
+    <div style={{ padding: '24px' }}>
     <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: '1440px', padding: '0 24px' }}>
         {/* 헤더 */}
@@ -128,7 +129,7 @@ export default function AdminNoticesPage() {
             style={{
               display: 'inline-block',
               padding: '12px 24px',
-              background: '#2563eb',
+              background: '#000',
               color: '#ffffff',
               borderRadius: '8px',
               textDecoration: 'none',
@@ -137,7 +138,7 @@ export default function AdminNoticesPage() {
               transition: 'background 0.2s'
             }}
           >
-            + 새 공지사항
+            새 공지사항
           </Link>
         </div>
 
@@ -242,7 +243,7 @@ export default function AdminNoticesPage() {
                             fontSize: '11px',
                             fontWeight: '600'
                           }}>
-                            📌 고정
+                            고정
                           </span>
                         )}
                         <span style={{
@@ -347,6 +348,7 @@ export default function AdminNoticesPage() {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 }

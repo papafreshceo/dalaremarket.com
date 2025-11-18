@@ -135,17 +135,17 @@ export default function AdminNicknamesPage() {
         <button
           onClick={() => setShowAddModal(true)}
           style={{
-            padding: '10px 20px',
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)',
-            color: 'white',
+            padding: '8px 16px',
+            background: '#000',
+            color: '#fff',
             border: 'none',
-            borderRadius: '8px',
+            borderRadius: '6px',
             fontSize: '14px',
             fontWeight: '600',
             cursor: 'pointer'
           }}
         >
-          + 닉네임 추가
+          닉네임 추가
         </button>
       </div>
 

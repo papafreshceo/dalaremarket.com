@@ -426,6 +426,7 @@ export default function SellerAccountsPage() {
   }
 
   return (
+    <div style={{ padding: '24px' }}>
     <div style={{
       display: 'flex',
       height: 'calc(100vh - 64px)',
@@ -1328,6 +1329,7 @@ export default function SellerAccountsPage() {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

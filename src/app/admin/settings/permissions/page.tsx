@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useToast } from '@/components/ui/Toast'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { ADMIN_PAGES, ROLE_INFO, UserRole } from '@/types/permissions'
@@ -24,8 +24,51 @@ export default function PermissionsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const { showToast } = useToast()
   const { confirm } = useConfirm()
+
+  const toggleGroup = (groupKey: string) => {
+    setCollapsedGroups(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(groupKey)) {
+        newSet.delete(groupKey)
+      } else {
+        newSet.add(groupKey)
+      }
+      return newSet
+    })
+  }
+
+  // 그룹의 특정 권한 상태 확인
+  const getGroupPermissionState = (groupKey: string, field: keyof Permission) => {
+    const groupPages = permissions.filter((_, index) => {
+      const page = ADMIN_PAGES[index]
+      return `${page.category}-${page.group}` === groupKey
+    })
+
+    if (groupPages.length === 0) return { checked: false, indeterminate: false }
+
+    const checkedCount = groupPages.filter(p => p[field]).length
+    if (checkedCount === 0) return { checked: false, indeterminate: false }
+    if (checkedCount === groupPages.length) return { checked: true, indeterminate: false }
+    return { checked: false, indeterminate: true }
+  }
+
+  // 그룹 전체 선택/해제 (세로 방향만)
+  const handleToggleGroupPermission = (groupKey: string, field: keyof Permission, checked: boolean) => {
+    const newPermissions = [...permissions]
+
+    newPermissions.forEach((permission, index) => {
+      const page = ADMIN_PAGES[index]
+      if (`${page.category}-${page.group}` === groupKey) {
+        // @ts-ignore
+        permission[field] = checked
+      }
+    })
+
+    setPermissions(newPermissions)
+  }
 
   useEffect(() => {
     fetchPermissions()
@@ -227,10 +270,10 @@ export default function PermissionsPage() {
   }
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">권한 설정</h1>
-        <p className="mt-1 text-sm text-gray-600">
+    <div className="max-w-[1440px] mx-auto">
+      <div className="mb-4">
+        <h1 className="text-xl font-bold text-gray-900">권한 설정</h1>
+        <p className="mt-1 text-xs text-gray-600">
           역할별로 접근 가능한 페이지와 작업 권한을 설정합니다.
         </p>
       </div>
@@ -264,10 +307,10 @@ export default function PermissionsPage() {
       </div>
 
       {/* 역할 설명 */}
-      <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
+      <div className="mb-3 bg-blue-50 border border-blue-200 rounded-lg p-2">
+        <div className="flex items-start gap-2">
           <svg
-            className="w-5 h-5 text-blue-600 mt-0.5"
+            className="w-4 h-4 text-blue-600 mt-0.5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -280,10 +323,10 @@ export default function PermissionsPage() {
             />
           </svg>
           <div>
-            <p className="text-sm font-medium text-blue-900">
+            <p className="text-xs font-medium text-blue-900">
               {ROLE_INFO[selectedRole].label}
             </p>
-            <p className="text-sm text-blue-700 mt-1">
+            <p className="text-xs text-blue-700 mt-0.5">
               {ROLE_INFO[selectedRole].description}
             </p>
           </div>
@@ -329,10 +372,10 @@ export default function PermissionsPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase w-64">
+                    <th className="px-3 py-1.5 text-left text-[10px] font-medium text-gray-500 uppercase w-64">
                       페이지
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-3 py-1.5 text-center text-[10px] font-medium text-gray-500 uppercase">
                       <div>접근</div>
                       <div className="mt-1 flex gap-1 justify-center">
                         <button
@@ -350,7 +393,7 @@ export default function PermissionsPage() {
                         </button>
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-3 py-1.5 text-center text-[10px] font-medium text-gray-500 uppercase">
                       <div>생성</div>
                       <div className="mt-1 flex gap-1 justify-center">
                         <button
@@ -368,7 +411,7 @@ export default function PermissionsPage() {
                         </button>
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-3 py-1.5 text-center text-[10px] font-medium text-gray-500 uppercase">
                       <div>조회</div>
                       <div className="mt-1 flex gap-1 justify-center">
                         <button
@@ -386,7 +429,7 @@ export default function PermissionsPage() {
                         </button>
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-3 py-1.5 text-center text-[10px] font-medium text-gray-500 uppercase">
                       <div>수정</div>
                       <div className="mt-1 flex gap-1 justify-center">
                         <button
@@ -404,7 +447,7 @@ export default function PermissionsPage() {
                         </button>
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-3 py-1.5 text-center text-[10px] font-medium text-gray-500 uppercase">
                       <div>삭제</div>
                       <div className="mt-1 flex gap-1 justify-center">
                         <button
@@ -427,80 +470,120 @@ export default function PermissionsPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {permissions.map((permission, index) => {
                     const page = ADMIN_PAGES[index]
+                    const prevPage = index > 0 ? ADMIN_PAGES[index - 1] : null
+                    const showGroupHeader = !prevPage || prevPage.group !== page.group
+
                     return (
-                      <tr
-                        key={page.path}
-                        className={`hover:bg-gray-50 ${
-                          !permission.can_access ? 'opacity-50' : ''
-                        }`}
-                      >
-                        <td className="px-6 py-2">
-                          <div className="flex items-center gap-2">
-                            {page.icon && (
-                              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={page.icon} />
-                              </svg>
-                            )}
-                            <span className="text-sm font-medium text-gray-900">
-                              {page.name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-2 text-center">
+                      <React.Fragment key={page.path}>
+                        {/* 그룹 헤더 */}
+                        {showGroupHeader && page.group && (
+                          <tr key={`group-${page.group}`} className="bg-gray-100">
+                            <td className="px-3 py-1">
+                              <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-200" onClick={() => toggleGroup(`${page.category}-${page.group}`)}>
+                                <svg
+                                  className={`w-3 h-3 text-gray-600 transition-transform ${collapsedGroups.has(`${page.category}-${page.group}`) ? '' : 'rotate-90'}`}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                                <span className="text-[10px] font-semibold text-gray-700 uppercase tracking-wide">
+                                  {page.category} &gt; {page.group}
+                                </span>
+                              </div>
+                            </td>
+                            {(['can_access', 'can_create', 'can_read', 'can_update', 'can_delete'] as const).map((field) => {
+                              const groupKey = `${page.category}-${page.group}`
+                              const state = getGroupPermissionState(groupKey, field)
+                              return (
+                                <td key={field} className="px-3 py-1 text-center bg-gray-50" onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={state.checked}
+                                    ref={(el) => {
+                                      if (el) el.indeterminate = state.indeterminate
+                                    }}
+                                    onChange={(e) => handleToggleGroupPermission(groupKey, field, e.target.checked)}
+                                    className="w-4 h-4 accent-black rounded focus:ring-2"
+                                  />
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        )}
+
+                        {/* 페이지 행 */}
+                        {!collapsedGroups.has(`${page.category}-${page.group}`) && (
+                          <tr
+                            className={`hover:bg-gray-50 ${
+                              !permission.can_access ? 'opacity-50' : ''
+                            }`}
+                          >
+                            <td className="px-3 py-0.5">
+                              <div className="flex items-center gap-1.5 pl-6">
+                                <span className="text-[11px] font-medium text-gray-900">
+                                  {page.name}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-0.5 text-center">
                           <input
                             type="checkbox"
                             checked={permission.can_access}
                             onChange={() =>
                               handleTogglePermission(index, 'can_access')
                             }
-                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                            className="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500"
                           />
                         </td>
-                        <td className="px-6 py-2 text-center">
+                            <td className="px-3 py-0.5 text-center">
                           <input
                             type="checkbox"
                             checked={permission.can_create}
                             onChange={() =>
                               handleTogglePermission(index, 'can_create')
                             }
-                            className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                            className="w-3.5 h-3.5 text-green-600 rounded focus:ring-green-500"
                             disabled={!permission.can_access}
                           />
                         </td>
-                        <td className="px-6 py-2 text-center">
+                            <td className="px-3 py-0.5 text-center">
                           <input
                             type="checkbox"
                             checked={permission.can_read}
                             onChange={() =>
                               handleTogglePermission(index, 'can_read')
                             }
-                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                            className="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500"
                             disabled={!permission.can_access}
                           />
                         </td>
-                        <td className="px-6 py-2 text-center">
+                            <td className="px-3 py-0.5 text-center">
                           <input
                             type="checkbox"
                             checked={permission.can_update}
                             onChange={() =>
                               handleTogglePermission(index, 'can_update')
                             }
-                            className="w-4 h-4 text-yellow-600 rounded focus:ring-yellow-500"
+                            className="w-3.5 h-3.5 text-yellow-600 rounded focus:ring-yellow-500"
                             disabled={!permission.can_access}
                           />
                         </td>
-                        <td className="px-6 py-2 text-center">
+                            <td className="px-3 py-0.5 text-center">
                           <input
                             type="checkbox"
                             checked={permission.can_delete}
                             onChange={() =>
                               handleTogglePermission(index, 'can_delete')
                             }
-                            className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
+                            className="w-3.5 h-3.5 text-red-600 rounded focus:ring-red-500"
                             disabled={!permission.can_access}
                           />
                         </td>
-                      </tr>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     )
                   })}
                 </tbody>
@@ -508,22 +591,21 @@ export default function PermissionsPage() {
             </div>
 
             {/* 하단 버튼 */}
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
-              <div className="text-sm text-gray-600">
-                {permissions.filter(p => p.can_access).length}개 페이지 접근
-                가능
+            <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+              <div className="text-xs text-gray-600">
+                {permissions.filter(p => p.can_access).length}개 페이지 접근 가능
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={handleReset}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
                   disabled={saving}
                 >
                   초기화
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
                   disabled={saving}
                 >
                   {saving ? '저장 중...' : '저장'}
@@ -535,10 +617,10 @@ export default function PermissionsPage() {
       </div>
 
       {/* 안내 문구 */}
-      <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
+      <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+        <div className="flex items-start gap-2">
           <svg
-            className="w-5 h-5 text-yellow-600 mt-0.5"
+            className="w-4 h-4 text-yellow-600 mt-0.5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -550,17 +632,13 @@ export default function PermissionsPage() {
               d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
             />
           </svg>
-          <div className="text-sm text-yellow-800">
+          <div className="text-xs text-yellow-800">
             <p className="font-medium">권한 설정 시 주의사항</p>
-            <ul className="mt-2 space-y-1 list-disc list-inside">
+            <ul className="mt-1 space-y-0.5 list-disc list-inside">
               <li>접근 권한이 없으면 해당 페이지에 접근할 수 없습니다.</li>
-              <li>
-                생성/수정/삭제 권한은 접근 권한이 있어야만 설정할 수 있습니다.
-              </li>
+              <li>생성/수정/삭제 권한은 접근 권한이 있어야만 설정할 수 있습니다.</li>
               <li>최고관리자 권한은 변경할 수 없습니다.</li>
-              <li>
-                권한 변경 후 저장하면 즉시 모든 사용자에게 적용됩니다.
-              </li>
+              <li>권한 변경 후 저장하면 즉시 모든 사용자에게 적용됩니다.</li>
             </ul>
           </div>
         </div>

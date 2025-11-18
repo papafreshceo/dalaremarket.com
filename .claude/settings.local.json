@@ -89,7 +89,20 @@
       "Bash(node extract-menu.js:*)",
       "Bash(del /f extract-menu.js remove-inline-menu.js temp_menu.txt 2)",
       "Bash(if not exist \"src\\contexts\" mkdir \"src\\contexts\")",
-      "Bash(if exist \"src\\app\\admin\\promotional-images\" rmdir /s /q \"src\\app\\admin\\promotional-images\")"
+      "Bash(if exist \"src\\app\\admin\\promotional-images\" rmdir /s /q \"src\\app\\admin\\promotional-images\")",
+      "Bash(for page in analytics announcements audit-logs inventory org-cleanup products/item-master schema tier-simulation)",
+      "Bash(do echo '=== /admin/$page ===' head -20 src/app/admin/$page/page.tsx)",
+      "Bash(if exist \"src\\app\\admin\\products\\item-master\" rmdir /s /q \"src\\app\\admin\\products\\item-master\")",
+      "Bash(if exist \"src\\app\\admin\\tier-simulation\" rmdir /s /q \"src\\app\\admin\\tier-simulation\")",
+      "Bash(if exist \"src\\app\\admin\\planning-sample\" rmdir /s /q \"src\\app\\admin\\planning-sample\")",
+      "Bash(if exist \"src\\app\\admin\\settings\\theme-test\" rmdir /s /q \"src\\app\\admin\\settings\\theme-test\")",
+      "Bash(if exist \"src\\app\\admin\\org-cleanup\" rmdir /s /q \"src\\app\\admin\\org-cleanup\")",
+      "Bash(if exist \"src\\app\\admin\\schema\" rmdir /s /q \"src\\app\\admin\\schema\")",
+      "Bash(if exist \"src\\app\\admin\\settings\\commission\" rmdir /s /q \"src\\app\\admin\\settings\\commission\")",
+      "Bash(node scripts/sync-permissions.js:*)",
+      "Bash(del /f scriptssync-permissions.js 2)",
+      "Bash(node scripts/check-permissions.js:*)",
+      "Bash(node scripts/init-permissions.js:*)"
     ],
     "deny": [],
     "ask": []

@@ -259,17 +259,11 @@ export default function RankingScoreSettingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* 헤더 */}
-      <div className="mb-6">
-        <button
-          onClick={() => router.push('/admin/settings')}
-          className="text-blue-600 hover:underline mb-4"
-        >
-          ← 설정으로 돌아가기
-        </button>
-        <h1 className="text-3xl font-bold">랭킹 점수 산정 설정</h1>
-        <p className="text-gray-600 mt-2">
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>랭킹 점수 산정 설정</h1>
+        <p style={{ fontSize: '14px', color: '#6b7280' }}>
           셀러 랭킹 시스템의 점수 계산 기준을 설정합니다
         </p>
       </div>

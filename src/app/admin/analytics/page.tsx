@@ -8,11 +8,11 @@ export default function AnalyticsPage() {
   const [analyticsLoaded, setAnalyticsLoaded] = useState(false);
 
   return (
-    <div>
+    <div style={{ padding: '24px' }}>
       {/* 페이지 헤더 */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-text mb-2">Google 분석 도구</h1>
-        <p className="text-text-secondary">
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>Google 분석 도구</h1>
+        <p style={{ fontSize: '14px', color: '#6b7280' }}>
           Google Analytics와 Search Console을 통해 사이트 성능을 분석하세요
         </p>
       </div>

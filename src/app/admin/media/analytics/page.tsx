@@ -85,10 +85,10 @@ export default function MediaAnalyticsPage() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">이미지 다운로드 분석</h1>
-        <p className="text-gray-600 text-sm mt-1">다운로드 통계 및 로그 확인</p>
+    <div style={{ padding: '24px' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>이미지 다운로드 분석</h1>
+        <p style={{ fontSize: '14px', color: '#6b7280' }}>다운로드 통계 및 로그 확인</p>
       </div>
 
       {loading ? (

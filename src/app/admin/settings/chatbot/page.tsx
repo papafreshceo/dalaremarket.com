@@ -186,10 +186,10 @@ export default function ChatbotSettingsPage() {
   }
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-[20px] font-bold text-gray-900">챗봇 설정</h1>
-        <p className="text-[13px] text-gray-600 mt-1">사이트 챗봇의 모든 설정을 관리합니다</p>
+    <div style={{ padding: '24px' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>챗봇 설정</h1>
+        <p style={{ fontSize: '14px', color: '#6b7280' }}>사이트 챗봇의 모든 설정을 관리합니다</p>
       </div>
 
       <div className="grid grid-cols-3 gap-6">
