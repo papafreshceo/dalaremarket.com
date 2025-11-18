@@ -178,9 +178,9 @@ export default function AllProductsPage() {
       }} />
 
       {/* Flex 컨테이너: 사이드바 + 메인 */}
-      <div className="flex">
+      <div className="flex" style={{ border: '3px solid red' }}>
         {/* 왼쪽 사이드바 */}
-        <div className="w-64 bg-white border-r border-gray-200 sticky top-[35px] md:top-[70px] h-[calc(100vh-35px)] md:h-[calc(100vh-70px)] overflow-y-auto flex-shrink-0">
+        <div className="w-64 bg-white border-r border-gray-200 sticky top-[35px] md:top-[70px] h-[calc(100vh-35px)] md:h-[calc(100vh-70px)] overflow-y-auto flex-shrink-0" style={{ border: '3px solid blue' }}>
           <div className="p-4 space-y-6">
             {/* 카테고리2 필터 */}
             <div>
@@ -266,9 +266,9 @@ export default function AllProductsPage() {
         </div>
 
         {/* 오른쪽 메인 영역 */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0" style={{ border: '3px solid green' }}>
           {/* 헤더 */}
-          <div className="bg-white border-b border-gray-200 sticky top-[35px] md:top-[70px] z-50 shadow-sm">
+          <div className="bg-white border-b border-gray-200 sticky top-[35px] md:top-[70px] z-50 shadow-sm" style={{ border: '3px solid orange' }}>
             <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
               {/* 검색 */}
               <div className="relative flex-1 max-w-md">
@@ -311,7 +311,7 @@ export default function AllProductsPage() {
           </div>
 
           {/* 컨텐츠 */}
-          <div className="px-4 sm:px-6 lg:px-8 py-6">
+          <div className="px-4 sm:px-6 lg:px-8 py-6" style={{ border: '3px solid purple' }}>
         {loading ? (
           <div className="space-y-4">
             {/* 스켈레톤 카드 */}
@@ -636,9 +636,9 @@ export default function AllProductsPage() {
           </div>
         ) : (
           // 품목별 그룹화 리스트 뷰 (카드보기와 동일한 형식)
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-3 gap-6" style={{ border: '3px solid cyan' }}>
             {/* 칼럼1: 품목 카드 */}
-            <div className="col-span-1 space-y-0">
+            <div className="col-span-1 space-y-0" style={{ border: '3px solid magenta' }}>
             {(() => {
               const groupedData = Object.entries(
                 filteredProducts.reduce((groups, product) => {
@@ -857,7 +857,7 @@ export default function AllProductsPage() {
             </div>
 
             {/* 칼럼2: 선택된 품목의 옵션상품 표시 */}
-            <div className="col-span-2 sticky top-[105px] md:top-[140px] h-[calc(100vh-105px)] md:h-[calc(100vh-140px)] overflow-y-auto self-start">
+            <div className="col-span-2 sticky top-[105px] md:top-[140px] h-[calc(100vh-105px)] md:h-[calc(100vh-140px)] overflow-y-auto self-start" style={{ border: '3px solid yellow', backgroundColor: 'rgba(255, 255, 0, 0.05)' }}>
               {(() => {
                 // 선택된 품목 찾기
                 const expandedItem = Array.from(expandedGroups)[0];
