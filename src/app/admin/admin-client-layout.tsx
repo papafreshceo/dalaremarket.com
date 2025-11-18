@@ -521,7 +521,7 @@ export default function AdminClientLayout({
     },
     {
       id: 'communication',
-      name: '커뮤니케이션',
+      name: '공지/알림',
       category: 'platform',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
