@@ -638,7 +638,7 @@ export default function AllProductsPage() {
           // 품목별 그룹화 리스트 뷰 (카드보기와 동일한 형식)
           <div className="flex gap-6">
             {/* 칼럼1: 품목 카드 */}
-            <div className="flex-[2] space-y-0" style={{ border: '3px solid magenta' }}>
+            <div className="flex-[1.2] space-y-0" style={{ border: '3px solid magenta' }}>
             {(() => {
               const groupedData = Object.entries(
                 filteredProducts.reduce((groups, product) => {
