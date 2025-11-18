@@ -15,6 +15,8 @@ import { CalendarPopup } from '@/components/admin/CalendarPopup'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { getUserAccessiblePages } from '@/lib/permissions'
 import { menuCategories, menuGroups } from '@/config/admin-menu'
+import { AdminAuthProvider, UserData } from '@/contexts/AdminAuthContext'
+import { User } from '@supabase/supabase-js'
 
 // React Query 클라이언트 설정 (최적화)
 const queryClient = new QueryClient({
@@ -32,15 +34,17 @@ const queryClient = new QueryClient({
 
 export default function AdminClientLayout({
   children,
+  initialUser,
+  initialUserData
 }: {
   children: React.ReactNode
+  initialUser: User | null
+  initialUserData: UserData | null
 }) {
   const pathname = usePathname()
   const router = useRouter()
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
-  const [user, setUser] = useState<any>(null)
-  const [userData, setUserData] = useState<any>(null)
   const [showHtmlBuilder, setShowHtmlBuilder] = useState(false)
   const [showCalendarPopup, setShowCalendarPopup] = useState(false)
   const [themeLoaded, setThemeLoaded] = useState(false)
@@ -121,30 +125,16 @@ export default function AdminClientLayout({
     };
   }, []);
 
-  // 사용자 정보 및 접근 가능한 페이지 가져오기 (병렬 처리로 최적화)
+  // 접근 가능한 페이지 가져오기 (user, userData는 props로 전달받음)
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setUser(user)
-
-        // 병렬로 데이터 페칭 (순차 실행 방지)
-        const [userData, accessiblePages] = await Promise.all([
-          supabase
-            .from('users')
-            .select('name, email, role')
-            .eq('id', user.id)
-            .single()
-            .then(({ data }) => data),
-          getUserAccessiblePages(user.id)
-        ])
-
-        if (userData) setUserData(userData)
-        if (accessiblePages) setAccessiblePages(accessiblePages)
+    const fetchAccessiblePages = async () => {
+      if (initialUser) {
+        const pages = await getUserAccessiblePages(initialUser.id)
+        if (pages) setAccessiblePages(pages)
       }
     }
-    getUser()
-  }, [])
+    fetchAccessiblePages()
+  }, [initialUser])
 
   // 모든 메뉴 아이템을 플랫하게 만들기 (권한 체크용)
   const menuItems = useMemo(
@@ -219,8 +209,9 @@ export default function AdminClientLayout({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <ConfirmProvider>
+      <AdminAuthProvider initialUser={initialUser} initialUserData={initialUserData}>
+        <ToastProvider>
+          <ConfirmProvider>
           <div className="flex flex-col h-screen bg-background" style={{ background: 'var(--color-background)' }}>
       {/* 헤더 */}
       <header className="h-16 bg-surface border-b border-gray-200 z-50">
@@ -246,9 +237,9 @@ export default function AdminClientLayout({
                 </svg>
               </div>
               <p className="text-sm text-text">
-                <span className="font-medium">{userData?.name || '관리자'}</span>
+                <span className="font-medium">{initialUserData?.name || '관리자'}</span>
                 <span className="text-text-tertiary mx-1.5">·</span>
-                <span className="text-text-tertiary text-xs">{user?.email || 'loading...'}</span>
+                <span className="text-text-tertiary text-xs">{initialUser?.email || 'loading...'}</span>
               </p>
             </div>
           </div>
@@ -530,7 +521,8 @@ export default function AdminClientLayout({
           isOpen={showCalendarPopup}
           onClose={() => setShowCalendarPopup(false)}
         />
-      </ToastProvider>
+        </ToastProvider>
+      </AdminAuthProvider>
     </QueryClientProvider>
   )
 }

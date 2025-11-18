@@ -87,7 +87,8 @@
       "Bash(temp_menu.txt)",
       "Bash(\"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\config\\admin-menu-data.txt\")",
       "Bash(node extract-menu.js:*)",
-      "Bash(del /f extract-menu.js remove-inline-menu.js temp_menu.txt 2)"
+      "Bash(del /f extract-menu.js remove-inline-menu.js temp_menu.txt 2)",
+      "Bash(if not exist \"src\\contexts\" mkdir \"src\\contexts\")"
     ],
     "deny": [],
     "ask": []

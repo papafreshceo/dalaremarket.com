@@ -14,14 +14,16 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
 import DashboardTab from './components/DashboardTab';
 import { Order, StatusConfig } from './types';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 const ITEMS_PER_PAGE = 50; // 페이지당 주문 수
 
 export default function AdminDashboardPage() {
-  const router = useRouter();
+  // Context에서 인증 정보 가져오기 (중복 쿼리 제거)
+  const { user, userData } = useAdminAuth();
+
   const [isMobile, setIsMobile] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,30 +37,10 @@ export default function AdminDashboardPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // 초기 주문 조회
   useEffect(() => {
-    const checkAuth = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        router.push('/auth/login');
-        return;
-      }
-
-      const { data: userData } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (!userData?.approved || (userData.role !== 'admin' && userData.role !== 'employee' && userData.role !== 'super_admin')) {
-        router.push('/');
-      }
-    };
-
-    checkAuth();
     fetchOrders(1);
-  }, [router]);
+  }, []);
 
   // 페이지 변경 시 주문 조회
   useEffect(() => {

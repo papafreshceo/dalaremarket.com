@@ -16,10 +16,10 @@ export default async function AdminLayout({
     redirect('/auth/login');
   }
 
-  // 사용자 역할 확인
+  // 사용자 정보 및 역할 확인 (모든 필요한 필드를 한번에 조회)
   const { data: userData } = await supabase
     .from('users')
-    .select('role')
+    .select('id, name, email, role')
     .eq('id', user.id)
     .single();
 
@@ -29,5 +29,13 @@ export default async function AdminLayout({
     redirect('/');
   }
 
-  return <AdminClientLayout>{children}</AdminClientLayout>;
+  // Client Component에 인증 정보 전달 (중복 쿼리 방지)
+  return (
+    <AdminClientLayout
+      initialUser={user}
+      initialUserData={userData}
+    >
+      {children}
+    </AdminClientLayout>
+  );
 }
