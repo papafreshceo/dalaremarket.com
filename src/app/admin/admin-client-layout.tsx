@@ -446,13 +446,15 @@ export default function AdminClientLayout({
         </div>
 
         {/* 메인 */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="p-4 lg:p-6">
-            {children}
-          </div>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <main className="flex-1 overflow-y-auto">
+            <div className="p-4 lg:p-6">
+              {children}
+            </div>
+          </main>
 
           {/* 관리자 전용 푸터 */}
-          <footer className="mt-auto border-t border-border bg-surface">
+          <footer className="border-t border-border bg-surface">
             <div className="px-4 lg:px-6 py-4">
               <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 {/* 좌측: 저작권 정보 */}
@@ -485,7 +487,7 @@ export default function AdminClientLayout({
               </div>
             </div>
           </footer>
-        </main>
+        </div>
       </div>
     </div>
         </ConfirmProvider>
