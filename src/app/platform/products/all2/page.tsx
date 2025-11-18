@@ -126,14 +126,6 @@ export default function AllProductsPage() {
       setExpandedGroups(new Set());
     } else {
       setExpandedGroups(new Set([itemName]));
-
-      // 클릭한 카드로 스크롤
-      setTimeout(() => {
-        const element = document.getElementById(`product-card-${itemName}`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 100);
     }
   };
 
