@@ -19,14 +19,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null)
   const supabase = createClient()
 
-  // 초기 로드 시 테마 적용 (이미 FOUC 방지 스크립트에서 적용되었으므로 state만 동기화)
+  // 초기 로드 시 테마 적용 (무조건 라이트모드)
   useEffect(() => {
     if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/platform/orders'))) {
-      const savedTheme = localStorage.getItem('theme') as Theme
-      const initialTheme = savedTheme || 'light'
-
-      // state만 설정하고 DOM은 건드리지 않음 (이미 layout.tsx의 스크립트에서 처리됨)
-      setTheme(initialTheme)
+      // 무조건 라이트모드로 강제 설정
+      localStorage.setItem('theme', 'light')
+      setTheme('light')
+      document.documentElement.classList.remove('dark')
     }
   }, [])
 
@@ -89,38 +88,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme])
 
   useEffect(() => {
-    // 사용자 ID 및 테마 설정 로드
+    // 사용자 ID 로드 (테마는 무조건 light로 고정)
     const loadUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setUserId(user.id)
 
-        // DB에서 사용자 테마 설정 가져오기
-        const { data: userData } = await supabase
+        // DB의 테마도 light로 강제 설정
+        await supabase
           .from('users')
-          .select('theme_preference')
+          .update({ theme_preference: 'light' })
           .eq('id', user.id)
-          .single()
-
-        if (userData?.theme_preference) {
-          const dbTheme = userData.theme_preference as Theme
-          // DB의 테마를 localStorage에 동기화
-          localStorage.setItem('theme', dbTheme)
-          setTheme(dbTheme)
-
-          // HTML 클래스 적용 (admin과 platform/orders에서만)
-          const path = window.location.pathname
-          if (path.startsWith('/admin') || path.startsWith('/platform/orders')) {
-            if (dbTheme === 'dark') {
-              document.documentElement.classList.add('dark')
-            } else {
-              document.documentElement.classList.remove('dark')
-            }
-          } else {
-            // 다른 페이지에서는 무조건 라이트모드
-            document.documentElement.classList.remove('dark')
-          }
-        }
       }
     }
     loadUser()

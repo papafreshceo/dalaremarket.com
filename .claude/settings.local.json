@@ -78,7 +78,9 @@
       "Bash(node scripts/check-status-designs.js:*)",
       "Bash(del /f scriptscheck-status-designs.js 2)",
       "Bash(if exist \"src\\app\\platform\\products\\status-animation-demo\" rmdir /s /q \"src\\app\\platform\\products\\status-animation-demo\")",
-      "Bash(if exist \"src\\app\\platform\\admin\" rmdir /s /q \"src\\app\\platform\\admin\")"
+      "Bash(if exist \"src\\app\\platform\\admin\" rmdir /s /q \"src\\app\\platform\\admin\")",
+      "Bash(node scripts/check-theme-settings.js:*)",
+      "Bash(node scripts/reset-theme-to-light.js:*)"
     ],
     "deny": [],
     "ask": []

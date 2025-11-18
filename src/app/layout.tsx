@@ -54,10 +54,11 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  const theme = localStorage.getItem('theme');
+                  // 무조건 라이트모드로 강제 설정
                   const path = window.location.pathname;
-                  if ((path.startsWith('/admin') || path.startsWith('/platform/orders')) && theme === 'dark') {
-                    document.documentElement.classList.add('dark');
+                  if (path.startsWith('/admin') || path.startsWith('/platform/orders')) {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
                   }
                 } catch(e) {}
               })();
