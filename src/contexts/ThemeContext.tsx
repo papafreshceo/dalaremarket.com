@@ -2,6 +2,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 type Theme = 'light' | 'dark'
@@ -18,89 +19,43 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>('light')
   const [userId, setUserId] = useState<string | null>(null)
   const supabase = createClient()
+  const pathname = usePathname()
 
   // 적용된 CSS 변수 키를 저장하는 ref
   const appliedCssVarsRef = useRef<string[]>([])
 
   // 초기 로드 시 테마 적용 (무조건 라이트모드)
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/platform/orders'))) {
+    if (typeof window !== 'undefined' && (pathname?.startsWith('/admin') || pathname?.startsWith('/platform/orders'))) {
       // 무조건 라이트모드로 강제 설정
       localStorage.setItem('theme', 'light')
       setTheme('light')
       document.documentElement.classList.remove('dark')
     }
-  }, [])
+  }, [pathname])
 
-  // DB에서 활성 테마의 CSS 변수 불러와서 적용 (admin/settings 경로에서만)
+  // DB 테마 테이블이 삭제되어 더 이상 커스텀 테마를 로드하지 않음
   useEffect(() => {
-    const loadActiveTheme = async () => {
-      // 현재 경로 확인
-      const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
-      const isSettingsPage = pathname.startsWith('/admin/settings')
+    // 모든 경로에서 theme-enabled 클래스 제거
+    document.documentElement.classList.remove('theme-enabled')
 
-      if (!isSettingsPage) {
-        // settings 페이지가 아니면 theme-enabled 클래스 제거
-        document.documentElement.classList.remove('theme-enabled')
-
-        // 이전에 적용된 CSS 변수들을 모두 제거
-        appliedCssVarsRef.current.forEach(key => {
-          document.documentElement.style.removeProperty(key)
-        })
-        appliedCssVarsRef.current = []
-
-        return
-      }
-
-      // settings 페이지면 theme-enabled 클래스 추가
-      document.documentElement.classList.add('theme-enabled')
-
-      // 현재 경로에 따라 scope 결정
-      let scope = 'admin'
-      if (pathname.startsWith('/platform/orders')) {
-        scope = 'orders'
-      } else if (pathname.startsWith('/platform')) {
-        scope = 'platform'
-      } else if (pathname.startsWith('/admin')) {
-        scope = 'admin'
-      }
-
-      try {
-        const response = await fetch(`/api/design-theme/active?scope=${scope}`)
-        const result = await response.json()
-
-        if (result.success && result.data?.css_variables) {
-          const cssVars = result.data.css_variables
-
-          // 이전에 적용된 CSS 변수들 제거
-          appliedCssVarsRef.current.forEach(key => {
-            document.documentElement.style.removeProperty(key)
-          })
-
-          // 새로운 CSS 변수를 :root에 동적으로 적용
-          appliedCssVarsRef.current = Object.keys(cssVars)
-          Object.entries(cssVars).forEach(([key, value]) => {
-            document.documentElement.style.setProperty(key, value as string)
-          })
-        }
-      } catch (error) {
-        console.error('테마 로드 실패:', error)
-      }
-    }
-
-    loadActiveTheme()
-  }, [])
+    // 이전에 적용된 CSS 변수들을 모두 제거
+    appliedCssVarsRef.current.forEach(key => {
+      document.documentElement.style.removeProperty(key)
+    })
+    appliedCssVarsRef.current = []
+  }, [pathname])
 
   // 테마 변경 시 HTML 클래스 업데이트
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/platform/orders'))) {
+    if (pathname?.startsWith('/admin') || pathname?.startsWith('/platform/orders')) {
       if (theme === 'dark') {
         document.documentElement.classList.add('dark')
       } else {
         document.documentElement.classList.remove('dark')
       }
     }
-  }, [theme])
+  }, [theme, pathname])
 
   useEffect(() => {
     // 사용자 ID 로드 (테마는 무조건 light로 고정)
@@ -121,7 +76,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const toggleTheme = async () => {
     // 관리자 및 발주관리 화면에서만 테마 토글 작동
-    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/admin') && !window.location.pathname.startsWith('/platform/orders')) {
+    if (!pathname?.startsWith('/admin') && !pathname?.startsWith('/platform/orders')) {
       return
     }
 

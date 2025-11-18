@@ -1024,7 +1024,7 @@ export default function AdminClientLayout({
         <ConfirmProvider>
           <div className="flex flex-col h-screen bg-background" style={{ background: 'var(--color-background)' }}>
       {/* 헤더 */}
-      <header className="h-16 bg-surface border-b border-border shadow-sm z-50">
+      <header className="h-16 bg-surface border-b border-gray-200 z-50">
         <div className="h-full px-4 lg:px-6 flex items-center justify-between">
           <div className="flex items-center gap-4 flex-1">
             {/* 로고 */}
@@ -1036,12 +1036,11 @@ export default function AdminClientLayout({
                 <h2 className="text-lg font-bold text-text">달래마켓 관리자</h2>
               </Link>
             </div>
-          </div>
 
-          {/* 헤더 우측 */}
-          <div className="flex items-center gap-3">
+            <div className="w-px h-5 bg-border hidden lg:block" />
+
             {/* 사용자 정보 */}
-            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-surface rounded-lg border border-border">
+            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-surface rounded-lg">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white">
                 <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
@@ -1053,8 +1052,10 @@ export default function AdminClientLayout({
                 <span className="text-text-tertiary text-xs">{user?.email || 'loading...'}</span>
               </p>
             </div>
+          </div>
 
-            <div className="w-px h-5 bg-border hidden lg:block" />
+          {/* 헤더 우측 */}
+          <div className="flex items-center gap-3">
 
             <div className="hidden md:flex items-center bg-background-secondary rounded-lg px-3 py-2">
               <svg className="w-4 h-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1093,20 +1094,12 @@ export default function AdminClientLayout({
               </svg>
             </button>
 
-            {/* 설정 아이콘 */}
-            <button className="p-2 rounded-lg hover:bg-surface-hover transition-colors group">
-              <svg className="w-5 h-5 text-text-tertiary group-hover:text-text transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
-
             <div className="w-px h-5 bg-border" />
 
             {/* HTML 생성기 버튼 */}
             <button
               onClick={() => setShowHtmlBuilder(!showHtmlBuilder)}
-              className="px-2.5 py-1.5 text-xs bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center gap-1.5"
+              className="px-2.5 py-1.5 text-xs bg-gray-900 dark:bg-gray-800 text-white rounded-md hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
               title="HTML 생성기"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1118,23 +1111,23 @@ export default function AdminClientLayout({
             {/* 플랫폼 화면 버튼 */}
             <Link
               href="/platform"
-              className="px-2.5 py-1.5 text-xs bg-primary text-white rounded-md hover:bg-primary-hover transition-colors flex items-center gap-1.5"
+              className="px-2.5 py-1.5 text-xs bg-gray-900 dark:bg-gray-800 !text-white rounded-md hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
-              <span className="font-medium">플랫폼</span>
+              <span className="font-medium text-white">플랫폼</span>
             </Link>
-
-            <div className="w-px h-5 bg-border" />
-
-            {/* 테마 토글 */}
-            <ThemeToggle />
 
             <div className="w-px h-5 bg-border" />
 
             {/* 로그아웃 버튼 */}
             <LogoutButton />
+
+            <div className="w-px h-5 bg-border" />
+
+            {/* 테마 토글 */}
+            <ThemeToggle />
 
           </div>
         </div>
@@ -1157,7 +1150,7 @@ export default function AdminClientLayout({
           transition-transform duration-200 ease-in-out z-40
         `}>
           {/* 1단 사이드바: 대카테고리 */}
-          <aside className="w-16 h-full bg-surface shadow-[2px_0_8px_rgba(0,0,0,0.08)] flex flex-col">
+          <aside className="w-16 h-full bg-surface border-r border-gray-200 flex flex-col">
             {/* 대카테고리 */}
             <nav className="flex-1 py-4 overflow-y-auto">
               <div className="space-y-1">
@@ -1197,7 +1190,7 @@ export default function AdminClientLayout({
           </aside>
 
           {/* 2단 사이드바: 선택된 카테고리의 그룹들 */}
-          <aside className="w-16 h-full bg-surface shadow-[2px_0_10px_rgba(0,0,0,0.1)] flex flex-col">
+          <aside className="w-16 h-full bg-surface border-r border-gray-200 flex flex-col">
             {/* 메뉴 그룹 */}
             <nav className="flex-1 py-4 overflow-y-auto">
               <div className="space-y-1">
@@ -1230,7 +1223,7 @@ export default function AdminClientLayout({
           </aside>
 
           {/* 3단 사이드바: 선택된 그룹의 메뉴 */}
-          <aside className="w-48 h-full bg-gradient-to-b from-surface to-background shadow-[2px_0_12px_rgba(0,0,0,0.12)] flex flex-col">
+          <aside className="w-48 h-full bg-gradient-to-b from-surface to-background border-r border-gray-200 shadow-[2px_0_8px_rgba(0,0,0,0.06)] flex flex-col">
             {/* 메뉴 목록 */}
             <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar">
               <div className="px-3 space-y-1">
@@ -1286,21 +1279,6 @@ export default function AdminClientLayout({
                 })}
               </div>
             </nav>
-
-            {/* 하단 정보 */}
-            <div className="p-4 border-t border-border/30 bg-gradient-to-t from-background/50 to-transparent">
-              <div className="text-[10px] text-text-tertiary/70 text-center space-y-1 font-medium">
-                <p className="flex items-center justify-center gap-1">
-                  <span>©</span>
-                  <span>2025</span>
-                  <span className="font-semibold">달래마켓</span>
-                </p>
-                <div className="flex items-center justify-center gap-1.5 text-[9px]">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                  <span>v2.0</span>
-                </div>
-              </div>
-            </div>
           </aside>
         </div>
 
@@ -1309,6 +1287,41 @@ export default function AdminClientLayout({
           <div className="p-4 lg:p-6">
             {children}
           </div>
+
+          {/* 관리자 전용 푸터 */}
+          <footer className="mt-auto border-t border-border bg-surface">
+            <div className="px-4 lg:px-6 py-4">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                {/* 좌측: 저작권 정보 */}
+                <div className="text-sm text-text-tertiary">
+                  <p>© 2025 <span className="font-semibold text-text">달래마켓</span>. All rights reserved.</p>
+                </div>
+
+                {/* 중앙: 빠른 링크 */}
+                <div className="flex items-center gap-6 text-xs text-text-secondary">
+                  <Link href="/admin/settings" className="hover:text-primary transition-colors">
+                    설정
+                  </Link>
+                  <Link href="/admin/notifications" className="hover:text-primary transition-colors">
+                    알림
+                  </Link>
+                  <Link href="/admin/help" className="hover:text-primary transition-colors">
+                    도움말
+                  </Link>
+                </div>
+
+                {/* 우측: 버전 정보 */}
+                <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <span className="font-medium">시스템 정상</span>
+                  </div>
+                  <span className="text-border">|</span>
+                  <span>v2.0.0</span>
+                </div>
+              </div>
+            </div>
+          </footer>
         </main>
       </div>
     </div>

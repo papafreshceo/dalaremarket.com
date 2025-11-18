@@ -80,7 +80,10 @@
       "Bash(if exist \"src\\app\\platform\\products\\status-animation-demo\" rmdir /s /q \"src\\app\\platform\\products\\status-animation-demo\")",
       "Bash(if exist \"src\\app\\platform\\admin\" rmdir /s /q \"src\\app\\platform\\admin\")",
       "Bash(node scripts/check-theme-settings.js:*)",
-      "Bash(node scripts/reset-theme-to-light.js:*)"
+      "Bash(node scripts/reset-theme-to-light.js:*)",
+      "Bash(node scripts/check-active-theme.js:*)",
+      "Bash(node scripts/check-all-active-themes.js:*)",
+      "Bash(node scripts/delete-all-themes.js:*)"
     ],
     "deny": [],
     "ask": []
