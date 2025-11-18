@@ -905,17 +905,17 @@ export default function AllProductsPage() {
                           className="bg-white border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                           onClick={() => handleProductClick(product)}
                         >
-                          <div className="grid grid-cols-[56px_180px_80px_80px_80px_100px_80px_1fr] items-center gap-2 px-3 py-2">
+                          <div className="grid grid-cols-[40px_1fr_80px_80px_80px_100px_80px_auto] items-center gap-2 px-2 py-1.5">
                             {/* 썸네일 */}
                             {product.thumbnail_url ? (
                               <img
                                 src={product.thumbnail_url}
                                 alt={product.option_name}
-                                className="w-14 h-14 aspect-square rounded object-cover"
+                                className="w-10 h-10 aspect-square rounded object-cover"
                               />
                             ) : (
-                              <div className="w-14 h-14 aspect-square rounded bg-gray-100 flex items-center justify-center">
-                                <Package className="w-7 h-7 text-gray-400" />
+                              <div className="w-10 h-10 aspect-square rounded bg-gray-100 flex items-center justify-center">
+                                <Package className="w-5 h-5 text-gray-400" />
                               </div>
                             )}
 
