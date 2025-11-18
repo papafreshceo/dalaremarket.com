@@ -582,12 +582,63 @@ export default function AgriChatbot() {
     }
   }
 
-  // 초기 대화방 조회
+  // 초기 대화방 조회 및 읽지 않은 메시지 개수 업데이트
   useEffect(() => {
     if (currentUser && isOpen && activeTab === 'messages') {
       fetchThreads()
     }
   }, [currentUser, isOpen, activeTab])
+
+  // 챗봇이 닫혀있을 때도 읽지 않은 메시지 개수 실시간 업데이트
+  useEffect(() => {
+    if (!currentUser) return
+
+    // 초기 읽지 않은 메시지 개수 조회
+    const fetchUnreadCount = async () => {
+      try {
+        const response = await fetch('/api/messages')
+        const data = await response.json()
+        if (data.success) {
+          const totalUnread = data.threads.reduce((sum: number, thread: Thread) => {
+            return sum + (thread.unread_count || 0)
+          }, 0)
+          setUnreadCount(totalUnread)
+        }
+      } catch (error) {
+        console.error('읽지 않은 메시지 개수 조회 실패:', error)
+      }
+    }
+
+    fetchUnreadCount()
+
+    // Realtime 구독: 새 메시지가 도착하면 읽지 않은 개수 업데이트
+    const channel = supabase
+      .channel('unread-messages-badge')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=neq.${currentUser.id}` // 내가 보낸 메시지는 제외
+        },
+        async (payload) => {
+          console.log('📨 [AgriChatbot] 새 메시지 도착:', payload)
+          // 읽지 않은 메시지 개수 다시 조회
+          await fetchUnreadCount()
+        }
+      )
+      .subscribe()
+
+    channelRef.current = channel
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+    }
+  }, [currentUser])
 
   // AI 챗봇 - 키워드 매칭
   const handleKeywordMatch = (message: string): string | null => {
