@@ -43,6 +43,7 @@ export default function AllProductsPage() {
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [selectedImageCategory, setSelectedImageCategory] = useState<{category4: string; category4Id?: number} | null>(null);
   const [categoryImageMap, setCategoryImageMap] = useState<Map<string, string>>(new Map());
+  const [cardOffsetTop, setCardOffsetTop] = useState(0);
 
   const supabase = createClient();
 
@@ -124,8 +125,65 @@ export default function AllProductsPage() {
     // 같은 카드를 다시 클릭하면 닫기, 다른 카드 클릭하면 그 카드만 열기
     if (expandedGroups.has(itemName)) {
       setExpandedGroups(new Set());
+      setCardOffsetTop(0);
     } else {
+      // 현재 스크롤 위치 저장
+      const currentScrollY = window.scrollY;
+
       setExpandedGroups(new Set([itemName]));
+
+      // 클릭한 카드의 위치 계산
+      setTimeout(() => {
+        const cardElement = document.getElementById(`product-card-${itemName}`);
+        if (cardElement) {
+          const cardHeight = cardElement.offsetHeight;
+          const cardTop = cardElement.offsetTop;
+          const containerElement = cardElement.parentElement;
+
+          let offset = 0;
+
+          if (containerElement) {
+            // 옵션상품 개수 파악
+            const groupedData = Object.entries(
+              filteredProducts.reduce((groups, product) => {
+                const itemName = product.category_4 || '기타';
+                if (!groups[itemName]) groups[itemName] = [];
+                groups[itemName].push(product);
+                return groups;
+              }, {} as Record<string, OptionProduct[]>)
+            );
+
+            const selectedGroup = groupedData.find(([name]) => name === itemName);
+            const optionCount = selectedGroup ? selectedGroup[1].length : 0;
+
+            // 옵션상품 전체 높이 계산
+            const estimatedOptionHeight = 60 + (optionCount * 35) + 32;
+
+            // 조건3: 선택한 품목카드 위치에서 카드 2개 높이만큼 위로
+            let desiredOffset = cardTop - (cardHeight * 2);
+
+            // 조건2: 갈색 컨테이너가 아래로 확장되지 않도록 최대 하단 위치 설정
+            const viewportHeight = window.innerHeight;
+            const headerHeight = window.innerWidth >= 768 ? 140 : 105;
+            const maxBottomPosition = viewportHeight - headerHeight;
+
+            // 조건1: 모든 옵션상품이 스크롤 없이 보이려면
+            // (offset + 옵션상품높이) <= 최대하단위치
+            // offset <= 최대하단위치 - 옵션상품높이
+            const maxAllowedOffset = maxBottomPosition - estimatedOptionHeight;
+
+            // 최종 offset: 품목카드 위치를 원하지만, 컨테이너가 아래로 확장되지 않도록 제한
+            offset = Math.min(desiredOffset, maxAllowedOffset);
+          }
+
+          setCardOffsetTop(Math.max(0, offset));
+
+          // 스크롤 위치 복원 (레이아웃 시프트 방지)
+          requestAnimationFrame(() => {
+            window.scrollTo(0, currentScrollY);
+          });
+        }
+      }, 10);
     }
   };
 
@@ -707,11 +765,10 @@ export default function AllProductsPage() {
                       <div
                         key={itemName}
                         id={`product-card-${itemName}`}
-                        className="rounded-lg transition-all duration-300 ease-out scroll-mt-[110px] md:scroll-mt-[145px]"
+                        className="transition-all duration-300 ease-out scroll-mt-[110px] md:scroll-mt-[145px]"
                         style={{
                           background: isShipping ? '#ffffff' : '#f3f4f6',
-                          border: `1px solid ${isShipping ? '#ffc0cb' : '#d1d5db'}`,
-                          borderRadius: '0.5rem'
+                          border: `1px solid ${isShipping ? '#ffc0cb' : '#d1d5db'}`
                         }}
                       >
                         {/* 그룹 헤더 */}
@@ -721,7 +778,7 @@ export default function AllProductsPage() {
                           }`}
                           onClick={() => toggleGroup(itemName)}
                         >
-                          <div className="grid items-center gap-1.5 min-w-0" style={{ gridTemplateColumns: 'minmax(40px, 48px) minmax(60px, 80px) minmax(80px, 120px) minmax(60px, 90px) minmax(150px, 220px) 1fr' }}>
+                          <div className="grid items-center gap-1.5 min-w-0" style={{ gridTemplateColumns: 'minmax(40px, 48px) minmax(60px, 80px) minmax(80px, 120px) minmax(60px, 90px) minmax(100px, 220px) 1fr' }}>
                             {/* 썸네일 */}
                             {(() => {
                               const categoryThumbnail = categoryImageMap.get(itemName);
@@ -753,7 +810,7 @@ export default function AllProductsPage() {
                             </p>
 
                             {/* 시즌밴드 */}
-                            <div>
+                            <div className="min-w-0 overflow-hidden w-full">
                               <SeasonBand
                                 seasonStart={(groupProducts[0] as any).season_start_date}
                                 seasonEnd={(groupProducts[0] as any).season_end_date}
@@ -857,7 +914,33 @@ export default function AllProductsPage() {
             </div>
 
             {/* 칼럼2: 선택된 품목의 옵션상품 표시 */}
-            <div className="flex-[7] sticky top-[105px] md:top-[140px] h-[calc(100vh-105px)] md:h-[calc(100vh-140px)] overflow-y-auto self-start" style={{ border: '3px solid yellow', backgroundColor: 'rgba(255, 255, 0, 0.05)' }}>
+            <div
+              className="flex-[7] self-start"
+              style={{
+                border: '3px solid yellow',
+                backgroundColor: 'rgba(255, 255, 0, 0.05)',
+                paddingTop: `${cardOffsetTop}px`
+              }}
+            >
+              <div
+                key={Array.from(expandedGroups)[0] || 'empty'}
+                className="overflow-visible"
+                style={{
+                  animation: 'slideInFromLeft 0.4s ease-out'
+                }}
+              >
+                <style jsx>{`
+                  @keyframes slideInFromLeft {
+                    from {
+                      opacity: 0;
+                      transform: translateX(-30px);
+                    }
+                    to {
+                      opacity: 1;
+                      transform: translateX(0);
+                    }
+                  }
+                `}</style>
               {(() => {
                 // 선택된 품목 찾기
                 const expandedItem = Array.from(expandedGroups)[0];
@@ -892,9 +975,9 @@ export default function AllProductsPage() {
                 return (
                   <div className="p-4">
                     {/* 헤더 */}
-                    <div className="mb-3 pb-2 border-b border-gray-200">
+                    <div className="mb-3 pb-2 border-b border-gray-200 flex items-center gap-2">
                       <h3 className="text-base font-semibold text-gray-900 truncate">{itemName}</h3>
-                      <p className="text-xs text-gray-500">{groupProducts.length}개 옵션상품</p>
+                      <span className="text-xs text-gray-500 whitespace-nowrap">{groupProducts.length}개 옵션상품</span>
                     </div>
 
                     {/* 옵션상품 그리드 테이블 */}
@@ -983,6 +1066,7 @@ export default function AllProductsPage() {
                   </div>
                 );
               })()}
+              </div>
             </div>
 
             {/* 칼럼3: 새로운 칼럼 */}

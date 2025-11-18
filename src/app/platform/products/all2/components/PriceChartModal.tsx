@@ -28,11 +28,23 @@ export default function PriceChartModal({ product, onClose }: PriceChartModalPro
   const [priceHistory, setPriceHistory] = useState<PriceHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<'1M' | '3M' | '6M' | '1Y' | 'ALL'>('3M');
+  const [isReady, setIsReady] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     fetchPriceHistory();
   }, [product.id, selectedPeriod]);
+
+  // 초기 로딩이 완료되면 모달 표시
+  useEffect(() => {
+    if (!loading && !isReady) {
+      // 약간의 딜레이를 주어 차트가 렌더링된 후 모달 애니메이션 시작
+      const timer = setTimeout(() => {
+        setIsReady(true);
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, isReady]);
 
   const fetchPriceHistory = async () => {
     try {
@@ -154,8 +166,22 @@ export default function PriceChartModal({ product, onClose }: PriceChartModalPro
 
   const stats = calculateStats();
 
+  // 로딩 중일 때는 투명한 오버레이만 표시
+  if (!isReady) {
+    return (
+      <div className="fixed inset-0 bg-black/10 z-[9998] flex items-center justify-center">
+        <div className="bg-white rounded-lg p-8 shadow-xl">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-gray-600">차트 로딩 중...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Modal isOpen={true} onClose={onClose} title="셀러 공급가 변동 그래프" size="xl">
+    <Modal isOpen={isReady} onClose={onClose} title="셀러 공급가 변동 그래프" size="xl">
       <div className="space-y-6">
         {/* 상품 정보 헤더 */}
         <div className="bg-gray-50 p-4 rounded-lg">

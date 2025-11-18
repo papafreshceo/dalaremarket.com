@@ -5,7 +5,7 @@ import {
   Palette, Bell, Shield, Database, Mail, Globe, Key,
   FileText, Building2, TrendingUp, Package, Truck, CreditCard,
   Image, Layout, MessageSquare, UserPlus, Settings, Wrench,
-  ClipboardList, FileSpreadsheet, ShoppingCart, Tags, UserCog, Award, TrendingUp as ChartUp, Calendar, Boxes
+  ClipboardList, FileSpreadsheet, ShoppingCart, Tags, UserCog, Award, TrendingUp as ChartUp, Calendar, Boxes, Sparkles
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -85,14 +85,21 @@ export default function SettingsPage() {
           description: '메인 페이지 프로모션 이미지를 관리합니다',
           icon: Image,
           href: '/admin/settings/promotional-images',
-          
+
+        },
+        {
+          title: '상태 디자인',
+          description: '상품 상태별 애니메이션 디자인을 설정합니다',
+          icon: Sparkles,
+          href: '/admin/settings/status-design',
+
         },
         {
           title: '카테고리 노출',
           description: '플랫폼 카테고리 노출 순서를 설정합니다',
           icon: Layout,
           href: '/admin/settings/category-display',
-          
+
         },
         {
           title: '결제 설정',

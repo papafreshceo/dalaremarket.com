@@ -55,7 +55,7 @@ export function Modal({
       // 애니메이션이 끝난 후 DOM에서 제거
       const timer = setTimeout(() => {
         setShouldRender(false)
-      }, 300)
+      }, 500)
       return () => clearTimeout(timer)
     }
     return () => {
@@ -77,13 +77,46 @@ export function Modal({
 
   return (
     <>
+      <style>{`
+        @keyframes modalOverlayFadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes modalSlideUp {
+          from {
+            opacity: 0;
+            transform: translateY(48px) scale(0.9);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        @keyframes modalSlideDown {
+          from {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+          to {
+            opacity: 0;
+            transform: translateY(48px) scale(0.9);
+          }
+        }
+      `}</style>
+
       {/* 오버레이 - 10% 투명도 */}
       <div
-        className={cn(
-          'fixed inset-0 bg-black/10 z-[9998]',
-          'transition-opacity duration-300 ease-out',
-          isVisible ? 'opacity-100' : 'opacity-0'
-        )}
+        className="fixed inset-0 bg-black/10 z-[9998]"
+        style={{
+          animation: isVisible ? 'modalOverlayFadeIn 0.4s ease-out forwards' : 'none',
+          opacity: isVisible ? 1 : 0
+        }}
         onClick={closeOnOverlay ? onClose : undefined}
       />
 
@@ -92,10 +125,13 @@ export function Modal({
         <div
           className={cn(
             'relative bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-h-[90vh] overflow-hidden',
-            'transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]',
-            isVisible ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-8 opacity-0 scale-95',
             sizeStyles[size]
           )}
+          style={{
+            animation: isVisible
+              ? 'modalSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+              : 'modalSlideDown 0.3s ease-in forwards'
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* 헤더 */}
