@@ -857,7 +857,7 @@ export default function AllProductsPage() {
             </div>
 
             {/* 칼럼2: 선택된 품목의 옵션상품 표시 */}
-            <div className="flex-[0.8] sticky top-[105px] md:top-[140px] h-[calc(100vh-105px)] md:h-[calc(100vh-140px)] overflow-y-auto self-start" style={{ border: '3px solid yellow', backgroundColor: 'rgba(255, 255, 0, 0.05)' }}>
+            <div className="flex-[1.3] sticky top-[105px] md:top-[140px] h-[calc(100vh-105px)] md:h-[calc(100vh-140px)] overflow-y-auto self-start" style={{ border: '3px solid yellow', backgroundColor: 'rgba(255, 255, 0, 0.05)' }}>
               {(() => {
                 // 선택된 품목 찾기
                 const expandedItem = Array.from(expandedGroups)[0];
@@ -985,7 +985,7 @@ export default function AllProductsPage() {
             </div>
 
             {/* 칼럼3: 새로운 칼럼 */}
-            <div className="flex-1 sticky top-[105px] md:top-[140px] h-[calc(100vh-105px)] md:h-[calc(100vh-140px)] overflow-y-auto self-start" style={{ border: '3px solid lime', backgroundColor: 'rgba(0, 255, 0, 0.05)' }}>
+            <div className="flex-[0.5] sticky top-[105px] md:top-[140px] h-[calc(100vh-105px)] md:h-[calc(100vh-140px)] overflow-y-auto self-start" style={{ border: '3px solid lime', backgroundColor: 'rgba(0, 255, 0, 0.05)' }}>
               <div className="p-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">칼럼 3</h3>
                 <p className="text-sm text-gray-500">여기에 원하는 컨텐츠를 추가하세요</p>
