@@ -209,8 +209,13 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
         }
       } else if (event === 'SIGNED_OUT') {
         // 로그아웃 시 OneSignal 로그아웃
-        if (window.OneSignal) {
-          await window.OneSignal.logout();
+        try {
+          if (window.OneSignal && typeof window.OneSignal.logout === 'function') {
+            await window.OneSignal.logout();
+          }
+        } catch (error) {
+          console.error('OneSignal logout error:', error);
+          // 로그아웃 실패는 무시 (사용자 경험에 영향 없음)
         }
       }
     });
