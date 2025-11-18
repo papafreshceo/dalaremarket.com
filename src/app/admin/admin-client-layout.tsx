@@ -1041,7 +1041,7 @@ export default function AdminClientLayout({
             <nav className="hidden lg:flex items-center text-sm text-text-tertiary ml-4">
               {pathname && pathname !== '/admin' && pathname !== '/admin/dashboard' && (
                 <span className="text-text font-medium">
-                  {menuItems.find(item => pathname.startsWith(item.href))?.name || ''}
+                  {menuItems.find(item => item.name !== '---divider---' && pathname.startsWith(item.href))?.name || ''}
                 </span>
               )}
             </nav>
