@@ -721,7 +721,7 @@ export default function AllProductsPage() {
                           }`}
                           onClick={() => toggleGroup(itemName)}
                         >
-                          <div className="grid grid-cols-[48px_80px_120px_90px_150px_1fr] items-center gap-2">
+                          <div className="grid grid-cols-[48px_80px_120px_90px_220px_1fr] items-center gap-2">
                             {/* 썸네일 */}
                             {(() => {
                               const categoryThumbnail = categoryImageMap.get(itemName);
