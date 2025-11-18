@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AuthModal } from '@/components/auth/AuthModal'
 
-export default function LoginPage() {
+function LoginContent() {
   const [isModalOpen, setIsModalOpen] = useState(true)
   const [initialMode, setInitialMode] = useState<'login' | 'findId' | 'resetPassword'>('login')
   const router = useRouter()
@@ -27,6 +27,16 @@ export default function LoginPage() {
   }
 
   return (
+    <AuthModal
+      isOpen={isModalOpen}
+      onClose={handleClose}
+      initialMode={initialMode}
+    />
+  )
+}
+
+export default function LoginPage() {
+  return (
     <div style={{
       minHeight: '100vh',
       display: 'flex',
@@ -34,11 +44,9 @@ export default function LoginPage() {
       justifyContent: 'center',
       background: 'linear-gradient(180deg, #3b82f6 0%, #60a5fa 300px, #93c5fd 600px, #ffffff 100%)'
     }}>
-      <AuthModal
-        isOpen={isModalOpen}
-        onClose={handleClose}
-        initialMode={initialMode}
-      />
+      <Suspense fallback={<div>Loading...</div>}>
+        <LoginContent />
+      </Suspense>
     </div>
   )
 }

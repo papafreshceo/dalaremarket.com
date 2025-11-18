@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import TierBadge from '@/components/TierBadge';
@@ -72,7 +72,7 @@ interface ChatbotSettings {
   business_hours: string;
 }
 
-export default function MessagesPage() {
+function MessagesPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const supabase = createClient();
@@ -998,4 +998,12 @@ export default function MessagesPage() {
       </div>
     </div>
   );
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>로딩 중...</div>}>
+      <MessagesPageContent />
+    </Suspense>
+  )
 }
