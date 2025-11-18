@@ -127,10 +127,15 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
             });
           } catch (error: any) {
             // OneSignal 초기화 중 에러 발생 시
-            logger.error('OneSignal 초기화 에러:', error);
+            const isAlreadyInitialized = error.message?.includes('already initialized');
 
-            // 이미 초기화된 에러가 아니면 플래그 리셋 (재시도 가능하게)
-            if (!error.message?.includes('already initialized')) {
+            if (isAlreadyInitialized) {
+              // 이미 초기화된 경우 디버그 레벨로만 로그
+              logger.debug('OneSignal이 이미 초기화되어 있습니다.');
+            } else {
+              // 다른 에러는 error 레벨로 로그
+              logger.error('OneSignal 초기화 에러:', error);
+              // 플래그 리셋 (재시도 가능하게)
               isOneSignalInitialized = false;
             }
 
