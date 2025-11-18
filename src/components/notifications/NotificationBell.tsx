@@ -143,8 +143,8 @@ export default function NotificationBell() {
 
       {/* 읽지 않은 알림 뱃지 */}
       {unreadCount > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-red-500 rounded-full">
-          {unreadCount > 9 ? '9+' : unreadCount}
+        <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[9px] font-bold text-white bg-red-500 rounded-full">
+          {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       )}
     </button>
