@@ -721,18 +721,18 @@ export default function AllProductsPage() {
                           }`}
                           onClick={() => toggleGroup(itemName)}
                         >
-                          <div className="grid grid-cols-[48px_80px_120px_90px_220px_1fr] items-center gap-2 min-w-0">
+                          <div className="grid items-center gap-1.5 min-w-0" style={{ gridTemplateColumns: 'minmax(40px, 48px) minmax(60px, 80px) minmax(80px, 120px) minmax(60px, 90px) minmax(150px, 220px) 1fr' }}>
                             {/* 썸네일 */}
                             {(() => {
                               const categoryThumbnail = categoryImageMap.get(itemName);
                               if (categoryThumbnail) {
                                 return (
-                                  <img src={categoryThumbnail} alt={itemName} className="w-12 h-12 aspect-square rounded-lg object-cover flex-shrink-0" />
+                                  <img src={categoryThumbnail} alt={itemName} className="w-full aspect-square rounded-lg object-cover" style={{ maxWidth: '48px' }} />
                                 );
                               }
                               return (
-                                <div className="w-12 h-12 aspect-square rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                  <Package className="w-6 h-6 text-gray-400" />
+                                <div className="w-full aspect-square rounded-lg bg-gray-100 flex items-center justify-center" style={{ maxWidth: '48px' }}>
+                                  <Package className="w-5 h-5 text-gray-400" />
                                 </div>
                               );
                             })()}
@@ -905,17 +905,18 @@ export default function AllProductsPage() {
                           className="bg-white border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer overflow-hidden"
                           onClick={() => handleProductClick(product)}
                         >
-                          <div className="grid items-center gap-1.5 px-2 py-1" style={{ gridTemplateColumns: '40px minmax(120px, 1fr) 60px 60px 60px 80px 60px 90px' }}>
+                          <div className="grid items-center gap-1.5 px-2 py-1" style={{ gridTemplateColumns: 'minmax(35px, 40px) minmax(100px, 1fr) minmax(45px, 60px) minmax(45px, 60px) minmax(45px, 60px) minmax(60px, 80px) minmax(45px, 60px) minmax(70px, 90px)' }}>
                             {/* 썸네일 */}
                             {product.thumbnail_url ? (
                               <img
                                 src={product.thumbnail_url}
                                 alt={product.option_name}
-                                className="w-10 h-10 aspect-square rounded object-cover flex-shrink-0"
+                                className="w-full aspect-square rounded object-cover"
+                                style={{ maxWidth: '40px' }}
                               />
                             ) : (
-                              <div className="w-10 h-10 aspect-square rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                <Package className="w-5 h-5 text-gray-400" />
+                              <div className="w-full aspect-square rounded bg-gray-100 flex items-center justify-center" style={{ maxWidth: '40px' }}>
+                                <Package className="w-4 h-4 text-gray-400" />
                               </div>
                             )}
 
