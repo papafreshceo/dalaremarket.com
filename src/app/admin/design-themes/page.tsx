@@ -334,7 +334,7 @@ export default function DesignThemesPage() {
   }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1000px' }}>
+    <div style={{ padding: '24px', maxWidth: '1440px', margin: '0 auto' }}>
       <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '20px' }}>
         디자인 테마 관리
       </h1>

@@ -453,6 +453,7 @@ export default function CompanyPage() {
   }
 
   return (
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
     <div className="space-y-6">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
@@ -550,6 +551,7 @@ export default function CompanyPage() {
           ))
         )}
       </div>
+    </div>
     </div>
   )
 }

@@ -153,6 +153,7 @@ export default function PartnerTypesPage() {
   ]
 
   return (
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div className="text-[16px] font-bold">거래처 유형 관리</div>
@@ -173,6 +174,7 @@ export default function PartnerTypesPage() {
         height="600px"
         globalSearchPlaceholder="유형명, 설명 검색"
       />
+    </div>
     </div>
   )
 }

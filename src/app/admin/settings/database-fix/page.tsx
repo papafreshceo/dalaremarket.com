@@ -156,7 +156,8 @@ export default function DatabaseFixPage() {
   }
 
   return (
-    <div className="max-w-4xl">
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
+    <div>
       <div className="mb-6">
         <h1 className="text-[20px] font-bold text-text">데이터베이스 문제 해결</h1>
         <p className="mt-1 text-[14px] text-text-secondary">사용자 승인 문제 진단 및 해결</p>
@@ -222,6 +223,7 @@ export default function DatabaseFixPage() {
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;</pre>
         </div>
       </div>
+    </div>
     </div>
   )
 }

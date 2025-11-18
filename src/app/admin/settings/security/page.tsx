@@ -88,6 +88,7 @@ export default function SecurityPage() {
   );
 
   return (
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
     <div>
       {/* 헤더 */}
       <div className="mb-8">
@@ -380,6 +381,7 @@ export default function SecurityPage() {
           설정 저장
         </button>
       </div>
+    </div>
     </div>
   );
 }

@@ -394,6 +394,7 @@ export default function SupplyStatusSettingsPage() {
   }
 
   return (
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
     <div className="space-y-6">
       {/* 페이지 헤더 */}
       <div>
@@ -666,6 +667,7 @@ export default function SupplyStatusSettingsPage() {
           animation: slide 1.5s ease-in-out infinite;
         }
       `}</style>
+    </div>
     </div>
   )
 }

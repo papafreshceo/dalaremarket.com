@@ -206,6 +206,7 @@ export default function UsersPage() {
   }
 
   return (
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">사용자 관리</h1>
@@ -363,6 +364,7 @@ export default function UsersPage() {
           </table>
         )}
       </div>
+    </div>
     </div>
   )
 }

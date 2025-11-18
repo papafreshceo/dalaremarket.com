@@ -123,6 +123,7 @@ export default function ApiSettingsPage() {
   }
 
   return (
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
     <div className="space-y-6">
       {/* 헤더 */}
       <div>
@@ -501,6 +502,7 @@ export default function ApiSettingsPage() {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }

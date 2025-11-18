@@ -154,7 +154,8 @@ export default function AuditLogsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
+    <div className="space-y-6">
       {/* 헤더 */}
       <div className="flex justify-between items-center">
         <div>
@@ -437,6 +438,7 @@ export default function AuditLogsPage() {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

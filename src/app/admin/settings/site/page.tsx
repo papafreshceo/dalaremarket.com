@@ -114,6 +114,7 @@ export default function SiteSettingsPage() {
   }
 
   return (
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
     <div className="space-y-6">
       {/* 헤더 */}
       <div>
@@ -372,6 +373,7 @@ export default function SiteSettingsPage() {
           {loading ? '저장 중...' : '저장'}
         </Button>
       </div>
+    </div>
     </div>
   )
 }
