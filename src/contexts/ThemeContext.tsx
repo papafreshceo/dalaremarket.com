@@ -30,21 +30,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // DB에서 활성 테마의 CSS 변수 불러와서 적용 (admin 경로 전체)
+  // DB에서 활성 테마의 CSS 변수 불러와서 적용 (admin/settings 경로에서만)
   useEffect(() => {
     const loadActiveTheme = async () => {
       // 현재 경로 확인
       const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
-      const isAdminPage = pathname.startsWith('/admin')
+      const isSettingsPage = pathname.startsWith('/admin/settings')
 
-      if (!isAdminPage) {
-        // admin 페이지가 아니면 theme-enabled 클래스 제거하고 종료
+      if (!isSettingsPage) {
+        // settings 페이지가 아니면 theme-enabled 클래스 제거하고 종료
         document.documentElement.classList.remove('theme-enabled')
         // CSS 변수를 원래대로 되돌리지 않고 그대로 둠 (기본 CSS 파일의 값 유지)
         return
       }
 
-      // admin 페이지면 theme-enabled 클래스 추가
+      // settings 페이지면 theme-enabled 클래스 추가
       document.documentElement.classList.add('theme-enabled')
 
       // 현재 경로에 따라 scope 결정
