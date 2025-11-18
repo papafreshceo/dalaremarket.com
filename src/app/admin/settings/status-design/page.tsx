@@ -275,8 +275,6 @@ export default function AdminStatusDesignPage() {
       </div>
 
       <div className="max-w-6xl mx-auto">
-        <div>
-
         {statusOptions.map((status) => {
           const currentDesign = statusDesigns.find(d => d.status_name === status.name);
           const selectedType = currentDesign?.animation_type || 1;

@@ -639,6 +639,5 @@ export default function PopupsPage() {
         </div>
       )}
     </div>
-    </div>
   )
 }

@@ -337,6 +337,5 @@ export default function BannersPage() {
         </div>
       )}
     </div>
-    </div>
   )
 }
