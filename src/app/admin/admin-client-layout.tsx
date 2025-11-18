@@ -1233,18 +1233,25 @@ export default function AdminClientLayout({
           </aside>
 
           {/* 3단 사이드바: 선택된 그룹의 메뉴 */}
-          <aside className="w-48 h-full bg-surface border-r border-border shadow-sm flex flex-col text-[14px]">
+          <aside className="w-56 h-full bg-gradient-to-b from-surface to-background border-r border-border/50 shadow-lg flex flex-col">
             {/* 그룹 헤더 */}
-            <div className="px-4 py-3 border-b border-border">
-              <h3 className="text-sm font-bold text-text flex items-center gap-2">
-                {selectedGroupData?.icon}
-                <span>{selectedGroupData?.name}</span>
-              </h3>
+            <div className="px-5 py-4 border-b border-border/50 bg-gradient-to-br from-primary/5 via-transparent to-transparent">
+              <div className="flex items-center gap-2.5 mb-1">
+                <div className="p-1.5 rounded-lg bg-primary/10 text-primary shadow-sm">
+                  {selectedGroupData?.icon}
+                </div>
+                <h3 className="text-[15px] font-semibold text-text tracking-tight">
+                  {selectedGroupData?.name}
+                </h3>
+              </div>
+              <p className="text-[11px] text-text-tertiary ml-9">
+                {currentItems.filter(item => item.name !== '---divider---').length}개 메뉴
+              </p>
             </div>
 
             {/* 메뉴 목록 */}
-            <nav className="flex-1 py-3 overflow-y-auto">
-              <div className="px-3 space-y-0.5">
+            <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar">
+              <div className="px-3 space-y-1">
                 {currentItems.map((item, index) => {
                   // 구분선 제외
                   if (item.name === '---divider---') {
@@ -1257,22 +1264,40 @@ export default function AdminClientLayout({
                       key={item.href}
                       href={item.href}
                       className={`
-                        flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150
+                        group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200
                         ${active
-                          ? 'bg-primary/10 text-primary shadow-sm border border-primary/20'
-                          : 'text-text-secondary hover:text-text hover:bg-surface-hover'
+                          ? 'bg-gradient-to-r from-primary/10 to-primary/5 text-primary shadow-sm ring-1 ring-primary/20'
+                          : 'text-text-secondary hover:text-text hover:bg-surface-hover/80 hover:shadow-sm hover:translate-x-0.5'
                         }
                       `}
                       onClick={() => isMobile && setIsSidebarOpen(false)}
                     >
-                      <span className={`${active ? 'text-primary' : 'text-text-tertiary'}`}>
+                      {/* 활성 인디케이터 */}
+                      {active && (
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-primary via-primary to-primary/50 rounded-r-full" />
+                      )}
+
+                      {/* 아이콘 */}
+                      <div className={`
+                        flex items-center justify-center w-5 h-5 transition-all duration-200
+                        ${active ? 'text-primary scale-110' : 'text-text-tertiary group-hover:text-primary group-hover:scale-105'}
+                      `}>
                         {item.icon}
-                      </span>
-                      <span className="font-normal text-[13px] flex-1">
+                      </div>
+
+                      {/* 메뉴명 */}
+                      <span className={`
+                        text-[13px] flex-1 transition-all duration-200
+                        ${active ? 'font-medium' : 'font-normal group-hover:font-medium'}
+                      `}>
                         {item.name}
                       </span>
+
+                      {/* 화살표 (활성 시) */}
                       {active && (
-                        <div className="w-1 h-6 bg-primary rounded-full" />
+                        <svg className="w-4 h-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                        </svg>
                       )}
                     </Link>
                   );
@@ -1281,10 +1306,17 @@ export default function AdminClientLayout({
             </nav>
 
             {/* 하단 정보 */}
-            <div className="p-3 border-t border-border">
-              <div className="text-[10px] text-text-tertiary text-center space-y-0.5">
-                <p>© 2025 달래마켓</p>
-                <p>Version 2.0</p>
+            <div className="p-4 border-t border-border/30 bg-gradient-to-t from-background/50 to-transparent">
+              <div className="text-[10px] text-text-tertiary/70 text-center space-y-1 font-medium">
+                <p className="flex items-center justify-center gap-1">
+                  <span>©</span>
+                  <span>2025</span>
+                  <span className="font-semibold">달래마켓</span>
+                </p>
+                <div className="flex items-center justify-center gap-1.5 text-[9px]">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                  <span>v2.0</span>
+                </div>
               </div>
             </div>
           </aside>
