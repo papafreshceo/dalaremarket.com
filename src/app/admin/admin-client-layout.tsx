@@ -393,7 +393,7 @@ export default function AdminClientLayout({
       items: [
         {
           name: '고객관리',
-          href: '/admin/customer-management',
+          href: '/admin/customers',
           icon: (
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -472,15 +472,6 @@ export default function AdminClientLayout({
         </svg>
       ),
       items: [
-        {
-          name: '고객관리',
-          href: '/admin/customers',
-          icon: (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          )
-        },
         {
           name: '회원관리',
           href: '/admin/members',
