@@ -16,7 +16,7 @@ export default function SeasonBand({ seasonStart, seasonEnd, className = '' }: S
   if (!seasonStart || !seasonEnd) {
     return (
       <div className={`${className}`}>
-        <div className="h-3 w-full rounded-full bg-gray-100" />
+        <div className="h-[10px] w-full rounded-full bg-gray-100" />
         <div className="mt-1.5 flex justify-between text-[9px] sm:text-[10px] text-gray-400 select-none">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map((month) => (
             <span key={month} className="flex-1 text-center">{month}</span>
@@ -88,12 +88,12 @@ export default function SeasonBand({ seasonStart, seasonEnd, className = '' }: S
         onMouseLeave={() => setShowTooltip(false)}
       >
         {/* 배경 바 */}
-        <div className="h-3 w-full rounded-full bg-gray-100 relative">
+        <div className="h-[10px] w-full rounded-full bg-gray-100 relative">
           {/* 활성 시즌 구간 (한 개 또는 두 개) */}
           {seasonBands.map((band, index) => (
             <div
               key={index}
-              className="h-3 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-200 hover:shadow-md absolute top-0"
+              className="h-[10px] rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-200 hover:shadow-md absolute top-0"
               style={{
                 width: `${Math.max(band.width, 2)}%`, // 최소 2%
                 left: `${band.start}%`
