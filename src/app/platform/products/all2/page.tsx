@@ -636,9 +636,9 @@ export default function AllProductsPage() {
           </div>
         ) : (
           // 품목별 그룹화 리스트 뷰 (카드보기와 동일한 형식)
-          <div className="grid grid-cols-3 gap-6" style={{ border: '3px solid cyan', backgroundColor: 'rgba(0, 255, 255, 0.05)' }}>
+          <div className="grid grid-cols-4 gap-6" style={{ border: '3px solid cyan', backgroundColor: 'rgba(0, 255, 255, 0.05)' }}>
             {/* 칼럼1: 품목 카드 */}
-            <div className="col-span-2 space-y-0" style={{ border: '3px solid magenta' }}>
+            <div className="col-span-1 space-y-0" style={{ border: '3px solid magenta' }}>
             {(() => {
               const groupedData = Object.entries(
                 filteredProducts.reduce((groups, product) => {
@@ -857,7 +857,7 @@ export default function AllProductsPage() {
             </div>
 
             {/* 칼럼2: 선택된 품목의 옵션상품 표시 */}
-            <div className="col-span-1 sticky top-[105px] md:top-[140px] h-[calc(100vh-105px)] md:h-[calc(100vh-140px)] overflow-y-auto self-start" style={{ border: '3px solid yellow', backgroundColor: 'rgba(255, 255, 0, 0.05)' }}>
+            <div className="col-span-2 sticky top-[105px] md:top-[140px] h-[calc(100vh-105px)] md:h-[calc(100vh-140px)] overflow-y-auto self-start" style={{ border: '3px solid yellow', backgroundColor: 'rgba(255, 255, 0, 0.05)' }}>
               {(() => {
                 // 선택된 품목 찾기
                 const expandedItem = Array.from(expandedGroups)[0];
@@ -982,6 +982,14 @@ export default function AllProductsPage() {
                   </div>
                 );
               })()}
+            </div>
+
+            {/* 칼럼3: 새로운 칼럼 */}
+            <div className="col-span-1 sticky top-[105px] md:top-[140px] h-[calc(100vh-105px)] md:h-[calc(100vh-140px)] overflow-y-auto self-start" style={{ border: '3px solid lime', backgroundColor: 'rgba(0, 255, 0, 0.05)' }}>
+              <div className="p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">칼럼 3</h3>
+                <p className="text-sm text-gray-500">여기에 원하는 컨텐츠를 추가하세요</p>
+              </div>
             </div>
           </div>
         )}
