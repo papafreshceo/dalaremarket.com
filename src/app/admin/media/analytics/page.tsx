@@ -85,7 +85,7 @@ export default function MediaAnalyticsPage() {
   };
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>이미지 다운로드 분석</h1>
         <p style={{ fontSize: '14px', color: '#6b7280' }}>다운로드 통계 및 로그 확인</p>

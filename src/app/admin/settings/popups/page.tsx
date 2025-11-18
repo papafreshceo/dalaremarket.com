@@ -205,7 +205,7 @@ export default function PopupsPage() {
   }
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
       {/* 헤더 */}
       <div style={{
         display: 'flex',

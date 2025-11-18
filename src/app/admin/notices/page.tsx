@@ -102,9 +102,9 @@ export default function AdminNoticesPage() {
   };
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
     <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: '1440px', padding: '0 24px' }}>
+      <div style={{ width: '100%', padding: '0 24px' }}>
         {/* 헤더 */}
         <div style={{
           display: 'flex',

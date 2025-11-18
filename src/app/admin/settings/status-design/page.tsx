@@ -268,7 +268,7 @@ export default function AdminStatusDesignPage() {
   }
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>상태 디자인 관리</h1>
         <p style={{ fontSize: '14px', color: '#6b7280' }}>각 상태별로 원하는 애니메이션 디자인을 선택하세요.</p>

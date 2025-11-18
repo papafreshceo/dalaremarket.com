@@ -638,7 +638,7 @@ export default function TierCriteriaPage() {
   };
 
   return (
-    <div style={{ padding: '24px', width: '100%' }}>
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
       {/* 헤더 */}
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>

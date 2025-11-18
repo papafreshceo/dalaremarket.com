@@ -21,7 +21,7 @@ export default function NotificationsManagementPage() {
   ] as const
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px' }}>
+    <div style={{ padding: '24px', maxWidth: '1440px', margin: '0 auto' }}>
       <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>
         알림 관리
       </h1>
