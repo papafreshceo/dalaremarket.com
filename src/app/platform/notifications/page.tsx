@@ -170,9 +170,14 @@ export default function NotificationsPage() {
       const data = await response.json()
 
       if (data.success) {
-        const allNotifications = data.notifications
+        // 메시지 알림 제외 (AgriChatbot에서 확인)
+        const allNotifications = data.notifications.filter(
+          (n: Notification) => n.type !== 'new_message'
+        )
         setNotifications(allNotifications)
-        setUnreadCount(data.unread_count)
+        // 메시지 알림을 제외한 읽지 않은 알림 개수
+        const unreadNonMessageCount = allNotifications.filter((n: Notification) => !n.is_read).length
+        setUnreadCount(unreadNonMessageCount)
 
         // 탭별 읽지 않은 알림 개수 계산
         const counts: Record<NotificationTab, number> = {
@@ -592,21 +597,6 @@ export default function NotificationsPage() {
             {tabCounts.products > 0 && (
               <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-xs font-semibold">
                 {tabCounts.products}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('messages')}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-              activeTab === 'messages'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-            }`}
-          >
-            메시지
-            {tabCounts.messages > 0 && (
-              <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-xs font-semibold">
-                {tabCounts.messages}
               </span>
             )}
           </button>
