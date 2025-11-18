@@ -1047,14 +1047,11 @@ export default function AdminClientLayout({
                   <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                 </svg>
               </div>
-              <div className="flex flex-col">
-                <p className="font-medium text-text text-sm">
-                  {userData?.name || '관리자'}
-                </p>
-                <p className="text-xs text-text-tertiary">
-                  {user?.email || 'loading...'}
-                </p>
-              </div>
+              <p className="text-sm text-text">
+                <span className="font-medium">{userData?.name || '관리자'}</span>
+                <span className="text-text-tertiary mx-1.5">·</span>
+                <span className="text-text-tertiary text-xs">{user?.email || 'loading...'}</span>
+              </p>
             </div>
 
             <div className="w-px h-5 bg-border hidden lg:block" />
