@@ -1234,21 +1234,6 @@ export default function AdminClientLayout({
 
           {/* 3단 사이드바: 선택된 그룹의 메뉴 */}
           <aside className="w-56 h-full bg-gradient-to-b from-surface to-background border-r border-border/50 shadow-lg flex flex-col">
-            {/* 그룹 헤더 */}
-            <div className="px-5 py-4 border-b border-border/50 bg-gradient-to-br from-primary/5 via-transparent to-transparent">
-              <div className="flex items-center gap-2.5 mb-1">
-                <div className="p-1.5 rounded-lg bg-primary/10 text-primary shadow-sm">
-                  {selectedGroupData?.icon}
-                </div>
-                <h3 className="text-[15px] font-semibold text-text tracking-tight">
-                  {selectedGroupData?.name}
-                </h3>
-              </div>
-              <p className="text-[11px] text-text-tertiary ml-9">
-                {currentItems.filter(item => item.name !== '---divider---').length}개 메뉴
-              </p>
-            </div>
-
             {/* 메뉴 목록 */}
             <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar">
               <div className="px-3 space-y-1">
