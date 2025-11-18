@@ -218,24 +218,24 @@ export async function createNotification(params: CreateNotificationParams): Prom
         .eq('user_id', targetUserId)
         .single();
 
-      // 전체 알림 비활성화
-      if (settings && !settings.push_enabled) {
+      // 전체 알림 비활성화 (설정이 없으면 기본적으로 활성화)
+      if (settings && settings.push_enabled === false) {
         continue;
       }
 
-      // 카테고리별 알림 설정 확인
+      // 카테고리별 알림 설정 확인 (설정이 없으면 기본적으로 활성화)
       if (category === 'seller' && settings) {
-        if (type === 'order_status' && !settings.order_status_enabled) continue;
-        if (type === 'announcement' && !settings.announcements_enabled) continue;
-        if (type === 'comment_reply' && !settings.comment_reply_enabled) continue;
-        if (type === 'deposit_confirm' && !settings.deposit_confirm_enabled) continue;
-        if (type === 'new_message' && !settings.new_message_enabled) continue;
+        if (type === 'order_status' && settings.order_status_enabled === false) continue;
+        if (type === 'announcement' && settings.announcements_enabled === false) continue;
+        if (type === 'comment_reply' && settings.comment_reply_enabled === false) continue;
+        if (type === 'deposit_confirm' && settings.deposit_confirm_enabled === false) continue;
+        if (type === 'new_message' && settings.new_message_enabled === false) continue;
       }
 
       if (category === 'admin' && settings) {
-        if (type === 'admin_new_order' && !settings.new_order_enabled) continue;
-        if (type === 'admin_support_post' && !settings.support_post_enabled) continue;
-        if (type === 'admin_new_member' && !settings.new_member_enabled) continue;
+        if (type === 'admin_new_order' && settings.new_order_enabled === false) continue;
+        if (type === 'admin_support_post' && settings.support_post_enabled === false) continue;
+        if (type === 'admin_new_member' && settings.new_member_enabled === false) continue;
       }
 
       // 방해 금지 시간 확인

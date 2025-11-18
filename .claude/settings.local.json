@@ -102,7 +102,9 @@
       "Bash(node scripts/sync-permissions.js:*)",
       "Bash(del /f scriptssync-permissions.js 2)",
       "Bash(node scripts/check-permissions.js:*)",
-      "Bash(node scripts/init-permissions.js:*)"
+      "Bash(node scripts/init-permissions.js:*)",
+      "Bash(node scripts/check-message-notification.js:*)",
+      "Bash(del /f scriptscheck-message-notification.js 2)"
     ],
     "deny": [],
     "ask": []
