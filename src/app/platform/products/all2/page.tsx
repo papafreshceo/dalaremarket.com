@@ -638,7 +638,7 @@ export default function AllProductsPage() {
           // 품목별 그룹화 리스트 뷰 (카드보기와 동일한 형식)
           <div className="flex gap-6">
             {/* 칼럼1: 품목 카드 */}
-            <div className="flex-1 space-y-0" style={{ border: '3px solid magenta' }}>
+            <div className="flex-[2] space-y-0" style={{ border: '3px solid magenta' }}>
             {(() => {
               const groupedData = Object.entries(
                 filteredProducts.reduce((groups, product) => {
@@ -857,7 +857,7 @@ export default function AllProductsPage() {
             </div>
 
             {/* 칼럼2: 선택된 품목의 옵션상품 표시 */}
-            <div className="flex-1 sticky top-[105px] md:top-[140px] h-[calc(100vh-105px)] md:h-[calc(100vh-140px)] overflow-y-auto self-start" style={{ border: '3px solid yellow', backgroundColor: 'rgba(255, 255, 0, 0.05)' }}>
+            <div className="flex-[0.8] sticky top-[105px] md:top-[140px] h-[calc(100vh-105px)] md:h-[calc(100vh-140px)] overflow-y-auto self-start" style={{ border: '3px solid yellow', backgroundColor: 'rgba(255, 255, 0, 0.05)' }}>
               {(() => {
                 // 선택된 품목 찾기
                 const expandedItem = Array.from(expandedGroups)[0];
