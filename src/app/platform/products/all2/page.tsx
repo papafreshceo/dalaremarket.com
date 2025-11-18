@@ -905,7 +905,7 @@ export default function AllProductsPage() {
                           className="bg-white border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                           onClick={() => handleProductClick(product)}
                         >
-                          <div className="grid grid-cols-[40px_1fr_70px_70px_70px_90px_70px_100px] items-center gap-2 px-2 py-1.5">
+                          <div className="grid items-center gap-2 px-2 py-1.5" style={{ gridTemplateColumns: '40px minmax(150px, 1fr) 70px 70px 70px 90px 70px 100px' }}>
                             {/* 썸네일 */}
                             {product.thumbnail_url ? (
                               <img
@@ -920,7 +920,7 @@ export default function AllProductsPage() {
                             )}
 
                             {/* 옵션명 */}
-                            <div className="text-sm font-medium text-gray-900 truncate">
+                            <div className="text-sm font-medium text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
                               {product.option_name}
                             </div>
 
