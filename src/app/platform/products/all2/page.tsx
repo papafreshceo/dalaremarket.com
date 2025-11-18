@@ -905,7 +905,7 @@ export default function AllProductsPage() {
                           className="bg-white border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                           onClick={() => handleProductClick(product)}
                         >
-                          <div className="grid grid-cols-[40px_1fr_80px_80px_80px_100px_80px_auto] items-center gap-2 px-2 py-1.5">
+                          <div className="grid grid-cols-[40px_1fr_70px_70px_70px_90px_70px_100px] items-center gap-2 px-2 py-1.5">
                             {/* 썸네일 */}
                             {product.thumbnail_url ? (
                               <img
