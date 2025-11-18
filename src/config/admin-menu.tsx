@@ -81,7 +81,7 @@ export   const menuCategories = [
     },
   ];
 
-  const menuGroups = [
+export const menuGroups = [
     {
       id: 'products',
       name: '상품관리',
