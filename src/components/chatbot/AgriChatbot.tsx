@@ -593,6 +593,8 @@ export default function AgriChatbot() {
   useEffect(() => {
     if (!currentUser) return
 
+    console.log('🔵 [AgriChatbot] 읽지 않은 메시지 배지 초기화 시작, userId:', currentUser.id)
+
     // 초기 읽지 않은 메시지 개수 조회
     const fetchUnreadCount = async () => {
       try {
@@ -602,10 +604,11 @@ export default function AgriChatbot() {
           const totalUnread = data.threads.reduce((sum: number, thread: Thread) => {
             return sum + (thread.unread_count || 0)
           }, 0)
+          console.log('📊 [AgriChatbot] 읽지 않은 메시지 개수:', totalUnread)
           setUnreadCount(totalUnread)
         }
       } catch (error) {
-        console.error('읽지 않은 메시지 개수 조회 실패:', error)
+        console.error('❌ [AgriChatbot] 읽지 않은 메시지 개수 조회 실패:', error)
       }
     }
 
@@ -619,21 +622,42 @@ export default function AgriChatbot() {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'messages',
-          filter: `sender_id=neq.${currentUser.id}` // 내가 보낸 메시지는 제외
+          table: 'messages'
         },
-        async (payload) => {
-          console.log('📨 [AgriChatbot] 새 메시지 도착:', payload)
-          // 읽지 않은 메시지 개수 다시 조회
+        async (payload: any) => {
+          console.log('📨 [AgriChatbot] 새 메시지 INSERT 이벤트:', payload)
+
+          // 내가 보낸 메시지가 아닌 경우에만 unreadCount 업데이트
+          if (payload.new.sender_id !== currentUser.id) {
+            console.log('✅ [AgriChatbot] 다른 사용자의 메시지, 배지 업데이트')
+            await fetchUnreadCount()
+          } else {
+            console.log('⏭️ [AgriChatbot] 내가 보낸 메시지, 배지 업데이트 스킵')
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `is_read=eq.true`
+        },
+        async (payload: any) => {
+          console.log('✅ [AgriChatbot] 메시지 읽음 처리 이벤트, 배지 업데이트')
           await fetchUnreadCount()
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('🔔 [AgriChatbot] Realtime 구독 상태:', status)
+      })
 
     channelRef.current = channel
 
     return () => {
       if (channelRef.current) {
+        console.log('🔴 [AgriChatbot] Realtime 구독 해제')
         supabase.removeChannel(channelRef.current)
         channelRef.current = null
       }
