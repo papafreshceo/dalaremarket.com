@@ -1160,7 +1160,7 @@ export default function AdminClientLayout({
           transition-transform duration-200 ease-in-out z-40
         `}>
           {/* 1단 사이드바: 대카테고리 */}
-          <aside className="w-16 h-full bg-surface border-r border-border shadow-sm flex flex-col">
+          <aside className="w-16 h-full bg-surface shadow-[2px_0_8px_rgba(0,0,0,0.08)] flex flex-col">
             {/* 대카테고리 */}
             <nav className="flex-1 py-4 overflow-y-auto">
               <div className="space-y-1">
@@ -1200,7 +1200,7 @@ export default function AdminClientLayout({
           </aside>
 
           {/* 2단 사이드바: 선택된 카테고리의 그룹들 */}
-          <aside className="w-16 h-full bg-surface border-r border-border shadow-sm flex flex-col">
+          <aside className="w-16 h-full bg-surface shadow-[2px_0_10px_rgba(0,0,0,0.1)] flex flex-col">
             {/* 메뉴 그룹 */}
             <nav className="flex-1 py-4 overflow-y-auto">
               <div className="space-y-1">
@@ -1233,7 +1233,7 @@ export default function AdminClientLayout({
           </aside>
 
           {/* 3단 사이드바: 선택된 그룹의 메뉴 */}
-          <aside className="w-48 h-full bg-gradient-to-b from-surface to-background border-r border-border/50 shadow-lg flex flex-col">
+          <aside className="w-48 h-full bg-gradient-to-b from-surface to-background shadow-[2px_0_12px_rgba(0,0,0,0.12)] flex flex-col">
             {/* 메뉴 목록 */}
             <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar">
               <div className="px-3 space-y-1">
