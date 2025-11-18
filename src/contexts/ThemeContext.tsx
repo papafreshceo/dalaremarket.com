@@ -1,7 +1,7 @@
 // src/contexts/ThemeContext.tsx
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Theme = 'light' | 'dark'
@@ -18,6 +18,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>('light')
   const [userId, setUserId] = useState<string | null>(null)
   const supabase = createClient()
+
+  // 적용된 CSS 변수 키를 저장하는 ref
+  const appliedCssVarsRef = useRef<string[]>([])
 
   // 초기 로드 시 테마 적용 (무조건 라이트모드)
   useEffect(() => {
@@ -37,9 +40,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const isSettingsPage = pathname.startsWith('/admin/settings')
 
       if (!isSettingsPage) {
-        // settings 페이지가 아니면 theme-enabled 클래스 제거하고 종료
+        // settings 페이지가 아니면 theme-enabled 클래스 제거
         document.documentElement.classList.remove('theme-enabled')
-        // CSS 변수를 원래대로 되돌리지 않고 그대로 둠 (기본 CSS 파일의 값 유지)
+
+        // 이전에 적용된 CSS 변수들을 모두 제거
+        appliedCssVarsRef.current.forEach(key => {
+          document.documentElement.style.removeProperty(key)
+        })
+        appliedCssVarsRef.current = []
+
         return
       }
 
@@ -63,7 +72,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         if (result.success && result.data?.css_variables) {
           const cssVars = result.data.css_variables
 
-          // CSS 변수를 :root에 동적으로 적용
+          // 이전에 적용된 CSS 변수들 제거
+          appliedCssVarsRef.current.forEach(key => {
+            document.documentElement.style.removeProperty(key)
+          })
+
+          // 새로운 CSS 변수를 :root에 동적으로 적용
+          appliedCssVarsRef.current = Object.keys(cssVars)
           Object.entries(cssVars).forEach(([key, value]) => {
             document.documentElement.style.setProperty(key, value as string)
           })
