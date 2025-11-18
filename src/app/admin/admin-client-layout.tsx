@@ -147,10 +147,6 @@ export default function AdminClientLayout({
     getUser()
   }, [])
 
-
-  // 대카테고리 정의
-  ];
-
   // 모든 메뉴 아이템을 플랫하게 만들기 (권한 체크용)
   const menuItems = menuGroups.flatMap(group => group.items);
 
