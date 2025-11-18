@@ -45,6 +45,7 @@ export default function AdminClientLayout({
   const [themeLoaded, setThemeLoaded] = useState(false)
   const [accessiblePages, setAccessiblePages] = useState<string[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const [selectedCategory, setSelectedCategory] = useState<string>('operation')
   const [selectedGroup, setSelectedGroup] = useState<string>('dashboard')
   const supabase = createClient()
 
@@ -145,10 +146,61 @@ export default function AdminClientLayout({
   }, [])
 
 
+  // 대카테고리 정의
+  const menuCategories = [
+    {
+      id: 'operation',
+      name: '운영',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 00-2-2m0 0h2a2 2 0 012 2v6a2 2 0 01-2 2h-2a2 2 0 01-2-2v-6z" />
+        </svg>
+      )
+    },
+    {
+      id: 'partner',
+      name: '파트너',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+      )
+    },
+    {
+      id: 'management',
+      name: '관리',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+        </svg>
+      )
+    },
+    {
+      id: 'communication',
+      name: '소통',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+        </svg>
+      )
+    },
+    {
+      id: 'system',
+      name: '시스템',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      )
+    },
+  ];
+
   const menuGroups = [
     {
       id: 'dashboard',
       name: '대시보드',
+      category: 'operation',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -169,6 +221,7 @@ export default function AdminClientLayout({
     {
       id: 'products',
       name: '상품',
+      category: 'operation',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -189,6 +242,7 @@ export default function AdminClientLayout({
     {
       id: 'orders',
       name: '주문',
+      category: 'operation',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -227,6 +281,7 @@ export default function AdminClientLayout({
     {
       id: 'inventory',
       name: '구매/재고',
+      category: 'operation',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
@@ -256,6 +311,7 @@ export default function AdminClientLayout({
     {
       id: 'partners',
       name: '파트너',
+      category: 'partner',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -285,6 +341,7 @@ export default function AdminClientLayout({
     {
       id: 'members',
       name: '회원',
+      category: 'partner',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -323,6 +380,7 @@ export default function AdminClientLayout({
     {
       id: 'finance',
       name: '재무',
+      category: 'management',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -343,6 +401,7 @@ export default function AdminClientLayout({
     {
       id: 'hr',
       name: '인력',
+      category: 'management',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -363,6 +422,7 @@ export default function AdminClientLayout({
     {
       id: 'work',
       name: '업무',
+      category: 'management',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -392,6 +452,7 @@ export default function AdminClientLayout({
     {
       id: 'communication',
       name: '커뮤니케이션',
+      category: 'communication',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -448,6 +509,7 @@ export default function AdminClientLayout({
     {
       id: 'system',
       name: '시스템',
+      category: 'system',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -490,13 +552,14 @@ export default function AdminClientLayout({
   // 모든 메뉴 아이템을 플랫하게 만들기 (권한 체크용)
   const menuItems = menuGroups.flatMap(group => group.items);
 
-  // 현재 경로에 따라 활성 그룹 자동 선택
+  // 현재 경로에 따라 활성 그룹 및 카테고리 자동 선택
   useEffect(() => {
     if (pathname) {
       for (const group of menuGroups) {
         for (const item of group.items) {
           if (pathname.startsWith(item.href)) {
             setSelectedGroup(group.id);
+            setSelectedCategory(group.category);
             return;
           }
         }
@@ -520,9 +583,17 @@ export default function AdminClientLayout({
     })
   })).filter(group => group.items.length > 0); // 아이템이 없는 그룹은 제외
 
+  // 현재 선택된 카테고리의 그룹들
+  const currentCategoryGroups = filteredMenuGroups.filter(g => g.category === selectedCategory);
+
   // 현재 선택된 그룹의 메뉴 아이템들
   const selectedGroupData = filteredMenuGroups.find(g => g.id === selectedGroup);
   const currentItems = selectedGroupData?.items || [];
+
+  // 카테고리별 필터링 (적어도 하나의 그룹이 있는 카테고리만)
+  const filteredCategories = menuCategories.filter(category =>
+    filteredMenuGroups.some(group => group.category === category.id)
+  );
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -666,19 +737,66 @@ export default function AdminClientLayout({
           />
         )}
 
-        {/* 2단 사이드바 */}
+        {/* 3단 사이드바 */}
         <div className={`
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           fixed lg:relative lg:translate-x-0
           flex h-full
           transition-transform duration-200 ease-in-out z-40
         `}>
-          {/* 1단 사이드바: 그룹 */}
+          {/* 1단 사이드바: 대카테고리 */}
+          <aside className="w-16 h-full bg-surface border-r border-border shadow-sm flex flex-col">
+            {/* 대카테고리 */}
+            <nav className="flex-1 py-4 overflow-y-auto">
+              <div className="space-y-1">
+                {filteredCategories.map((category) => {
+                  const isCategoryActive = selectedCategory === category.id;
+                  return (
+                    <button
+                      key={category.id}
+                      onClick={() => {
+                        setSelectedCategory(category.id);
+                        // 해당 카테고리의 첫 번째 그룹 자동 선택
+                        const firstGroup = filteredMenuGroups.find(g => g.category === category.id);
+                        if (firstGroup) {
+                          setSelectedGroup(firstGroup.id);
+                        }
+                      }}
+                      className={`
+                        w-full flex flex-col items-center gap-1 py-3 transition-all duration-150
+                        ${isCategoryActive
+                          ? 'bg-primary/10 text-primary border-r-2 border-primary'
+                          : 'text-text-tertiary hover:text-text hover:bg-surface-hover'
+                        }
+                      `}
+                      title={category.name}
+                    >
+                      <span className={`${isCategoryActive ? 'text-primary' : 'text-text-tertiary'}`}>
+                        {category.icon}
+                      </span>
+                      <span className="text-[9px] font-medium text-center px-1 leading-tight">
+                        {category.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </nav>
+
+            {/* 하단 아이콘 */}
+            <div className="p-2 border-t border-border space-y-2">
+              <div className="flex justify-center">
+                <ThemeToggle />
+              </div>
+            </div>
+          </aside>
+
+          {/* 2단 사이드바: 선택된 카테고리의 그룹들 */}
           <aside className="w-16 h-full bg-surface border-r border-border shadow-sm flex flex-col">
             {/* 메뉴 그룹 */}
             <nav className="flex-1 py-4 overflow-y-auto">
               <div className="space-y-1">
-                {filteredMenuGroups.map((group) => {
+                {currentCategoryGroups.map((group) => {
                   const isGroupActive = selectedGroup === group.id;
                   return (
                     <button
@@ -704,16 +822,9 @@ export default function AdminClientLayout({
                 })}
               </div>
             </nav>
-
-            {/* 하단 아이콘 */}
-            <div className="p-2 border-t border-border space-y-2">
-              <div className="flex justify-center">
-                <ThemeToggle />
-              </div>
-            </div>
           </aside>
 
-          {/* 2단 사이드바: 선택된 그룹의 메뉴 */}
+          {/* 3단 사이드바: 선택된 그룹의 메뉴 */}
           <aside className="w-48 h-full bg-surface border-r border-border shadow-sm flex flex-col text-[14px]">
             {/* 그룹 헤더 */}
             <div className="px-4 py-3 border-b border-border">
