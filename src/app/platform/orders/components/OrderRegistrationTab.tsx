@@ -583,11 +583,11 @@ export default function OrderRegistrationTab({
       // 각 주문에 발주번호 생성 및 업데이트
       const now = getCurrentTimeUTC();
 
-      // DB에서 최신 product_amount 조회 (공급가 갱신 후 값)
+      // DB에서 최신 product_amount 및 seller_supply_price 조회 (공급가 갱신 후 값)
       const orderIds = filteredOrders.map(o => o.id);
       const { data: latestOrders, error: fetchError } = await supabase
         .from('integrated_orders')
-        .select('id, product_amount')
+        .select('id, product_amount, seller_supply_price')
         .in('id', orderIds);
 
       if (fetchError) {
@@ -596,10 +596,12 @@ export default function OrderRegistrationTab({
         return;
       }
 
-      // product_amount 맵 생성
+      // product_amount 및 seller_supply_price 맵 생성
       const productAmountMap = new Map<number, number>();
+      const sellerSupplyPriceMap = new Map<number, number>();
       (latestOrders || []).forEach((order: any) => {
         productAmountMap.set(order.id, Number(order.product_amount) || 0);
+        sellerSupplyPriceMap.set(order.id, Number(order.seller_supply_price) || 0);
       });
 
       // 총 공급가 계산 (DB에서 가져온 최신 product_amount 사용)
@@ -700,6 +702,8 @@ export default function OrderRegistrationTab({
           finalDepositAmount: Math.round(finalPaymentAmount)
         });
 
+        const sellerSupplyPriceSnapshot = sellerSupplyPriceMap.get(order.id) || 0;
+
         const { error } = await supabase
           .from('integrated_orders')
           .update({
@@ -713,6 +717,7 @@ export default function OrderRegistrationTab({
             final_deposit_amount: Math.round(finalPaymentAmount), // 최종입금액 저장 (product_amount - discount_amount - cash_used)
             cash_used: orderCashUsed, // 주문별 캐시 사용액 저장
             depositor_name: (selectedSubAccount && selectedSubAccount !== 'main') ? selectedSubAccount.account_holder : finalDepositorName, // 서브계정 예금주 또는 메인계정 입금자명
+            seller_supply_price_snapshot: sellerSupplyPriceSnapshot, // 발주확정 시점의 공급단가 스냅샷
           })
           .eq('id', order.id);
 
@@ -1882,7 +1887,7 @@ export default function OrderRegistrationTab({
       // 취소완료 상태: 취소승인 -> 취소요청 -> 취소사유 순서
       const cols = [
         {
-          key: 'cancelledAt',
+          key: 'cancelApprovedAt',
           title: '취소승인',
           width: 160,
           readOnly: true,
@@ -2497,10 +2502,19 @@ export default function OrderRegistrationTab({
     }, 0);
 
     // 정산금액 합계 (DB 저장값)
-    const totalSettlementAmount = filteredOrders.reduce((sum, order) => {
-      const settlement = Number(order.settlementAmount) || 0;
-      return sum + settlement;
-    }, 0);
+    let totalSettlementAmount = 0;
+    if (filterStatus === 'refunded') {
+      // 환불완료 상태: refund_amount_canceled 사용
+      totalSettlementAmount = filteredOrders.reduce((sum, order) => {
+        const refund = Number(order.refundAmount) || 0;
+        return sum + refund;
+      }, 0);
+    } else {
+      totalSettlementAmount = filteredOrders.reduce((sum, order) => {
+        const settlement = Number(order.settlementAmount) || 0;
+        return sum + settlement;
+      }, 0);
+    }
 
     return {
       count,
@@ -3305,7 +3319,7 @@ export default function OrderRegistrationTab({
       )}
 
       {/* 주문 요약 섹션 - 발주확정 ~ 환불완료: 간단한 통계만 (회색) */}
-      {['confirmed', 'preparing', 'shipped', 'cancel_requested', 'cancelled', 'refunded'].includes(filterStatus) && filteredOrders.length > 0 && (
+      {['confirmed', 'preparing', 'shipped', 'cancelRequested', 'cancelled', 'refunded'].includes(filterStatus) && filteredOrders.length > 0 && (
         <div style={{
           marginBottom: '16px',
           padding: '16px',
@@ -3391,7 +3405,7 @@ export default function OrderRegistrationTab({
       )}
 
       {/* 일괄 취소요청 버튼 (발주서확정, 상품준비중 단계) */}
-      {(filterStatus === 'confirmed' || filterStatus === 'preparing') && (
+      {(filterStatus === 'confirmed' || filterStatus === 'preparing') && filteredOrders.length > 0 && (
         <div className="mb-3 flex justify-start">
           <button
             onClick={handleBatchCancelRequest}
@@ -3424,7 +3438,7 @@ export default function OrderRegistrationTab({
       )}
 
       {/* CS접수 및 마켓송장파일 버튼 (발송완료 단계만) */}
-      {filterStatus === 'shipped' && (
+      {filterStatus === 'shipped' && filteredOrders.length > 0 && (
         <div className="mb-3 flex justify-start gap-2">
           <button
             onClick={() => {
@@ -3536,10 +3550,6 @@ export default function OrderRegistrationTab({
             </p>
             <p style={{ marginBottom: '12px' }}>
               <strong style={{ color: 'var(--color-text)' }}>발주서 업로드:</strong> 달래마켓 전용 양식 사용
-            </p>
-            <p style={{ marginTop: '16px', fontSize: '13px' }}>
-              주문 등록 후 <strong style={{ color: 'var(--color-text)' }}>공급가 갱신</strong> 버튼으로 최신 공급가를 적용하고,<br />
-              <strong style={{ color: 'var(--color-text)' }}>등급할인</strong>이 자동 적용되며 <strong style={{ color: '#2563eb' }}>캐시</strong>를 사용하여 최종 입금액을 확인할 수 있습니다.
             </p>
           </div>
         </div>

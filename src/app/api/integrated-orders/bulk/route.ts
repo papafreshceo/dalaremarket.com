@@ -340,7 +340,7 @@ export async function PUT(request: NextRequest) {
       'total_amount', 'settlement_amount', 'courier_company', 'tracking_number',
       'shipping_date', 'shipped_date', 'order_status', 'shipping_status', 'payment_method', 'market_fee', 'pg_fee',
       'delivery_fee_paid_by_seller', 'other_fees', 'payment_confirmed_at', 'shipped_at',
-      'delivered_at', 'cancelled_at', 'refunded_at', 'refund_processed_at', 'refund_amount_canceled', 'refund_amount_canceled_at', 'cancel_reason',
+      'delivered_at', 'cancelled_at', 'cancel_approved_at', 'refunded_at', 'refund_processed_at', 'refund_amount_canceled', 'refund_amount_canceled_at', 'cancel_reason',
       'refund_reason', 'customer_id', 'cs_memo', 'admin_memo', 'market_check', 'is_deleted'
     ];
 

@@ -625,6 +625,7 @@ function OrdersPageContent() {
       trackingNo: order.tracking_number, // 송장번호
       cancelRequestedAt: order.cancel_requested_at,
       cancelledAt: order.canceled_at,
+      cancelApprovedAt: order.cancel_approved_at, // 취소승인일시
       cancelReason: order.cancel_reason,
       orderer: order.buyer_name,
       ordererPhone: order.buyer_phone,
@@ -635,13 +636,15 @@ function OrdersPageContent() {
       optionName: order.option_name,
       optionCode: order.option_code || '',
       specialRequest: order.special_request,
-      unitPrice: order.seller_supply_price ? parseFloat(order.seller_supply_price) : undefined,
+      unitPrice: order.seller_supply_price_snapshot
+        ? parseFloat(order.seller_supply_price_snapshot)
+        : (order.seller_supply_price ? parseFloat(order.seller_supply_price) : undefined), // 발주확정 시점 스냅샷 우선, 없으면 현재값
       supplyPrice: order.product_amount ? parseFloat(order.product_amount) : undefined,
       discountAmount: order.discount_amount ? parseFloat(order.discount_amount) : 0, // 할인액 (DB 저장값)
       cashUsed: order.cash_used ? parseFloat(order.cash_used) : 0, // 사용캐시 (DB 저장값)
       settlementAmount: order.final_deposit_amount ? parseFloat(order.final_deposit_amount) : 0, // 정산금액 (최종입금액)
-      refundAmount: order.product_amount ? parseFloat(order.product_amount) : undefined, // 환불액 (원공급가와 동일)
-      refundedAt: order.refund_processed_at, // 환불일
+      refundAmount: order.refund_amount_canceled ? parseFloat(order.refund_amount_canceled) : undefined, // 환불액
+      refundedAt: order.refund_amount_canceled_at, // 환불일
       marketName: order.market_name || '미지정', // 마켓명
       sellerMarketName: order.seller_market_name || '미지정', // 셀러 마켓명
       priceUpdatedAt: order.price_updated_at, // 공급가 갱신 일시

@@ -1118,7 +1118,8 @@ export default function OrderPlatformPage() {
         payment_confirmed_at: order.payment_confirmed_at,
         confirmed_at: order.confirmed_at,
         cancel_requested_at: order.cancel_requested_at,
-        canceled_at: now,  // 취소승인 일시 추가
+        canceled_at: now,
+        cancel_approved_at: now,  // 취소승인 일시
         refund_processed_at: order.refund_processed_at,
         created_at: order.created_at,
         sheet_date: order.sheet_date
@@ -1134,12 +1135,12 @@ export default function OrderPlatformPage() {
 
       if (result.success) {
         setOrders(prev => prev.map(o =>
-          o.id === orderId ? { ...o, shipping_status: '취소완료', canceled_at: now } : o
+          o.id === orderId ? { ...o, shipping_status: '취소완료', canceled_at: now, cancel_approved_at: now } : o
         ));
 
         setTimeout(() => {
           const updatedOrders = orders.map(o =>
-            o.id === orderId ? { ...o, shipping_status: '취소완료', canceled_at: now } : o
+            o.id === orderId ? { ...o, shipping_status: '취소완료', canceled_at: now, cancel_approved_at: now } : o
           );
           calculateOrganizationStats(updatedOrders);
         }, 0);
@@ -1787,7 +1788,7 @@ export default function OrderPlatformPage() {
             <div className="col-span-1 text-center">취소요청</div>
             <div className="col-span-1 text-center">취소완료</div>
             <div className="col-span-1 text-center">환불완료</div>
-            <div className="col-span-1 text-center">환불액</div>
+            <div className="col-span-1 text-center">환불예정</div>
           </div>
         </div>
 
@@ -2030,7 +2031,7 @@ export default function OrderPlatformPage() {
                                             <td className="px-2 py-0.5 text-xs text-gray-900" style={{ width: '15%' }}>{order.option_name}</td>
                                             <td className="px-2 py-0.5 text-center text-xs text-gray-900" style={{ width: '60px' }}>{order.quantity}</td>
                                             <td className="px-2 py-0.5 text-right text-xs text-gray-700" style={{ width: '80px' }}>
-                                              {Number(order.seller_supply_price || 0).toLocaleString()}
+                                              {Number(order.seller_supply_price_snapshot || order.seller_supply_price || 0).toLocaleString()}
                                             </td>
                                             <td className="px-2 py-0.5 text-right text-xs text-gray-900 font-medium" style={{ width: '90px' }}>
                                               {Number(order.product_amount || 0).toLocaleString()}
@@ -2073,6 +2074,14 @@ export default function OrderPlatformPage() {
                     const statusOrders = organizationOrders.filter(order => order.shipping_status === status);
                     if (statusOrders.length === 0) return null;
 
+                    // 합계 계산
+                    const totals = statusOrders.reduce((acc, order) => ({
+                      supplyPrice: acc.supplyPrice + (Number(order.product_amount) || 0),
+                      discount: acc.discount + (Number(order.discount_amount) || 0),
+                      cashUsed: acc.cashUsed + (Number(order.cash_used) || 0),
+                      finalDeposit: acc.finalDeposit + (Number(order.final_deposit_amount) || 0)
+                    }), { supplyPrice: 0, discount: 0, cashUsed: 0, finalDeposit: 0 });
+
                     const statusColors: Record<string, string> = {
                       '발주서등록': 'bg-purple-50',
                       '접수': 'bg-indigo-50',
@@ -2087,7 +2096,15 @@ export default function OrderPlatformPage() {
                     return (
                       <div key={status} className="pl-8 pr-4 py-3">
                         <div className={`text-sm font-semibold text-gray-700 mb-2 p-2 rounded ${statusColors[status]} flex justify-between items-center`}>
-                          <span>{status} ({statusOrders.length}건)</span>
+                          <div className="flex items-center gap-3">
+                            <span>{status} ({statusOrders.length}건)</span>
+                            <span className="text-xs font-normal text-gray-600">
+                              {totals.supplyPrice.toLocaleString()} |
+                              <span className="text-purple-600"> -{totals.discount.toLocaleString()}</span> |
+                              <span className="text-orange-600"> -{totals.cashUsed.toLocaleString()}</span> |
+                              <span className="text-blue-600 font-semibold"> {totals.finalDeposit.toLocaleString()}</span>
+                            </span>
+                          </div>
                           {status === '취소요청' && statusOrders.length > 0 && (
                             <button
                               onClick={async (e) => {
@@ -2103,7 +2120,8 @@ export default function OrderPlatformPage() {
                                       orders: statusOrders.map(order => ({
                                         id: order.id,
                                         shipping_status: '취소완료',
-                                        canceled_at: now
+                                        canceled_at: now,
+                                        cancel_approved_at: now
                                       }))
                                     }),
                                   });
@@ -2116,7 +2134,7 @@ export default function OrderPlatformPage() {
                                     // 로컬 상태 업데이트
                                     setOrders(prev => prev.map(o => {
                                       const found = statusOrders.find(so => so.id === o.id);
-                                      return found ? { ...o, shipping_status: '취소완료', canceled_at: now } : o;
+                                      return found ? { ...o, shipping_status: '취소완료', canceled_at: now, cancel_approved_at: now } : o;
                                     }));
                                   } else {
                                     toast.error('처리 실패: ' + result.error);
@@ -2210,7 +2228,11 @@ export default function OrderPlatformPage() {
                                       /* 그 외 모든 상태: 전체 금액 정보 표시 */
                                       <>
                                         <td className="px-2 py-0.5 text-right text-xs text-gray-700" style={{ width: '80px' }}>
-                                          {Number(order.seller_supply_price || 0).toLocaleString()}
+                                          {Number(
+                                            ['결제완료', '상품준비중', '발송완료', '취소요청', '취소완료', '환불완료'].includes(status)
+                                              ? (order.seller_supply_price_snapshot || order.seller_supply_price || 0)
+                                              : (order.seller_supply_price || 0)
+                                          ).toLocaleString()}
                                         </td>
                                         <td className="px-2 py-0.5 text-right text-xs text-gray-900 font-medium" style={{ width: '90px' }}>
                                           {Number(order.product_amount || 0).toLocaleString()}
@@ -2256,6 +2278,7 @@ export default function OrderPlatformPage() {
                                             if (!confirm('취소를 승인하시겠습니까?')) return;
 
                                             try {
+                                              const now = new Date().toISOString();
                                               const response = await fetch('/api/integrated-orders/bulk', {
                                                 method: 'PUT',
                                                 headers: { 'Content-Type': 'application/json' },
@@ -2263,7 +2286,8 @@ export default function OrderPlatformPage() {
                                                   orders: [{
                                                     id: order.id,
                                                     shipping_status: '취소완료',
-                                                    canceled_at: new Date().toISOString()
+                                                    canceled_at: now,
+                                                    cancel_approved_at: now
                                                   }]
                                                 }),
                                               });
@@ -2274,7 +2298,7 @@ export default function OrderPlatformPage() {
                                                 // 로컬 상태 업데이트
                                                 setOrders(prev => prev.map(o =>
                                                   o.id === order.id
-                                                    ? { ...o, shipping_status: '취소완료', canceled_at: new Date().toISOString() }
+                                                    ? { ...o, shipping_status: '취소완료', canceled_at: now, cancel_approved_at: now }
                                                     : o
                                                 ));
                                               } else {
