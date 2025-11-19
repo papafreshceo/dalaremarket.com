@@ -1164,7 +1164,7 @@ export default function OrderRegistrationTab({
   // 서브계정 ID로 사업자명 찾기 헬퍼 함수
   const getAccountName = (subAccountId: string | null | undefined): string => {
     if (!subAccountId) {
-      return organizationName || '메인계정';
+      return '-'; // 메인 계정은 빈 값
     }
     const subAccount = subAccounts.find(sub => sub.id === subAccountId);
     return subAccount?.business_name || '알 수 없음';

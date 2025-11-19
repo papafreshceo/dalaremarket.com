@@ -133,7 +133,9 @@
       "Bash(node scripts/check-refunded-orders.js:*)",
       "Bash(node scripts/check-refunded-simple.js:*)",
       "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\orders\\notify-cancel-approval\" rmdir /s /q \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\orders\\notify-cancel-approval\")",
-      "Bash(node scripts/run-migration-088.js:*)"
+      "Bash(node scripts/run-migration-088.js:*)",
+      "Bash(node scripts/check-test4-user.js:*)",
+      "Bash(node scripts/check-sub-account.js:*)"
     ],
     "deny": [],
     "ask": []

@@ -97,12 +97,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // 서브 계정 목록 조회 (메인 계정 제외, 삭제되지 않은 것만)
+    // 서브 계정 목록 조회 (is_main 포함, 삭제되지 않은 것만)
     const { data: subAccounts, error } = await supabase
       .from('sub_accounts')
       .select('*')
       .eq('organization_id', org.id)
-      .eq('is_main', false)
       .eq('is_deleted', false)
       .order('created_at', { ascending: true })
 
