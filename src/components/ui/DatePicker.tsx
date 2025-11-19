@@ -23,14 +23,15 @@ const CustomInput = forwardRef<HTMLInputElement, any>(({ value, onClick, placeho
     readOnly
     className={className || "filter-input"}
     style={{
-      width: '90px',
-      padding: '2px 6px',
-      borderRadius: '4px',
-      fontSize: '10px',
-      height: '20px',
-      border: '1px solid #d1d5db',
+      width: '110px',
+      padding: '4px 12px',
+      borderRadius: '6px',
+      fontSize: '12px',
+      height: '28px',
+      border: '1px solid var(--color-border, #d1d5db)',
       cursor: 'pointer',
-      backgroundColor: '#fff',
+      backgroundColor: 'var(--color-surface, #fff)',
+      color: 'var(--color-text, #000)',
       boxSizing: 'border-box',
       display: 'inline-block',
       ...style

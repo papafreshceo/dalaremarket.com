@@ -408,13 +408,13 @@ function OrdersPageContent() {
     init();
   }, []);
 
-  // 날짜 필터 변경 시 주문 다시 조회
-  useEffect(() => {
-    // 최초 로딩이 아닐 때만 실행 (userId가 설정된 후)
-    if (userId) {
-      fetchOrders();
-    }
-  }, [startDate, endDate, userId]);
+  // 날짜 필터 변경 시 주문 다시 조회 - 제거됨 (프론트엔드에서만 필터링)
+  // useEffect(() => {
+  //   // 최초 로딩이 아닐 때만 실행 (userId가 설정된 후)
+  //   if (userId) {
+  //     fetchOrders();
+  //   }
+  // }, [startDate, endDate, userId]);
 
   // 캐시 & 크레딧 잔액 조회 함수
   const fetchBalances = async (showRefillToast: boolean = true) => {
@@ -551,16 +551,8 @@ function OrdersPageContent() {
       }
 
 
-      // API URL에 날짜 파라미터 추가
-      const params = new URLSearchParams();
-      if (startDate) {
-        params.append('startDate', startDate.toISOString());
-      }
-      if (endDate) {
-        params.append('endDate', endDate.toISOString());
-      }
-
-      const url = `/api/platform-orders${params.toString() ? `?${params.toString()}` : ''}`;
+      // API URL - 날짜 파라미터 제거 (프론트엔드에서만 필터링)
+      const url = `/api/platform-orders`;
 
       // API를 통해 주문 조회 (샘플 모드 자동 처리)
       const response = await fetch(url, {
@@ -718,11 +710,48 @@ function OrdersPageContent() {
 
   // 날짜와 검색 필터만 적용 (통계 계산용) - 서브계정 필터링된 주문 기준
   const dateAndSearchFilteredOrders = filteredOrdersBySubAccount.filter(order => {
-    // 날짜 필터 (한국 시간 기준)
+    // 날짜 필터 (한국 시간 기준) - updated_at 기준
     let matchesDate = true;
     if (startDate || endDate) {
+      // updated_at만 사용
+      const dateValue = (order as any).updated_at;
+
+      if (!dateValue) {
+        return true; // updated_at 값이 없으면 필터 통과
+      }
+
+      // 첫 번째 주문만 디버깅
+      if (filteredOrdersBySubAccount.indexOf(order) === 0) {
+        const orderDate = new Date(dateValue);
+        const koreaOrderDate = new Date(orderDate.getTime() + (9 * 60 * 60 * 1000));
+        const orderDateOnly = new Date(
+          koreaOrderDate.getUTCFullYear(),
+          koreaOrderDate.getUTCMonth(),
+          koreaOrderDate.getUTCDate()
+        );
+        const startDateOnly = startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null;
+        const endDateOnly = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null;
+
+        console.log('🔍 날짜 필터 디버깅:', {
+          주문ID: order.id,
+          날짜값: dateValue,
+          '1_원본_UTC시간': orderDate.toISOString(),
+          '2_한국시간_UTC표기': koreaOrderDate.toISOString(),
+          '3_주문날짜만_로컬': orderDateOnly.toString(),
+          '4_시작일_버튼클릭': startDate?.toString(),
+          '5_시작일만_로컬': startDateOnly?.toString(),
+          '6_종료일_버튼클릭': endDate?.toString(),
+          '7_종료일만_로컬': endDateOnly?.toString(),
+          '8_브라우저_타임존_오프셋': new Date().getTimezoneOffset(),
+          '9_비교결과_시작일보다작음': orderDateOnly < (startDateOnly || new Date(0)),
+          '10_비교결과_종료일보다큼': orderDateOnly > (endDateOnly || new Date()),
+          등록일시: order.registeredAt,
+          날짜: order.date
+        });
+      }
+
       // UTC 시간을 한국 시간(UTC+9)으로 변환
-      const orderDate = new Date(order.date);
+      const orderDate = new Date(dateValue);
       const koreaOrderDate = new Date(orderDate.getTime() + (9 * 60 * 60 * 1000));
 
       // 한국 시간 기준 날짜만 추출 (시간 제거)
@@ -735,6 +764,13 @@ function OrdersPageContent() {
       if (startDate) {
         const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
         if (orderDateOnly < startDateOnly) {
+          if (filteredOrdersBySubAccount.indexOf(order) === 0) {
+            console.log('❌ startDate 필터 실패:', {
+              orderDateOnly,
+              startDateOnly,
+              result: orderDateOnly < startDateOnly
+            });
+          }
           matchesDate = false;
         }
       }
@@ -742,21 +778,46 @@ function OrdersPageContent() {
       if (endDate) {
         const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
         if (orderDateOnly > endDateOnly) {
+          if (filteredOrdersBySubAccount.indexOf(order) === 0) {
+            console.log('❌ endDate 필터 실패:', {
+              orderDateOnly,
+              endDateOnly,
+              result: orderDateOnly > endDateOnly
+            });
+          }
           matchesDate = false;
         }
       }
+
+      if (filteredOrdersBySubAccount.indexOf(order) === 0) {
+        console.log('✅ 최종 matchesDate:', matchesDate);
+      }
     }
 
-    // 검색 필터
-    const matchesSearch = !searchTerm ||
-      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.optionName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.marketName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.recipientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.recipientPhone?.toLowerCase().includes(searchTerm.toLowerCase());
+    // 검색 필터 (주문자, 주문자전화번호, 수령인, 수령인전화번호, 주소, 옵션상품)
+    const matchesSearch = !searchTerm || [
+      order.orderer,
+      order.ordererPhone,
+      order.recipient,
+      order.recipientPhone,
+      order.address,
+      order.optionName
+    ].some(field => field && field.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return matchesDate && matchesSearch;
   });
+
+  // 필터링 결과 디버깅
+  if (startDate || endDate) {
+    console.log('📊 필터링 결과:', {
+      전체주문수: orders.length,
+      서브계정필터후: filteredOrdersBySubAccount.length,
+      날짜검색필터후: dateAndSearchFilteredOrders.length,
+      시작일: startDate?.toLocaleDateString('ko-KR'),
+      종료일: endDate?.toLocaleDateString('ko-KR'),
+      검색어: searchTerm || '없음'
+    });
+  }
 
   // 날짜, 검색, 상태 필터 모두 적용 (테이블 표시용)
   const filteredOrders = dateAndSearchFilteredOrders.filter(order => {

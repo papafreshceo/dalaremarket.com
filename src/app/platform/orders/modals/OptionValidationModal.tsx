@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, AlertCircle, CheckCircle, Edit2, Save, ExternalLink } from 'lucide-react';
+import { X, AlertCircle, CheckCircle, Edit2, Save, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import toast from 'react-hot-toast';
+import OptionMappingTab from '../components/OptionMappingTab';
 
 interface OptionValidationModalProps {
   show: boolean;
@@ -28,6 +29,7 @@ export default function OptionValidationModal({
   const [bulkEditFrom, setBulkEditFrom] = useState('');
   const [bulkEditTo, setBulkEditTo] = useState('');
   const [recommendedOptions, setRecommendedOptions] = useState<string[]>([]); // 추천 옵션상품 목록
+  const [isUploading, setIsUploading] = useState(false);
   const [showMappingModal, setShowMappingModal] = useState(false);
 
   useEffect(() => {
@@ -281,7 +283,7 @@ export default function OptionValidationModal({
   };
 
   // DB 저장
-  const handleSaveToDatabase = () => {
+  const handleSaveToDatabase = async () => {
     // 미매칭건이 있으면 저장 불가
     if (stats.unmatched > 0) {
       toast.error('매칭 실패한 주문건은 발주서등록/확정이 불가능합니다.\n모든 옵션상품을 매칭해주세요.', {
@@ -291,7 +293,22 @@ export default function OptionValidationModal({
       return;
     }
 
-    onSave(validatedOrders);
+    // 업로드 시작
+    setIsUploading(true);
+
+    // 저장 로직 실행
+    try {
+      await onSave(validatedOrders);
+
+      // 잠시 대기 후 모달 닫기 (업로드 완료 표시)
+      setTimeout(() => {
+        onClose();
+        setIsUploading(false);
+      }, 500);
+    } catch (error) {
+      console.error('발주서 등록 오류:', error);
+      setIsUploading(false);
+    }
   };
 
   if (!show) return null;
@@ -324,6 +341,14 @@ export default function OptionValidationModal({
           to {
             transform: scale(1);
             opacity: 1;
+          }
+        }
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
           }
         }
       `}</style>
@@ -381,7 +406,6 @@ export default function OptionValidationModal({
                 onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
               >
                 옵션상품매핑
-                <ExternalLink size={12} />
               </button>{' '}
               탭에서 미리 설정해두시면 다음부터는 수정작업 없이 바로 등록이 가능합니다.
             </p>
@@ -711,26 +735,30 @@ export default function OptionValidationModal({
             </button>
             <button
               onClick={handleSaveToDatabase}
-              disabled={stats.unmatched > 0}
+              disabled={stats.unmatched > 0 || isUploading}
               style={{
                 padding: '10px 20px',
-                background: stats.unmatched > 0 ? '#9ca3af' : '#2563eb',
+                background: (stats.unmatched > 0 || isUploading) ? '#9ca3af' : '#2563eb',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
                 fontSize: '14px',
                 fontWeight: '600',
-                cursor: stats.unmatched > 0 ? 'not-allowed' : 'pointer',
-                opacity: stats.unmatched > 0 ? 0.6 : 1
+                cursor: (stats.unmatched > 0 || isUploading) ? 'not-allowed' : 'pointer',
+                opacity: (stats.unmatched > 0 || isUploading) ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
               }}
             >
-              발주서등록
+              {isUploading && <Loader2 size={16} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />}
+              {isUploading ? '업로드 중...' : '발주서등록'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* 옵션상품매핑 플로팅 모달 */}
+      {/* 옵션상품매핑 모달 */}
       {showMappingModal && (
         <div style={{
           position: 'fixed',
@@ -789,20 +817,13 @@ export default function OptionValidationModal({
               </button>
             </div>
 
-            {/* iframe 컨텐츠 */}
+            {/* 컨텐츠 */}
             <div style={{
               flex: 1,
-              overflow: 'hidden'
+              overflow: 'auto',
+              padding: '20px'
             }}>
-              <iframe
-                src="/platform/orders?tab=옵션상품매핑&modal=true"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  border: 'none'
-                }}
-                title="옵션상품매핑 설정"
-              />
+              <OptionMappingTab isMobile={false} />
             </div>
           </div>
         </div>
