@@ -5,6 +5,7 @@ import { requireStaff } from '@/lib/api-security';
 import { canCreateServer, canUpdateServer, canDeleteServer } from '@/lib/permissions-server';
 import { getOrganizationDataFilter } from '@/lib/organization-utils';
 import logger from '@/lib/logger';
+import { notifyAdminOrderStatusChange, createNotification } from '@/lib/onesignal-notifications';
 
 /**
  * POST /api/integrated-orders/bulk
@@ -339,9 +340,22 @@ export async function PUT(request: NextRequest) {
       'total_amount', 'settlement_amount', 'courier_company', 'tracking_number',
       'shipping_date', 'shipped_date', 'order_status', 'shipping_status', 'payment_method', 'market_fee', 'pg_fee',
       'delivery_fee_paid_by_seller', 'other_fees', 'payment_confirmed_at', 'shipped_at',
-      'delivered_at', 'cancelled_at', 'refunded_at', 'refund_processed_at', 'cancel_reason',
+      'delivered_at', 'cancelled_at', 'refunded_at', 'refund_processed_at', 'refund_amount_canceled', 'refund_amount_canceled_at', 'cancel_reason',
       'refund_reason', 'customer_id', 'cs_memo', 'admin_memo', 'market_check', 'is_deleted'
     ];
+
+    // 상태 변경 추적을 위한 배열
+    const statusChanges: Array<{
+      id: number;
+      userId: string;
+      organizationId: string;
+      subAccountId: string;
+      oldStatus: string;
+      newStatus: string;
+      orderNumber: string;
+      finalDepositAmount: number;
+      refundAmount: number;
+    }> = [];
 
     // 각 주문 개별 업데이트
     const updatePromises = orders.map(async (order) => {
@@ -350,6 +364,13 @@ export async function PUT(request: NextRequest) {
       }
 
       const { id, ...allData } = order;
+
+      // 기존 주문 정보 조회 (상태 변경 확인용)
+      const { data: existingOrder } = await supabase
+        .from('integrated_orders')
+        .select('shipping_status, order_number, created_by, organization_id, sub_account_id, final_deposit_amount, refund_amount')
+        .eq('id', id)
+        .single();
 
       // 허용된 칼럼만 필터링
       const updateData: any = {};
@@ -367,6 +388,26 @@ export async function PUT(request: NextRequest) {
 
       if (result.error) {
         console.error(`주문 ${id} 업데이트 실패:`, result.error);
+      }
+
+      // 상태 변경 추적
+      if (
+        existingOrder &&
+        updateData.shipping_status &&
+        existingOrder.shipping_status !== updateData.shipping_status &&
+        existingOrder.created_by
+      ) {
+        statusChanges.push({
+          id,
+          userId: existingOrder.created_by,
+          organizationId: existingOrder.organization_id,
+          subAccountId: existingOrder.sub_account_id,
+          oldStatus: existingOrder.shipping_status || '',
+          newStatus: updateData.shipping_status,
+          orderNumber: existingOrder.order_number || String(id),
+          finalDepositAmount: Number(existingOrder.final_deposit_amount) || 0,
+          refundAmount: Number(existingOrder.refund_amount) || 0,
+        });
       }
 
       return result;
@@ -388,6 +429,157 @@ export async function PUT(request: NextRequest) {
     }
 
     const data = results.flatMap((r) => r.data || []);
+
+    // 📱 그룹화 알림 전송
+    if (statusChanges.length > 0) {
+      // 사용자별 + 상태별 + 서브계정별로 그룹화
+      const notificationGroups = new Map<string, {
+        userId: string;
+        organizationId: string;
+        subAccountId: string;
+        status: string;
+        orderCount: number;
+        totalAmount: number;
+        refundAmount: number;
+      }>();
+
+      for (const change of statusChanges) {
+        const key = `${change.userId}_${change.subAccountId}_${change.newStatus}`;
+
+        if (!notificationGroups.has(key)) {
+          notificationGroups.set(key, {
+            userId: change.userId,
+            organizationId: change.organizationId,
+            subAccountId: change.subAccountId,
+            status: change.newStatus,
+            orderCount: 0,
+            totalAmount: 0,
+            refundAmount: 0,
+          });
+        }
+
+        const group = notificationGroups.get(key)!;
+        group.orderCount++;
+        group.totalAmount += change.finalDepositAmount;
+        group.refundAmount += change.refundAmount;
+      }
+
+      // 각 그룹에 대해 알림 전송
+      for (const [key, group] of notificationGroups) {
+        try {
+          // 사용자가 만드는 상태 → 관리자에게 알림
+          const userStatuses = ['발주서확정', '취소요청'];
+
+          if (userStatuses.includes(group.status)) {
+            // 조직명 조회
+            const { data: orgData } = await supabase
+              .from('organizations')
+              .select('business_name')
+              .eq('id', group.organizationId)
+              .single();
+
+            const organizationName = orgData?.business_name || '셀러';
+
+            await notifyAdminOrderStatusChange({
+              orderId: key,
+              orderNumber: `${group.orderCount}건`,
+              organizationName,
+              newStatus: group.status,
+            });
+          }
+
+          // 관리자가 만드는 상태 → 사용자에게 알림 (상품준비중 제외)
+          if (group.status === '결제완료') {
+            // 서브계정 사업자명 조회
+            const { data: subAccountData } = await supabase
+              .from('sub_accounts')
+              .select('business_name')
+              .eq('id', group.subAccountId)
+              .single();
+
+            const businessName = subAccountData?.business_name || '고객';
+
+            await createNotification({
+              userId: group.userId,
+              type: 'order_status',
+              category: 'seller',
+              title: '💰 입금확인',
+              body: `${businessName}님! 총 ${group.orderCount}건의 주문 ${group.totalAmount.toLocaleString()}원 입금확인 되었습니다`,
+              resourceType: 'order',
+              resourceId: key,
+              actionUrl: '/platform/orders',
+              priority: 'high',
+            });
+          } else if (group.status === '발송완료') {
+            // 서브계정 사업자명 조회
+            const { data: subAccountData } = await supabase
+              .from('sub_accounts')
+              .select('business_name')
+              .eq('id', group.subAccountId)
+              .single();
+
+            const businessName = subAccountData?.business_name || '고객';
+
+            await createNotification({
+              userId: group.userId,
+              type: 'order_status',
+              category: 'seller',
+              title: '📦 발송완료',
+              body: `${businessName}님! 총 ${group.orderCount}건의 주문이 발송처리 되었습니다`,
+              resourceType: 'order',
+              resourceId: key,
+              actionUrl: '/platform/orders',
+              priority: 'normal',
+            });
+          } else if (group.status === '취소완료') {
+            // 서브계정 사업자명 조회
+            const { data: subAccountData } = await supabase
+              .from('sub_accounts')
+              .select('business_name')
+              .eq('id', group.subAccountId)
+              .single();
+
+            const businessName = subAccountData?.business_name || '고객';
+
+            await createNotification({
+              userId: group.userId,
+              type: 'order_status',
+              category: 'seller',
+              title: '🚫 취소승인',
+              body: `${businessName}님! 총 ${group.orderCount}건의 주문이 취소승인 되었습니다`,
+              resourceType: 'order',
+              resourceId: key,
+              actionUrl: '/platform/orders',
+              priority: 'normal',
+            });
+          } else if (group.status === '환불완료') {
+            // 서브계정 사업자명 조회
+            const { data: subAccountData } = await supabase
+              .from('sub_accounts')
+              .select('business_name')
+              .eq('id', group.subAccountId)
+              .single();
+
+            const businessName = subAccountData?.business_name || '고객';
+
+            await createNotification({
+              userId: group.userId,
+              type: 'order_status',
+              category: 'seller',
+              title: '💸 환불완료',
+              body: `${businessName}님! 총 ${group.orderCount}건의 주문 ${group.refundAmount.toLocaleString()}원이 환불완료 되었습니다`,
+              resourceType: 'order',
+              resourceId: key,
+              actionUrl: '/platform/orders',
+              priority: 'normal',
+            });
+          }
+          // 상품준비중은 알림 보내지 않음
+        } catch (notificationError) {
+          logger.error('그룹 알림 전송 실패:', notificationError);
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,

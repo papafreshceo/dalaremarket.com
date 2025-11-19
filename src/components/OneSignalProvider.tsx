@@ -103,9 +103,12 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
                 localStorage.setItem('openChatWithUser', notificationData.sender_id);
               }
 
-              // actionUrl이 있으면 해당 URL로 이동 (OneSignal 기본 동작 사용)
+              // actionUrl이 있으면 발주관리시스템 창으로 열기 (이미 열려있으면 재사용)
               if (notificationData?.actionUrl && notificationData.actionUrl !== '#') {
-                window.location.href = notificationData.actionUrl;
+                const screenWidth = window.screen.width;
+                const screenHeight = window.screen.height;
+                const windowFeatures = `width=${screenWidth},height=${screenHeight},left=0,top=0,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no`;
+                window.open(notificationData.actionUrl, 'dalrea_orders', windowFeatures);
               }
             });
 

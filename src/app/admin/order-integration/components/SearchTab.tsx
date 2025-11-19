@@ -47,7 +47,7 @@ interface Order {
   settlement_amount?: string;
   settlement_target_amount?: string;
   product_amount?: string;
-  final_payment_amount?: string;
+  final_deposit_amount?: string;
   discount_amount?: string;
   platform_discount?: string;
   seller_discount?: string;
@@ -498,7 +498,7 @@ export default function SearchTab() {
             'settlement_amount',        // field_27 - 정산예정금액 (이전 field_26)
             'settlement_target_amount', // field_28 - 정산대상금액 (이전 field_27)
             'product_amount',           // field_29 - 상품금액 (이전 field_28)
-            'final_payment_amount',     // field_30 - 최종결제금액 (이전 field_29)
+            'final_deposit_amount',     // field_30 - 최종결제금액 (이전 field_29)
             'discount_amount',          // field_31 - 할인금액 (이전 field_30)
             'platform_discount',        // field_32 - 마켓부담할인금액 (이전 field_31)
             'seller_discount',          // field_33 - 판매자할인쿠폰할인 (이전 field_32)
@@ -2999,11 +2999,12 @@ export default function SearchTab() {
         // UTC 시간으로 타임스탬프 저장 (DB는 TIMESTAMPTZ)
         const now = new Date().toISOString();
 
-        // 상태를 결제완료로 변경하고 payment_confirmed_at 타임스탬프 저장
+        // 상태를 결제완료로 변경하고 payment_confirmed_at 타임스탬프 및 settlement_amount 저장
         const updatedOrders = organizationOrders.map(order => ({
           ...order,
           shipping_status: '결제완료',
-          payment_confirmed_at: now
+          payment_confirmed_at: now,
+          settlement_amount: order.final_deposit_amount || 0 // final_deposit_amount를 settlement_amount에 복사
         }));
 
         const response = await fetch('/api/integrated-orders/bulk', {
@@ -3113,10 +3114,12 @@ export default function SearchTab() {
       const koreaTimeISO = koreaTime.toISOString();
       const formattedDateTime = koreaTimeISO.slice(0, 16).replace('T', ' ');
 
-      // refund_processed_at 타임스탬프 저장
+      // refund_processed_at 타임스탬프 및 환불금액 저장
       const updatedOrders = organizationRefundOrders.map(order => ({
         ...order,
-        refund_processed_at: koreaTimeISO
+        refund_processed_at: koreaTimeISO,
+        refund_amount_canceled: parseFloat(order.settlement_amount) || 0, // 정산예정금액을 환불금액으로 저장
+        refund_amount_canceled_at: koreaTimeISO // 환불금액 기록 일시
       }));
 
       const response = await fetch('/api/integrated-orders/bulk', {
@@ -3128,6 +3131,27 @@ export default function SearchTab() {
       const result = await response.json();
 
       if (result.success) {
+        // 총 환불금액 계산
+        const totalRefundAmount = updatedOrders.reduce((sum, order) => {
+          return sum + (order.refund_amount_canceled || 0);
+        }, 0);
+
+        // 사용자에게 환불완료 알림 전송
+        try {
+          await fetch('/api/orders/notify-refund-complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              organizationId,
+              orderCount: organizationRefundOrders.length,
+              totalRefundAmount
+            })
+          });
+        } catch (notifyError) {
+          console.error('환불완료 알림 전송 오류:', notifyError);
+          // 알림 전송 실패해도 환불처리는 성공으로 처리
+        }
+
         // UI 상태 업데이트
         setSellerStats(prev =>
           prev.map(stat =>
@@ -3136,7 +3160,7 @@ export default function SearchTab() {
               : stat
           )
         );
-        alert(`${result.count}건의 주문에 대해 환불처리가 완료되었습니다.`);
+        alert(`${result.count}건의 주문에 대해 환불처리가 완료되었습니다.\n환불금액: ${totalRefundAmount.toLocaleString()}원`);
         fetchOrders(); // 주문 목록 새로고침
       } else {
         alert('환불처리 실패: ' + result.error);
@@ -4310,7 +4334,7 @@ export default function SearchTab() {
                 </div>
                 <div className="flex items-center">
                   <span className="text-gray-600 w-28 flex-shrink-0">최종결제금액</span>
-                  <span className="text-emerald-700 font-bold text-base">{selectedOrderDetail.final_payment_amount || '-'}</span>
+                  <span className="text-emerald-700 font-bold text-base">{selectedOrderDetail.final_deposit_amount || '-'}</span>
                 </div>
               </div>
             </div>

@@ -78,7 +78,7 @@ export default function UserHeader() {
       return;
     }
 
-    // 데스크톱: 새 창으로 열기 (주소창 있음, 하지만 PWA 설치 안내 표시)
+    // 데스크톱: 별도 창으로 열기 (미니멀 UI)
     const url = status
       ? `/platform/orders?status=${status}`
       : '/platform/orders';
@@ -86,7 +86,7 @@ export default function UserHeader() {
     // Full HD 화면 크기 또는 사용자 화면 크기에 맞춤
     const screenWidth = window.screen.width;
     const screenHeight = window.screen.height;
-    const windowFeatures = `width=${screenWidth},height=${screenHeight},left=0,top=0,resizable=yes,scrollbars=yes`;
+    const windowFeatures = `width=${screenWidth},height=${screenHeight},left=0,top=0,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no`;
     window.open(url, 'dalrea_orders', windowFeatures);
   };
 
