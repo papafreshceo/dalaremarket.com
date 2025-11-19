@@ -81,11 +81,8 @@ export async function POST(request: NextRequest) {
         });
 
       if (insertError) {
-        logger.error('[statements/generate] DB 저장 실패:', insertError);
-        return NextResponse.json(
-          { success: false, error: 'DB 저장 실패' },
-          { status: 500 }
-        );
+        logger.error('[statements/generate] DB 저장 실패 (무시하고 계속 진행):', insertError);
+        // DB 저장 실패해도 PDF는 생성하도록 계속 진행
       }
 
     } else {

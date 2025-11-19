@@ -23,6 +23,7 @@ interface CompanyInfo {
 }
 
 interface UserInfo {
+  sub_account_id: string;
   name: string;
   email: string;
   business_number?: string;
@@ -205,6 +206,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
               // 첫 번째 서브계정을 기본으로 사용
               const defaultSubAccount = subAccounts[0];
               setUserInfo({
+                sub_account_id: defaultSubAccount.id,
                 name: defaultSubAccount.business_name,
                 email: defaultSubAccount.email || '',
                 business_number: defaultSubAccount.business_number,
@@ -410,8 +412,13 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
       email: companyInfo.email
     };
 
+    if (!userInfo?.sub_account_id) {
+      alert('서브계정 정보를 찾을 수 없습니다.');
+      return;
+    }
+
     // 유틸리티 함수 호출
-    await downloadMonthlyStatementPDF(year, month, orders, buyerInfo, sellerInfo);
+    await downloadMonthlyStatementPDF(year, month, orders, buyerInfo, userInfo.sub_account_id, sellerInfo);
   };
 
   return (
@@ -570,7 +577,8 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                   border: '1px solid var(--color-border)',
                   background: 'var(--color-surface)',
                   transition: 'box-shadow 0.2s ease',
-                  boxShadow: isExpanded ? 'none' : '2px 2px 3px rgba(0, 0, 0, 0.15)'
+                  boxShadow: isExpanded ? 'none' : '2px 2px 3px rgba(0, 0, 0, 0.15)',
+                  overflow: 'visible'
                 }}
               >
                 {/* 월별 집계 헤더 (클릭 가능) */}
@@ -610,7 +618,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                   </div>
 
                   {/* 년월 + 서브계정 */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '180px', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '140px', flexShrink: 1 }}>
                     <div style={{ fontSize: '15px', fontWeight: '400', color: 'var(--color-text)' }}>
                       {year}년 {monthNum}월
                     </div>
@@ -631,7 +639,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                   </div>
 
                   {/* 통계 배지 그룹 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '60px', marginLeft: '100px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, flexWrap: 'wrap' }}>
                     {/* 발주 */}
                     <div style={{
                       display: 'flex',
@@ -641,8 +649,8 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       borderRadius: '6px',
                       background: month.confirmedCount > 0 ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
                       border: month.confirmedCount > 0 ? '1px solid rgba(59, 130, 246, 0.15)' : '1px solid transparent',
-                      flex: '0 0 auto',
-                      minWidth: '165px',
+                      flex: '1 1 auto',
+                      minWidth: '120px',
                       visibility: month.confirmedCount > 0 ? 'visible' : 'hidden'
                     }}>
                       <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{month.confirmedAmount.toLocaleString()}</span>
@@ -658,8 +666,8 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       borderRadius: '6px',
                       background: month.cancelCount > 0 ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
                       border: month.cancelCount > 0 ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid transparent',
-                      flex: '0 0 auto',
-                      minWidth: '165px',
+                      flex: '1 1 auto',
+                      minWidth: '120px',
                       visibility: month.cancelCount > 0 ? 'visible' : 'hidden'
                     }}>
                       <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{month.cancelAmount.toLocaleString()}</span>
@@ -675,8 +683,8 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       borderRadius: '6px',
                       background: month.shippedCount > 0 ? 'rgba(16, 185, 129, 0.05)' : 'transparent',
                       border: month.shippedCount > 0 ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid transparent',
-                      flex: '0 0 auto',
-                      minWidth: '165px',
+                      flex: '1 1 auto',
+                      minWidth: '120px',
                       visibility: month.shippedCount > 0 ? 'visible' : 'hidden'
                     }}>
                       <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{month.shippedAmount.toLocaleString()}</span>
@@ -692,8 +700,8 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       borderRadius: '6px',
                       background: month.refundAmount > 0 ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
                       border: month.refundAmount > 0 ? '1px solid rgba(245, 158, 11, 0.15)' : '1px solid transparent',
-                      flex: '0 0 auto',
-                      minWidth: '132px',
+                      flex: '1 1 auto',
+                      minWidth: '100px',
                       visibility: month.refundAmount > 0 ? 'visible' : 'hidden'
                     }}>
                       <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{month.refundAmount.toLocaleString()}</span>
@@ -701,7 +709,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                   </div>
 
                   {/* 다운로드 아이콘 영역 */}
-                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
                     {/* 엑셀 다운로드 */}
                     <div style={{ position: 'relative' }}>
                       <button
@@ -751,7 +759,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                           fontWeight: '500',
                           whiteSpace: 'nowrap',
                           pointerEvents: 'none',
-                          zIndex: 1000,
+                          zIndex: 9999,
                           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)',
                           animation: 'fadeIn 0.15s ease-in-out'
                         }}>
@@ -823,7 +831,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                           fontWeight: '500',
                           whiteSpace: 'nowrap',
                           pointerEvents: 'none',
-                          zIndex: 1000,
+                          zIndex: 9999,
                           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)',
                           animation: 'fadeIn 0.15s ease-in-out'
                         }}>
@@ -1097,7 +1105,8 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                 style={{
                   border: '1px solid var(--color-border)',
                   background: 'var(--color-surface)',
-                  boxShadow: '2px 2px 3px rgba(0, 0, 0, 0.15)'
+                  boxShadow: '2px 2px 3px rgba(0, 0, 0, 0.15)',
+                  overflow: 'visible'
                 }}
               >
                 <div
@@ -1110,7 +1119,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                   }}
                 >
                   {/* 서브계정 이름 */}
-                  <div style={{ minWidth: '120px', flexShrink: 0 }}>
+                  <div style={{ minWidth: '120px', flexShrink: 1 }}>
                     <div style={{
                       fontSize: '12px',
                       fontWeight: '500',
@@ -1125,7 +1134,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                   </div>
 
                   {/* 통계 배지 그룹 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '60px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, flexWrap: 'wrap' }}>
                     {/* 발주 */}
                     <div style={{
                       display: 'flex',
@@ -1135,8 +1144,8 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       borderRadius: '6px',
                       background: stats.confirmedCount > 0 ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
                       border: stats.confirmedCount > 0 ? '1px solid rgba(59, 130, 246, 0.15)' : '1px solid transparent',
-                      flex: '0 0 auto',
-                      minWidth: '165px',
+                      flex: '1 1 auto',
+                      minWidth: '120px',
                       visibility: stats.confirmedCount > 0 ? 'visible' : 'hidden'
                     }}>
                       <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{stats.confirmedAmount.toLocaleString()}</span>
@@ -1152,8 +1161,8 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       borderRadius: '6px',
                       background: stats.cancelCount > 0 ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
                       border: stats.cancelCount > 0 ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid transparent',
-                      flex: '0 0 auto',
-                      minWidth: '165px',
+                      flex: '1 1 auto',
+                      minWidth: '120px',
                       visibility: stats.cancelCount > 0 ? 'visible' : 'hidden'
                     }}>
                       <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{stats.cancelAmount.toLocaleString()}</span>
@@ -1169,8 +1178,8 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       borderRadius: '6px',
                       background: stats.shippedCount > 0 ? 'rgba(16, 185, 129, 0.05)' : 'transparent',
                       border: stats.shippedCount > 0 ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid transparent',
-                      flex: '0 0 auto',
-                      minWidth: '165px',
+                      flex: '1 1 auto',
+                      minWidth: '120px',
                       visibility: stats.shippedCount > 0 ? 'visible' : 'hidden'
                     }}>
                       <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{stats.shippedAmount.toLocaleString()}</span>
@@ -1186,8 +1195,8 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       borderRadius: '6px',
                       background: stats.refundAmount > 0 ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
                       border: stats.refundAmount > 0 ? '1px solid rgba(245, 158, 11, 0.15)' : '1px solid transparent',
-                      flex: '0 0 auto',
-                      minWidth: '132px',
+                      flex: '1 1 auto',
+                      minWidth: '100px',
                       visibility: stats.refundAmount > 0 ? 'visible' : 'hidden'
                     }}>
                       <span style={{ color: 'var(--color-text)', fontWeight: '600', fontSize: '14px' }}>{stats.refundAmount.toLocaleString()}</span>
@@ -1196,7 +1205,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                   </div>
 
               {/* 다운로드 아이콘 영역 */}
-              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '16px' }}>
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '16px' }}>
                 {/* 엑셀 다운로드 */}
                 <div style={{ position: 'relative' }}>
                   <button
@@ -1253,7 +1262,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       fontWeight: '500',
                       whiteSpace: 'nowrap',
                       pointerEvents: 'none',
-                      zIndex: 1000,
+                      zIndex: 9999,
                       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)',
                       animation: 'fadeIn 0.15s ease-in-out'
                     }}>
@@ -1321,7 +1330,12 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                         email: companyInfo.email
                       };
 
-                      await downloadPeriodStatementPDF(startDate, endDate, orders, buyerInfo, sellerInfo);
+                      if (!userInfo?.sub_account_id) {
+                        alert('서브계정 정보를 찾을 수 없습니다.');
+                        return;
+                      }
+
+                      await downloadPeriodStatementPDF(startDate, endDate, orders, buyerInfo, userInfo.sub_account_id, sellerInfo);
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
@@ -1367,7 +1381,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
                       fontWeight: '500',
                       whiteSpace: 'nowrap',
                       pointerEvents: 'none',
-                      zIndex: 1000,
+                      zIndex: 9999,
                       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)',
                       animation: 'fadeIn 0.15s ease-in-out'
                     }}>

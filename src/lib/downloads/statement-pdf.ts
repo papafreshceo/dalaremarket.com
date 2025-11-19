@@ -143,6 +143,7 @@ async function aggregateOrdersByOption(orders: Order[]): Promise<StatementItem[]
  * @param month - 월 (MM)
  * @param orders - 해당 월의 발송완료된 주문 목록
  * @param buyerInfo - 공급받는자 정보 (로그인한 회원 정보)
+ * @param buyerSubAccountId - 구매 사업자의 서브계정 ID
  * @param sellerInfo - 공급자 정보 (회사 정보)
  */
 export async function downloadMonthlyStatementPDF(
@@ -157,6 +158,7 @@ export async function downloadMonthlyStatementPDF(
     phone?: string;
     email?: string;
   },
+  buyerSubAccountId: string,
   sellerInfo?: {
     name?: string;
     businessNumber?: string;
@@ -195,6 +197,7 @@ export async function downloadMonthlyStatementPDF(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        buyerSubAccountId,
         buyerInfo,
         sellerInfo,
         items,
@@ -235,6 +238,7 @@ export async function downloadMonthlyStatementPDF(
  * @param endDate - 종료일 (YYYY-MM-DD)
  * @param orders - 전체 주문 목록
  * @param buyerInfo - 공급받는자 정보 (로그인한 회원 정보)
+ * @param buyerSubAccountId - 구매 사업자의 서브계정 ID
  * @param sellerInfo - 공급자 정보 (회사 정보)
  */
 export async function downloadPeriodStatementPDF(
@@ -249,6 +253,7 @@ export async function downloadPeriodStatementPDF(
     phone?: string;
     email?: string;
   },
+  buyerSubAccountId: string,
   sellerInfo?: {
     name?: string;
     businessNumber?: string;
@@ -296,6 +301,7 @@ export async function downloadPeriodStatementPDF(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        buyerSubAccountId,
         buyerInfo,
         sellerInfo,
         items,
