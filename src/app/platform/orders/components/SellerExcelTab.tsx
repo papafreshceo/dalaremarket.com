@@ -409,12 +409,6 @@ export default function SellerExcelTab({ onClose, onOrdersUploaded, userId, user
       const { orders: mappedOrders, mappingResults, totalOrders, mappedOrders: mappedCount } =
         await applyOptionMapping(allOrders, userId);
 
-      console.log('✅ 옵션상품 매핑 완료:', {
-        totalOrders,
-        mappedOrders: mappedCount,
-        mappingResults
-      });
-
       // 2. 옵션 상품 데이터 로드 (매핑 후 검증용)
       const productMap = await loadOptionProducts();
 

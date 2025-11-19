@@ -1,3 +1,5 @@
+'use client';
+
 interface ValidationErrorModalProps {
   show: boolean;
   onClose: () => void;

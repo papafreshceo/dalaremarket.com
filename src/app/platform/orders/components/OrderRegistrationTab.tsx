@@ -215,7 +215,6 @@ export default function OrderRegistrationTab({
 
     // 초기 다크모드 상태 설정
     const initialDarkMode = document.documentElement.classList.contains('dark');
-    console.log('🌓 초기 다크모드 상태:', initialDarkMode);
     setIsDarkMode(initialDarkMode);
 
     // MutationObserver로 dark 클래스 변경 감지
@@ -223,7 +222,6 @@ export default function OrderRegistrationTab({
       mutations.forEach((mutation) => {
         if (mutation.attributeName === 'class') {
           const newDarkMode = document.documentElement.classList.contains('dark');
-          console.log('🌓 다크모드 변경 감지:', newDarkMode, 'classList:', document.documentElement.className);
           setIsDarkMode(newDarkMode);
         }
       });
@@ -247,8 +245,6 @@ export default function OrderRegistrationTab({
       const tier = organizationTier.toUpperCase();
 
       try {
-        console.log('🔍 티어 할인율 조회 시작:', { tier });
-
         const { createClient } = await import('@/lib/supabase/client');
         const supabase = createClient();
 
@@ -267,12 +263,6 @@ export default function OrderRegistrationTab({
         if (criteriaData) {
           const rate = Number(criteriaData.discount_rate) || 0;
           setDiscountRate(rate);
-          console.log('✅ 티어 할인율 적용:', {
-            조직명: organizationName,
-            티어: tier,
-            할인율: `${rate}%`,
-            설명: criteriaData.description
-          });
         }
       } catch (error) {
         console.error('❌ 티어 할인율 조회 중 오류:', error);
@@ -408,14 +398,6 @@ export default function OrderRegistrationTab({
 
         // DB 업데이트 (price_updated_at 필드에 갱신 일시 저장)
         // 할인 없이 순수 공급단가만 갱신
-        if (updatedCount === 0) {
-          console.log('💰 공급단가 갱신:', {
-            단가: newUnitPrice,
-            수량: quantity,
-            공급가: newSupplyPrice
-          });
-        }
-
         const { error: updateError } = await supabase
           .from('integrated_orders')
           .update({
@@ -476,8 +458,6 @@ export default function OrderRegistrationTab({
 
       // 서브계정이 선택된 경우 서브계정 정보 사용
       if (selectedSubAccount && selectedSubAccount !== 'main') {
-        console.log('🔍 선택된 서브계정:', selectedSubAccount);
-
         // 필수 정보 확인
         const missingFields = [];
         if (!selectedSubAccount?.account_number?.trim()) missingFields.push('정산계좌번호');
@@ -498,7 +478,6 @@ export default function OrderRegistrationTab({
       }
 
       // 메인 계정 정보 조회
-      console.log('🔍 메인 셀러계정 정보 조회 시작:', { organizationId });
       const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
 
@@ -507,8 +486,6 @@ export default function OrderRegistrationTab({
         .select('bank_account, bank_name, account_holder, representative_name, representative_phone, seller_code')
         .eq('id', organizationId)
         .single();
-
-      console.log('🔍 조회 결과:', { orgData, orgError });
 
       if (orgError || !orgData) {
         console.error('셀러계정 정보 조회 실패:', orgError);
@@ -610,12 +587,6 @@ export default function OrderRegistrationTab({
         return sum + productAmount;
       }, 0);
 
-      console.log('💰 총 공급가 계산:', {
-        filteredOrders: filteredOrders.length,
-        totalSupplyPrice,
-        sampleSettlement: latestOrders?.[0]
-      });
-
       // 주문당 캐시 차감액 계산
       const cashPerOrder = appliedCashToUse / filteredOrders.length;
 
@@ -668,23 +639,8 @@ export default function OrderRegistrationTab({
         discountPerOrderList.push(orderDiscount);
       }
 
-      console.log('💳 주문별 캐시 사용액 및 최종 입금액 계산:', {
-        totalSupplyPrice,
-        appliedCashToUse,
-        totalDiscountAmount,
-        orderCount: filteredOrders.length,
-        cashPerOrderList,
-        discountPerOrderList
-      });
-
       // 셀러코드 결정: 무조건 서브계정의 seller_code 사용
       const sellerCodeToUse = subAccountSellerCode;
-
-      console.log('📋 발주번호 생성에 사용할 셀러코드:', {
-        selectedSubAccount: selectedSubAccount ? (selectedSubAccount === 'main' ? 'main' : selectedSubAccount.seller_code) : 'none',
-        subAccountSellerCode: subAccountSellerCode,
-        finalSellerCode: sellerCodeToUse
-      });
 
       for (let i = 0; i < filteredOrders.length; i++) {
         const order = filteredOrders[i];
@@ -693,14 +649,6 @@ export default function OrderRegistrationTab({
         const orderCashUsed = cashPerOrderList[i];
         const orderDiscount = discountPerOrderList[i];
         const finalPaymentAmount = supplyPrice - orderDiscount - orderCashUsed;
-
-        console.log(`📝 주문 ${i + 1} 업데이트:`, {
-          orderId: order.id,
-          supplyPrice,
-          orderDiscount,
-          orderCashUsed,
-          finalDepositAmount: Math.round(finalPaymentAmount)
-        });
 
         const sellerSupplyPriceSnapshot = sellerSupplyPriceMap.get(order.id) || 0;
 
@@ -728,8 +676,6 @@ export default function OrderRegistrationTab({
         }
       }
 
-      console.log('✅ 모든 주문 업데이트 완료');
-
       // 관리자에게 알림 전송 (발주확정)
       try {
         const orderIdsToNotify = filteredOrders.map(o => o.id);
@@ -749,17 +695,6 @@ export default function OrderRegistrationTab({
 
       // 배치 정보 저장
       const finalPaymentAmountTotal = totalSupplyPrice - totalDiscountAmount - appliedCashToUse;
-      console.log('📦 배치 정보 저장 시작:', {
-        organization_id: organizationId,
-        confirmed_at: now,
-        total_amount: totalSupplyPrice,
-        discount_amount: totalDiscountAmount,
-        cash_used: appliedCashToUse,
-        final_deposit_amount: finalPaymentAmountTotal,
-        order_count: filteredOrders.length,
-        depositor_name: finalDepositorName,
-        executor_id: userId
-      });
 
       try {
         const { data: batchData, error: batchError } = await supabase
@@ -782,8 +717,6 @@ export default function OrderRegistrationTab({
 
         if (batchError) {
           console.error('❌ 배치 정보 저장 오류:', batchError);
-        } else {
-          console.log('✅ 배치 정보 저장 성공:', batchData);
         }
       } catch (batchSaveError) {
         console.error('❌ 배치 저장 실패:', batchSaveError);

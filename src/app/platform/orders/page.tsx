@@ -182,8 +182,6 @@ function OrdersPageContent() {
         e.preventDefault(); // 기본 새로고침 동작 막기
         e.stopPropagation(); // 이벤트 전파 중지
 
-        console.log('🔄 완전한 새로고침 시작 (캐시 무시)...');
-
         try {
           // 강제 새로고침: 캐시를 무시하고 서버에서 새로 가져옴 (Ctrl+Shift+R과 동일)
           window.location.reload();
@@ -265,11 +263,6 @@ function OrdersPageContent() {
           setUserEmail(profileUser.email || '');
           setUserRole(profileUser.role || '');
 
-          console.log('👤 사용자 정보:', {
-            role: profileUser.role,
-            primary_organization_id: profileUser.primary_organization_id
-          });
-
           // 조직 정보 가져오기 (profile 페이지와 동일한 방식)
           if (profileUser.primary_organization_id) {
             const supabase = createClient();
@@ -306,14 +299,6 @@ function OrdersPageContent() {
             if (orgData) {
               const validTiers = ['light', 'standard', 'advance', 'elite', 'legend'];
 
-              console.log('🏢 조직 정보 로드:', {
-                id: orgData.id,
-                business_name: orgData.business_name,
-                seller_code: orgData.seller_code,
-                partner_code: orgData.partner_code,
-                tier: orgData.tier,
-                user_role: profileUser.role
-              });
               setOrganizationId(orgData.id); // organizationId 설정
               setOrganizationName(orgData.business_name || '');
 
@@ -321,10 +306,8 @@ function OrdersPageContent() {
               const orgTier = orgData.tier?.toLowerCase();
               if (orgTier && validTiers.includes(orgTier)) {
                 setOrganizationTier(orgTier as any);
-                console.log('🎯 조직 티어 설정:', orgTier);
               } else {
                 setOrganizationTier(null);
-                console.log('🎯 조직 티어 없음');
               }
 
               // role에 따라 적절한 코드 표시
@@ -334,12 +317,6 @@ function OrdersPageContent() {
                 ? orgData.partner_code
                 : '';
               setSellerCode(code || '');
-              console.log('✅ 조직 정보 설정 완료:', {
-                organizationId: orgData.id,
-                organizationName: orgData.business_name,
-                sellerCode: code,
-                tier: orgTier
-              });
             }
 
             // 조직 내 역할 가져오기
@@ -359,9 +336,6 @@ function OrdersPageContent() {
               };
               const roleName = roleNames[memberData.role] || memberData.role;
               setMemberRole(roleName);
-              console.log('👤 멤버 역할 설정:', roleName);
-            } else {
-              console.log('⚠️ 멤버 정보 없음 (organization_members에 레코드 없음)');
             }
 
             // 서브계정 목록 불러오기
@@ -371,7 +345,6 @@ function OrdersPageContent() {
 
               if (subData.success && subData.sub_organizations) {
                 setSubAccounts(subData.sub_organizations);
-                console.log('📋 서브계정 목록 로드:', subData.sub_organizations.length, '개');
               }
             } catch (error) {
               console.error('❌ 서브계정 목록 로드 실패:', error);
@@ -407,14 +380,6 @@ function OrdersPageContent() {
 
     init();
   }, []);
-
-  // 날짜 필터 변경 시 주문 다시 조회 - 제거됨 (프론트엔드에서만 필터링)
-  // useEffect(() => {
-  //   // 최초 로딩이 아닐 때만 실행 (userId가 설정된 후)
-  //   if (userId) {
-  //     fetchOrders();
-  //   }
-  // }, [startDate, endDate, userId]);
 
   // 캐시 & 크레딧 잔액 조회 함수
   const fetchBalances = async (showRefillToast: boolean = true) => {
