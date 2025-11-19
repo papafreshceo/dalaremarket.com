@@ -3546,7 +3546,7 @@ export default function OrderRegistrationTab({
       {/* 발주 테이블 (주문이 있을 때만) */}
       {filteredOrders.length > 0 && (
       <EditableAdminGrid
-        key={`grid-${refreshTrigger}-${isDarkMode ? 'dark' : 'light'}`}
+        key={`grid-${refreshTrigger}-${isDarkMode ? 'dark' : 'light'}-${searchTerm}`}
         data={filteredOrders}
         columns={getColumnsByStatus}
         height="600px"

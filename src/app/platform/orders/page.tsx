@@ -709,122 +709,69 @@ function OrdersPageContent() {
   }, [orders, selectedSubAccount]);
 
   // 날짜와 검색 필터만 적용 (통계 계산용) - 서브계정 필터링된 주문 기준
-  const dateAndSearchFilteredOrders = filteredOrdersBySubAccount.filter(order => {
-    // 날짜 필터 (한국 시간 기준) - updated_at 기준
-    let matchesDate = true;
-    if (startDate || endDate) {
-      // updated_at만 사용
-      const dateValue = (order as any).updated_at;
+  const dateAndSearchFilteredOrders = useMemo(() => {
+    return filteredOrdersBySubAccount.filter(order => {
+      // 날짜 필터 (한국 시간 기준) - updated_at 기준
+      let matchesDate = true;
+      if (startDate || endDate) {
+        // updated_at만 사용
+        const dateValue = (order as any).updated_at;
 
-      if (!dateValue) {
-        return true; // updated_at 값이 없으면 필터 통과
-      }
+        if (!dateValue) {
+          return true; // updated_at 값이 없으면 필터 통과
+        }
 
-      // 첫 번째 주문만 디버깅
-      if (filteredOrdersBySubAccount.indexOf(order) === 0) {
+        // UTC 시간을 한국 시간(UTC+9)으로 변환
         const orderDate = new Date(dateValue);
         const koreaOrderDate = new Date(orderDate.getTime() + (9 * 60 * 60 * 1000));
+
+        // 한국 시간 기준 날짜만 추출 (시간 제거)
         const orderDateOnly = new Date(
           koreaOrderDate.getUTCFullYear(),
           koreaOrderDate.getUTCMonth(),
           koreaOrderDate.getUTCDate()
         );
-        const startDateOnly = startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null;
-        const endDateOnly = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null;
 
-        console.log('🔍 날짜 필터 디버깅:', {
-          주문ID: order.id,
-          날짜값: dateValue,
-          '1_원본_UTC시간': orderDate.toISOString(),
-          '2_한국시간_UTC표기': koreaOrderDate.toISOString(),
-          '3_주문날짜만_로컬': orderDateOnly.toString(),
-          '4_시작일_버튼클릭': startDate?.toString(),
-          '5_시작일만_로컬': startDateOnly?.toString(),
-          '6_종료일_버튼클릭': endDate?.toString(),
-          '7_종료일만_로컬': endDateOnly?.toString(),
-          '8_브라우저_타임존_오프셋': new Date().getTimezoneOffset(),
-          '9_비교결과_시작일보다작음': orderDateOnly < (startDateOnly || new Date(0)),
-          '10_비교결과_종료일보다큼': orderDateOnly > (endDateOnly || new Date()),
-          등록일시: order.registeredAt,
-          날짜: order.date
-        });
-      }
-
-      // UTC 시간을 한국 시간(UTC+9)으로 변환
-      const orderDate = new Date(dateValue);
-      const koreaOrderDate = new Date(orderDate.getTime() + (9 * 60 * 60 * 1000));
-
-      // 한국 시간 기준 날짜만 추출 (시간 제거)
-      const orderDateOnly = new Date(
-        koreaOrderDate.getUTCFullYear(),
-        koreaOrderDate.getUTCMonth(),
-        koreaOrderDate.getUTCDate()
-      );
-
-      if (startDate) {
-        const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-        if (orderDateOnly < startDateOnly) {
-          if (filteredOrdersBySubAccount.indexOf(order) === 0) {
-            console.log('❌ startDate 필터 실패:', {
-              orderDateOnly,
-              startDateOnly,
-              result: orderDateOnly < startDateOnly
-            });
+        if (startDate) {
+          const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+          if (orderDateOnly < startDateOnly) {
+            matchesDate = false;
           }
-          matchesDate = false;
+        }
+
+        if (endDate) {
+          const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+          if (orderDateOnly > endDateOnly) {
+            matchesDate = false;
+          }
         }
       }
 
-      if (endDate) {
-        const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-        if (orderDateOnly > endDateOnly) {
-          if (filteredOrdersBySubAccount.indexOf(order) === 0) {
-            console.log('❌ endDate 필터 실패:', {
-              orderDateOnly,
-              endDateOnly,
-              result: orderDateOnly > endDateOnly
-            });
-          }
-          matchesDate = false;
-        }
+      // 검색 필터 (주문자, 주문자전화번호, 수령인, 수령인전화번호, 주소, 옵션상품)
+      let matchesSearch = true;
+      if (searchTerm && searchTerm.trim()) {
+        matchesSearch = [
+          order.orderer,
+          order.ordererPhone,
+          order.recipient,
+          order.recipientPhone,
+          order.address,
+          order.optionName
+        ].some(field => field && field.toLowerCase().includes(searchTerm.toLowerCase()));
       }
 
-      if (filteredOrdersBySubAccount.indexOf(order) === 0) {
-        console.log('✅ 최종 matchesDate:', matchesDate);
-      }
-    }
-
-    // 검색 필터 (주문자, 주문자전화번호, 수령인, 수령인전화번호, 주소, 옵션상품)
-    const matchesSearch = !searchTerm || [
-      order.orderer,
-      order.ordererPhone,
-      order.recipient,
-      order.recipientPhone,
-      order.address,
-      order.optionName
-    ].some(field => field && field.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    return matchesDate && matchesSearch;
-  });
-
-  // 필터링 결과 디버깅
-  if (startDate || endDate) {
-    console.log('📊 필터링 결과:', {
-      전체주문수: orders.length,
-      서브계정필터후: filteredOrdersBySubAccount.length,
-      날짜검색필터후: dateAndSearchFilteredOrders.length,
-      시작일: startDate?.toLocaleDateString('ko-KR'),
-      종료일: endDate?.toLocaleDateString('ko-KR'),
-      검색어: searchTerm || '없음'
+      return matchesDate && matchesSearch;
     });
-  }
+  }, [filteredOrdersBySubAccount, searchTerm, startDate, endDate]);
 
   // 날짜, 검색, 상태 필터 모두 적용 (테이블 표시용)
-  const filteredOrders = dateAndSearchFilteredOrders.filter(order => {
-    // 상태 필터
-    const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
-    return matchesStatus;
-  });
+  const filteredOrders = useMemo(() => {
+    return dateAndSearchFilteredOrders.filter(order => {
+      // 상태 필터
+      const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
+      return matchesStatus;
+    });
+  }, [dateAndSearchFilteredOrders, filterStatus]);
 
   // 통계 데이터 (상태 필터 제외, 날짜와 검색 필터만 적용)
   const statsData: StatsData[] = [
