@@ -132,7 +132,8 @@
       "Bash(node scripts/check-cancel-orders.js:*)",
       "Bash(node scripts/check-refunded-orders.js:*)",
       "Bash(node scripts/check-refunded-simple.js:*)",
-      "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\orders\\notify-cancel-approval\" rmdir /s /q \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\orders\\notify-cancel-approval\")"
+      "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\orders\\notify-cancel-approval\" rmdir /s /q \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\orders\\notify-cancel-approval\")",
+      "Bash(node scripts/run-migration-088.js:*)"
     ],
     "deny": [],
     "ask": []

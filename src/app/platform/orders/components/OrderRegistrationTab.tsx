@@ -20,8 +20,8 @@ interface OrderRegistrationTabProps {
   statusConfig: Record<Order['status'], StatusConfig>;
   filterStatus: 'all' | Order['status'];
   setFilterStatus: (status: 'all' | Order['status']) => void;
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
+  tableSearchTerm: string;
+  setTableSearchTerm: (term: string) => void;
   selectedOrders: number[];
   setSelectedOrders: (orders: number[]) => void;
   setShowUploadModal: (show: boolean) => void;
@@ -52,8 +52,8 @@ export default function OrderRegistrationTab({
   statusConfig,
   filterStatus,
   setFilterStatus,
-  searchTerm,
-  setSearchTerm,
+  tableSearchTerm,
+  setTableSearchTerm,
   selectedOrders,
   setSelectedOrders,
   setShowUploadModal,
@@ -2878,18 +2878,20 @@ export default function OrderRegistrationTab({
 
           <input
             type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="전체 검색"
+            value={tableSearchTerm}
+            onChange={(e) => setTableSearchTerm(e.target.value)}
+            placeholder="테이블 검색 (주문자/수령인/주소/옵션)"
             className="filter-input"
             style={{
-              width: isMobile ? '120px' : '180px',
-              minWidth: isMobile ? '100px' : '150px',
+              width: isMobile ? '150px' : '250px',
+              minWidth: isMobile ? '130px' : '200px',
               padding: '4px 8px',
               borderRadius: '6px',
               fontSize: isMobile ? '11px' : '12px',
               height: '28px',
-              flex: isMobile ? '1 1 auto' : '0 0 auto'
+              flex: isMobile ? '1 1 auto' : '0 0 auto',
+              border: '2px solid #3b82f6',
+              backgroundColor: 'var(--color-surface)'
             }}
           />
         </div>
@@ -3546,7 +3548,7 @@ export default function OrderRegistrationTab({
       {/* 발주 테이블 (주문이 있을 때만) */}
       {filteredOrders.length > 0 && (
       <EditableAdminGrid
-        key={`grid-${refreshTrigger}-${isDarkMode ? 'dark' : 'light'}-${searchTerm}`}
+        key={`grid-${refreshTrigger}-${isDarkMode ? 'dark' : 'light'}-${tableSearchTerm}`}
         data={filteredOrders}
         columns={getColumnsByStatus}
         height="600px"

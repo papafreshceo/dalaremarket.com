@@ -55,7 +55,7 @@ function OrdersPageContent() {
   const [showCreditTooltip, setShowCreditTooltip] = useState(false);
 
   const [filterStatus, setFilterStatus] = useState<'all' | Order['status']>(statusParam || 'registered');
-  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [tableSearchTerm, setTableSearchTerm] = useState<string>(''); // 테이블 전용 검색어
 
   // postMessage 처리 여부 추적
   const messageHandledRef = useRef<boolean>(false);
@@ -447,6 +447,12 @@ function OrdersPageContent() {
         cache: 'no-store',
         headers: baseHeaders
       });
+
+      if (!cashResponse.ok) {
+        console.error('캐시 조회 실패:', cashResponse.status, cashResponse.statusText);
+        throw new Error(`캐시 조회 실패: ${cashResponse.status}`);
+      }
+
       const cashData = await cashResponse.json();
       if (cashData.success) {
         setCashBalance(cashData.balance);
@@ -461,6 +467,12 @@ function OrdersPageContent() {
         },
         cache: 'no-store'
       });
+
+      if (!creditResponse.ok) {
+        console.error('크레딧 조회 실패:', creditResponse.status, creditResponse.statusText);
+        throw new Error(`크레딧 조회 실패: ${creditResponse.status}`);
+      }
+
       const creditData = await creditResponse.json();
       if (creditData.success) {
         setCreditBalance(creditData.balance);
@@ -633,8 +645,9 @@ function OrdersPageContent() {
       marketName: order.market_name || '미지정', // 마켓명
       sellerMarketName: order.seller_market_name || '미지정', // 셀러 마켓명
       priceUpdatedAt: order.price_updated_at, // 공급가 갱신 일시
-      subAccountId: order.sub_account_id || null // 서브계정 ID
-    }));
+      subAccountId: order.sub_account_id || null, // 서브계정 ID
+      updated_at: order.updated_at // 날짜 필터용
+    } as any));
 
     setOrders(convertedOrders);
 
@@ -708,8 +721,8 @@ function OrdersPageContent() {
     }
   }, [orders, selectedSubAccount]);
 
-  // 날짜와 검색 필터만 적용 (통계 계산용) - 서브계정 필터링된 주문 기준
-  const dateAndSearchFilteredOrders = useMemo(() => {
+  // 날짜 필터만 적용 (통계 계산용) - 서브계정 필터링된 주문 기준
+  const dateFilteredOrders = useMemo(() => {
     return filteredOrdersBySubAccount.filter(order => {
       // 날짜 필터 (한국 시간 기준) - updated_at 기준
       let matchesDate = true;
@@ -747,41 +760,40 @@ function OrdersPageContent() {
         }
       }
 
-      // 검색 필터 (주문자, 주문자전화번호, 수령인, 수령인전화번호, 주소, 옵션상품)
-      let matchesSearch = true;
-      if (searchTerm && searchTerm.trim()) {
-        matchesSearch = [
-          order.orderer,
-          order.ordererPhone,
-          order.recipient,
-          order.recipientPhone,
-          order.address,
-          order.optionName
-        ].some(field => field && field.toLowerCase().includes(searchTerm.toLowerCase()));
-      }
-
-      return matchesDate && matchesSearch;
+      return matchesDate;
     });
-  }, [filteredOrdersBySubAccount, searchTerm, startDate, endDate]);
+  }, [filteredOrdersBySubAccount, startDate, endDate]);
 
-  // 날짜, 검색, 상태 필터 모두 적용 (테이블 표시용)
+  // 날짜, 상태, 테이블검색 필터 모두 적용 (테이블 표시용)
   const filteredOrders = useMemo(() => {
-    return dateAndSearchFilteredOrders.filter(order => {
+    return dateFilteredOrders.filter(order => {
       // 상태 필터
       const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
-      return matchesStatus;
-    });
-  }, [dateAndSearchFilteredOrders, filterStatus]);
 
-  // 통계 데이터 (상태 필터 제외, 날짜와 검색 필터만 적용)
+      // 테이블 검색 필터
+      const matchesTableSearch = !tableSearchTerm || [
+        order.orderer,
+        order.ordererPhone,
+        order.recipient,
+        order.recipientPhone,
+        order.address,
+        order.optionName,
+        order.products
+      ].some(field => field && field.toLowerCase().includes(tableSearchTerm.toLowerCase()));
+
+      return matchesStatus && matchesTableSearch;
+    });
+  }, [dateFilteredOrders, filterStatus, tableSearchTerm]);
+
+  // 통계 데이터 (상태 필터 제외, 날짜 필터만 적용)
   const statsData: StatsData[] = [
-    { status: 'registered', count: dateAndSearchFilteredOrders.filter(o => o.status === 'registered').length, bgGradient: 'linear-gradient(135deg, #2563eb 0%, #60a5fa 100%)' },
-    { status: 'confirmed', count: dateAndSearchFilteredOrders.filter(o => o.status === 'confirmed').length, bgGradient: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)' },
-    { status: 'preparing', count: dateAndSearchFilteredOrders.filter(o => o.status === 'preparing').length, bgGradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' },
-    { status: 'shipped', count: dateAndSearchFilteredOrders.filter(o => o.status === 'shipped').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' },
-    { status: 'cancelRequested', count: dateAndSearchFilteredOrders.filter(o => o.status === 'cancelRequested').length, bgGradient: 'linear-gradient(135deg, #f87171 0%, #fca5a5 100%)' },
-    { status: 'cancelled', count: dateAndSearchFilteredOrders.filter(o => o.status === 'cancelled').length, bgGradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' },
-    { status: 'refunded', count: dateAndSearchFilteredOrders.filter(o => o.status === 'refunded').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' }
+    { status: 'registered', count: dateFilteredOrders.filter(o => o.status === 'registered').length, bgGradient: 'linear-gradient(135deg, #2563eb 0%, #60a5fa 100%)' },
+    { status: 'confirmed', count: dateFilteredOrders.filter(o => o.status === 'confirmed').length, bgGradient: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)' },
+    { status: 'preparing', count: dateFilteredOrders.filter(o => o.status === 'preparing').length, bgGradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' },
+    { status: 'shipped', count: dateFilteredOrders.filter(o => o.status === 'shipped').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' },
+    { status: 'cancelRequested', count: dateFilteredOrders.filter(o => o.status === 'cancelRequested').length, bgGradient: 'linear-gradient(135deg, #f87171 0%, #fca5a5 100%)' },
+    { status: 'cancelled', count: dateFilteredOrders.filter(o => o.status === 'cancelled').length, bgGradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' },
+    { status: 'refunded', count: dateFilteredOrders.filter(o => o.status === 'refunded').length, bgGradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' }
   ];
 
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
@@ -2123,8 +2135,8 @@ function OrdersPageContent() {
               statusConfig={statusConfig}
               filterStatus={filterStatus}
               setFilterStatus={setFilterStatus}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
+              tableSearchTerm={tableSearchTerm}
+              setTableSearchTerm={setTableSearchTerm}
               selectedOrders={selectedOrders}
               setSelectedOrders={setSelectedOrders}
               setShowUploadModal={setShowUploadModal}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import UserHeader from '@/components/layout/UserHeader'
 import MobileBottomNav from '@/components/layout/MobileBottomNav'
 import PlatformFooter from '@/components/PlatformFooter'
@@ -14,6 +15,7 @@ export default function PlatformLayout({
   // iframe 안에서 로드되었는지 확인 - hydration mismatch 방지를 위해 null로 초기화
   const [isInIframe, setIsInIframe] = useState<boolean | null>(null)
   const [isMounted, setIsMounted] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     setIsMounted(true)
@@ -68,10 +70,14 @@ export default function PlatformLayout({
   // mount 전까지 항상 헤더/네비 표시 (hydration mismatch 방지)
   const showHeaderAndNav = !isMounted || isInIframe === false
 
+  // /platform/orders 페이지에서는 UserHeader 숨김 (전용 헤더 사용)
+  const isOrdersPage = pathname?.startsWith('/platform/orders')
+  const showUserHeader = showHeaderAndNav && !isOrdersPage
+
   return (
     <UserBalanceProvider>
       <div className="flex flex-col min-h-screen">
-        {showHeaderAndNav && <UserHeader />}
+        {showUserHeader && <UserHeader />}
         <main className="flex-1">{children}</main>
         {showHeaderAndNav && <PlatformFooter />}
         {showHeaderAndNav && <MobileBottomNav />}
