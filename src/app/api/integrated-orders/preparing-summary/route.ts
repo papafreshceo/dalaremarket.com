@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     // 주문 조회 (상태 필터는 선택사항)
     let query = supabase
       .from('integrated_orders')
-      .select('option_name, quantity, final_payment_amount, vendor_name, shipping_status, sheet_date, organization_id')
+      .select('option_name, quantity, final_deposit_amount, vendor_name, shipping_status, sheet_date, organization_id')
       .gte('sheet_date', startDate)
       .lte('sheet_date', endDate)
       .or('is_deleted.is.null,is_deleted.eq.false');
@@ -94,9 +94,9 @@ export async function GET(request: NextRequest) {
       const key = `${order.option_name}|${order.vendor_name || ''}`;
 
       // 숫자로 변환 (문자열로 저장되어 있을 수 있음)
-      const paymentAmount = typeof order.final_payment_amount === 'string'
-        ? parseFloat(order.final_payment_amount) || 0
-        : order.final_payment_amount || 0;
+      const paymentAmount = typeof order.final_deposit_amount === 'string'
+        ? parseFloat(order.final_deposit_amount) || 0
+        : order.final_deposit_amount || 0;
 
       const quantity = typeof order.quantity === 'string'
         ? parseInt(order.quantity, 10) || 0

@@ -632,8 +632,11 @@ function OrdersPageContent() {
       optionCode: order.option_code || '',
       specialRequest: order.special_request,
       unitPrice: order.seller_supply_price ? parseFloat(order.seller_supply_price) : undefined,
-      supplyPrice: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined,
-      refundAmount: order.settlement_amount ? parseFloat(order.settlement_amount) : undefined, // 환불액 (정산금액과 동일)
+      supplyPrice: order.product_amount ? parseFloat(order.product_amount) : undefined,
+      discountAmount: order.discount_amount ? parseFloat(order.discount_amount) : 0, // 할인액 (DB 저장값)
+      cashUsed: order.cash_used ? parseFloat(order.cash_used) : 0, // 사용캐시 (DB 저장값)
+      settlementAmount: order.final_deposit_amount ? parseFloat(order.final_deposit_amount) : 0, // 정산금액 (최종입금액)
+      refundAmount: order.product_amount ? parseFloat(order.product_amount) : undefined, // 환불액 (원공급가와 동일)
       refundedAt: order.refund_processed_at, // 환불일
       marketName: order.market_name || '미지정', // 마켓명
       sellerMarketName: order.seller_market_name || '미지정', // 셀러 마켓명
@@ -1264,7 +1267,7 @@ function OrdersPageContent() {
         </div>
       )}
 
-      {/* 다크모드 스크롤바 스타일 */}
+      {/* 다크모드 스크롤바 & 반응형 스타일 */}
       <style>{`
         * {
           scrollbar-width: thin;
@@ -1287,6 +1290,65 @@ function OrdersPageContent() {
 
         *::-webkit-scrollbar-thumb:hover {
           background: var(--color-text-secondary);
+        }
+
+        /* 반응형 유틸리티 클래스 */
+        .responsive-text {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .responsive-button {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 100%;
+        }
+
+        .responsive-flex-wrap {
+          flex-wrap: wrap;
+          gap: 8px !important;
+        }
+
+        /* 모바일 대응 */
+        @media (max-width: 768px) {
+          .hide-on-mobile {
+            display: none !important;
+          }
+
+          .mobile-full-width {
+            width: 100% !important;
+          }
+
+          .mobile-small-text {
+            font-size: 12px !important;
+          }
+
+          .mobile-small-padding {
+            padding: 4px 8px !important;
+          }
+
+          .mobile-gap-small {
+            gap: 4px !important;
+          }
+        }
+
+        /* 태블릿 대응 */
+        @media (max-width: 1024px) {
+          .tablet-flex-wrap {
+            flex-wrap: wrap !important;
+          }
+
+          .tablet-small-text {
+            font-size: 13px !important;
+          }
+        }
+
+        /* 작은 화면에서 버튼 텍스트 오버플로우 방지 */
+        button {
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
       `}</style>
 
@@ -1321,23 +1383,25 @@ function OrdersPageContent() {
         }}
       />
       {/* 발주관리 전용 헤더 */}
-      <div style={{
+      <div className="tablet-flex-wrap" style={{
         position: 'fixed',
         top: 0,
         left: 0,
         width: '100%',
-        height: '70px',
+        minHeight: '70px',
+        height: 'auto',
         background: 'var(--color-background-secondary)',
         borderBottom: '1px solid var(--color-border)',
         zIndex: 1200,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: isMobile ? '0 16px' : '0 24px',
-        gap: '16px'
+        padding: isMobile ? '8px 12px' : '0 24px',
+        gap: isMobile ? '8px' : '16px',
+        flexWrap: 'wrap'
       }}>
         {/* 왼쪽: 햄버거 메뉴(모바일) + 나가기 버튼 & 로그인 정보 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '0 0 auto' }}>
+        <div className="tablet-flex-wrap mobile-gap-small" style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 auto', minWidth: 0, flexWrap: 'wrap' }}>
           {/* 햄버거 메뉴 버튼 (모바일만) */}
           {isMobile && (
             <button
@@ -1367,14 +1431,16 @@ function OrdersPageContent() {
 
           {/* 로그인 정보 */}
           {!isMobile && (
-            <div style={{
+            <div className="tablet-flex-wrap" style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: '8px',
+              flexWrap: 'wrap',
+              maxWidth: 'calc(100vw - 300px)'
             }}>
               {/* 셀러계정 정보 (등급 배지, 캐시, 크레딧, 기여점수 포함) */}
               {organizationName && (
-                <div style={{
+                <div className="tablet-small-text" style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
@@ -1384,7 +1450,9 @@ function OrdersPageContent() {
                   borderRadius: '6px',
                   fontSize: '13px',
                   fontWeight: '600',
-                  color: 'var(--color-primary)'
+                  color: 'var(--color-primary)',
+                  maxWidth: '100%',
+                  overflow: 'hidden'
                 }}>
                   {/* 등급 배지 */}
                   {organizationTier && (
@@ -1394,12 +1462,12 @@ function OrdersPageContent() {
                   )}
 
                   {/* 셀러계정명 + 코드 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>{organizationName}</span>
+                  <div className="responsive-text" style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: '1 1 auto' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{organizationName}</span>
                     {sellerCode && (
                       <>
-                        <span style={{ opacity: 0.5 }}>·</span>
-                        <span style={{ fontFamily: 'monospace' }}>{sellerCode}</span>
+                        <span style={{ opacity: 0.5, flexShrink: 0 }}>·</span>
+                        <span style={{ fontFamily: 'monospace', flexShrink: 0 }}>{sellerCode}</span>
                       </>
                     )}
                   </div>
@@ -1432,15 +1500,17 @@ function OrdersPageContent() {
 
               {/* 서브계정 선택 배지 - 서브계정이 2개 이상일 때만 표시 */}
               {userId && userId !== 'guest' && organizationName && subAccounts.length > 0 && (
-                <div style={{
+                <div className="responsive-flex-wrap" style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  padding: '4px 0'
+                  padding: '4px 0',
+                  flexWrap: 'wrap'
                 }}>
                   {/* 전체 배지 */}
                   <button
                     onClick={() => setSelectedSubAccount(null)}
+                    className="responsive-button mobile-small-padding"
                     style={{
                       padding: '4px 10px',
                       background: !selectedSubAccount ? 'var(--color-success)' : 'var(--color-surface)',
@@ -1451,7 +1521,8 @@ function OrdersPageContent() {
                       color: !selectedSubAccount ? '#fff' : 'var(--color-text-secondary)',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
                     }}
                     onMouseEnter={(e) => {
                       if (selectedSubAccount) {
@@ -1474,6 +1545,7 @@ function OrdersPageContent() {
                   {/* 메인 계정 배지 */}
                   <button
                     onClick={() => setSelectedSubAccount('main')}
+                    className="responsive-button mobile-small-padding"
                     style={{
                       padding: '4px 10px',
                       background: selectedSubAccount === 'main' ? 'var(--color-success)' : 'var(--color-surface)',
@@ -1484,7 +1556,8 @@ function OrdersPageContent() {
                       color: selectedSubAccount === 'main' ? '#fff' : 'var(--color-text-secondary)',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
                     }}
                     onMouseEnter={(e) => {
                       if (selectedSubAccount !== 'main') {
@@ -1510,6 +1583,7 @@ function OrdersPageContent() {
                     <button
                       key={sub.id}
                       onClick={() => setSelectedSubAccount(sub)}
+                      className="responsive-button mobile-small-padding"
                       style={{
                         padding: '4px 10px',
                         background: selectedSubAccount?.id === sub.id ? 'var(--color-success)' : 'var(--color-surface)',
@@ -1520,7 +1594,9 @@ function OrdersPageContent() {
                         color: selectedSubAccount?.id === sub.id ? '#fff' : 'var(--color-text-secondary)',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                        maxWidth: '150px'
                       }}
                       onMouseEnter={(e) => {
                         if (selectedSubAccount?.id !== sub.id) {
@@ -1545,10 +1621,11 @@ function OrdersPageContent() {
               )}
 
               {/* 사용자 이메일 */}
-              <div style={{
+              <div className="responsive-text tablet-small-text" style={{
                 fontSize: '14px',
                 color: 'var(--color-text)',
-                fontWeight: '500'
+                fontWeight: '500',
+                maxWidth: '200px'
               }}>
                 {userEmail || '로그인 정보 없음'}
               </div>
@@ -1605,19 +1682,21 @@ function OrdersPageContent() {
             onClick={() => {
               window.close();
             }}
+            className="mobile-small-padding"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '6px 12px',
+              padding: isMobile ? '4px 8px' : '6px 12px',
               background: 'transparent',
               border: '1px solid var(--color-border)',
               borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '13px',
+              fontSize: isMobile ? '12px' : '13px',
               fontWeight: '500',
               color: 'var(--color-text)',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'var(--color-surface-hover)';

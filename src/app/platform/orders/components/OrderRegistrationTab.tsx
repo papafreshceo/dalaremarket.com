@@ -121,6 +121,7 @@ export default function OrderRegistrationTab({
   // 공급가 갱신 상태
   const [isPriceUpdated, setIsPriceUpdated] = useState<boolean>(false);
   const [isUpdatingPrice, setIsUpdatingPrice] = useState<boolean>(false);
+  const [lastPriceUpdateTime, setLastPriceUpdateTime] = useState<string>('');
 
   // 티어 할인율 관련 state
   const [discountRate, setDiscountRate] = useState<number | null>(null);
@@ -169,6 +170,9 @@ export default function OrderRegistrationTab({
 
   // 다크모드 감지
   useEffect(() => {
+    // 클라이언트 사이드에서만 실행
+    if (typeof window === 'undefined') return;
+
     // 초기 다크모드 상태 설정
     const initialDarkMode = document.documentElement.classList.contains('dark');
     console.log('🌓 초기 다크모드 상태:', initialDarkMode);
@@ -363,16 +367,12 @@ export default function OrderRegistrationTab({
         }
 
         // DB 업데이트 (price_updated_at 필드에 갱신 일시 저장)
-        // 할인 금액 계산 후 10원 단위 절사
-        const discountAmount = Math.floor((newSupplyPrice * discountRate / 100) / 10) * 10;
-        const finalSupplyPrice = newSupplyPrice - discountAmount;
-
+        // 할인 없이 순수 공급단가만 갱신
         if (updatedCount === 0) {
-          console.log('💰 할인율 적용 예시:', {
-            원공급가: newSupplyPrice,
-            할인율: `${discountRate}%`,
-            할인금액: discountAmount,
-            할인후공급가: finalSupplyPrice
+          console.log('💰 공급단가 갱신:', {
+            단가: newUnitPrice,
+            수량: quantity,
+            공급가: newSupplyPrice
           });
         }
 
@@ -380,7 +380,7 @@ export default function OrderRegistrationTab({
           .from('integrated_orders')
           .update({
             seller_supply_price: newUnitPrice.toString(),
-            settlement_amount: finalSupplyPrice.toString(),
+            product_amount: newSupplyPrice.toString(),  // 원공급가 (할인 없이)
             price_updated_at: now
           })
           .eq('id', order.id);
@@ -394,6 +394,11 @@ export default function OrderRegistrationTab({
 
       setIsUpdatingPrice(false);
       setIsPriceUpdated(true);
+
+      // 갱신 시간 저장
+      const currentTime = new Date();
+      const timeStr = currentTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setLastPriceUpdateTime(timeStr);
 
       const message = notFoundCount > 0
         ? `${updatedCount}건의 공급가가 업데이트되었습니다.\n(${notFoundCount}건은 공급단가를 찾을 수 없어 제외되었습니다.)`
@@ -459,7 +464,7 @@ export default function OrderRegistrationTab({
 
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
-        .select('bank_account, bank_name, account_holder, representative_name, representative_phone')
+        .select('bank_account, bank_name, account_holder, representative_name, representative_phone, seller_code')
         .eq('id', organizationId)
         .single();
 
@@ -512,14 +517,37 @@ export default function OrderRegistrationTab({
       const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
 
+      // 서브계정의 seller_code 및 ID 조회
+      let subAccountSellerCode = 'S000000'; // 기본값
+      let subAccountId: string | null = null;
+
+      if (selectedSubAccount && selectedSubAccount !== 'main') {
+        // 선택된 서브계정의 seller_code 및 ID 사용
+        subAccountSellerCode = selectedSubAccount.seller_code || 'S000000';
+        subAccountId = selectedSubAccount.id;
+      } else {
+        // 'main' 또는 미선택 시 메인 서브계정의 seller_code 및 ID 조회
+        const { data: mainSubAccount } = await supabase
+          .from('sub_accounts')
+          .select('id, seller_code')
+          .eq('organization_id', organizationId)
+          .eq('is_main', true)
+          .single();
+
+        if (mainSubAccount) {
+          subAccountSellerCode = mainSubAccount.seller_code || 'S000000';
+          subAccountId = mainSubAccount.id;
+        }
+      }
+
       // 각 주문에 발주번호 생성 및 업데이트
       const now = getCurrentTimeUTC();
 
-      // DB에서 최신 settlement_amount 조회 (공급가 갱신 후 값)
+      // DB에서 최신 product_amount 조회 (공급가 갱신 후 값)
       const orderIds = filteredOrders.map(o => o.id);
       const { data: latestOrders, error: fetchError } = await supabase
         .from('integrated_orders')
-        .select('id, settlement_amount')
+        .select('id, product_amount')
         .in('id', orderIds);
 
       if (fetchError) {
@@ -528,16 +556,16 @@ export default function OrderRegistrationTab({
         return;
       }
 
-      // settlement_amount 맵 생성
-      const settlementMap = new Map<number, number>();
+      // product_amount 맵 생성
+      const productAmountMap = new Map<number, number>();
       (latestOrders || []).forEach((order: any) => {
-        settlementMap.set(order.id, Number(order.settlement_amount) || 0);
+        productAmountMap.set(order.id, Number(order.product_amount) || 0);
       });
 
-      // 총 공급가 계산 (DB에서 가져온 최신 settlement_amount 사용)
+      // 총 공급가 계산 (DB에서 가져온 최신 product_amount 사용)
       const totalSupplyPrice = filteredOrders.reduce((sum, order) => {
-        const settlementAmount = settlementMap.get(order.id) || 0;
-        return sum + settlementAmount;
+        const productAmount = productAmountMap.get(order.id) || 0;
+        return sum + productAmount;
       }, 0);
 
       console.log('💰 총 공급가 계산:', {
@@ -555,7 +583,7 @@ export default function OrderRegistrationTab({
 
       for (let i = 0; i < filteredOrders.length; i++) {
         const order = filteredOrders[i];
-        const supplyPrice = settlementMap.get(order.id) || 0;
+        const supplyPrice = productAmountMap.get(order.id) || 0;
 
         // 주문별 캐시 사용액 계산 (비율 분배, 원 단위로 반올림)
         let orderCashUsed = 0;
@@ -571,23 +599,62 @@ export default function OrderRegistrationTab({
         cashPerOrderList.push(orderCashUsed);
       }
 
+      // 등급할인 금액 계산 및 배분
+      const totalDiscountAmount = discountRate !== null && discountRate > 0
+        ? Math.floor((totalSupplyPrice * discountRate / 100) / 10) * 10
+        : 0;
+
+      let remainingDiscount = totalDiscountAmount;
+      const discountPerOrderList: number[] = [];
+
+      for (let i = 0; i < filteredOrders.length; i++) {
+        const order = filteredOrders[i];
+        const supplyPrice = productAmountMap.get(order.id) || 0;
+
+        // 주문별 할인 금액 계산 (비율 분배, 원 단위로 반올림)
+        let orderDiscount = 0;
+        if (totalSupplyPrice > 0 && totalDiscountAmount > 0) {
+          if (i === filteredOrders.length - 1) {
+            // 마지막 주문은 남은 할인 금액 전부 (반올림 오차 보정)
+            orderDiscount = remainingDiscount;
+          } else {
+            orderDiscount = Math.round((supplyPrice / totalSupplyPrice) * totalDiscountAmount);
+            remainingDiscount -= orderDiscount;
+          }
+        }
+        discountPerOrderList.push(orderDiscount);
+      }
+
       console.log('💳 주문별 캐시 사용액 및 최종 입금액 계산:', {
         totalSupplyPrice,
         cashToUse,
+        totalDiscountAmount,
         orderCount: filteredOrders.length,
-        cashPerOrderList
+        cashPerOrderList,
+        discountPerOrderList
+      });
+
+      // 셀러코드 결정: 무조건 서브계정의 seller_code 사용
+      const sellerCodeToUse = subAccountSellerCode;
+
+      console.log('📋 발주번호 생성에 사용할 셀러코드:', {
+        selectedSubAccount: selectedSubAccount ? (selectedSubAccount === 'main' ? 'main' : selectedSubAccount.seller_code) : 'none',
+        subAccountSellerCode: subAccountSellerCode,
+        finalSellerCode: sellerCodeToUse
       });
 
       for (let i = 0; i < filteredOrders.length; i++) {
         const order = filteredOrders[i];
-        const orderNo = generateOrderNumber(userEmail, i + 1);
-        const supplyPrice = settlementMap.get(order.id) || 0;
+        const orderNo = generateOrderNumber(sellerCodeToUse, i + 1);
+        const supplyPrice = productAmountMap.get(order.id) || 0;
         const orderCashUsed = cashPerOrderList[i];
-        const finalPaymentAmount = supplyPrice - orderCashUsed;
+        const orderDiscount = discountPerOrderList[i];
+        const finalPaymentAmount = supplyPrice - orderDiscount - orderCashUsed;
 
         console.log(`📝 주문 ${i + 1} 업데이트:`, {
           orderId: order.id,
           supplyPrice,
+          orderDiscount,
           orderCashUsed,
           finalDepositAmount: Math.round(finalPaymentAmount)
         });
@@ -599,9 +666,10 @@ export default function OrderRegistrationTab({
             order_number: orderNo,
             confirmed_at: now,
             organization_id: organizationId, // 조직 ID 저장
-            sub_account_id: (selectedSubAccount && selectedSubAccount !== 'main') ? selectedSubAccount.id : null, // 서브계정 ID 저장 (서브계정 선택 시만)
+            sub_account_id: subAccountId, // 메인 또는 선택된 서브계정 ID 저장
             created_by: userId, // 등록자 ID 저장
-            final_deposit_amount: Math.round(finalPaymentAmount), // 최종입금액 저장 (settlement_amount - cash_used)
+            discount_amount: orderDiscount, // 등급할인 금액 저장
+            final_deposit_amount: Math.round(finalPaymentAmount), // 최종입금액 저장 (product_amount - discount_amount - cash_used)
             cash_used: orderCashUsed, // 주문별 캐시 사용액 저장
             depositor_name: (selectedSubAccount && selectedSubAccount !== 'main') ? selectedSubAccount.account_holder : finalDepositorName, // 서브계정 예금주 또는 메인계정 입금자명
           })
@@ -616,14 +684,32 @@ export default function OrderRegistrationTab({
 
       console.log('✅ 모든 주문 업데이트 완료');
 
+      // 관리자에게 알림 전송 (발주확정)
+      try {
+        const orderIdsToNotify = filteredOrders.map(o => o.id);
+        await fetch('/api/orders/notify-status-change', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderIds: orderIdsToNotify,
+            status: '발주서확정',
+            totalAmount: totalSupplyPrice
+          })
+        });
+      } catch (notifyError) {
+        console.error('알림 전송 오류:', notifyError);
+        // 알림 전송 실패해도 발주확정은 성공으로 처리
+      }
+
       // 배치 정보 저장
-      const finalPaymentAmountTotal = totalSupplyPrice - cashToUse;
+      const finalPaymentAmountTotal = totalSupplyPrice - totalDiscountAmount - cashToUse;
       console.log('📦 배치 정보 저장 시작:', {
         organization_id: organizationId,
         confirmed_at: now,
         total_amount: totalSupplyPrice,
+        discount_amount: totalDiscountAmount,
         cash_used: cashToUse,
-        final_payment_amount: finalPaymentAmountTotal,
+        final_deposit_amount: finalPaymentAmountTotal,
         order_count: filteredOrders.length,
         depositor_name: finalDepositorName,
         executor_id: userId
@@ -636,8 +722,9 @@ export default function OrderRegistrationTab({
             organization_id: organizationId,
             confirmed_at: now,
             total_amount: totalSupplyPrice,
+            discount_amount: totalDiscountAmount,
             cash_used: cashToUse,
-            final_payment_amount: finalPaymentAmountTotal,
+            final_deposit_amount: finalPaymentAmountTotal,
             order_count: filteredOrders.length,
             depositor_name: finalDepositorName,
             executor_id: userId,
@@ -755,27 +842,25 @@ export default function OrderRegistrationTab({
   };
 
   // 발주번호 생성 함수
-  const generateOrderNumber = (userEmail: string, sequence: number): string => {
-    // 이메일 앞 2글자 추출 (대문자로 변환)
-    const emailPrefix = userEmail.substring(0, 2).toUpperCase();
-
+  const generateOrderNumber = (sellerCode: string, sequence: number): string => {
     // 한국 시간 (서울 시간대: UTC+9)
     const utcNow = new Date();
     const now = new Date(utcNow.getTime() + (9 * 60 * 60 * 1000));
 
-    const year = now.getUTCFullYear();
+    const year = String(now.getUTCFullYear()).substring(2); // YY (2자리)
     const month = String(now.getUTCMonth() + 1).padStart(2, '0');
     const day = String(now.getUTCDate()).padStart(2, '0');
     const hours = String(now.getUTCHours()).padStart(2, '0');
     const minutes = String(now.getUTCMinutes()).padStart(2, '0');
     const seconds = String(now.getUTCSeconds()).padStart(2, '0');
-    const dateTime = `${year}${month}${day}${hours}${minutes}${seconds}`;
+    const dateTime = `${year}${month}${day}${hours}${minutes}${seconds}`; // YYMMDDHHMMSS (12자리)
 
     // 순번 (4자리)
     const seqStr = String(sequence).padStart(4, '0');
 
-    // 발주번호: 이메일앞2글자 + YYYYMMDDHHMMSS + 순번4자리
-    return `${emailPrefix}${dateTime}${seqStr}`;
+    // 발주번호: 셀러코드 + YYMMDDHHMMSS + 순번4자리
+    // 예: S123456-250119153045-0001 또는 SA123456-250119153045-0001
+    return `${sellerCode}-${dateTime}-${seqStr}`;
   };
 
   // 주문 삭제 핸들러
@@ -884,6 +969,21 @@ export default function OrderRegistrationTab({
             return;
           }
 
+          // 관리자에게 알림 전송
+          try {
+            await fetch('/api/orders/notify-status-change', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                orderIds: [orderId],
+                status: '취소요청'
+              })
+            });
+          } catch (notifyError) {
+            console.error('알림 전송 오류:', notifyError);
+            // 알림 전송 실패해도 취소요청은 성공으로 처리
+          }
+
           showModal('alert', '완료', '취소요청이 완료되었습니다.', () => {
             if (onRefresh) {
               onRefresh();
@@ -961,6 +1061,21 @@ export default function OrderRegistrationTab({
               }
             });
             return;
+          }
+
+          // 관리자에게 알림 전송
+          try {
+            await fetch('/api/orders/notify-status-change', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                orderIds: selectedOrders,
+                status: '취소요청'
+              })
+            });
+          } catch (notifyError) {
+            console.error('알림 전송 오류:', notifyError);
+            // 알림 전송 실패해도 취소요청은 성공으로 처리
           }
 
           // 토스트 메시지 (화면 정중앙)
@@ -2308,30 +2423,42 @@ export default function OrderRegistrationTab({
     alert(`${activeMarkets.length}개 마켓의 송장파일이 다운로드되었습니다.`);
   };
 
-  // 주문건수 및 공급가 합계 계산
+  // 주문건수 및 공급가 합계 계산 (DB 저장값 기준)
   const orderSummary = useMemo(() => {
     const count = filteredOrders.length;
 
-    // 원래 공급가 합계 (할인 전)
+    // 공급가 합계 (DB 저장값)
     const totalSupplyPrice = filteredOrders.reduce((sum, order) => {
-      const price = parseFloat(order.supplyPrice || '0');
-      return sum + (isNaN(price) ? 0 : price);
+      const price = Number(order.supplyPrice) || 0;
+      return sum + price;
     }, 0);
 
-    // 할인 금액 계산 후 10원 단위 절사 (할인율이 없으면 0)
-    const discountAmount = discountRate !== null && discountRate > 0
-      ? Math.floor((totalSupplyPrice * discountRate / 100) / 10) * 10
-      : 0;
-    // 할인 후 공급가 = 원래 공급가 - 절사된 할인금액
-    const discountedTotalSupplyPrice = totalSupplyPrice - discountAmount;
+    // 할인액 합계 (DB 저장값)
+    const totalDiscountAmount = filteredOrders.reduce((sum, order) => {
+      const discount = Number(order.discountAmount) || 0;
+      return sum + discount;
+    }, 0);
+
+    // 사용캐시 합계 (DB 저장값)
+    const totalCashUsed = filteredOrders.reduce((sum, order) => {
+      const cash = Number(order.cashUsed) || 0;
+      return sum + cash;
+    }, 0);
+
+    // 정산금액 합계 (DB 저장값)
+    const totalSettlementAmount = filteredOrders.reduce((sum, order) => {
+      const settlement = Number(order.settlementAmount) || 0;
+      return sum + settlement;
+    }, 0);
 
     return {
       count,
-      totalSupplyPrice,           // 원래 공급가
-      discountAmount,             // 할인 금액 (10원 단위 절사)
-      discountedTotalSupplyPrice  // 할인 후 공급가
+      totalSupplyPrice,        // 공급가 합계 (DB값)
+      totalDiscountAmount,     // 할인액 합계 (DB값)
+      totalCashUsed,           // 사용캐시 합계 (DB값)
+      totalSettlementAmount    // 정산금액 합계 (DB값)
     };
-  }, [filteredOrders, discountRate]);
+  }, [filteredOrders]);
 
   // 상태별 설명 텍스트
   const statusDescriptions: Record<Order['status'], string> = {
@@ -2453,15 +2580,17 @@ export default function OrderRegistrationTab({
 
       {/* 필터 및 버튼 섹션 */}
       <div className="card" style={{
-        padding: '16px',
+        padding: isMobile ? '12px' : '16px',
         borderRadius: '8px',
         marginBottom: '16px',
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '12px'
       }}>
         {/* 필터 - 좌측 */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: isMobile ? '4px' : '8px', alignItems: 'center', flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 }}>
           <div style={{ display: 'inline-block' }}>
             <DatePicker
               value={startDate}
@@ -2495,20 +2624,24 @@ export default function OrderRegistrationTab({
               setSelectedDateFilter('today');
             }}
             style={{
-              padding: '4px 12px',
+              padding: isMobile ? '4px 8px' : '4px 12px',
               border: selectedDateFilter === 'today'
                 ? '2px solid #3b82f6'
-                : document.documentElement.classList.contains('dark')
+                : isDarkMode
                   ? '0.2px solid var(--color-border)'
                   : '1px solid var(--color-border)',
               borderRadius: '6px',
-              fontSize: '12px',
+              fontSize: isMobile ? '11px' : '12px',
               height: '28px',
               background: selectedDateFilter === 'today' ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-surface)',
               color: selectedDateFilter === 'today' ? '#3b82f6' : 'var(--color-text)',
               fontWeight: selectedDateFilter === 'today' ? '600' : '400',
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              flexShrink: 0
             }}
             onMouseEnter={(e) => {
               if (selectedDateFilter !== 'today') {
@@ -2533,20 +2666,24 @@ export default function OrderRegistrationTab({
               setSelectedDateFilter('yesterday');
             }}
             style={{
-              padding: '4px 12px',
+              padding: isMobile ? '4px 8px' : '4px 12px',
               border: selectedDateFilter === 'yesterday'
                 ? '2px solid #3b82f6'
-                : document.documentElement.classList.contains('dark')
+                : isDarkMode
                   ? '0.2px solid var(--color-border)'
                   : '1px solid var(--color-border)',
               borderRadius: '6px',
-              fontSize: '12px',
+              fontSize: isMobile ? '11px' : '12px',
               height: '28px',
               background: selectedDateFilter === 'yesterday' ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-surface)',
               color: selectedDateFilter === 'yesterday' ? '#3b82f6' : 'var(--color-text)',
               fontWeight: selectedDateFilter === 'yesterday' ? '600' : '400',
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              flexShrink: 0
             }}
             onMouseEnter={(e) => {
               if (selectedDateFilter !== 'yesterday') {
@@ -2571,20 +2708,24 @@ export default function OrderRegistrationTab({
               setSelectedDateFilter('7days');
             }}
             style={{
-              padding: '4px 12px',
+              padding: isMobile ? '4px 8px' : '4px 12px',
               border: selectedDateFilter === '7days'
                 ? '2px solid #3b82f6'
-                : document.documentElement.classList.contains('dark')
+                : isDarkMode
                   ? '0.2px solid var(--color-border)'
                   : '1px solid var(--color-border)',
               borderRadius: '6px',
-              fontSize: '12px',
+              fontSize: isMobile ? '11px' : '12px',
               height: '28px',
               background: selectedDateFilter === '7days' ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-surface)',
               color: selectedDateFilter === '7days' ? '#3b82f6' : 'var(--color-text)',
               fontWeight: selectedDateFilter === '7days' ? '600' : '400',
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              flexShrink: 0
             }}
             onMouseEnter={(e) => {
               if (selectedDateFilter !== '7days') {
@@ -2609,20 +2750,24 @@ export default function OrderRegistrationTab({
               setSelectedDateFilter('30days');
             }}
             style={{
-              padding: '4px 12px',
+              padding: isMobile ? '4px 8px' : '4px 12px',
               border: selectedDateFilter === '30days'
                 ? '2px solid #3b82f6'
-                : document.documentElement.classList.contains('dark')
+                : isDarkMode
                   ? '0.2px solid var(--color-border)'
                   : '1px solid var(--color-border)',
               borderRadius: '6px',
-              fontSize: '12px',
+              fontSize: isMobile ? '11px' : '12px',
               height: '28px',
               background: selectedDateFilter === '30days' ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-surface)',
               color: selectedDateFilter === '30days' ? '#3b82f6' : 'var(--color-text)',
               fontWeight: selectedDateFilter === '30days' ? '600' : '400',
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              flexShrink: 0
             }}
             onMouseEnter={(e) => {
               if (selectedDateFilter !== '30days') {
@@ -2647,20 +2792,24 @@ export default function OrderRegistrationTab({
               setSelectedDateFilter('90days');
             }}
             style={{
-              padding: '4px 12px',
+              padding: isMobile ? '4px 8px' : '4px 12px',
               border: selectedDateFilter === '90days'
                 ? '2px solid #3b82f6'
-                : document.documentElement.classList.contains('dark')
+                : isDarkMode
                   ? '0.2px solid var(--color-border)'
                   : '1px solid var(--color-border)',
               borderRadius: '6px',
-              fontSize: '12px',
+              fontSize: isMobile ? '11px' : '12px',
               height: '28px',
               background: selectedDateFilter === '90days' ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-surface)',
               color: selectedDateFilter === '90days' ? '#3b82f6' : 'var(--color-text)',
               fontWeight: selectedDateFilter === '90days' ? '600' : '400',
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              flexShrink: 0
             }}
             onMouseEnter={(e) => {
               if (selectedDateFilter !== '90days') {
@@ -2683,18 +2832,20 @@ export default function OrderRegistrationTab({
             placeholder="전체 검색"
             className="filter-input"
             style={{
-              width: '180px',
+              width: isMobile ? '120px' : '180px',
+              minWidth: isMobile ? '100px' : '150px',
               padding: '4px 8px',
               borderRadius: '6px',
-              fontSize: '12px',
-              height: '28px'
+              fontSize: isMobile ? '11px' : '12px',
+              height: '28px',
+              flex: isMobile ? '1 1 auto' : '0 0 auto'
             }}
           />
         </div>
 
         {/* 발주서 관리 버튼들 - 우측 (발주서등록 상태만) */}
         {filterStatus === 'registered' && (
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: isMobile ? '4px' : '8px', flexWrap: 'wrap', flexShrink: 0 }}>
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <button
                 onClick={() => {
@@ -2719,23 +2870,27 @@ export default function OrderRegistrationTab({
                   e.currentTarget.style.background = 'transparent';
                 }}
                 style={{
-                  padding: '6px 16px',
+                  padding: isMobile ? '6px 10px' : '6px 16px',
                   color: '#8b5cf6',
                   background: 'transparent',
                   border: '1px solid #8b5cf6',
                   borderRadius: '6px',
-                  fontSize: '12px',
+                  fontSize: isMobile ? '11px' : '12px',
                   fontWeight: '500',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   height: '28px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: isMobile ? '4px' : '6px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  flexShrink: 0
                 }}
               >
-                <Upload size={14} />
-                마켓파일 업로드
+                <Upload size={isMobile ? 12 : 14} />
+                {isMobile ? '마켓파일' : '마켓파일 업로드'}
               </button>
               <div style={{
                 visibility: 'hidden',
@@ -2792,23 +2947,27 @@ export default function OrderRegistrationTab({
                   e.currentTarget.style.background = 'transparent';
                 }}
                 style={{
-                  padding: '6px 16px',
+                  padding: isMobile ? '6px 10px' : '6px 16px',
                   color: '#2563eb',
                   background: 'transparent',
                   border: '1px solid #2563eb',
                   borderRadius: '6px',
-                  fontSize: '12px',
+                  fontSize: isMobile ? '11px' : '12px',
                   fontWeight: '500',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   height: '28px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: isMobile ? '4px' : '6px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  flexShrink: 0
                 }}
               >
-                <Upload size={14} />
-                발주서 업로드
+                <Upload size={isMobile ? 12 : 14} />
+                {isMobile ? '발주서' : '발주서 업로드'}
               </button>
               <div style={{
                 visibility: 'hidden',
@@ -2850,30 +3009,34 @@ export default function OrderRegistrationTab({
                 e.currentTarget.style.background = 'transparent';
               }}
               style={{
-                padding: '6px 16px',
+                padding: isMobile ? '6px 10px' : '6px 16px',
                 color: '#10b981',
                 background: 'transparent',
                 border: '1px solid #10b981',
                 borderRadius: '6px',
-                fontSize: '12px',
+                fontSize: isMobile ? '11px' : '12px',
                 fontWeight: '500',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 height: '28px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: isMobile ? '4px' : '6px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                flexShrink: 0
               }}
             >
-              <Download size={14} />
-              발주서 양식
+              <Download size={isMobile ? 12 : 14} />
+              {isMobile ? '양식' : '발주서 양식'}
             </button>
           </div>
         )}
       </div>
 
-      {/* 주문 요약 섹션 (주문이 있을 때 모든 상태에서 표시) */}
-      {filteredOrders.length > 0 && (
+      {/* 주문 요약 섹션 - 발주서등록: 캐시 사용 기능 포함 */}
+      {filterStatus === 'registered' && filteredOrders.length > 0 && (
         <div style={{
           marginBottom: '16px',
           padding: '16px',
@@ -2885,320 +3048,219 @@ export default function OrderRegistrationTab({
           alignItems: 'center'
         }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          {/* 첫 번째 줄: 주문 통계 */}
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* 주문건수 */}
             <div>
-              <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>주문건수</span>
-              <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-text)' }}>
+              <span style={{ fontSize: '13px', color: '#64748b', marginRight: '8px' }}>주문건수</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>
                 {orderSummary.count.toLocaleString()}건
               </span>
             </div>
 
+            {/* 공급가 합계 */}
             <div>
-              <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>공급가 합계</span>
-              <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-text)' }}>
+              <span style={{ fontSize: '13px', color: '#64748b', marginRight: '8px' }}>공급가 합계</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>
                 {orderSummary.totalSupplyPrice.toLocaleString()}원
               </span>
             </div>
 
-            {/* 화살표 */}
-            {discountRate > 0 && (
-              <svg width="32" height="24" viewBox="0 0 32 24" fill="none" style={{ flexShrink: 0 }}>
-                <path d="M6 8L10 12L6 16M14 8L18 12L14 16" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-
-            {/* 등급할인적용 */}
-            {discountRate !== null && discountRate > 0 && (
-              <div>
-                <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>등급할인적용 ({organizationTier?.toUpperCase()} {discountRate}%)</span>
-                <span style={{ fontSize: '18px', fontWeight: '700', color: '#f87171' }}>
-                  -{orderSummary.discountAmount.toLocaleString()}원
-                </span>
-              </div>
-            )}
-
-            {/* 화살표 */}
-            {discountRate !== null && discountRate > 0 && (
-              <svg width="32" height="24" viewBox="0 0 32 24" fill="none" style={{ flexShrink: 0 }}>
-                <path d="M6 8L10 12L6 16M14 8L18 12L14 16" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-
-            {/* 할인 후 금액 */}
-            {discountRate !== null && discountRate > 0 && (
-              <div>
-                <span style={{ fontSize: '18px', fontWeight: '700', color: '#10b981' }}>
-                  {orderSummary.discountedTotalSupplyPrice.toLocaleString()}원
-                </span>
-              </div>
-            )}
-
-            {/* 화살표 */}
-            {filterStatus === 'registered' && isPriceUpdated && (
-              <svg width="32" height="24" viewBox="0 0 32 24" fill="none" style={{ flexShrink: 0 }}>
-                <path d="M6 8L10 12L6 16M14 8L18 12L14 16" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-
-            {/* 캐시 사용 - 공급가 갱신 후에만 활성화 (발주서등록 상태일 때만) */}
-            {filterStatus === 'registered' && isPriceUpdated && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {!isCashEnabled ? (
-                <button
-                  onClick={() => setIsCashEnabled(true)}
-                  style={{
-                    padding: '4px 10px',
-                    background: 'transparent',
-                    color: 'var(--color-primary, #2563eb)',
-                    border: '1px solid var(--color-primary, #2563eb)',
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap',
-                    outline: 'none'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--color-primary-light, #dbeafe)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                  }}
-                >
-                  캐시사용
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => {
-                      setIsCashEnabled(false);
-                      setCashToUse(0);
-                    }}
-                    style={{
-                      padding: '4px 10px',
-                      background: 'var(--color-primary, #2563eb)',
-                      color: 'white',
-                      border: '1px solid var(--color-primary, #2563eb)',
-                      borderRadius: '4px',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      whiteSpace: 'nowrap',
-                      outline: 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--color-primary-dark, #1d4ed8)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'var(--color-primary, #2563eb)';
-                    }}
-                  >
-                    캐시사용
-                  </button>
-                  <input
-                    type="number"
-                    value={cashToUse || ''}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value) || 0;
-                      // 10원 단위로 절사
-                      const roundedValue = Math.floor(value / 10) * 10;
-                      const maxCash = Math.min(cashBalance, orderSummary.discountedTotalSupplyPrice);
-                      setCashToUse(Math.max(0, Math.min(roundedValue, maxCash)));
-                    }}
-                    min={0}
-                    max={Math.min(cashBalance, orderSummary.discountedTotalSupplyPrice)}
-                    step={10}
-                    placeholder="캐시 입력"
-                    style={{
-                      width: '100px',
-                      height: '26px',
-                      padding: '0 8px',
-                      border: '1px solid var(--color-primary, #2563eb)',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: 'var(--color-primary, #2563eb)',
-                      background: 'transparent',
-                      textAlign: 'right',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                  <div style={{ position: 'relative', display: 'inline-block' }}>
-                    <button
-                      onClick={() => {
-                        const maxCash = Math.min(cashBalance, orderSummary.discountedTotalSupplyPrice);
-                        // 10원 단위로 절사
-                        const roundedMaxCash = Math.floor(maxCash / 10) * 10;
-                        setCashToUse(roundedMaxCash);
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'var(--color-primary-dark, #1d4ed8)';
-                        const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
-                        if (tooltip) tooltip.style.visibility = 'visible';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'var(--color-primary, #2563eb)';
-                        const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
-                        if (tooltip) tooltip.style.visibility = 'hidden';
-                      }}
-                      style={{
-                        height: '26px',
-                        padding: '0 8px',
-                        background: 'var(--color-primary, #2563eb)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        fontSize: '10px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        whiteSpace: 'nowrap',
-                        display: 'flex',
-                        alignItems: 'center',
-                        outline: 'none'
-                      }}
-                    >
-                      전액
-                    </button>
-                    <div style={{
-                      visibility: 'hidden',
-                      position: 'absolute',
-                      bottom: '100%',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      marginBottom: '8px',
-                      padding: '6px 10px',
-                      background: 'var(--color-tooltip-bg, #1f2937)',
-                      color: 'white',
-                      fontSize: '11px',
-                      borderRadius: '4px',
-                      whiteSpace: 'nowrap',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                      pointerEvents: 'none',
-                      zIndex: 1000
-                    }}>
-                      캐시는 10원 단위로 사용 가능합니다
-                      <div style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        width: 0,
-                        height: 0,
-                        borderLeft: '5px solid transparent',
-                        borderRight: '5px solid transparent',
-                        borderTop: '5px solid var(--color-tooltip-bg, #1f2937)'
-                      }}></div>
-                    </div>
-                  </div>
-                </>
-              )}
-              </div>
-            )}
-
-            {/* 화살표 */}
-            {filterStatus === 'registered' && isPriceUpdated && (
-              <svg width="32" height="24" viewBox="0 0 32 24" fill="none" style={{ flexShrink: 0 }}>
-                <path d="M6 8L10 12L6 16M14 8L18 12L14 16" stroke="var(--color-primary, #2563eb)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-
-            {/* 최종 입금액 - 공급가 갱신 후에만 (발주서등록 상태일 때만) */}
-            {filterStatus === 'registered' && isPriceUpdated && (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--color-primary, #2563eb)' }}>최종 입금액</span>
-                <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-primary, #2563eb)' }}>
-                  {(orderSummary.discountedTotalSupplyPrice - cashToUse).toLocaleString()}원
-                </span>
-              </div>
-            )}
+            {/* 할인액 */}
+            <div>
+              <span style={{ fontSize: '13px', color: '#64748b', marginRight: '8px' }}>할인액</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: '#dc2626' }}>
+                {orderSummary.totalDiscountAmount.toLocaleString()}원
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* 공급가 갱신 및 발주확정 버튼 영역 (발주서등록 상태일 때만) */}
-        {filterStatus === 'registered' && (
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            {/* 공급가 갱신 버튼 */}
-            {!isPriceUpdated ? (
-              <button
-                onClick={handlePriceUpdate}
-                disabled={isUpdatingPrice}
+          {/* 두 번째 줄: 캐시 사용 */}
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* 보유 캐시 */}
+            <div>
+              <span style={{ fontSize: '13px', color: '#64748b', marginRight: '8px' }}>💰 보유 캐시</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: '#0891b2' }}>
+                {cashBalance.toLocaleString()}캐시
+              </span>
+            </div>
+
+            {/* 캐시 사용 입력 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#64748b' }}>사용캐시</span>
+              <input
+                type="number"
+                value={cashToUse}
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  if (value >= 0 && value <= cashBalance) {
+                    setCashToUse(value);
+                  }
+                }}
+                min={0}
+                max={cashBalance}
                 style={{
-                  padding: '12px 24px',
-                  background: isUpdatingPrice ? '#9ca3af' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  color: 'white',
-                  border: 'none',
+                  width: '120px',
+                  padding: '6px 12px',
+                  border: '1px solid #cbd5e1',
                   borderRadius: '6px',
                   fontSize: '14px',
                   fontWeight: '600',
-                  cursor: isUpdatingPrice ? 'not-allowed' : 'pointer',
+                  textAlign: 'right',
+                  color: '#0f172a'
+                }}
+              />
+              <span style={{ fontSize: '14px', color: '#64748b' }}>캐시</span>
+              <button
+                onClick={() => setCashToUse(Math.min(cashBalance, orderSummary.totalSupplyPrice))}
+                style={{
+                  padding: '6px 12px',
+                  background: '#06b6d4',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
                   transition: 'all 0.2s',
-                  boxShadow: '0 2px 4px rgba(245, 158, 11, 0.2)',
-                  whiteSpace: 'nowrap',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
+                  whiteSpace: 'nowrap'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isUpdatingPrice) e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.background = '#0891b2';
                 }}
                 onMouseLeave={(e) => {
-                  if (!isUpdatingPrice) e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.background = '#06b6d4';
                 }}
               >
-                <RefreshCw size={16} className={isUpdatingPrice ? 'animate-spin' : ''} />
-                {isUpdatingPrice ? '처리 중...' : '공급가 갱신'}
+                전액사용
               </button>
-            ) : (
-              <div style={{
-                padding: '12px 24px',
-                background: 'transparent',
-                color: '#059669',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: '600',
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                ✓ 공급가 갱신 완료
-              </div>
-            )}
+            </div>
 
-            {/* 발주확정 버튼 */}
-            <button
-              onClick={handlePaymentConfirmation}
-              disabled={!isPriceUpdated}
-              style={{
-                padding: '12px 24px',
-                background: 'transparent',
-                color: !isPriceUpdated ? '#9ca3af' : '#2563eb',
-                border: !isPriceUpdated ? '1px solid #9ca3af' : '1px solid #2563eb',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: '600',
-                transition: 'all 0.2s',
-                cursor: !isPriceUpdated ? 'not-allowed' : 'pointer'
-              }}
-              onMouseEnter={(e) => {
-                if (isPriceUpdated) {
-                  e.currentTarget.style.background = 'rgba(37, 99, 235, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (isPriceUpdated) {
-                  e.currentTarget.style.background = 'transparent';
-                }
-              }}
-            >
-              💳 입금완료 및 발주확정
-            </button>
+            {/* 최종 입금액 */}
+            <div>
+              <span style={{ fontSize: '13px', color: '#64748b', marginRight: '8px' }}>최종 입금액</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: '#059669' }}>
+                {(orderSummary.totalSupplyPrice - cashToUse).toLocaleString()}원
+              </span>
+            </div>
           </div>
-        )}
+        </div>
+
+        {/* 공급가 갱신 및 발주확정 버튼 영역 */}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {/* 공급가 갱신 버튼 */}
+          <button
+            onClick={handlePriceUpdate}
+            disabled={isUpdatingPrice}
+            style={{
+              padding: '12px 24px',
+              background: isUpdatingPrice ? '#9ca3af' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: isUpdatingPrice ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 2px 4px rgba(245, 158, 11, 0.2)',
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            onMouseEnter={(e) => {
+              if (!isUpdatingPrice) e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              if (!isUpdatingPrice) e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <RefreshCw size={16} className={isUpdatingPrice ? 'animate-spin' : ''} />
+            {isUpdatingPrice ? '처리 중...' : '공급가 갱신'}
+          </button>
+
+          {/* 발주확정 버튼 */}
+          <button
+            onClick={handlePaymentConfirmation}
+            disabled={!isPriceUpdated}
+            style={{
+              padding: '12px 24px',
+              background: 'transparent',
+              color: !isPriceUpdated ? '#9ca3af' : '#2563eb',
+              border: !isPriceUpdated ? '1px solid #9ca3af' : '1px solid #2563eb',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '600',
+              transition: 'all 0.2s',
+              cursor: !isPriceUpdated ? 'not-allowed' : 'pointer'
+            }}
+            onMouseEnter={(e) => {
+              if (isPriceUpdated) {
+                e.currentTarget.style.background = 'rgba(37, 99, 235, 0.1)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (isPriceUpdated) {
+                e.currentTarget.style.background = 'transparent';
+              }
+            }}
+          >
+            💳 입금완료 및 발주확정
+          </button>
+        </div>
+        </div>
+      )}
+
+      {/* 주문 요약 섹션 - 발주확정 ~ 환불완료: 간단한 통계만 (회색) */}
+      {['confirmed', 'preparing', 'shipped', 'cancel_requested', 'cancelled', 'refunded'].includes(filterStatus) && filteredOrders.length > 0 && (
+        <div style={{
+          marginBottom: '16px',
+          padding: '16px',
+          background: 'var(--color-surface)',
+          borderRadius: '8px',
+          border: '1px solid var(--color-border)'
+        }}>
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* 주문건수 */}
+            <div>
+              <span style={{ fontSize: '13px', color: '#9ca3af', marginRight: '8px' }}>주문건수</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: '#6b7280' }}>
+                {orderSummary.count.toLocaleString()}건
+              </span>
+            </div>
+
+            {/* 공급가 합계 */}
+            <div>
+              <span style={{ fontSize: '13px', color: '#9ca3af', marginRight: '8px' }}>공급가 합계</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: '#6b7280' }}>
+                {orderSummary.totalSupplyPrice.toLocaleString()}원
+              </span>
+            </div>
+
+            {/* 할인액 */}
+            <div>
+              <span style={{ fontSize: '13px', color: '#9ca3af', marginRight: '8px' }}>할인액</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: '#6b7280' }}>
+                {orderSummary.totalDiscountAmount.toLocaleString()}원
+              </span>
+            </div>
+
+            {/* 사용캐시 */}
+            <div>
+              <span style={{ fontSize: '13px', color: '#9ca3af', marginRight: '8px' }}>사용캐시</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: '#6b7280' }}>
+                {orderSummary.totalCashUsed.toLocaleString()}원
+              </span>
+            </div>
+
+            {/* 정산금액 */}
+            <div>
+              <span style={{ fontSize: '13px', color: '#9ca3af', marginRight: '8px' }}>정산금액</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: '#6b7280' }}>
+                {orderSummary.totalSettlementAmount.toLocaleString()}원
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
@@ -3412,11 +3474,9 @@ export default function OrderRegistrationTab({
           setSelectedOrders(selectedIds);
         }}
         getRowStyle={filterStatus === 'registered' ? (row: Order) => {
-          const darkModeNow = document.documentElement.classList.contains('dark');
-
           if (!row.priceUpdatedAt) {
             // 미갱신 - 밝은 빨간색 계열
-            const bgColor = darkModeNow ? 'rgba(252, 165, 165, 0.05)' : '#fef2f2';
+            const bgColor = isDarkMode ? 'rgba(252, 165, 165, 0.05)' : '#fef2f2';
             return {
               backgroundColor: bgColor,
             };
@@ -3435,13 +3495,13 @@ export default function OrderRegistrationTab({
 
           if (isToday) {
             // 오늘 갱신 완료 - 밝은 하늘색 계열
-            const bgColor = darkModeNow ? 'rgba(125, 211, 252, 0.05)' : '#f0f9ff';
+            const bgColor = isDarkMode ? 'rgba(125, 211, 252, 0.05)' : '#f0f9ff';
             return {
               backgroundColor: bgColor,
             };
           } else {
             // 과거 갱신 - 녹색 계열
-            const bgColor = darkModeNow ? 'rgba(134, 239, 172, 0.05)' : '#f0fdf4';
+            const bgColor = isDarkMode ? 'rgba(134, 239, 172, 0.05)' : '#f0fdf4';
             return {
               backgroundColor: bgColor,
             };
@@ -3466,8 +3526,8 @@ export default function OrderRegistrationTab({
               zIndex: 10,
               width: '24px',
               height: '24px',
-              background: document.documentElement.classList.contains('dark') ? 'var(--color-surface)' : '#ffffff',
-              border: document.documentElement.classList.contains('dark') ? '0.2px solid #3b82f6' : '0.5px solid #3b82f6',
+              background: isDarkMode ? 'var(--color-surface)' : '#ffffff',
+              border: isDarkMode ? '0.2px solid #3b82f6' : '0.5px solid #3b82f6',
               borderRadius: '4px',
               cursor: 'pointer',
               display: 'flex',
@@ -3478,13 +3538,11 @@ export default function OrderRegistrationTab({
               boxShadow: '0 1px 3px rgba(59,130,246,0.1)'
             }}
             onMouseEnter={(e) => {
-              const isDark = document.documentElement.classList.contains('dark');
-              e.currentTarget.style.background = isDark ? 'var(--color-surface-hover)' : '#eff6ff';
+              e.currentTarget.style.background = isDarkMode ? 'var(--color-surface-hover)' : '#eff6ff';
               e.currentTarget.style.borderColor = '#2563eb';
             }}
             onMouseLeave={(e) => {
-              const isDark = document.documentElement.classList.contains('dark');
-              e.currentTarget.style.background = isDark ? 'var(--color-surface)' : '#ffffff';
+              e.currentTarget.style.background = isDarkMode ? 'var(--color-surface)' : '#ffffff';
               e.currentTarget.style.borderColor = '#3b82f6';
             }}
           >
@@ -3541,8 +3599,8 @@ export default function OrderRegistrationTab({
                     display: 'inline-block',
                     width: '16px',
                     height: '16px',
-                    backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(252, 165, 165, 0.05)' : '#fef2f2',
-                    border: document.documentElement.classList.contains('dark') ? 'none' : '1px solid #fecaca',
+                    backgroundColor: isDarkMode ? 'rgba(252, 165, 165, 0.05)' : '#fef2f2',
+                    border: isDarkMode ? 'none' : '1px solid #fecaca',
                     borderRadius: '3px',
                     marginRight: '8px',
                     verticalAlign: 'middle'
@@ -3554,8 +3612,8 @@ export default function OrderRegistrationTab({
                     display: 'inline-block',
                     width: '16px',
                     height: '16px',
-                    backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(134, 239, 172, 0.05)' : '#f0fdf4',
-                    border: document.documentElement.classList.contains('dark') ? 'none' : '1px solid #86efac',
+                    backgroundColor: isDarkMode ? 'rgba(134, 239, 172, 0.05)' : '#f0fdf4',
+                    border: isDarkMode ? 'none' : '1px solid #86efac',
                     borderRadius: '3px',
                     marginRight: '8px',
                     verticalAlign: 'middle'
@@ -3567,8 +3625,8 @@ export default function OrderRegistrationTab({
                     display: 'inline-block',
                     width: '16px',
                     height: '16px',
-                    backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(125, 211, 252, 0.05)' : '#f0f9ff',
-                    border: document.documentElement.classList.contains('dark') ? 'none' : '1px solid #7dd3fc',
+                    backgroundColor: isDarkMode ? 'rgba(125, 211, 252, 0.05)' : '#f0f9ff',
+                    border: isDarkMode ? 'none' : '1px solid #7dd3fc',
                     borderRadius: '3px',
                     marginRight: '8px',
                     verticalAlign: 'middle'
@@ -3868,6 +3926,29 @@ export default function OrderRegistrationTab({
             const { createClient } = await import('@/lib/supabase/client');
             const supabase = createClient();
 
+            // 서브계정의 seller_code 및 ID 조회
+            let subAccountSellerCode = 'S000000'; // 기본값
+            let subAccountId: string | null = null;
+
+            if (selectedSubAccount && selectedSubAccount !== 'main') {
+              // 선택된 서브계정의 seller_code 및 ID 사용
+              subAccountSellerCode = selectedSubAccount.seller_code || 'S000000';
+              subAccountId = selectedSubAccount.id;
+            } else {
+              // 'main' 또는 미선택 시 메인 서브계정의 seller_code 및 ID 조회
+              const { data: mainSubAccount } = await supabase
+                .from('sub_accounts')
+                .select('id, seller_code')
+                .eq('organization_id', organizationId)
+                .eq('is_main', true)
+                .single();
+
+              if (mainSubAccount) {
+                subAccountSellerCode = mainSubAccount.seller_code || 'S000000';
+                subAccountId = mainSubAccount.id;
+              }
+            }
+
             // 각 주문에 발주번호 생성 및 업데이트
             const now = getCurrentTimeUTC();
 
@@ -3881,9 +3962,12 @@ export default function OrderRegistrationTab({
             // 주문당 캐시 차감액 계산
             const cashPerOrder = cashToUse / validatedOrders.length;
 
+            // 셀러코드 결정: 무조건 서브계정의 seller_code 사용
+            const sellerCodeToUse = subAccountSellerCode;
+
             for (let i = 0; i < validatedOrders.length; i++) {
               const order = validatedOrders[i];
-              const orderNo = generateOrderNumber(userEmail, i + 1);
+              const orderNo = generateOrderNumber(sellerCodeToUse, i + 1);
               const quantity = parseInt(order.quantity) || 1;
               const unitPrice = order.unitPrice || 0;
               const supplyPrice = order.supplyPrice || (unitPrice * quantity);
@@ -3903,11 +3987,12 @@ export default function OrderRegistrationTab({
                   order_number: orderNo,
                   confirmed_at: now,
                   organization_id: organizationId, // 조직 ID 저장
+                  sub_account_id: subAccountId, // 메인 또는 선택된 서브계정 ID 저장
                   created_by: userId, // 등록자 ID 저장
                   option_name: order.optionName, // 수정된 옵션상품
                   seller_supply_price: unitPrice,
                   settlement_amount: finalSupplyPrice,
-                  final_payment_amount: roundedFinalPayment.toString() // 최종입금액 저장 (10원 단위 절사)
+                  final_deposit_amount: roundedFinalPayment.toString() // 최종입금액 저장 (10원 단위 절사)
                 })
                 .eq('id', order._metadata.id);
 

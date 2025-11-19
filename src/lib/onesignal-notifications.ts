@@ -521,28 +521,36 @@ export async function notifyNewMessage(params: {
 // =====================================================
 
 /**
- * 관리자 알림: 신규 발주서 등록
+ * 관리자 알림: 신규 발주서 등록 (배치)
  */
 export async function notifyAdminNewOrder(params: {
-  orderId: string;
-  orderNumber: string;
-  sellerName: string;
+  organizationName: string;
+  orderCount: number;
   totalAmount: number;
+  batchId?: string;
 }) {
+  // 기본 URL (환경변수에서 가져오거나 기본값 사용)
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dalreamarket.com';
+
+  // 배치 ID가 있으면 배치 전용 페이지로, 없으면 일반 주문 페이지로
+  const actionUrl = params.batchId
+    ? `${baseUrl}/admin/order-batch/${params.batchId}`
+    : `${baseUrl}/admin/order-platform`;
+
   return createNotification({
     sendToAdmins: true,
     type: 'admin_new_order',
     category: 'admin',
     title: '🆕 신규 발주서 등록',
-    body: `${params.sellerName}님이 발주서 ${params.orderNumber}을(를) 등록했습니다.\n총액: ${params.totalAmount.toLocaleString()}원`,
-    resourceType: 'order',
-    resourceId: params.orderId,
-    actionUrl: `/admin/orders/${params.orderId}`,
+    body: `${params.organizationName}님이 발주서 ${params.orderCount}건을 등록했습니다.\n최종입금액: ${params.totalAmount.toLocaleString()}원`,
+    resourceType: 'order_batch',
+    resourceId: params.batchId || 'single',
+    actionUrl,
     data: {
-      order_id: params.orderId,
-      order_number: params.orderNumber,
-      seller_name: params.sellerName,
+      organization_name: params.organizationName,
+      order_count: params.orderCount,
       total_amount: params.totalAmount,
+      batch_id: params.batchId,
     },
     priority: 'high',
   });
@@ -603,5 +611,41 @@ export async function notifyAdminNewMember(params: {
       organization_name: params.organizationName,
     },
     priority: 'normal',
+  });
+}
+
+/**
+ * 관리자 알림: 주문 상태 변경 (사용자 액션)
+ * 발주서확정, 취소요청 등 사용자가 변경한 상태를 관리자에게 알림
+ */
+export async function notifyAdminOrderStatusChange(params: {
+  orderId: string;
+  orderNumber: string;
+  organizationName: string;
+  newStatus: string;
+}) {
+  const statusLabels: Record<string, { icon: string; label: string }> = {
+    '발주서확정': { icon: '✅', label: '발주서 확정' },
+    '취소요청': { icon: '🚫', label: '취소 요청' },
+  };
+
+  const statusInfo = statusLabels[params.newStatus] || { icon: '📝', label: params.newStatus };
+
+  return createNotification({
+    sendToAdmins: true,
+    type: 'admin_new_order',
+    category: 'admin',
+    title: `${statusInfo.icon} ${statusInfo.label}`,
+    body: `${params.organizationName}님이 발주서를 "${statusInfo.label}" 상태로 변경했습니다.\n주문번호: ${params.orderNumber}`,
+    resourceType: 'order',
+    resourceId: params.orderId,
+    actionUrl: `/admin/order-platform`,
+    data: {
+      order_id: params.orderId,
+      order_number: params.orderNumber,
+      organization_name: params.organizationName,
+      new_status: params.newStatus,
+    },
+    priority: 'high',
   });
 }

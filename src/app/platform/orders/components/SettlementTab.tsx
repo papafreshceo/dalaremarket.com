@@ -191,7 +191,7 @@ export default function SettlementTab({ isMobile, orders }: SettlementTabProps) 
             // 해당 조직의 서브계정 목록 조회 (활성화된 것만)
             const { data: subAccounts, error: subError } = await supabase
               .from('sub_accounts')
-              .select('id, business_name, business_number, address, representative_name, phone, email')
+              .select('id, business_name, business_number, address, representative_name, phone, email, seller_code')
               .eq('organization_id', userData.primary_organization_id)
               .eq('is_active', true)
               .order('created_at', { ascending: true });

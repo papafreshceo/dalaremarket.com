@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import MessagesPanel from '@/components/MessagesPanel'
 
 // OneSignal 알림 타입 정의
 interface Notification {
@@ -127,7 +128,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string
 }
 
 // 알림 탭 타입 정의
-type NotificationTab = 'all' | 'orders' | 'announcements' | 'payments' | 'products' | 'messages' | 'others'
+type NotificationTab = 'all' | 'orders' | 'announcements' | 'payments' | 'products' | 'messages' | 'chat' | 'others'
 
 // 알림 탭별 포함되는 타입들
 const TAB_TYPE_MAPPING: Record<NotificationTab, string[]> = {
@@ -137,11 +138,13 @@ const TAB_TYPE_MAPPING: Record<NotificationTab, string[]> = {
   payments: ['deposit_confirm'],
   products: ['harvest_news', 'price_change', 'out_of_stock'],
   messages: ['new_message', 'comment_reply'],
+  chat: [], // 메시지 탭 (알림 없음, 메시징 패널만 표시)
   others: ['admin_support_post', 'admin_new_member', 'organization_invitation', 'system_notice'],
 }
 
-export default function NotificationsPage() {
+function NotificationsPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<NotificationTab>('all')
@@ -155,6 +158,7 @@ export default function NotificationsPage() {
     payments: 0,
     products: 0,
     messages: 0,
+    chat: 0,
     others: 0,
   })
 
@@ -187,6 +191,7 @@ export default function NotificationsPage() {
           payments: 0,
           products: 0,
           messages: 0,
+          chat: 0,
           others: 0,
         }
 
@@ -216,6 +221,14 @@ export default function NotificationsPage() {
       setLoading(false)
     }
   }
+
+  // URL 쿼리 파라미터에서 탭 설정
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab && ['all', 'orders', 'announcements', 'payments', 'products', 'messages', 'chat', 'others'].includes(tab)) {
+      setActiveTab(tab as NotificationTab)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     fetchNotifications()
@@ -321,6 +334,7 @@ export default function NotificationsPage() {
         payments: 0,
         products: 0,
         messages: 0,
+        chat: 0,
         others: 0,
       })
 
@@ -601,6 +615,16 @@ export default function NotificationsPage() {
             )}
           </button>
           <button
+            onClick={() => setActiveTab('chat')}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeTab === 'chat'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+            }`}
+          >
+            메시지
+          </button>
+          <button
             onClick={() => setActiveTab('others')}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
               activeTab === 'others'
@@ -618,68 +642,73 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      {/* 읽음 필터 및 액션 */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setReadFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              readFilter === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            전체
-          </button>
-          <button
-            onClick={() => setReadFilter('unread')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              readFilter === 'unread'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            읽지 않음
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {unreadCount > 0 && (
+      {/* 읽음 필터 및 액션 (메시지 탭에서는 숨김) */}
+      {activeTab !== 'chat' && (
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex gap-2">
             <button
-              onClick={markAllAsRead}
-              className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+              onClick={() => setReadFilter('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                readFilter === 'all'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+              }`}
             >
-              모두 읽음 처리
+              전체
             </button>
-          )}
-          {notifications.length > 0 && (
             <button
-              onClick={deleteAllNotifications}
-              className="px-4 py-2 text-sm text-red-600 hover:text-red-700 font-medium"
+              onClick={() => setReadFilter('unread')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                readFilter === 'unread'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+              }`}
             >
-              모두 삭제
+              읽지 않음
             </button>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* 알림 목록 */}
-      <div className="space-y-2">
-        {loading ? (
-          <div className="text-center py-12 text-gray-500">
-            로딩 중...
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllAsRead}
+                className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                모두 읽음 처리
+              </button>
+            )}
+            {notifications.length > 0 && (
+              <button
+                onClick={deleteAllNotifications}
+                className="px-4 py-2 text-sm text-red-600 hover:text-red-700 font-medium"
+              >
+                모두 삭제
+              </button>
+            )}
           </div>
-        ) : filteredNotifications.length === 0 ? (
-          <div className="text-center py-12">
-            <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-            </svg>
-            <p className="text-gray-600">
-              {readFilter === 'unread' ? '읽지 않은 알림이 없습니다' : '알림이 없습니다'}
-            </p>
-          </div>
-        ) : (
-          filteredNotifications.map((notification) => {
+        </div>
+      )}
+
+      {/* 메시지 패널 또는 알림 목록 */}
+      {activeTab === 'chat' ? (
+        <MessagesPanel />
+      ) : (
+        <div className="space-y-2">
+          {loading ? (
+            <div className="text-center py-12 text-gray-500">
+              로딩 중...
+            </div>
+          ) : filteredNotifications.length === 0 ? (
+            <div className="text-center py-12">
+              <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+              </svg>
+              <p className="text-gray-600">
+                {readFilter === 'unread' ? '읽지 않은 알림이 없습니다' : '알림이 없습니다'}
+              </p>
+            </div>
+          ) : (
+            filteredNotifications.map((notification) => {
             const colors = CATEGORY_COLORS[notification.type] || CATEGORY_COLORS['system_notice']
             const icon = getCategoryIcon(notification.type)
             const label = CATEGORY_LABELS[notification.type] || '알림'
@@ -820,7 +849,22 @@ export default function NotificationsPage() {
             )
           })
         )}
-      </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+export default function NotificationsPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="text-center py-12 text-gray-500">
+          로딩 중...
+        </div>
+      </div>
+    }>
+      <NotificationsPageContent />
+    </Suspense>
   )
 }

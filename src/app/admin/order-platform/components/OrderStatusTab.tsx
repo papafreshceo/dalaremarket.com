@@ -136,6 +136,8 @@ interface Order {
   option_name: string;
   option_code?: string;
   quantity: number;
+  product_amount?: string; // 원공급가 (공급단가 × 수량, 할인 전)
+  discount_amount?: string; // 등급할인 금액
   settlement_amount: string;
   final_deposit_amount: number;
   cash_used: number;
@@ -351,7 +353,7 @@ export default function OrderStatusTab({ orders }: OrderStatusTabProps) {
       if (status === '발주서등록' || status === '접수') {
         stats.등록중.count++;
         stats.등록중.quantity += quantity;
-        stats.등록중.amount += Number(order.settlement_amount) || 0;
+        stats.등록중.amount += Number(order.product_amount) || 0;
       } else if (status === '발주서확정') {
         stats.발주확정.count++;
         stats.발주확정.quantity += quantity;
@@ -582,26 +584,29 @@ export default function OrderStatusTab({ orders }: OrderStatusTabProps) {
                   <th className="px-2 py-1 text-left font-medium text-gray-600">조직/서브계정</th>
                   <th className="px-2 py-1 text-left font-medium text-gray-600">옵션상품</th>
                   <th className="px-2 py-1 text-center font-medium text-gray-600">수량</th>
-                  <th className="px-2 py-1 text-right font-medium text-gray-600">금액</th>
-                  <th className="px-2 py-1 text-right font-medium text-gray-600">캐시</th>
+                  <th className="px-2 py-1 text-right font-medium text-gray-600">공급단가</th>
+                  <th className="px-2 py-1 text-right font-medium text-gray-600">공급가</th>
+                  <th className="px-2 py-1 text-right font-medium text-gray-600">할인액</th>
+                  <th className="px-2 py-1 text-right font-medium text-gray-600">사용캐시</th>
+                  <th className="px-2 py-1 text-right font-medium text-gray-600">최종입금액</th>
                   <th className="px-2 py-1 text-center font-medium text-gray-600">상태</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-2 py-8 text-center text-gray-400">
+                    <td colSpan={9} className="px-2 py-8 text-center text-gray-400">
                       조건에 맞는 주문이 없습니다
                     </td>
                   </tr>
                 ) : (
                   filteredOrders.map(order => {
                     const status = order.shipping_status;
-                    const isUploadStage = status === '발주서등록' || status === '접수';
-                    const amount = isUploadStage
-                      ? Number(order.settlement_amount) || 0
-                      : Number(order.final_deposit_amount) || 0;
-                    const cash = Number(order.cash_used) || 0;
+                    const sellerSupplyPrice = Number(order.seller_supply_price) || 0;
+                    const productAmount = Number(order.product_amount) || 0;
+                    const discountAmount = Number(order.discount_amount) || 0;
+                    const cashUsed = Number(order.cash_used) || 0;
+                    const finalDepositAmount = Number(order.final_deposit_amount) || 0;
 
                     return (
                       <tr key={order.id} className="hover:bg-gray-50">
@@ -611,13 +616,20 @@ export default function OrderStatusTab({ orders }: OrderStatusTabProps) {
                         </td>
                         <td className="px-2 py-1 text-gray-900">{order.option_name}</td>
                         <td className="px-2 py-1 text-center text-gray-900">{order.quantity}</td>
-                        <td className="px-2 py-1 text-right">
-                          <span className={isUploadStage ? 'text-gray-900' : 'text-blue-600 font-semibold'}>
-                            {amount.toLocaleString()}
-                          </span>
+                        <td className="px-2 py-1 text-right text-gray-700">
+                          {sellerSupplyPrice > 0 ? sellerSupplyPrice.toLocaleString() : '-'}
+                        </td>
+                        <td className="px-2 py-1 text-right text-gray-900 font-medium">
+                          {productAmount > 0 ? productAmount.toLocaleString() : '-'}
+                        </td>
+                        <td className="px-2 py-1 text-right text-purple-600">
+                          {discountAmount > 0 ? discountAmount.toLocaleString() : '-'}
                         </td>
                         <td className="px-2 py-1 text-right text-orange-600">
-                          {cash > 0 ? cash.toLocaleString() : '-'}
+                          {cashUsed > 0 ? cashUsed.toLocaleString() : '-'}
+                        </td>
+                        <td className="px-2 py-1 text-right text-blue-600 font-semibold">
+                          {finalDepositAmount > 0 ? finalDepositAmount.toLocaleString() : '-'}
                         </td>
                         <td className="px-2 py-1 text-center">
                           <span className={`px-1.5 py-0.5 rounded text-xs ${getStatusColor(status)}`}>

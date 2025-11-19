@@ -161,8 +161,8 @@ export async function GET(request: NextRequest) {
       query = query.lte('created_at', endDateTime.toISOString());
     }
 
-    // 정렬
-    query = query.order('created_at', { ascending: false });
+    // 정렬: ID 오름차순 (업로드 순서 = Excel 행 순서)
+    query = query.order('id', { ascending: true });
 
     const { data: orders, error: ordersError } = await query;
 
@@ -289,15 +289,35 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // 배치 ID 생성 (이번 업로드의 고유 식별자)
+      const { createClient: createServiceClient } = await import('@supabase/supabase-js');
+      const supabaseAdmin = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      const { data: batchData } = await supabaseAdmin.rpc('gen_random_uuid');
+      const batchId = batchData || crypto.randomUUID();
+
       // 1단계: 옵션상품 매핑 적용 (사용자 설정 기준)
       orders = await applyOptionMappingToOrdersServer(orders, user.id);
 
-      // 🔒 조직 ID 자동 설정
+      // 🔒 조직 ID 및 서브계정 ID 자동 설정
       const organizationId = await getOrganizationDataFilter(user.id);
       if (organizationId) {
+        // 메인 서브계정 ID 조회
+        const { data: mainSubAccount } = await supabase
+          .from('sub_accounts')
+          .select('id')
+          .eq('organization_id', organizationId)
+          .eq('is_main', true)
+          .single();
+
         orders = orders.map((order: any) => ({
           ...order,
           organization_id: organizationId,
+          batch_id: batchId,
+          // sub_account_id가 없으면 메인 서브계정 ID 설정
+          sub_account_id: order.sub_account_id || mainSubAccount?.id || null,
         }));
       }
 
@@ -318,16 +338,30 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 🔔 관리자에게 신규 발주서 알림 전송
+      // 🔔 관리자에게 신규 발주서 알림 전송 (배치 단위)
       try {
-        for (const order of data) {
-          await notifyAdminNewOrder({
-            orderId: order.id,
-            orderNumber: order.order_number || `주문-${order.id.substring(0, 8)}`,
-            sellerName: order.seller_name || '셀러',
-            totalAmount: order.amount || 0
-          });
+        // 조직명 조회
+        let organizationName = '셀러';
+        if (organizationId) {
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('business_name')
+            .eq('id', organizationId)
+            .single();
+          organizationName = orgData?.business_name || '셀러';
         }
+
+        // 총액 계산 (최종입금액 기준)
+        const totalAmount = data.reduce((sum, order) => {
+          return sum + (Number(order.final_deposit_amount) || 0);
+        }, 0);
+
+        await notifyAdminNewOrder({
+          organizationName,
+          orderCount: data.length,
+          totalAmount,
+          batchId
+        });
       } catch (notificationError) {
         logger.error('신규 발주서 알림 전송 실패:', notificationError);
         // 알림 실패해도 주문은 성공으로 처리
@@ -365,10 +399,24 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 🔒 조직 ID 자동 설정
+      // 🔒 조직 ID 및 서브계정 ID 자동 설정
       const organizationId = await getOrganizationDataFilter(user.id);
       if (organizationId) {
         orderData.organization_id = organizationId;
+
+        // sub_account_id가 없으면 메인 서브계정 ID 설정
+        if (!orderData.sub_account_id) {
+          const { data: mainSubAccount } = await supabase
+            .from('sub_accounts')
+            .select('id')
+            .eq('organization_id', organizationId)
+            .eq('is_main', true)
+            .single();
+
+          if (mainSubAccount?.id) {
+            orderData.sub_account_id = mainSubAccount.id;
+          }
+        }
       }
 
       // 옵션 상품 정보 자동 매핑 (단건용)
@@ -392,11 +440,21 @@ export async function POST(request: NextRequest) {
 
       // 🔔 관리자에게 신규 발주서 알림 전송
       try {
+        // 조직명 조회
+        let organizationName = '셀러';
+        if (organizationId) {
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('business_name')
+            .eq('id', organizationId)
+            .single();
+          organizationName = orgData?.business_name || '셀러';
+        }
+
         await notifyAdminNewOrder({
-          orderId: data.id,
-          orderNumber: data.order_number || `주문-${data.id.substring(0, 8)}`,
-          sellerName: data.seller_name || '셀러',
-          totalAmount: data.amount || 0
+          organizationName,
+          orderCount: 1,
+          totalAmount: Number(data.final_deposit_amount) || 0
         });
       } catch (notificationError) {
         logger.error('신규 발주서 알림 전송 실패:', notificationError);

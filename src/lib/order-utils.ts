@@ -13,6 +13,10 @@ export interface OptionProductInfo {
   shipping_location_address?: string; // 발송지주소
   shipping_location_contact?: string; // 발송지연락처
   shipping_cost?: number | string;   // 출고비용
+  product_amount?: number;           // 공급가
+  discount_amount?: number;          // 할인액
+  cash_used?: number;                // 사용캐시
+  final_deposit_amount?: number;     // 최종입금액
 }
 
 /**
@@ -86,8 +90,8 @@ export async function enrichOrdersWithOptionInfo<T extends { option_name: string
     const optionInfo = optionInfoMap.get(order.option_name) || {};
     const orderAny = order as any;
 
-    // 정산금액 = 공급단가 × 수량
-    let settlement_amount: number | undefined;
+    // 원공급가 = 공급단가 × 수량
+    let product_amount: number | undefined;
     const supplyPrice = optionInfo.seller_supply_price;
     if (supplyPrice && order.quantity) {
       const unitPrice = typeof supplyPrice === 'string'
@@ -98,7 +102,7 @@ export async function enrichOrdersWithOptionInfo<T extends { option_name: string
         : order.quantity;
 
       if (!isNaN(unitPrice) && !isNaN(qty)) {
-        settlement_amount = unitPrice * qty;
+        product_amount = unitPrice * qty;
       }
     }
 
@@ -115,14 +119,36 @@ export async function enrichOrdersWithOptionInfo<T extends { option_name: string
       // 기존에 의미있는 값이 있으면 유지 (덮어쓰지 않음)
     });
 
-    // settlement_amount: 기존 값이 없을 때만 계산된 값 사용
-    const existingSettlement = orderAny.settlement_amount;
-    if (existingSettlement === undefined || existingSettlement === null) {
-      if (settlement_amount !== undefined) {
-        result.settlement_amount = settlement_amount;
+    // product_amount: 기존 값이 없을 때만 계산된 값 사용
+    const existingProductAmount = orderAny.product_amount;
+    if (existingProductAmount === undefined || existingProductAmount === null) {
+      if (product_amount !== undefined) {
+        result.product_amount = product_amount;
       }
     }
-    // 기존에 settlement_amount가 있으면 유지 (관리자가 계산한 값 보존)
+    // 기존에 product_amount가 있으면 유지 (관리자가 계산한 값 보존)
+
+    // 할인액, 사용캐시, 최종입금액 계산
+    // 기존 값이 없으면 기본값(0) 또는 계산값 사용
+    const finalProductAmount = result.product_amount || product_amount || 0;
+
+    // discount_amount: 기존 값이 없으면 0으로 설정
+    if (result.discount_amount === undefined || result.discount_amount === null) {
+      result.discount_amount = 0;
+    }
+
+    // cash_used: 기존 값이 없으면 0으로 설정
+    if (result.cash_used === undefined || result.cash_used === null) {
+      result.cash_used = 0;
+    }
+
+    // final_deposit_amount: 기존 값이 없으면 계산
+    // 최종입금액 = 공급가 - 할인액 - 사용캐시
+    if (result.final_deposit_amount === undefined || result.final_deposit_amount === null) {
+      const discountAmount = Number(result.discount_amount) || 0;
+      const cashUsed = Number(result.cash_used) || 0;
+      result.final_deposit_amount = Math.max(0, finalProductAmount - discountAmount - cashUsed);
+    }
 
     return result;
   });

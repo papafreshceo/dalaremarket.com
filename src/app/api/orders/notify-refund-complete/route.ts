@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
         organization_id: organizationId,
         order_count: orderCount,
         total_refund_amount: totalRefundAmount,
+        refund_amount_canceled: totalRefundAmount,
         business_name: orgData.business_name
       },
       priority: 'high',

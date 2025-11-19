@@ -1398,7 +1398,7 @@ export default function ExcelTab() {
           settlement_amount: cleanOrder.field_27,
           settlement_target_amount: cleanOrder.field_28,
           product_amount: cleanOrder.field_29,
-          final_payment_amount: cleanOrder.field_30,
+          final_deposit_amount: cleanOrder.field_30,
           discount_amount: cleanOrder.field_31,
           platform_discount: cleanOrder.field_32,
           seller_discount: cleanOrder.field_33,

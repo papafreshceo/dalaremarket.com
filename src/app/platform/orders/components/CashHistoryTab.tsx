@@ -277,7 +277,11 @@ export default function CashHistoryTab() {
                 </thead>
                 <tbody>
                   {transactions.map((transaction, index) => {
-                    const config = transactionTypeConfig[transaction.type];
+                    const config = transactionTypeConfig[transaction.type] || {
+                      label: transaction.type || '기타',
+                      color: '#6b7280',
+                      icon: '📝'
+                    };
                     const isPositive = transaction.amount > 0;
 
                     return (

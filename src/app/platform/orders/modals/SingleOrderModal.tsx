@@ -80,6 +80,11 @@ export default function SingleOrderModal({
   const [showDetailAddressModal, setShowDetailAddressModal] = useState(false);
   const [baseAddress, setBaseAddress] = useState('');
 
+  // 서브계정 선택 모달 관련 state
+  const [showSubAccountModal, setShowSubAccountModal] = useState(false);
+  const [subAccountsForSelection, setSubAccountsForSelection] = useState<any[]>([]);
+  const [selectedSubAccountForModal, setSelectedSubAccountForModal] = useState<string | null>(null);
+
   // 상품 배지 목록 관리
   interface ProductBadge {
     id: number;
@@ -627,11 +632,8 @@ export default function SingleOrderModal({
     return true;
   };
 
-  const handleSubmit = async () => {
-    if (!validateForm()) {
-      return;
-    }
-
+  // 실제 주문 등록 함수 (서브계정이 확정된 후 실행)
+  const performOrderSubmit = async (finalSubAccount: any) => {
     setIsSubmitting(true);
 
     try {
@@ -653,7 +655,7 @@ export default function SingleOrderModal({
           const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
           const orderData = {
-            order_no: orderNumber, // ✅ order_number → order_no 변경
+            order_no: orderNumber,
             buyer_name: formData.orderer,
             buyer_phone: formData.ordererPhone,
             recipient_name: recipient.recipient,
@@ -667,7 +669,7 @@ export default function SingleOrderModal({
             created_by: user.id,
             created_at: getCurrentTimeUTC(),
             is_deleted: false,
-            sub_account_id: (selectedSubAccount && selectedSubAccount !== 'main') ? selectedSubAccount.id : null
+            sub_account_id: finalSubAccount?.id || null
           };
 
           ordersToInsert.push(orderData);
@@ -693,10 +695,74 @@ export default function SingleOrderModal({
       toast.success(`${result.count}건의 주문이 등록되었습니다`);
       onRefresh?.();
       resetModal(); // 모달 초기화
+      onClose(); // 모달 닫기
     } catch (error) {
       console.error('주문 등록 실패:', error);
       toast.error('주문 등록에 실패했습니다');
     } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        toast.error('로그인이 필요합니다');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 🔒 서브계정 선택 확인
+      if (!selectedSubAccount || selectedSubAccount === 'main') {
+        // 조직의 서브계정 목록 조회
+        const { data: userOrg } = await supabase
+          .from('users')
+          .select('organization_id')
+          .eq('id', user.id)
+          .single();
+
+        if (userOrg?.organization_id) {
+          const { data: subAccounts } = await supabase
+            .from('sub_accounts')
+            .select('id, business_name, seller_code, is_main')
+            .eq('organization_id', userOrg.organization_id)
+            .order('is_main', { ascending: false });
+
+          if (subAccounts && subAccounts.length > 0) {
+            // 메인만 있는 경우 (추가 서브계정 없음)
+            const additionalSubAccounts = subAccounts.filter(sa => !sa.is_main);
+
+            if (additionalSubAccounts.length === 0) {
+              // 메인 서브계정만 있으면 자동으로 진행 (모달 표시 안 함)
+              const mainSubAccount = subAccounts.find(sa => sa.is_main);
+              await performOrderSubmit(mainSubAccount);
+              return;
+            } else {
+              // 추가 서브계정이 있으면 선택 모달 표시
+              setSubAccountsForSelection(subAccounts);
+              setSelectedSubAccountForModal(subAccounts.find(sa => sa.is_main)?.id || null);
+              setShowSubAccountModal(true);
+              setIsSubmitting(false);
+              return;
+            }
+          }
+        }
+      }
+
+      // 서브계정이 이미 선택되어 있으면 바로 주문 등록
+      await performOrderSubmit(selectedSubAccount);
+    } catch (error: any) {
+      console.error('주문 등록 오류:', error);
+      toast.error('주문 등록에 실패했습니다');
       setIsSubmitting(false);
     }
   };
@@ -1813,6 +1879,24 @@ export default function SingleOrderModal({
           }}
         />
       )}
+
+      {/* 서브계정 선택 모달 */}
+      {showSubAccountModal && (
+        <SubAccountSelectionModal
+          subAccounts={subAccountsForSelection}
+          selectedId={selectedSubAccountForModal}
+          onSelect={(id) => setSelectedSubAccountForModal(id)}
+          onConfirm={async () => {
+            const selected = subAccountsForSelection.find(sa => sa.id === selectedSubAccountForModal);
+            setShowSubAccountModal(false);
+            await performOrderSubmit(selected);
+          }}
+          onCancel={() => {
+            setShowSubAccountModal(false);
+            setIsSubmitting(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1949,6 +2033,192 @@ function DetailAddressModal({
               color: '#ffffff',
               background: 'var(--color-primary)',
               cursor: 'pointer'
+            }}
+          >
+            확인
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 서브계정 선택 모달 컴포넌트
+function SubAccountSelectionModal({
+  subAccounts,
+  selectedId,
+  onSelect,
+  onConfirm,
+  onCancel
+}: {
+  subAccounts: any[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.7)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10001,
+        padding: '20px'
+      }}
+      onClick={onCancel}
+    >
+      <div
+        style={{
+          background: 'var(--color-surface)',
+          borderRadius: '12px',
+          maxWidth: '500px',
+          width: '100%',
+          padding: '24px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 style={{
+          fontSize: '18px',
+          fontWeight: '600',
+          color: 'var(--color-text)',
+          marginBottom: '8px'
+        }}>
+          서브계정 선택
+        </h3>
+        <p style={{
+          fontSize: '13px',
+          color: 'var(--color-text-secondary)',
+          marginBottom: '20px',
+          margin: 0,
+          marginBottom: '20px'
+        }}>
+          주문을 등록할 서브계정을 선택해주세요.
+        </p>
+
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          marginBottom: '24px'
+        }}>
+          {subAccounts.map((subAccount) => (
+            <label
+              key={subAccount.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '12px 16px',
+                border: selectedId === subAccount.id
+                  ? '2px solid var(--color-primary)'
+                  : '1px solid var(--color-border)',
+                borderRadius: '8px',
+                background: selectedId === subAccount.id
+                  ? 'var(--color-background-secondary)'
+                  : 'var(--color-surface)',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                if (selectedId !== subAccount.id) {
+                  e.currentTarget.style.borderColor = 'var(--color-primary)';
+                  e.currentTarget.style.background = 'var(--color-background-secondary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (selectedId !== subAccount.id) {
+                  e.currentTarget.style.borderColor = 'var(--color-border)';
+                  e.currentTarget.style.background = 'var(--color-surface)';
+                }
+              }}
+            >
+              <input
+                type="radio"
+                name="subAccount"
+                value={subAccount.id}
+                checked={selectedId === subAccount.id}
+                onChange={() => onSelect(subAccount.id)}
+                style={{
+                  width: '18px',
+                  height: '18px',
+                  marginRight: '12px',
+                  cursor: 'pointer'
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: 'var(--color-text)',
+                  marginBottom: '4px'
+                }}>
+                  {subAccount.business_name || '(사업자명 없음)'}
+                  {subAccount.is_main && (
+                    <span style={{
+                      marginLeft: '8px',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      color: 'var(--color-primary)',
+                      padding: '2px 6px',
+                      background: 'rgba(14, 165, 233, 0.1)',
+                      borderRadius: '4px'
+                    }}>
+                      메인
+                    </span>
+                  )}
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  color: 'var(--color-text-secondary)'
+                }}>
+                  {subAccount.seller_code || '셀러코드 없음'}
+                </div>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        <div style={{
+          display: 'flex',
+          gap: '12px'
+        }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: '10px',
+              border: '1px solid var(--color-border)',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: 'var(--color-text)',
+              background: 'var(--color-surface)',
+              cursor: 'pointer'
+            }}
+          >
+            취소
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={!selectedId}
+            style={{
+              flex: 1,
+              padding: '10px',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#ffffff',
+              background: selectedId ? 'var(--color-primary)' : '#cccccc',
+              cursor: selectedId ? 'pointer' : 'not-allowed',
+              opacity: selectedId ? 1 : 0.6
             }}
           >
             확인

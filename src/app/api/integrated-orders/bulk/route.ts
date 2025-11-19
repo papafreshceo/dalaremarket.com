@@ -552,28 +552,8 @@ export async function PUT(request: NextRequest) {
               actionUrl: '/platform/orders',
               priority: 'normal',
             });
-          } else if (group.status === '환불완료') {
-            // 서브계정 사업자명 조회
-            const { data: subAccountData } = await supabase
-              .from('sub_accounts')
-              .select('business_name')
-              .eq('id', group.subAccountId)
-              .single();
-
-            const businessName = subAccountData?.business_name || '고객';
-
-            await createNotification({
-              userId: group.userId,
-              type: 'order_status',
-              category: 'seller',
-              title: '💸 환불완료',
-              body: `${businessName}님! 총 ${group.orderCount}건의 주문 ${group.refundAmount.toLocaleString()}원이 환불완료 되었습니다`,
-              resourceType: 'order',
-              resourceId: key,
-              actionUrl: '/platform/orders',
-              priority: 'normal',
-            });
           }
+          // 환불완료 알림은 개별 환불완료 버튼에서 전송 (refund_amount_canceled 사용)
           // 상품준비중은 알림 보내지 않음
         } catch (notificationError) {
           logger.error('그룹 알림 전송 실패:', notificationError);

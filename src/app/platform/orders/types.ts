@@ -35,6 +35,9 @@ export interface Order {
   specialRequest?: string;
   unitPrice?: number; // 공급단가
   supplyPrice?: number; // 공급가 (정산예정금액)
+  discountAmount?: number; // 할인액 (DB 저장값)
+  cashUsed?: number; // 사용캐시 (DB 저장값)
+  settlementAmount?: number; // 정산금액 (최종입금액, DB 저장값)
   marketName?: string; // 마켓명
   sellerMarketName?: string; // 셀러 마켓명
   priceUpdatedAt?: string; // 공급가 갱신 일시

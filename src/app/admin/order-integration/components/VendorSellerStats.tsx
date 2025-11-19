@@ -39,7 +39,6 @@ interface VendorSellerStatsProps {
   sellerStats: SellerStats[];
   onVendorExcelDownload: (vendorName: string) => void;
   onPaymentCheckToggle: (organizationId: string) => void;
-  onRefundComplete: (organizationId: string) => void;
 }
 
 export default function VendorSellerStats({
@@ -47,7 +46,6 @@ export default function VendorSellerStats({
   sellerStats,
   onVendorExcelDownload,
   onPaymentCheckToggle,
-  onRefundComplete,
 }: VendorSellerStatsProps) {
   const [vendorStatsExpanded, setVendorStatsExpanded] = useState(false);
   const [sellerStatsExpanded, setSellerStatsExpanded] = useState(false);
@@ -196,25 +194,8 @@ export default function VendorSellerStats({
                   <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#C2410C', fontWeight: 600 }}>{(stat.취소요청_건수 || 0) > 0 ? stat.취소요청_건수.toLocaleString() : ''}</td>
                   <td style={{ fontSize: '16px', padding: '6px 16px', textAlign: 'right', color: '#DC2626', fontWeight: 600 }}>{stat.환불예정액 > 0 ? stat.환불예정액.toLocaleString() : ''}</td>
                   <td style={{ fontSize: '14px', padding: '6px 16px', textAlign: 'center' }}>
-                    {stat.환불처리일시 ? (
+                    {stat.환불처리일시 && (
                       <span style={{ color: '#059669', fontWeight: 500 }}>{stat.환불처리일시}</span>
-                    ) : (
-                      <button
-                        onClick={() => onRefundComplete(stat.organization_id)}
-                        style={{
-                          fontSize: '14px',
-                          padding: '4px 12px',
-                          backgroundColor: '#DC2626',
-                          color: 'white',
-                          borderRadius: '4px',
-                          border: 'none',
-                          cursor: 'pointer'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#B91C1C'}
-                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#DC2626'}
-                      >
-                        환불완료
-                      </button>
                     )}
                   </td>
                   <td style={{ fontSize: '18px', padding: '6px 16px', textAlign: 'center', color: '#B91C1C', fontWeight: 600 }}>{(stat.취소완료_건수 || 0) > 0 ? stat.취소완료_건수.toLocaleString() : ''}</td>

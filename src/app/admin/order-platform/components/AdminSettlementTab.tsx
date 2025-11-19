@@ -16,8 +16,10 @@ interface IntegratedOrder {
   shipping_status?: string;
   quantity: string;
   seller_supply_price?: string;
+  product_amount?: string; // 원공급가 (공급단가 × 수량, 할인 전)
+  discount_amount?: string; // 등급할인 금액
   settlement_amount?: string;
-  final_payment_amount?: string;
+  final_deposit_amount?: string;
   payment_confirmed_at?: string;
   confirmed_at?: string;
   cancel_requested_at?: string;
@@ -205,8 +207,8 @@ export default function AdminSettlementTab({ integratedOrders, organizationNames
               order.shipping_status === '취소완료' || order.shipping_status === '취소요청' ? 'cancelled' :
               order.refund_processed_at ? 'refunded' :
               order.confirmed_at ? 'confirmed' : 'pending',
-      amount: parseFloat(order.final_payment_amount || order.settlement_amount || '0'),
-      refundAmount: order.refund_processed_at ? parseFloat(order.final_payment_amount || order.settlement_amount || '0') : 0
+      amount: parseFloat(order.final_deposit_amount || order.product_amount || '0'),
+      refundAmount: order.refund_processed_at ? parseFloat(order.final_deposit_amount || order.product_amount || '0') : 0
     }));
   };
 

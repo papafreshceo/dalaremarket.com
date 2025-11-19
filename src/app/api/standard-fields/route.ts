@@ -42,7 +42,7 @@ export async function GET() {
       { value: 'settlement_amount', label: '정산예정금액' },  // field_27
       { value: 'settlement_target_amount', label: '정산대상금액' }, // field_28
       { value: 'product_amount', label: '상품금액' },         // field_29
-      { value: 'final_payment_amount', label: '최종결제금액' }, // field_30
+      { value: 'final_deposit_amount', label: '최종입금액' }, // field_30
       { value: 'discount_amount', label: '할인금액' },        // field_31
       { value: 'platform_discount', label: '마켓부담할인금액' }, // field_32
       { value: 'seller_discount', label: '판매자할인쿠폰할인' }, // field_33

@@ -729,7 +729,7 @@ export default function CSTab() {
                 </div>
                 <div className="flex items-center">
                   <span className="text-gray-600 w-28 flex-shrink-0">최종결제금액</span>
-                  <span className="text-emerald-700 font-bold text-base">{selectedOrderDetail.final_payment_amount || '-'}</span>
+                  <span className="text-emerald-700 font-bold text-base">{selectedOrderDetail.final_deposit_amount || '-'}</span>
                 </div>
               </div>
             </div>

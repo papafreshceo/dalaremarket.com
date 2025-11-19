@@ -3087,90 +3087,6 @@ export default function SearchTab() {
     }
   };
 
-  // 환불완료 버튼 클릭 핸들러
-  const handleRefundComplete = async (organizationId: string) => {
-    // 해당 조직의 취소요청 상태 주문들 필터링
-    const organizationRefundOrders = orders.filter(order => {
-      const orderOrgId = order.organization_id || '미지정';
-      const status = order.shipping_status || '결제완료';
-      return orderOrgId === organizationId && status === '취소요청';
-    });
-
-    const currentStat = sellerStats.find(s => s.organization_id === organizationId);
-
-    if (organizationRefundOrders.length === 0) {
-      alert('해당 조직의 취소요청 상태 주문이 없습니다.');
-      return;
-    }
-
-    if (!confirm(`${currentStat?.seller_name}의 취소요청 주문 ${organizationRefundOrders.length}건에 대해 환불처리를 완료하시겠습니까?`)) {
-      return;
-    }
-
-    try {
-      // 한국 시간 생성
-      const now = new Date();
-      const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-      const koreaTimeISO = koreaTime.toISOString();
-      const formattedDateTime = koreaTimeISO.slice(0, 16).replace('T', ' ');
-
-      // refund_processed_at 타임스탬프 및 환불금액 저장
-      const updatedOrders = organizationRefundOrders.map(order => ({
-        ...order,
-        refund_processed_at: koreaTimeISO,
-        refund_amount_canceled: parseFloat(order.settlement_amount) || 0, // 정산예정금액을 환불금액으로 저장
-        refund_amount_canceled_at: koreaTimeISO // 환불금액 기록 일시
-      }));
-
-      const response = await fetch('/api/integrated-orders/bulk', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orders: updatedOrders }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        // 총 환불금액 계산
-        const totalRefundAmount = updatedOrders.reduce((sum, order) => {
-          return sum + (order.refund_amount_canceled || 0);
-        }, 0);
-
-        // 사용자에게 환불완료 알림 전송
-        try {
-          await fetch('/api/orders/notify-refund-complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              organizationId,
-              orderCount: organizationRefundOrders.length,
-              totalRefundAmount
-            })
-          });
-        } catch (notifyError) {
-          console.error('환불완료 알림 전송 오류:', notifyError);
-          // 알림 전송 실패해도 환불처리는 성공으로 처리
-        }
-
-        // UI 상태 업데이트
-        setSellerStats(prev =>
-          prev.map(stat =>
-            stat.organization_id === organizationId
-              ? { ...stat, 환불처리일시: formattedDateTime }
-              : stat
-          )
-        );
-        alert(`${result.count}건의 주문에 대해 환불처리가 완료되었습니다.\n환불금액: ${totalRefundAmount.toLocaleString()}원`);
-        fetchOrders(); // 주문 목록 새로고침
-      } else {
-        alert('환불처리 실패: ' + result.error);
-      }
-    } catch (error) {
-      console.error('환불처리 오류:', error);
-      alert('환불처리 중 오류가 발생했습니다.');
-    }
-  };
-
   // 상태 카드 클릭 핸들러 (개선: 클릭 시 데이터 재조회)
   const handleStatusCardClick = async (status: string | null) => {
     const newStatus = statusFilter === status ? null : status;
@@ -3343,7 +3259,6 @@ export default function SearchTab() {
           sellerStats={sellerStats}
           onVendorExcelDownload={handleVendorExcelDownload}
           onPaymentCheckToggle={handlePaymentCheckToggle}
-          onRefundComplete={handleRefundComplete}
         />
       </div>
 

@@ -21,8 +21,9 @@ interface Order {
   shipping_status?: string;
   quantity: string;
   seller_supply_price?: string;
+  product_amount?: string; // 원공급가 (공급단가 × 수량, 할인 전)
+  discount_amount?: string; // 등급할인 금액
   settlement_amount?: string;
-  final_payment_amount?: string;
   final_deposit_amount?: string; // 캐시 차감 후 실제 입금액
   cash_used?: string; // 주문별 캐시 사용액
   payment_confirmed_at?: string;
@@ -42,8 +43,9 @@ interface Order {
 interface ConfirmedBatch {
   confirmed_at: string;
   총금액: number;
+  등급할인: number;
   캐시사용금액: number;
-  최종입금액: number; // 캐시 차감 후 실제 입금액
+  최종입금액: number; // 등급할인 및 캐시 차감 후 실제 입금액
   주문건수: number;
   입금확인: boolean;
   입금자명?: string;
@@ -65,6 +67,7 @@ interface OrganizationStats {
   organization_name: string;
   tier?: string;
   총금액: number;
+  정산금액: number;
   입금확인: boolean;
   업로드_건수: number;
   업로드_수량: number;
@@ -244,8 +247,8 @@ export default function OrderPlatformPage() {
             if (!subError && subAccounts) {
               console.log('📋 서브계정 정보 조회 결과:', subAccounts);
               subAccounts.forEach((sub: any) => {
-                // is_main이 true면 '메인계정'으로 표시, 아니면 사업자명
-                const displayName = sub.is_main ? '메인계정' : (sub.business_name || '-');
+                // 무조건 서브계정의 사업자명 표시
+                const displayName = sub.business_name || '-';
                 subAccountNameMap.set(sub.id, displayName);
               });
             } else if (subError) {
@@ -299,6 +302,7 @@ export default function OrderPlatformPage() {
           organization_name: names.get(organizationId) || organizationId,
           tier: tierMap?.get(organizationId) || 'bronze',
           총금액: 0,
+          정산금액: 0,
           입금확인: false,
           업로드_건수: 0,
           업로드_수량: 0,
@@ -325,9 +329,10 @@ export default function OrderPlatformPage() {
       const status = order.shipping_status;
       if (!status) return; // shipping_status가 없으면 통계에서 제외
       const quantity = Number(order.quantity) || 0;
+      const productAmount = Number(order.product_amount) || 0;
       const settlementAmount = Number(order.settlement_amount) || 0;
-      // 최종입금액 (발주확정 시 저장된 값, 없으면 정산금액 사용)
-      const finalAmount = Number(order.final_payment_amount) || settlementAmount;
+      // 최종입금액 (발주확정 시 저장된 값, 없으면 원공급가 사용)
+      const finalAmount = Number(order.final_deposit_amount) || productAmount;
 
       // 총금액은 배치 기준으로 계산하므로 여기서는 계산하지 않음 (444번 라인에서 계산)
 
@@ -350,33 +355,36 @@ export default function OrderPlatformPage() {
       } else if (status === '결제완료') {
         stats.결제완료_건수 += 1;
         stats.결제완료_수량 += quantity;
+        stats.정산금액 += settlementAmount;
       } else if (status === '상품준비중') {
         stats.상품준비중_건수 += 1;
         stats.상품준비중_수량 += quantity;
+        stats.정산금액 += settlementAmount;
       } else if (status === '발송완료') {
         stats.발송완료_건수 += 1;
         stats.발송완료_수량 += quantity;
+        stats.정산금액 += settlementAmount;
       } else if (status === '취소요청') {
         stats.취소요청_건수 += 1;
         stats.취소요청_수량 += quantity;
-        stats.환불예정액 += settlementAmount;
+        stats.환불예정액 += productAmount;
       } else if (status === '취소완료') {
         if (order.refund_processed_at) {
           // 환불처리까지 완료된 건
           stats.환불완료_건수 += 1;
           stats.환불완료_수량 += quantity;
-          stats.환불완료액 += settlementAmount;
+          stats.환불완료액 += productAmount;
         } else {
           // 취소승인만 된 건 (환불 대기중)
           stats.취소완료_건수 += 1;
           stats.취소완료_수량 += quantity;
-          stats.환불예정액 += settlementAmount;
+          stats.환불예정액 += productAmount;
         }
       } else if (status === '환불완료') {
         // 환불완료 상태
         stats.환불완료_건수 += 1;
         stats.환불완료_수량 += quantity;
-        stats.환불완료액 += settlementAmount;
+        stats.환불완료액 += productAmount;
       }
     });
 
@@ -424,8 +432,9 @@ export default function OrderPlatformPage() {
               batchMap.set(confirmedAt, {
                 confirmed_at: confirmedAt,
                 총금액: Number(savedBatch.total_amount) || 0,
+                등급할인: Number(savedBatch.discount_amount) || 0,
                 캐시사용금액: Number(savedBatch.cash_used) || 0,
-                최종입금액: Number(savedBatch.final_payment_amount) || 0,
+                최종입금액: Number(savedBatch.final_deposit_amount) || 0,
                 주문건수: 0, // 주문 수는 다시 계산
                 입금확인: savedBatch.payment_confirmed || false,
                 입금자명: savedBatch.depositor_name || undefined,
@@ -436,6 +445,7 @@ export default function OrderPlatformPage() {
               batchMap.set(confirmedAt, {
                 confirmed_at: confirmedAt,
                 총금액: 0,
+                등급할인: 0,
                 캐시사용금액: 0,
                 최종입금액: 0,
                 주문건수: 0,
@@ -459,14 +469,15 @@ export default function OrderPlatformPage() {
           }
         });
 
-        // DB에 배치 정보가 없는 경우 (레거시 데이터) 주문별 cash_used 합산
+        // DB에 배치 정보가 없는 경우 (레거시 데이터) 주문별 합산
         batchMap.forEach((batch, confirmedAt) => {
-          if (batch.총금액 === 0 && batch.캐시사용금액 === 0) {
+          if (batch.총금액 === 0 && batch.등급할인 === 0 && batch.캐시사용금액 === 0) {
             // 레거시 데이터: 주문별로 계산
             const batchOrders = organizationOrdersWithConfirmedAt.filter(o => o.confirmed_at === confirmedAt);
-            batch.총금액 = batchOrders.reduce((sum, o) => sum + (Number(o.settlement_amount) || 0), 0);
+            batch.총금액 = batchOrders.reduce((sum, o) => sum + (Number(o.product_amount) || 0), 0);
+            batch.등급할인 = batchOrders.reduce((sum, o) => sum + (Number(o.discount_amount) || 0), 0);
             batch.캐시사용금액 = batchOrders.reduce((sum, o) => sum + (Number(o.cash_used) || 0), 0);
-            batch.최종입금액 = batch.총금액 - batch.캐시사용금액; // 레거시 배치도 최종입금액 계산
+            batch.최종입금액 = batch.총금액 - batch.등급할인 - batch.캐시사용금액; // 레거시 배치도 최종입금액 계산
           }
         });
 
@@ -713,7 +724,9 @@ export default function OrderPlatformPage() {
           shipping_status: '결제완료',
           quantity: order.quantity,
           seller_supply_price: order.seller_supply_price,
-          settlement_amount: order.settlement_amount,
+          product_amount: order.product_amount,
+          discount_amount: order.discount_amount,
+          settlement_amount: order.final_deposit_amount, // 관리자 입금확인 시 정산예정금액 = 최종입금액
           payment_confirmed_at: now,
           confirmed_at: order.confirmed_at,
           refund_processed_at: order.refund_processed_at,
@@ -845,6 +858,8 @@ export default function OrderPlatformPage() {
           shipping_status: '발주서확정',
           quantity: order.quantity,
           seller_supply_price: order.seller_supply_price,
+          product_amount: order.product_amount,
+          discount_amount: order.discount_amount,
           settlement_amount: order.settlement_amount,
           payment_confirmed_at: null,
           confirmed_at: order.confirmed_at,
@@ -922,32 +937,88 @@ export default function OrderPlatformPage() {
     const organizationRefundOrders = orders.filter(order => {
       const orderOrgId = order.organization_id || '미지정';
       const status = order.shipping_status;
-      return orderOrgId === organizationId && status === '취소요청';
+      return orderOrgId === organizationId && status === '취소완료';
     });
 
     if (organizationRefundOrders.length === 0) {
-      toast.error('해당 조직의 취소요청 상태 주문이 없습니다.');
+      toast.error('해당 조직의 취소완료 상태 주문이 없습니다.');
       return;
     }
 
     try {
       const now = getCurrentTimeUTC();
 
-      const updatedOrders = organizationRefundOrders.map(order => ({
-        id: order.id,
-        order_number: order.order_number,
-        organization_id: order.organization_id,
-        option_name: order.option_name,
-        shipping_status: order.shipping_status,
-        quantity: order.quantity,
-        seller_supply_price: order.seller_supply_price,
-        settlement_amount: order.settlement_amount,
-        payment_confirmed_at: order.payment_confirmed_at,
-        confirmed_at: order.confirmed_at,
-        refund_processed_at: now,
-        created_at: order.created_at,
-        sheet_date: order.sheet_date
-      }));
+      // 🔥 사용한 캐시 환불 처리 (각 주문별로)
+      const refundErrors: string[] = [];
+      for (const order of organizationRefundOrders) {
+        const cashUsed = Number(order.cash_used || 0);
+
+        if (cashUsed <= 0) {
+          console.log('ℹ️  사용한 캐시가 없습니다:', order.order_number || order.id);
+          continue;
+        }
+
+        try {
+          const refundResponse = await fetch('/api/cash/refund', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              organizationId,
+              amount: cashUsed,
+              orderId: order.id,
+              orderNumber: order.order_number
+            })
+          });
+
+          const refundResult = await refundResponse.json();
+
+          if (!refundResult.success) {
+            if (refundResult.alreadyRefunded) {
+              console.warn('⚠️  이미 환불된 주문:', order.order_number || order.id);
+            } else {
+              refundErrors.push(`주문 ${order.order_number || order.id}: ${refundResult.error}`);
+            }
+          } else {
+            console.log('✅ 캐시 환불 완료:', order.order_number || order.id, `${cashUsed}원`);
+          }
+        } catch (refundError) {
+          console.error('❌ 캐시 환불 API 호출 오류:', refundError);
+          refundErrors.push(`주문 ${order.order_number || order.id}: API 호출 실패`);
+        }
+      }
+
+      // 환불 오류가 있으면 사용자에게 알림
+      if (refundErrors.length > 0) {
+        const errorMessage = `일부 주문의 캐시 환불에 실패했습니다:\n${refundErrors.join('\n')}\n\n계속 진행하시겠습니까?`;
+        if (!confirm(errorMessage)) {
+          return;
+        }
+      }
+
+      const updatedOrders = organizationRefundOrders.map(order => {
+        // settlement_amount가 null이면 final_deposit_amount 사용 (백업)
+        const refundAmount = parseFloat(order.settlement_amount as any)
+          || parseFloat(order.final_deposit_amount as any)
+          || 0;
+        console.log('🔍 환불 금액 계산:', {
+          order_id: order.id,
+          order_number: order.order_number,
+          settlement_amount: order.settlement_amount,
+          final_deposit_amount: order.final_deposit_amount,
+          settlement_amount_type: typeof order.settlement_amount,
+          parsed_refund_amount: refundAmount
+        });
+
+        return {
+          id: order.id,
+          shipping_status: '환불완료',
+          refund_processed_at: now,
+          refund_amount_canceled: refundAmount,
+          refund_amount_canceled_at: now
+        };
+      });
+
+      console.log('📤 Bulk API로 전송할 데이터:', updatedOrders);
 
       const response = await fetch('/api/integrated-orders/bulk', {
         method: 'PUT',
@@ -962,7 +1033,11 @@ export default function OrderPlatformPage() {
         setOrders(prev => prev.map(order => {
           const organizationRefundOrder = organizationRefundOrders.find(o => o.id === order.id);
           if (organizationRefundOrder) {
-            return { ...order, refund_processed_at: now };
+            return {
+              ...order,
+              shipping_status: '환불완료',
+              refund_processed_at: now
+            };
           }
           return order;
         }));
@@ -989,6 +1064,29 @@ export default function OrderPlatformPage() {
           calculateOrganizationStats(updatedOrders);
         }, 0);
 
+        // 📱 사용자에게 환불완료 알림 전송
+        const totalRefundAmount = updatedOrders.reduce((sum, order) => sum + (order.refund_amount_canceled || 0), 0);
+        if (organizationId && totalRefundAmount > 0) {
+          try {
+            const notifyResponse = await fetch('/api/orders/notify-refund-complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                organizationId,
+                orderCount: result.count,
+                totalRefundAmount
+              })
+            });
+
+            if (!notifyResponse.ok) {
+              console.error('환불완료 알림 전송 실패:', await notifyResponse.text());
+            }
+          } catch (notifyError) {
+            console.error('환불완료 알림 전송 오류:', notifyError);
+            // 알림 전송 실패해도 환불처리는 성공으로 처리
+          }
+        }
+
         toast.success(`${result.count}건의 주문에 대해 환불처리가 완료되었습니다.`);
       } else {
         toast.error('환불처리 실패: ' + result.error);
@@ -1014,6 +1112,8 @@ export default function OrderPlatformPage() {
         shipping_status: '취소완료',
         quantity: order.quantity,
         seller_supply_price: order.seller_supply_price,
+        product_amount: order.product_amount,
+        discount_amount: order.discount_amount,
         settlement_amount: order.settlement_amount,
         payment_confirmed_at: order.payment_confirmed_at,
         confirmed_at: order.confirmed_at,
@@ -1068,6 +1168,8 @@ export default function OrderPlatformPage() {
         shipping_status: '상품준비중',
         quantity: order.quantity,
         seller_supply_price: order.seller_supply_price,
+        product_amount: order.product_amount,
+        discount_amount: order.discount_amount,
         settlement_amount: order.settlement_amount,
         payment_confirmed_at: order.payment_confirmed_at,
         confirmed_at: order.confirmed_at,
@@ -1120,6 +1222,8 @@ export default function OrderPlatformPage() {
         shipping_status: '환불완료',  // 상태를 refunded로 변경
         quantity: order.quantity,
         seller_supply_price: order.seller_supply_price,
+        product_amount: order.product_amount,
+        discount_amount: order.discount_amount,
         settlement_amount: order.settlement_amount,
         payment_confirmed_at: order.payment_confirmed_at,
         confirmed_at: order.confirmed_at,
@@ -1251,6 +1355,7 @@ export default function OrderPlatformPage() {
           organization_id: organizationId,
           organization_name: organizationNames.get(organizationId) || organizationId,
           총금액: originalStat?.총금액 || 0, // organizationStats에서 계산된 총금액 사용
+          정산금액: 0,
           입금확인: false,
           업로드_건수: 0,
           업로드_수량: 0,
@@ -1278,9 +1383,10 @@ export default function OrderPlatformPage() {
       const status = order.shipping_status;
       if (!status) return; // shipping_status가 없으면 통계에서 제외
       const quantity = Number(order.quantity) || 0;
+      const productAmount = Number(order.product_amount) || 0;
       const settlementAmount = Number(order.settlement_amount) || 0;
       // 최종입금액 (발주확정 시 저장된 값, 없으면 정산금액 사용)
-      const finalAmount = Number(order.final_payment_amount) || settlementAmount;
+      const finalAmount = Number(order.final_deposit_amount) || settlementAmount;
 
       // 총금액은 배치 기준으로 계산하므로 여기서는 계산하지 않음 (444번 라인에서 계산)
 
@@ -1303,12 +1409,15 @@ export default function OrderPlatformPage() {
       } else if (status === '결제완료') {
         stats.결제완료_건수 += 1;
         stats.결제완료_수량 += quantity;
+        stats.정산금액 += settlementAmount;
       } else if (status === '상품준비중') {
         stats.상품준비중_건수 += 1;
         stats.상품준비중_수량 += quantity;
+        stats.정산금액 += settlementAmount;
       } else if (status === '발송완료') {
         stats.발송완료_건수 += 1;
         stats.발송완료_수량 += quantity;
+        stats.정산금액 += settlementAmount;
       } else if (status === '취소요청') {
         stats.취소요청_건수 += 1;
         stats.취소요청_수량 += quantity;
@@ -1318,18 +1427,18 @@ export default function OrderPlatformPage() {
           // 환불처리까지 완료된 건
           stats.환불완료_건수 += 1;
           stats.환불완료_수량 += quantity;
-          stats.환불완료액 += settlementAmount;
+          stats.환불완료액 += productAmount;
         } else {
           // 취소승인만 된 건 (환불 대기중)
           stats.취소완료_건수 += 1;
           stats.취소완료_수량 += quantity;
-          stats.환불예정액 += settlementAmount;
+          stats.환불예정액 += productAmount;
         }
       } else if (status === '환불완료') {
         // 환불완료 상태
         stats.환불완료_건수 += 1;
         stats.환불완료_수량 += quantity;
-        stats.환불완료액 += settlementAmount;
+        stats.환불완료액 += productAmount;
       }
     });
 
@@ -1345,6 +1454,7 @@ export default function OrderPlatformPage() {
       organization_id: 'total',
       organization_name: '합계',
       총금액: statsArray.reduce((sum, s) => sum + s.총금액, 0),
+      정산금액: statsArray.reduce((sum, s) => sum + s.정산금액, 0),
       입금확인: false,
       업로드_건수: statsArray.reduce((sum, s) => sum + s.업로드_건수, 0),
       업로드_수량: statsArray.reduce((sum, s) => sum + s.업로드_수량, 0),
@@ -1411,7 +1521,7 @@ export default function OrderPlatformPage() {
     // StatusBatch 배열로 변환
     const batches: StatusBatch[] = [];
     batchMap.forEach((orders, timestamp) => {
-      const 총금액 = orders.reduce((sum, order) => sum + Number(order.settlement_amount || 0), 0);
+      const 총금액 = orders.reduce((sum, order) => sum + Number(order.product_amount || 0), 0);
       batches.push({
         status,
         timestamp,
@@ -1614,7 +1724,7 @@ export default function OrderPlatformPage() {
 
         {/* 헤더 아코디언 (컬럼명) */}
         <div className="bg-gray-700 border-b border-gray-600">
-          <div className="grid grid-cols-13 gap-4 px-6 py-3 text-xs font-semibold text-gray-200 uppercase">
+          <div className="grid grid-cols-14 gap-4 px-6 py-3 text-xs font-semibold text-gray-200 uppercase">
             <div className="col-span-2 flex items-center gap-2 pl-8">
               <button
                 type="button"
@@ -1670,6 +1780,7 @@ export default function OrderPlatformPage() {
             <div className="col-span-1 text-center">발주서확정</div>
             <div className="col-span-1 text-center">최종입금액</div>
             <div className="col-span-1 text-center">입금확인</div>
+            <div className="col-span-1 text-center" style={{ boxShadow: '-3px 0 0 0 rgba(75, 85, 99, 0.5)', marginLeft: '-4px' }}>정산금액</div>
             <div className="col-span-1 text-center">결제완료</div>
             <div className="col-span-1 text-center">상품준비중</div>
             <div className="col-span-1 text-center">발송완료</div>
@@ -1684,7 +1795,7 @@ export default function OrderPlatformPage() {
         {totalStat && (
           <div className="bg-gray-700 border-b border-gray-600">
             <div className="px-4 py-1.5">
-              <div className="grid grid-cols-13 gap-2 items-center">
+              <div className="grid grid-cols-14 gap-2 items-center">
                 <div className="col-span-2 font-bold text-white">
                   합계
                 </div>
@@ -1694,10 +1805,13 @@ export default function OrderPlatformPage() {
                 <div className="col-span-1 text-center font-semibold text-indigo-300">
                   {totalStat.발주서확정_건수 > 0 ? totalStat.발주서확정_건수 : '-'}
                 </div>
-                <div className="col-span-1 text-center font-bold text-blue-300">
-                  {totalStat.총금액 > 0 ? `${totalStat.총금액.toLocaleString()}원` : '-'}
+                <div className="col-span-1 text-center font-bold text-purple-300">
+                  {totalStat.발주서확정_건수 > 0 && totalStat.총금액 > 0 ? `${totalStat.총금액.toLocaleString()}원` : '-'}
                 </div>
                 <div className="col-span-1"></div>
+                <div className="col-span-1 text-center font-semibold text-cyan-300" style={{ boxShadow: '-2px 0 0 0 rgba(107, 114, 128, 0.6)' }}>
+                  {totalStat.정산금액 > 0 ? `${totalStat.정산금액.toLocaleString()}원` : '-'}
+                </div>
                 <div className="col-span-1 text-center font-semibold text-blue-300">
                   {totalStat.결제완료_건수 > 0 ? totalStat.결제완료_건수 : '-'}
                 </div>
@@ -1736,7 +1850,7 @@ export default function OrderPlatformPage() {
                 onClick={() => toggleOrganization(stat.organization_id)}
                 className="w-full px-4 py-1.5 hover:bg-gray-700 transition-colors"
               >
-                <div className="grid grid-cols-13 gap-2 items-center">
+                <div className="grid grid-cols-14 gap-2 items-center">
                   <div className="col-span-2 flex items-center gap-2 font-semibold text-white text-left pl-8">
                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     <div style={{ transform: 'scale(0.7)', display: 'flex', alignItems: 'center' }}>
@@ -1750,8 +1864,8 @@ export default function OrderPlatformPage() {
                   <div className="col-span-1 text-center font-semibold text-indigo-300">
                     {stat.발주서확정_건수 > 0 ? stat.발주서확정_건수 : '-'}
                   </div>
-                  <div className="col-span-1 text-center font-semibold text-blue-300">
-                    {stat.총금액?.toLocaleString() || 0}원
+                  <div className="col-span-1 text-center font-semibold text-purple-300">
+                    {stat.발주서확정_건수 > 0 && stat.총금액 > 0 ? `${stat.총금액.toLocaleString()}원` : '-'}
                   </div>
                   <div className="col-span-1 flex justify-center">
                     {stat.발주확정_배치 && stat.발주확정_배치.length > 0 ? (
@@ -1785,6 +1899,9 @@ export default function OrderPlatformPage() {
                     ) : (
                       <span className="text-xs text-gray-500">-</span>
                     )}
+                  </div>
+                  <div className="col-span-1 text-center font-semibold text-cyan-300" style={{ boxShadow: '-2px 0 0 0 rgba(107, 114, 128, 0.7)' }}>
+                    {stat.정산금액 > 0 ? `${stat.정산금액.toLocaleString()}원` : '-'}
                   </div>
                   <div className="col-span-1 text-center font-semibold text-blue-300">
                     {stat.결제완료_건수 > 0 ? stat.결제완료_건수 : '-'}
@@ -1845,14 +1962,16 @@ export default function OrderPlatformPage() {
                                   <div className="text-sm flex items-center gap-3">
                                     <span className="text-gray-900">{batch.총금액.toLocaleString()}</span>
                                     <span className="text-gray-400">-</span>
+                                    <span className="text-purple-600">{batch.등급할인.toLocaleString()}</span>
+                                    <span className="text-gray-400">-</span>
                                     <span className="text-gray-900">{batch.캐시사용금액.toLocaleString()}</span>
                                     <span className="text-gray-400">&gt;&gt;</span>
-                                    <span className="text-blue-600 font-semibold">{(batch.총금액 - batch.캐시사용금액).toLocaleString()}</span>
+                                    <span className="text-purple-600 font-semibold">{batch.최종입금액.toLocaleString()}</span>
                                   </div>
                                   <div className="text-sm text-gray-600">
                                     ({batch.입금자명 || '입금자명 없음'})
                                   </div>
-                                  <div className="text-xs text-gray-500" style={{ color: '#666' }}>
+                                  <div className="text-xs text-purple-600">
                                     {batch.실행자_이름 || '미지정'} {batch.실행자_전화번호 ? `(${batch.실행자_전화번호})` : ''}
                                   </div>
                                   {batch.입금확인 && (
@@ -1889,8 +2008,11 @@ export default function OrderPlatformPage() {
                                         <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '120px' }}>벤더사</th>
                                         <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '15%' }}>옵션상품</th>
                                         <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '60px' }}>수량</th>
-                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '100px' }}>최종입금액</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '80px' }}>공급단가</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '90px' }}>공급가</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '80px' }}>할인금액</th>
                                         <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '80px' }}>사용캐시</th>
+                                        <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '90px' }}>최종입금액</th>
                                         <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '130px' }}>상태</th>
                                         <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '200px' }}>발주확정</th>
                                       </tr>
@@ -1907,11 +2029,20 @@ export default function OrderPlatformPage() {
                                             <td className="px-2 py-0.5 text-xs text-gray-900" style={{ width: '120px' }}>{order.vendor_name || '-'}</td>
                                             <td className="px-2 py-0.5 text-xs text-gray-900" style={{ width: '15%' }}>{order.option_name}</td>
                                             <td className="px-2 py-0.5 text-center text-xs text-gray-900" style={{ width: '60px' }}>{order.quantity}</td>
-                                            <td className="px-2 py-0.5 text-right text-xs text-blue-600 font-semibold" style={{ width: '100px' }}>
-                                              {Number(order.final_deposit_amount || 0).toLocaleString()}원
+                                            <td className="px-2 py-0.5 text-right text-xs text-gray-700" style={{ width: '80px' }}>
+                                              {Number(order.seller_supply_price || 0).toLocaleString()}
+                                            </td>
+                                            <td className="px-2 py-0.5 text-right text-xs text-gray-900 font-medium" style={{ width: '90px' }}>
+                                              {Number(order.product_amount || 0).toLocaleString()}
+                                            </td>
+                                            <td className="px-2 py-0.5 text-right text-xs text-purple-600" style={{ width: '80px' }}>
+                                              {Number(order.discount_amount || 0).toLocaleString()}
                                             </td>
                                             <td className="px-2 py-0.5 text-right text-xs text-orange-600" style={{ width: '80px' }}>
                                               {Number(order.cash_used || 0).toLocaleString()}
+                                            </td>
+                                            <td className="px-2 py-0.5 text-right text-xs text-blue-600 font-semibold" style={{ width: '90px' }}>
+                                              {Number(order.final_deposit_amount || 0).toLocaleString()}
                                             </td>
                                             <td className="px-2 py-0.5 text-center" style={{ width: '130px' }}>
                                               <span className={`px-1.5 py-0 text-xs ${getStatusColor(status)}`}>
@@ -1955,8 +2086,62 @@ export default function OrderPlatformPage() {
 
                     return (
                       <div key={status} className="pl-8 pr-4 py-3">
-                        <div className={`text-sm font-semibold text-gray-700 mb-2 p-2 rounded ${statusColors[status]}`}>
-                          {status} ({statusOrders.length}건)
+                        <div className={`text-sm font-semibold text-gray-700 mb-2 p-2 rounded ${statusColors[status]} flex justify-between items-center`}>
+                          <span>{status} ({statusOrders.length}건)</span>
+                          {status === '취소요청' && statusOrders.length > 0 && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!confirm(`${statusOrders.length}건의 취소요청을 모두 승인하시겠습니까?`)) return;
+
+                                try {
+                                  const now = new Date().toISOString();
+                                  const response = await fetch('/api/integrated-orders/bulk', {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      orders: statusOrders.map(order => ({
+                                        id: order.id,
+                                        shipping_status: '취소완료',
+                                        canceled_at: now
+                                      }))
+                                    }),
+                                  });
+
+                                  const result = await response.json();
+                                  if (result.success) {
+                                    toast.success(`${statusOrders.length}건의 취소가 승인되었습니다.`);
+                                    // 알림은 Bulk API에서 자동으로 전송됨 (status === '취소완료')
+
+                                    // 로컬 상태 업데이트
+                                    setOrders(prev => prev.map(o => {
+                                      const found = statusOrders.find(so => so.id === o.id);
+                                      return found ? { ...o, shipping_status: '취소완료', canceled_at: now } : o;
+                                    }));
+                                  } else {
+                                    toast.error('처리 실패: ' + result.error);
+                                  }
+                                } catch (error) {
+                                  console.error('일괄승인 오류:', error);
+                                  toast.error('처리 중 오류가 발생했습니다.');
+                                }
+                              }}
+                              className="px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors"
+                            >
+                              일괄승인
+                            </button>
+                          )}
+                          {status === '취소완료' && statusOrders.length > 0 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRefundComplete(stat.organization_id);
+                              }}
+                              className="px-3 py-1 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700 transition-colors"
+                            >
+                              일괄환불
+                            </button>
+                          )}
                         </div>
                         <div className="bg-white p-3">
                           <table className="w-full seller-detail-table">
@@ -1968,21 +2153,31 @@ export default function OrderPlatformPage() {
                                 <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '120px' }}>벤더사</th>
                                 <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '15%' }}>옵션상품</th>
                                 <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '60px' }}>수량</th>
-                                <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '100px' }}>
-                                  {status === '취소완료' ? '환불예정금액' : status === '환불완료' ? '환불완료금액' : (status === '발주서등록' || status === '접수') ? '정산예정금액' : '최종입금액'}
-                                </th>
-                                {(status === '결제완료' || status === '상품준비중' || status === '발송완료' || status === '취소요청') && (
-                                  <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '80px' }}>사용캐시</th>
-                                )}
-                                {(status === '취소완료' || status === '환불완료') && (
+                                {/* 발주서등록, 접수 상태: 공급단가 + 공급가만 표시 */}
+                                {(status === '발주서등록' || status === '접수') ? (
                                   <>
-                                    <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '100px' }}>
-                                      {status === '취소완료' ? '환불예정캐시' : '환불완료캐시'}
+                                    <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '80px' }}>공급단가</th>
+                                    <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '90px' }}>공급가</th>
+                                  </>
+                                ) : (
+                                  /* 그 외 모든 상태: 전체 금액 정보 표시 */
+                                  <>
+                                    <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '80px' }}>공급단가</th>
+                                    <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '90px' }}>공급가</th>
+                                    <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '80px' }}>할인금액</th>
+                                    <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '80px' }}>사용캐시</th>
+                                    <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '90px' }}>
+                                      {status === '취소완료' ? '환불예정금액' : status === '환불완료' ? '환불완료금액' : '최종입금액'}
                                     </th>
-                                    <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '280px' }}>환불계좌</th>
                                   </>
                                 )}
+                                {(status === '취소완료' || status === '환불완료') && (
+                                  <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '280px' }}>환불계좌</th>
+                                )}
                                 <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '130px' }}>상태</th>
+                                {(status === '취소요청' || status === '취소완료' || status === '환불완료') && (
+                                  <th className="px-1 py-0 text-left font-medium text-xs" style={{ width: '250px' }}>취소사유</th>
+                                )}
                                 {status === '취소요청' && (
                                   <th className="px-1 py-0 text-center font-medium text-xs" style={{ width: '120px' }}>작업</th>
                                 )}
@@ -2001,42 +2196,57 @@ export default function OrderPlatformPage() {
                                     <td className="px-2 py-0.5 text-xs text-gray-900" style={{ width: '120px' }}>{order.vendor_name || '-'}</td>
                                     <td className="px-2 py-0.5 text-xs text-gray-900" style={{ width: '15%' }}>{order.option_name}</td>
                                     <td className="px-2 py-0.5 text-center text-xs text-gray-900" style={{ width: '60px' }}>{order.quantity}</td>
-                                    <td className={`px-2 py-0.5 text-right text-xs ${(status === '취소완료' || status === '환불완료') ? 'text-red-600 font-semibold' : (status === '발주서등록' || status === '접수') ? 'text-gray-900' : 'text-blue-600 font-semibold'}`} style={{ width: '100px' }}>
-                                      {(() => {
-                                        // 업로드 단계: settlement_amount (정산예정금액)
-                                        if (status === '발주서등록' || status === '접수') {
-                                          return `${Number(order.settlement_amount || 0).toLocaleString()}원`;
-                                        }
-                                        // 발주확정 이후: final_deposit_amount (최종입금액)
-                                        return `${Number(order.final_deposit_amount || 0).toLocaleString()}원`;
-                                      })()}
-                                    </td>
-                                    {(status === '결제완료' || status === '상품준비중' || status === '발송완료' || status === '취소요청') && (
-                                      <td className="px-2 py-0.5 text-right text-xs text-orange-600" style={{ width: '80px' }}>
-                                        {Number(order.cash_used || 0).toLocaleString()}
-                                      </td>
-                                    )}
-                                    {(status === '취소완료' || status === '환불완료') && (
+                                    {/* 발주서등록, 접수 상태: 공급단가 + 공급가만 표시 */}
+                                    {(status === '발주서등록' || status === '접수') ? (
                                       <>
-                                        <td className="px-2 py-0.5 text-right text-xs text-orange-600 font-semibold" style={{ width: '100px' }}>
-                                          {Number(order.cash_used || 0).toLocaleString()}캐시
+                                        <td className="px-2 py-0.5 text-right text-xs text-gray-700" style={{ width: '80px' }}>
+                                          {Number(order.seller_supply_price || 0).toLocaleString()}
                                         </td>
-                                        <td className="px-2 py-0.5 text-xs text-gray-700" style={{ width: '280px' }}>
-                                          {order.bank_name || order.bank_account || order.account_holder ? (
-                                            <span>
-                                              {order.bank_name || '-'} {order.bank_account || '-'} ({order.account_holder || '-'})
-                                            </span>
-                                          ) : (
-                                            <span className="text-gray-400">정보 없음</span>
-                                          )}
+                                        <td className="px-2 py-0.5 text-right text-xs text-gray-900 font-medium" style={{ width: '90px' }}>
+                                          {Number(order.product_amount || 0).toLocaleString()}
                                         </td>
                                       </>
+                                    ) : (
+                                      /* 그 외 모든 상태: 전체 금액 정보 표시 */
+                                      <>
+                                        <td className="px-2 py-0.5 text-right text-xs text-gray-700" style={{ width: '80px' }}>
+                                          {Number(order.seller_supply_price || 0).toLocaleString()}
+                                        </td>
+                                        <td className="px-2 py-0.5 text-right text-xs text-gray-900 font-medium" style={{ width: '90px' }}>
+                                          {Number(order.product_amount || 0).toLocaleString()}
+                                        </td>
+                                        <td className="px-2 py-0.5 text-right text-xs text-purple-600" style={{ width: '80px' }}>
+                                          {Number(order.discount_amount || 0).toLocaleString()}
+                                        </td>
+                                        <td className="px-2 py-0.5 text-right text-xs text-orange-600" style={{ width: '80px' }}>
+                                          {Number(order.cash_used || 0).toLocaleString()}
+                                        </td>
+                                        <td className={`px-2 py-0.5 text-right text-xs ${(status === '취소완료' || status === '환불완료') ? 'text-red-600 font-semibold' : 'text-blue-600 font-semibold'}`} style={{ width: '90px' }}>
+                                          {Number(order.final_deposit_amount || 0).toLocaleString()}
+                                        </td>
+                                      </>
+                                    )}
+                                    {(status === '취소완료' || status === '환불완료') && (
+                                      <td className="px-2 py-0.5 text-xs text-gray-700" style={{ width: '280px' }}>
+                                        {order.bank_name || order.bank_account || order.account_holder ? (
+                                          <span>
+                                            {order.bank_name || '-'} {order.bank_account || '-'} ({order.account_holder || '-'})
+                                          </span>
+                                        ) : (
+                                          <span className="text-gray-400">정보 없음</span>
+                                        )}
+                                      </td>
                                     )}
                                     <td className="px-2 py-0.5 text-center" style={{ width: '130px' }}>
                                       <span className={`px-1.5 py-0 text-xs ${getStatusColor(order.shipping_status)}`}>
                                         {getStatusDisplayName(order.shipping_status)}
                                       </span>
                                     </td>
+                                    {(status === '취소요청' || status === '취소완료' || status === '환불완료') && (
+                                      <td className="px-2 py-0.5 text-xs text-gray-700" style={{ width: '250px' }}>
+                                        {order.cancel_reason || <span className="text-gray-400">사유 없음</span>}
+                                      </td>
+                                    )}
                                     {status === '취소요청' && (
                                     <td className="px-2 py-0.5 text-center" style={{ width: '120px' }}>
                                       <div className="flex gap-1 justify-center">
@@ -2125,7 +2335,21 @@ export default function OrderPlatformPage() {
                                       <button
                                         onClick={async (e) => {
                                           e.stopPropagation();
-                                          if (!confirm('환불을 완료 처리하시겠습니까?')) return;
+
+                                          // 이미 환불완료된 주문인지 체크
+                                          if (order.refund_processed_at) {
+                                            toast.error('이미 환불 처리된 주문입니다.');
+                                            return;
+                                          }
+
+                                          if (!confirm('환불을 완료 처리하시겠습니까?\n\n⚠️ 이 작업은 취소할 수 없으며, 캐시 환불이 즉시 처리됩니다.')) return;
+
+                                          // 버튼 비활성화
+                                          const button = e.currentTarget;
+                                          button.disabled = true;
+                                          button.textContent = '처리중...';
+                                          button.style.opacity = '0.5';
+                                          button.style.cursor = 'not-allowed';
 
                                           try {
                                             // 1. 캐시 환불 (사용한 캐시가 있는 경우)
@@ -2142,9 +2366,23 @@ export default function OrderPlatformPage() {
                                                 }),
                                               });
 
-                                              const cashRefundResult = await cashRefundResponse.json();
+                                              if (!cashRefundResponse.ok) {
+                                                throw new Error(`캐시 환불 API error! status: ${cashRefundResponse.status}`);
+                                              }
+
+                                              const cashRefundText = await cashRefundResponse.text();
+                                              const cashRefundResult = cashRefundText ? JSON.parse(cashRefundText) : { success: false, error: '응답이 비어있습니다.' };
                                               if (!cashRefundResult.success) {
-                                                toast.error('캐시 환불 실패: ' + cashRefundResult.error);
+                                                if (cashRefundResult.alreadyRefunded) {
+                                                  toast.error('이미 환불 처리된 주문입니다.');
+                                                } else {
+                                                  toast.error('캐시 환불 실패: ' + cashRefundResult.error);
+                                                }
+                                                // 버튼 다시 활성화
+                                                button.disabled = false;
+                                                button.textContent = '환불완료';
+                                                button.style.opacity = '1';
+                                                button.style.cursor = 'pointer';
                                                 return;
                                               }
                                             }
@@ -2158,13 +2396,37 @@ export default function OrderPlatformPage() {
                                               }),
                                             });
 
-                                            const settlementResult = await settlementResponse.json();
+                                            if (!settlementResponse.ok) {
+                                              throw new Error(`정산 API error! status: ${settlementResponse.status}`);
+                                            }
+
+                                            const settlementText = await settlementResponse.text();
+                                            const settlementResult = settlementText ? JSON.parse(settlementText) : { success: false, error: '응답이 비어있습니다.' };
                                             if (!settlementResult.success) {
                                               toast.error('정산 데이터 저장 실패: ' + settlementResult.error);
+                                              // 버튼 다시 활성화
+                                              button.disabled = false;
+                                              button.textContent = '환불완료';
+                                              button.style.opacity = '1';
+                                              button.style.cursor = 'pointer';
                                               return;
                                             }
 
                                             // 3. 주문 상태 업데이트
+                                            const now = new Date().toISOString();
+                                            // settlement_amount가 null이면 final_deposit_amount 사용 (백업)
+                                            const refundAmount = parseFloat(order.settlement_amount as any)
+                                              || parseFloat(order.final_deposit_amount as any)
+                                              || 0;
+
+                                            console.log('🔍 환불 금액 저장:', {
+                                              order_id: order.id,
+                                              order_number: order.order_number,
+                                              settlement_amount: order.settlement_amount,
+                                              final_deposit_amount: order.final_deposit_amount,
+                                              refund_amount: refundAmount
+                                            });
+
                                             const response = await fetch('/api/integrated-orders/bulk', {
                                               method: 'PUT',
                                               headers: { 'Content-Type': 'application/json' },
@@ -2172,17 +2434,47 @@ export default function OrderPlatformPage() {
                                                 orders: [{
                                                   id: order.id,
                                                   shipping_status: '환불완료',
-                                                  refund_processed_at: new Date().toISOString()
+                                                  refund_processed_at: now,
+                                                  refund_amount_canceled: refundAmount,
+                                                  refund_amount_canceled_at: now
                                                 }]
                                               }),
                                             });
 
-                                            const result = await response.json();
+                                            if (!response.ok) {
+                                              throw new Error(`HTTP error! status: ${response.status}`);
+                                            }
+
+                                            const text = await response.text();
+                                            const result = text ? JSON.parse(text) : { success: false, error: '응답이 비어있습니다.' };
                                             if (result.success) {
                                               const successMsg = cashUsed > 0
                                                 ? `환불이 완료되었습니다. (캐시 ${cashUsed.toLocaleString()} 환불 포함)`
                                                 : '환불이 완료되었습니다.';
                                               toast.success(successMsg);
+
+                                              // 📱 사용자에게 환불완료 알림 전송
+                                              if (order.organization_id && refundAmount > 0) {
+                                                try {
+                                                  const notifyResponse = await fetch('/api/orders/notify-refund-complete', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({
+                                                      organizationId: order.organization_id,
+                                                      orderCount: 1,
+                                                      totalRefundAmount: refundAmount
+                                                    })
+                                                  });
+
+                                                  if (!notifyResponse.ok) {
+                                                    console.error('환불완료 알림 전송 실패:', await notifyResponse.text());
+                                                  }
+                                                } catch (notifyError) {
+                                                  console.error('환불완료 알림 전송 오류:', notifyError);
+                                                  // 알림 전송 실패해도 환불처리는 성공으로 처리
+                                                }
+                                              }
+
                                               // 로컬 상태 업데이트
                                               setOrders(prev => prev.map(o =>
                                                 o.id === order.id
@@ -2192,14 +2484,32 @@ export default function OrderPlatformPage() {
                                             } else {
                                               toast.error('처리 실패: ' + result.error);
                                             }
-                                          } catch (error) {
+                                          } catch (error: any) {
                                             console.error('환불완료 처리 오류:', error);
-                                            toast.error('처리 중 오류가 발생했습니다.');
+
+                                            // 에러 메시지 표시
+                                            if (error.message?.includes('이미 환불')) {
+                                              toast.error('이미 환불 처리된 주문입니다.');
+                                            } else {
+                                              toast.error('처리 중 오류가 발생했습니다.');
+                                            }
+
+                                            // 버튼 다시 활성화
+                                            button.disabled = false;
+                                            button.textContent = '환불완료';
+                                            button.style.opacity = '1';
+                                            button.style.cursor = 'pointer';
                                           }
                                         }}
-                                        className="px-2 py-1 text-xs bg-red-600 text-white hover:bg-red-700 transition-colors rounded"
+                                        disabled={!!order.refund_processed_at}
+                                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                                          order.refund_processed_at
+                                            ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                            : 'bg-red-600 text-white hover:bg-red-700 cursor-pointer'
+                                        }`}
+                                        title={order.refund_processed_at ? '이미 환불 처리됨' : '환불완료 처리'}
                                       >
-                                        환불완료
+                                        {order.refund_processed_at ? '환불완료됨' : '환불완료'}
                                       </button>
                                     </td>
                                   )}
