@@ -133,21 +133,21 @@ export default function TierBadge({
         onMouseLeave={() => setShowTooltip(false)}
       >
         <div
-          className="flex items-center justify-center w-7 h-7 rounded-full cursor-pointer"
+          className="flex items-center justify-center w-6 h-6 rounded-full cursor-pointer"
           style={{
             // @ts-ignore
             '--tier': meta.color,
             background: '#0b1020',
-            border: `1.5px solid ${meta.color}`,
-            boxShadow: `0 0 6px ${meta.color}55`
+            border: `1px solid ${meta.color}`,
+            boxShadow: `0 0 4px ${meta.color}55`
           }}
         >
           {/* Icon */}
           <meta.Icon
-            width={16}
-            height={16}
+            width={14}
+            height={14}
             className="relative z-10"
-            style={{ color: meta.color, filter: `drop-shadow(0 0 4px ${meta.color})` }}
+            style={{ color: meta.color, filter: `drop-shadow(0 0 3px ${meta.color})` }}
           />
         </div>
 

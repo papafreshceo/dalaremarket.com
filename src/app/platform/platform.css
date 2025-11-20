@@ -1,0 +1,146 @@
+/* Platform 전용 디자인 시스템 */
+
+:root {
+  /* Border Radius */
+  --platform-radius-sm: 4px;
+  --platform-radius-md: 8px;
+  --platform-radius-lg: 12px;
+  --platform-radius-xl: 16px;
+
+  /* Shadow */
+  --platform-shadow-none: none;
+  --platform-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --platform-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --platform-shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15);
+  --platform-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.2);
+
+  /* Colors */
+  --platform-primary: #2563eb;
+  --platform-primary-hover: #1d4ed8;
+  --platform-secondary: #10b981;
+  --platform-border: #e0e0e0;
+  --platform-text: #212529;
+  --platform-text-secondary: #6b7280;
+
+  /* Spacing */
+  --platform-padding-sm: 8px;
+  --platform-padding-md: 12px;
+  --platform-padding-lg: 16px;
+
+  /* Border Width */
+  --platform-border-width: 1px;
+}
+
+/* ===== 버튼 스타일 ===== */
+.platform-btn {
+  padding: var(--platform-padding-md) var(--platform-padding-lg);
+  border-radius: var(--platform-radius-md);
+  box-shadow: var(--platform-shadow-sm);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  outline: none;
+}
+
+.platform-btn-primary {
+  background: var(--platform-primary);
+  color: white;
+  border: var(--platform-border-width) solid var(--platform-primary);
+}
+
+.platform-btn-primary:hover {
+  background: var(--platform-primary-hover);
+  box-shadow: var(--platform-shadow-md);
+}
+
+.platform-btn-outline {
+  background: transparent;
+  color: var(--platform-primary);
+  border: var(--platform-border-width) solid var(--platform-border);
+}
+
+.platform-btn-outline:hover {
+  background: #f8f9fa;
+  border-color: var(--platform-primary);
+  box-shadow: var(--platform-shadow-md);
+}
+
+.platform-btn-secondary {
+  background: var(--platform-secondary);
+  color: white;
+  border: var(--platform-border-width) solid var(--platform-secondary);
+}
+
+.platform-btn-secondary:hover {
+  background: #059669;
+  box-shadow: var(--platform-shadow-md);
+}
+
+/* ===== 배지 스타일 ===== */
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--platform-padding-sm) var(--platform-padding-md);
+  border-radius: var(--platform-radius-sm);
+  box-shadow: var(--platform-shadow-sm);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.platform-badge-primary {
+  background: var(--platform-primary);
+  color: white;
+}
+
+.platform-badge-outline {
+  background: transparent;
+  border: var(--platform-border-width) solid var(--platform-border);
+  color: var(--platform-text);
+}
+
+.platform-badge-success {
+  background: var(--platform-secondary);
+  color: white;
+}
+
+/* ===== 카드 스타일 ===== */
+.platform-card {
+  background: white;
+  border-radius: var(--platform-radius-lg);
+  box-shadow: var(--platform-shadow-md);
+  padding: var(--platform-padding-lg);
+  border: var(--platform-border-width) solid var(--platform-border);
+}
+
+.platform-card:hover {
+  box-shadow: var(--platform-shadow-lg);
+}
+
+/* ===== 입력 필드 스타일 ===== */
+.platform-input {
+  padding: var(--platform-padding-md);
+  border-radius: var(--platform-radius-md);
+  border: var(--platform-border-width) solid var(--platform-border);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.platform-input:focus {
+  border-color: var(--platform-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* ===== 애니메이션 ===== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

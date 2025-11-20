@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { createClient } from '@/lib/supabase/client';
 import DOMPurify from 'isomorphic-dompurify';
 
@@ -17,7 +18,13 @@ export function NoticePopup() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [dontShowToday, setDontShowToday] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const supabase = createClient();
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   useEffect(() => {
     loadPopupNotices();
@@ -93,11 +100,11 @@ export function NoticePopup() {
     }
   };
 
-  if (!isOpen || notices.length === 0) return null;
+  if (!isOpen || notices.length === 0 || !mounted) return null;
 
   const currentNotice = notices[currentIndex];
 
-  return (
+  return createPortal(
     <>
       {/* 배경 오버레이 */}
       <div
@@ -311,6 +318,7 @@ export function NoticePopup() {
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }

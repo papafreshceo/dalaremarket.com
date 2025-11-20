@@ -44,8 +44,13 @@ export default function PlatformHome() {
         // 기존 파비콘 모두 제거 (안전하게)
         const existingFavicons = document.querySelectorAll("link[rel*='icon']");
         existingFavicons.forEach(el => {
-          if (el && el.parentNode) {
-            el.parentNode.removeChild(el);
+          try {
+            // isConnected로 DOM에 연결되어 있는지 확인 후 제거
+            if (el && el.isConnected && el.parentNode) {
+              el.parentNode.removeChild(el);
+            }
+          } catch (err) {
+            // 개별 요소 제거 실패는 무시
           }
         });
 
@@ -55,7 +60,9 @@ export default function PlatformHome() {
         link.rel = 'icon';
         link.type = 'image/png';
         link.href = `/platform-favicon.png?v=${timestamp}`;
-        document.head.appendChild(link);
+        if (document.head) {
+          document.head.appendChild(link);
+        }
 
         // 타이틀 변경
         document.title = '달래마켓';

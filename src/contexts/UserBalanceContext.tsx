@@ -35,7 +35,7 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 잔액 새로고침 함수
+  // 잔액 새로고침 함수 (조직 캐시/크레딧 조회)
   const refreshBalances = async () => {
     if (!user) {
       setCashBalance(0);
@@ -44,22 +44,37 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const [cashRes, creditRes] = await Promise.all([
-        fetch('/api/cash'),
-        fetch('/api/user/credits')
+      // 사용자의 primary_organization_id 조회
+      const { data: userData } = await supabase
+        .from('users')
+        .select('primary_organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.primary_organization_id) {
+        setCashBalance(0);
+        setCreditBalance(0);
+        return;
+      }
+
+      // 조직의 캐시와 크레딧 조회
+      const [cashData, creditData] = await Promise.all([
+        supabase
+          .from('organization_cash')
+          .select('balance')
+          .eq('organization_id', userData.primary_organization_id)
+          .single(),
+        supabase
+          .from('organization_credits')
+          .select('balance')
+          .eq('organization_id', userData.primary_organization_id)
+          .single()
       ]);
 
-      const cashData = await cashRes.json();
-      if (cashData.success) {
-        setCashBalance(cashData.balance);
-      }
-
-      const creditData = await creditRes.json();
-      if (creditData.success) {
-        setCreditBalance(creditData.credits);
-      }
+      setCashBalance(cashData.data?.balance || 0);
+      setCreditBalance(creditData.data?.balance || 0);
     } catch (error) {
-      console.error('잔액 조회 실패:', error);
+      console.error('조직 잔액 조회 실패:', error);
     }
   };
 

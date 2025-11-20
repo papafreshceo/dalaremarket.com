@@ -237,12 +237,24 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
 }
 
 // Player ID를 데이터베이스에 저장
-async function savePlayerIdToDatabase(userId: string, playerId: string) {
+async function savePlayerIdToDatabase(userId: string, playerId: string, retryCount = 0) {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 1000; // 1초
+
   try {
+    // CSRF 토큰 가져오기 (최대 5초 대기)
+    const csrfToken = await waitForCsrfToken(5000);
+
+    if (!csrfToken) {
+      logger.warn('CSRF 토큰을 찾을 수 없습니다. Player ID 저장을 건너뜁니다.');
+      return;
+    }
+
     const response = await fetch('/api/notifications/player-id', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
       },
       body: JSON.stringify({
         player_id: playerId,
@@ -252,13 +264,44 @@ async function savePlayerIdToDatabase(userId: string, playerId: string) {
     });
 
     if (!response.ok) {
-      throw new Error('Player ID 저장 실패');
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+
+      // CSRF 토큰 오류이고 재시도 횟수가 남았으면 재시도
+      if (response.status === 403 && retryCount < MAX_RETRIES) {
+        logger.warn(`CSRF 검증 실패, ${RETRY_DELAY}ms 후 재시도 (${retryCount + 1}/${MAX_RETRIES})`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        return savePlayerIdToDatabase(userId, playerId, retryCount + 1);
+      }
+
+      logger.error('Player ID 저장 API 응답 에러', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData,
+        retryCount,
+      });
+      throw new Error(`Player ID 저장 실패: ${errorData.error || response.statusText}`);
     }
 
     logger.debug('Player ID 저장 완료', { userId, playerId: playerId.substring(0, 20) + '...' });
   } catch (error) {
-    logger.error('Player ID 저장 오류', error);
+    logger.error('Player ID 저장 오류', { error, retryCount });
   }
+}
+
+// CSRF 토큰이 준비될 때까지 대기
+async function waitForCsrfToken(timeoutMs: number): Promise<string | null> {
+  const startTime = Date.now();
+  const checkInterval = 100; // 100ms마다 확인
+
+  while (Date.now() - startTime < timeoutMs) {
+    const token = getCsrfToken();
+    if (token) {
+      return token;
+    }
+    await new Promise(resolve => setTimeout(resolve, checkInterval));
+  }
+
+  return null; // 타임아웃
 }
 
 // 디바이스 타입 감지
@@ -285,4 +328,19 @@ function getDeviceModel(): string {
   if (userAgent.indexOf('Edge') > -1) return 'Edge';
 
   return 'Unknown';
+}
+
+// CSRF 토큰 가져오기
+function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null;
+
+  const cookies = document.cookie.split(';');
+  for (const cookie of cookies) {
+    const [name, value] = cookie.trim().split('=');
+    if (name === 'csrf-token') {
+      return decodeURIComponent(value);
+    }
+  }
+
+  return null;
 }

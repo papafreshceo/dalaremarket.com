@@ -19,13 +19,19 @@ export default async function AdminLayout({
   // 사용자 정보 및 역할 확인 (모든 필요한 필드를 한번에 조회)
   const { data: userData } = await supabase
     .from('users')
-    .select('id, name, email, role')
+    .select('id, name, email, role, approved')
     .eq('id', user.id)
     .single();
 
+  // 승인되지 않은 사용자는 로그아웃 후 로그인 페이지로
+  if (!userData || !userData.approved) {
+    await supabase.auth.signOut();
+    redirect('/auth/login?error=not-approved');
+  }
+
   // 관리자가 아니면 접근 불가
   const adminRoles = ['admin', 'employee', 'super_admin'];
-  if (!userData || !adminRoles.includes(userData.role)) {
+  if (!adminRoles.includes(userData.role)) {
     redirect('/');
   }
 

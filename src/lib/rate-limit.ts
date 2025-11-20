@@ -1,163 +1,132 @@
 /**
- * Rate Limiting 유틸리티
- *
- * API 요청 속도 제한을 위한 헬퍼 함수들
+ * Simple in-memory rate limiter
+ * For production, consider using Redis-based solution like @upstash/ratelimit
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { LRUCache } from 'lru-cache';
-
-// Rate limit 설정
-interface RateLimitOptions {
-  interval: number;  // 시간 윈도우 (밀리초)
-  uniqueTokenPerInterval: number;  // 시간 윈도우당 허용 토큰 수
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
 }
 
-// 캐시 인스턴스들 (서로 다른 제한을 위해 분리)
-const caches = new Map<string, LRUCache<string, number>>();
+class RateLimiter {
+  private requests: Map<string, RateLimitEntry> = new Map();
+  private cleanupInterval: NodeJS.Timeout;
 
-function getCache(name: string, options: RateLimitOptions): LRUCache<string, number> {
-  if (!caches.has(name)) {
-    caches.set(name, new LRUCache({
-      max: options.uniqueTokenPerInterval,
-      ttl: options.interval,
-    }));
+  constructor() {
+    // 주기적으로 만료된 항목 정리 (5분마다)
+    this.cleanupInterval = setInterval(() => {
+      this.cleanup();
+    }, 5 * 60 * 1000);
   }
-  return caches.get(name)!;
+
+  /**
+   * Rate limit 체크
+   * @param identifier - IP 주소, 사용자 ID 등 고유 식별자
+   * @param maxRequests - 윈도우 내 최대 요청 수
+   * @param windowMs - 시간 윈도우 (밀리초)
+   * @returns { success: boolean, remaining: number, resetTime: number }
+   */
+  check(
+    identifier: string,
+    maxRequests: number = 10,
+    windowMs: number = 60 * 1000 // 기본 1분
+  ): { success: boolean; remaining: number; resetTime: number } {
+    const now = Date.now();
+    const entry = this.requests.get(identifier);
+
+    // 항목이 없거나 시간 윈도우가 만료됨 → 새로 생성
+    if (!entry || now > entry.resetTime) {
+      const newEntry: RateLimitEntry = {
+        count: 1,
+        resetTime: now + windowMs,
+      };
+      this.requests.set(identifier, newEntry);
+
+      return {
+        success: true,
+        remaining: maxRequests - 1,
+        resetTime: newEntry.resetTime,
+      };
+    }
+
+    // 한도 초과
+    if (entry.count >= maxRequests) {
+      return {
+        success: false,
+        remaining: 0,
+        resetTime: entry.resetTime,
+      };
+    }
+
+    // 카운트 증가
+    entry.count++;
+    this.requests.set(identifier, entry);
+
+    return {
+      success: true,
+      remaining: maxRequests - entry.count,
+      resetTime: entry.resetTime,
+    };
+  }
+
+  /**
+   * 만료된 항목 정리
+   */
+  private cleanup(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.requests.entries()) {
+      if (now > entry.resetTime) {
+        this.requests.delete(key);
+      }
+    }
+  }
+
+  /**
+   * 특정 식별자의 rate limit 초기화
+   */
+  reset(identifier: string): void {
+    this.requests.delete(identifier);
+  }
+
+  /**
+   * 인스턴스 정리
+   */
+  destroy(): void {
+    clearInterval(this.cleanupInterval);
+    this.requests.clear();
+  }
+}
+
+// 싱글톤 인스턴스
+const rateLimiter = new RateLimiter();
+
+export default rateLimiter;
+
+/**
+ * API Route에서 사용할 간편한 헬퍼 함수
+ */
+export function rateLimit(
+  identifier: string,
+  options: {
+    maxRequests?: number;
+    windowMs?: number;
+  } = {}
+) {
+  const { maxRequests = 10, windowMs = 60 * 1000 } = options;
+  return rateLimiter.check(identifier, maxRequests, windowMs);
 }
 
 /**
- * IP 주소 추출
+ * IP 주소 추출 헬퍼
  */
-function getIP(request: NextRequest): string {
+export function getClientIp(request: Request): string {
   const forwarded = request.headers.get('x-forwarded-for');
-  const realIP = request.headers.get('x-real-ip');
+  const realIp = request.headers.get('x-real-ip');
 
+  // 프록시 환경에서 첫 번째 IP를 반환
   if (forwarded) {
     return forwarded.split(',')[0].trim();
   }
 
-  if (realIP) {
-    return realIP;
-  }
-
-  return 'anonymous';
-}
-
-/**
- * Rate Limiting 체크
- */
-export async function rateLimit(
-  request: NextRequest,
-  limit: number = 10,
-  interval: number = 60000 // 기본 1분
-): Promise<{ success: boolean; limit: number; remaining: number; reset: number }> {
-  const ip = getIP(request);
-  const cache = getCache('default', {
-    interval,
-    uniqueTokenPerInterval: 500
-  });
-
-  const tokenCount = cache.get(ip) || 0;
-
-  if (tokenCount >= limit) {
-    return {
-      success: false,
-      limit,
-      remaining: 0,
-      reset: Date.now() + interval
-    };
-  }
-
-  cache.set(ip, tokenCount + 1);
-
-  return {
-    success: true,
-    limit,
-    remaining: limit - tokenCount - 1,
-    reset: Date.now() + interval
-  };
-}
-
-/**
- * Rate Limiting 응답 헤더 추가
- */
-export function addRateLimitHeaders(
-  response: NextResponse,
-  result: { limit: number; remaining: number; reset: number }
-): NextResponse {
-  response.headers.set('X-RateLimit-Limit', result.limit.toString());
-  response.headers.set('X-RateLimit-Remaining', result.remaining.toString());
-  response.headers.set('X-RateLimit-Reset', new Date(result.reset).toISOString());
-  return response;
-}
-
-/**
- * Rate Limiting 미들웨어 (API 라우트용)
- */
-export async function withRateLimit(
-  request: NextRequest,
-  handler: () => Promise<NextResponse>,
-  limit: number = 10,
-  interval: number = 60000
-): Promise<NextResponse> {
-  const result = await rateLimit(request, limit, interval);
-
-  if (!result.success) {
-    const response = NextResponse.json(
-      {
-        error: 'Too many requests. Please try again later.',
-        retryAfter: Math.ceil((result.reset - Date.now()) / 1000)
-      },
-      { status: 429 }
-    );
-    return addRateLimitHeaders(response, result);
-  }
-
-  const response = await handler();
-  return addRateLimitHeaders(response, result);
-}
-
-/**
- * 엄격한 Rate Limiting (파일 업로드, 결제 등)
- */
-export async function strictRateLimit(request: NextRequest): Promise<{ success: boolean; error?: NextResponse }> {
-  const result = await rateLimit(request, 5, 60000); // 1분에 5회
-
-  if (!result.success) {
-    return {
-      success: false,
-      error: addRateLimitHeaders(
-        NextResponse.json(
-          { error: 'Too many requests. Please wait before trying again.' },
-          { status: 429 }
-        ),
-        result
-      )
-    };
-  }
-
-  return { success: true };
-}
-
-/**
- * 관대한 Rate Limiting (조회 API)
- */
-export async function lenientRateLimit(request: NextRequest): Promise<{ success: boolean; error?: NextResponse }> {
-  const result = await rateLimit(request, 60, 60000); // 1분에 60회
-
-  if (!result.success) {
-    return {
-      success: false,
-      error: addRateLimitHeaders(
-        NextResponse.json(
-          { error: 'Too many requests.' },
-          { status: 429 }
-        ),
-        result
-      )
-    };
-  }
-
-  return { success: true };
+  return realIp || 'unknown';
 }

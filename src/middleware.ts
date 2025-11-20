@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { handleCsrfToken } from '@/lib/csrf'
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -66,6 +67,8 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/', request.url))
       }
     }
+    // CSRF 토큰 설정
+    response = handleCsrfToken(request, response)
     return response
   }
 
@@ -102,6 +105,9 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/', request.url))
     }
   }
+
+  // CSRF 토큰 설정
+  response = handleCsrfToken(request, response)
 
   return response
 }

@@ -141,7 +141,16 @@
       "Bash(del /f scriptsupdate-products-view.js 2)",
       "Bash(node scripts/check-option-mapping-permissions.js:*)",
       "Bash(node scripts/run-migration-092.js:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(node scripts/run-migration-093.js:*)",
+      "Bash(tasklist:*)",
+      "Bash(\"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\lib\\rate-limit.ts\")",
+      "Bash(timeout /t 3 /nobreak)",
+      "Bash(del /f \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\platform\\orders\\components\\SellerInfoTab.tsx\" 2)",
+      "Bash(if exist \"src\\app\\platform\\orders\\components\\SellerInfoTab.tsx\" del /f \"src\\app\\platform\\orders\\components\\SellerInfoTab.tsx\")",
+      "Bash(node scripts/run-migration-094.js:*)",
+      "Bash(timeout /t 2 /nobreak)",
+      "Bash(tskill:*)"
     ],
     "deny": [],
     "ask": []

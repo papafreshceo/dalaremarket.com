@@ -41,13 +41,28 @@ export default function UserHeader() {
   const supabase = createClient();
   const { showToast } = useToast();
   const [orders, setOrders] = useState<any[]>([]);
-  const { cashBalance, creditBalance, setCashBalance, setCreditBalance } = useUserBalance();
+  const { cashBalance, creditBalance, setCashBalance, setCreditBalance, refreshBalances } = useUserBalance();
   const [showCashTooltip, setShowCashTooltip] = useState(false);
   const [showCreditTooltip, setShowCreditTooltip] = useState(false);
   const [contributionPoints, setContributionPoints] = useState(0);
   const [showContributionTooltip, setShowContributionTooltip] = useState(false);
   const [organizationName, setOrganizationName] = useState<string>('');
   const [sellerCode, setSellerCode] = useState<string>('');
+
+  // 잔액 초기 로드 및 주기적 갱신
+  useEffect(() => {
+    if (!user) return;
+
+    // 초기 로드
+    refreshBalances();
+
+    // 30초마다 갱신
+    const interval = setInterval(() => {
+      refreshBalances();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [user, refreshBalances]);
 
   // 활동 추적 콜백 (useCallback으로 안정화)
   const handleRewardClaimed = useCallback((amount: number, newBalance: number) => {
@@ -357,12 +372,97 @@ export default function UserHeader() {
   const isActive = (path: string) => pathname?.startsWith(path);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    // 로그아웃 시 탭 상태 초기화
-    localStorage.removeItem('ordersActiveTab');
-    showToast('로그아웃되었습니다.', 'success');
-    router.push('/platform');
+    try {
+      // 1. OneSignal Player ID 비활성화
+      try {
+        // CSRF 토큰 가져오기
+        const csrfToken = getCsrfToken();
+
+        await fetch('/api/notifications/player-id', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
+          },
+        });
+      } catch (error) {
+        console.warn('OneSignal Player ID 비활성화 실패 (무시):', error);
+        // 실패해도 로그아웃은 계속 진행
+      }
+
+      // 2. OneSignal 로그아웃 (선택적)
+      try {
+        if (typeof window !== 'undefined' && window.OneSignal && typeof window.OneSignal.logout === 'function') {
+          await window.OneSignal.logout();
+        }
+      } catch (error) {
+        console.warn('OneSignal 로그아웃 실패 (무시):', error);
+      }
+
+      // 3. Supabase 인증 로그아웃
+      await supabase.auth.signOut();
+
+      // 4. 로컬 스토리지 정리
+      const keysToRemove = [
+        'ordersActiveTab',
+        'openChatWithUser', // 메시지 알림 관련
+      ];
+
+      // 로그인 보상 관련 키 찾기 (login_reward_claimed_*)
+      const allKeys = Object.keys(localStorage);
+      allKeys.forEach(key => {
+        if (key.startsWith('login_reward_claimed_') || key.startsWith('activity_')) {
+          keysToRemove.push(key);
+        }
+      });
+
+      keysToRemove.forEach(key => {
+        try {
+          localStorage.removeItem(key);
+        } catch (error) {
+          console.warn(`localStorage.removeItem('${key}') 실패:`, error);
+        }
+      });
+
+      // 5. 세션 스토리지 정리
+      try {
+        sessionStorage.clear();
+      } catch (error) {
+        console.warn('sessionStorage.clear() 실패:', error);
+      }
+
+      // 6. 상태 초기화
+      setUser(null);
+      setUserRole(null);
+      setOrganizationTier(null);
+      setContributionPoints(0);
+      setOrganizationName('');
+      setSellerCode('');
+      setCashBalance(0);
+      setCreditBalance(0);
+
+      showToast('로그아웃되었습니다.', 'success');
+      router.push('/platform');
+    } catch (error) {
+      console.error('로그아웃 중 오류:', error);
+      showToast('로그아웃 중 오류가 발생했습니다.', 'error');
+    }
   };
+
+  // CSRF 토큰 가져오기 헬퍼 함수
+  function getCsrfToken(): string | null {
+    if (typeof document === 'undefined') return null;
+
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'csrf-token') {
+        return decodeURIComponent(value);
+      }
+    }
+
+    return null;
+  }
 
   // 상태별 설정
   const statusConfig: Record<string, { label: string; color: string }> = {

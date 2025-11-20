@@ -70,11 +70,6 @@ export default function ProfilePage() {
   const [additionalAccounts, setAdditionalAccounts] = useState<any[]>([]);
   const [savingSubAccounts, setSavingSubAccounts] = useState<Record<string, boolean>>({});
 
-  // 회원탈퇴 state
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
-  const [deleting, setDeleting] = useState(false);
-
   /**
    * ============================================================
    * 서브계정 추가 한도 설정
@@ -523,45 +518,6 @@ export default function ProfilePage() {
     }
   };
 
-  // 회원 탈퇴 처리
-  const handleDeleteAccount = async () => {
-    if (deleteConfirmText !== '회원탈퇴') {
-      toast.error('"회원탈퇴"를 정확히 입력해주세요.');
-      return;
-    }
-
-    setDeleting(true);
-    try {
-      // API 호출로 auth.users 삭제 (CASCADE로 모든 데이터 자동 삭제)
-      const response = await fetch('/api/user/delete-account', {
-        method: 'DELETE'
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error('회원 탈퇴 API 오류:', data);
-        const errorMsg = data.details ? `${data.error}\n상세: ${data.details}` : data.error;
-        throw new Error(errorMsg || '회원 탈퇴 중 오류가 발생했습니다.');
-      }
-
-      toast.success('회원 탈퇴가 완료되었습니다.');
-
-      // 로그아웃 처리
-      await supabase.auth.signOut();
-      localStorage.removeItem('ordersActiveTab');
-
-      // 메인 페이지로 이동
-      setTimeout(() => {
-        router.push('/');
-      }, 1000);
-    } catch (error: any) {
-      console.error('회원 탈퇴 오류:', error);
-      toast.error(error.message || '회원 탈퇴 중 오류가 발생했습니다.');
-      setDeleting(false);
-    }
-  };
-
   // 서브 계정 저장
   const handleSaveSubAccount = async (account: any) => {
     console.log('🔄 서브 계정 저장 시작:', account);
@@ -669,36 +625,22 @@ export default function ProfilePage() {
   if (!isMounted) return null;
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%)',
-      paddingTop: '70px'
-    }}>
+    <>
       <Toaster position="top-center" />
+
       <div style={{
         maxWidth: '1200px',
         margin: '0 auto',
         padding: '40px 20px'
       }}>
         {/* 헤더 */}
-        <div style={{
-          background: 'white',
-          borderRadius: '20px',
-          padding: '32px',
-          marginBottom: '24px',
-          boxShadow: '0 2px 20px rgba(0, 0, 0, 0.05)'
-        }}>
+        <div style={{ marginBottom: '32px' }}>
           <h1 style={{
             fontSize: '28px',
             fontWeight: '700',
-            marginBottom: '8px',
-            color: '#212529'
-          }}>회원정보 설정</h1>
-          <p style={{
-            fontSize: '14px',
-            color: '#6c757d',
-            margin: 0
-          }}>기본정보 및 셀러계정 정보를 관리하세요</p>
+            color: '#212529',
+            marginBottom: '8px'
+          }}>셀러정보</h1>
         </div>
 
         {loading ? (
@@ -730,273 +672,6 @@ export default function ProfilePage() {
                 {message}
               </div>
             )}
-
-            {/* 프로필 이름 설정 섹션 */}
-            <div style={{
-              background: 'white',
-              borderRadius: '20px',
-              padding: '32px',
-              marginBottom: '24px',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.05)'
-            }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '24px'
-              }}>
-                <h2 style={{
-                  fontSize: '20px',
-                  fontWeight: '700',
-                  color: '#212529',
-                  margin: 0
-                }}>기본정보</h2>
-
-                <button
-                  onClick={handleSaveBasicInfo}
-                  disabled={savingBasicInfo}
-                  style={{
-                    padding: '10px 20px',
-                    background: savingBasicInfo
-                      ? '#adb5bd'
-                      : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: savingBasicInfo ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!savingBasicInfo) {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  {savingBasicInfo ? '저장 중...' : '저장'}
-                </button>
-              </div>
-
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: '20px'
-              }}>
-                {/* 이메일 */}
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#495057',
-                    marginBottom: '8px'
-                  }}>이메일</label>
-                  <input
-                    type="text"
-                    value={user?.email || ''}
-                    disabled
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '10px',
-                      fontSize: '14px',
-                      background: '#f8f9fa',
-                      color: '#6c757d'
-                    }}
-                  />
-                </div>
-
-                {/* 이름 */}
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#495057',
-                    marginBottom: '8px'
-                  }}>이름</label>
-                  <input
-                    type="text"
-                    value={sellerInfo.name}
-                    onChange={(e) => handleChange('name', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '10px',
-                      fontSize: '14px',
-                      outline: 'none',
-                      transition: 'border 0.2s'
-                    }}
-                    onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                    onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
-                  />
-                </div>
-
-                {/* 전화번호 */}
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#495057',
-                    marginBottom: '8px'
-                  }}>전화번호</label>
-                  <input
-                    type="tel"
-                    value={sellerInfo.phone || ''}
-                    onChange={(e) => {
-                      // IME 조합 중이 아닐 때만 처리
-                      if (!(e.nativeEvent as any).isComposing) {
-                        handleChange('phone', e.target.value);
-                      }
-                    }}
-                    onCompositionEnd={(e) => {
-                      // IME 입력 완료 시 처리
-                      handleChange('phone', (e.target as HTMLInputElement).value);
-                    }}
-                    placeholder="010-0000-0000"
-                    maxLength={13}
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '10px',
-                      fontSize: '14px',
-                      outline: 'none',
-                      transition: 'border 0.2s'
-                    }}
-                    onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                    onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
-                  />
-                </div>
-
-                {/* 프로필 이름 */}
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#495057',
-                    marginBottom: '8px'
-                  }}>프로필 이름</label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      value={profileName}
-                      onChange={(e) => {
-                        setProfileName(e.target.value);
-                        setProfileNameCheckResult(null); // 프로필 이름 변경 시 확인 결과 초기화
-                      }}
-                      placeholder="프로필 이름을 입력하세요"
-                      maxLength={10}
-                      style={{
-                        width: '100%',
-                        padding: '12px 14px',
-                        paddingRight: '80px',
-                        border: `1px solid ${
-                          profileNameCheckResult
-                            ? (profileNameCheckResult.available ? '#10b981' : '#ef4444')
-                            : '#dee2e6'
-                        }`,
-                        borderRadius: '10px',
-                        fontSize: '14px',
-                        outline: 'none',
-                        transition: 'border 0.2s'
-                      }}
-                      onFocus={(e) => {
-                        if (!profileNameCheckResult) {
-                          e.target.style.borderColor = '#3b82f6';
-                        }
-                      }}
-                      onBlur={(e) => {
-                        if (!profileNameCheckResult) {
-                          e.target.style.borderColor = '#dee2e6';
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={handleCheckProfileName}
-                      disabled={checkingProfileName || !profileName.trim()}
-                      type="button"
-                      style={{
-                        position: 'absolute',
-                        right: '8px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        padding: '6px 12px',
-                        background: checkingProfileName || !profileName.trim() ? '#adb5bd' : '#3b82f6',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        cursor: checkingProfileName || !profileName.trim() ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!checkingProfileName && profileName.trim()) {
-                          e.currentTarget.style.background = '#2563eb';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!checkingProfileName && profileName.trim()) {
-                          e.currentTarget.style.background = '#3b82f6';
-                        }
-                      }}
-                    >
-                      {checkingProfileName ? '확인 중...' : '중복확인'}
-                    </button>
-                  </div>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginTop: '6px'
-                  }}>
-                    <div style={{
-                      fontSize: '12px',
-                      color: profileNameCheckResult
-                        ? (profileNameCheckResult.available ? '#10b981' : '#ef4444')
-                        : '#6c757d'
-                    }}>
-                      {profileNameCheckResult
-                        ? (profileNameCheckResult.available ? '✓ ' : '✗ ') + profileNameCheckResult.message
-                        : (profileName.trim() !== originalProfileName && profileName.trim()
-                          ? '프로필 이름 중복 확인이 필요합니다'
-                          : '')}
-                    </div>
-                    <div style={{
-                      fontSize: '12px',
-                      color: '#6c757d'
-                    }}>
-                      {profileName.length}/10자
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 안내 메시지 */}
-              <div style={{
-                marginTop: '24px',
-                padding: '16px',
-                background: '#f8f9fa',
-                borderRadius: '12px',
-                fontSize: '13px',
-                color: '#6c757d',
-                lineHeight: '1.6'
-              }}>
-                프로필이름은 랭킹 프로필, 셀러피드 게시글과 댓글에 표시됩니다. 기본값으로 이메일 @앞부분이 표시됩니다. 최대 10자까지 설정가능합니다.
-              </div>
-            </div>
 
             {/* 판매자 정보 섹션 */}
             <div style={{
@@ -2239,194 +1914,15 @@ export default function ProfilePage() {
                     listStyle: 'disc'
                   }}>
                     <li>같은 셀러계정의 모든 멤버는 주문, 발주서 등의 데이터를 공유합니다</li>
-                    <li>소유자와 관리자는 멤버를 초대하고 관리할 수 있습니다</li>
-                    <li>각 멤버별로 세부 권한을 설정할 수 있습니다</li>
-                    <li>캐시와 크레딧은 셀러계정 단위로 관리됩니다</li>
-                    <li>멤버가 등록한 주문은 자동으로 셀러계정에 연결되어 모든 멤버가 조회 가능합니다</li>
+                    <li>소유자는 멤버를 초대하고 관리할 수 있습니다 (담당자 초대)</li>
+                    <li>서브계정을 추가하면 여러 사업자번호로 발주가 가능합니다</li>
                   </ul>
                 </div>
               </div>
             )}
-
-            {/* 회원 탈퇴 섹션 */}
-            <div style={{
-              background: '#fff',
-              borderRadius: '16px',
-              padding: isMounted && window.innerWidth <= 768 ? '20px' : '32px',
-              marginTop: '24px',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.05)',
-              border: '2px solid #fee',
-            }}>
-              <h3 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                marginBottom: '16px',
-                color: '#dc3545'
-              }}>회원 탈퇴</h3>
-
-              <div style={{
-                background: '#fff3cd',
-                border: '1px solid #ffc107',
-                borderRadius: '8px',
-                padding: '16px',
-                marginBottom: '20px',
-                fontSize: '13px',
-                lineHeight: '1.6'
-              }}>
-                <strong style={{ color: '#856404', display: 'block', marginBottom: '8px' }}>
-                  ⚠️ 회원 탈퇴 시 주의사항
-                </strong>
-                <ul style={{
-                  margin: 0,
-                  paddingLeft: '20px',
-                  color: '#856404'
-                }}>
-                  <li>조직 및 서브계정이 모두 삭제됩니다</li>
-                  <li>캐시, 크레딧 등 모든 포인트가 삭제됩니다</li>
-                  <li>멤버 정보 및 초대 내역이 삭제됩니다</li>
-                  <li>알림 및 활동 이력이 삭제됩니다</li>
-                  <li>주문 기록은 정산 목적으로 보존되며, 조직명만 기록에 남습니다</li>
-                  <li><strong>이 작업은 되돌릴 수 없습니다</strong></li>
-                </ul>
-              </div>
-
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                style={{
-                  padding: '12px 24px',
-                  background: '#dc3545',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#c82333'}
-                onMouseLeave={(e) => e.currentTarget.style.background = '#dc3545'}
-              >
-                회원 탈퇴
-              </button>
-            </div>
           </>
         )}
       </div>
-
-      {/* 회원 탈퇴 확인 모달 */}
-      {showDeleteConfirm && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-        }}
-          onClick={() => {
-            setShowDeleteConfirm(false);
-            setDeleteConfirmText('');
-          }}
-        >
-          <div
-            style={{
-              background: 'white',
-              borderRadius: '16px',
-              padding: '32px',
-              maxWidth: '500px',
-              width: '90%',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{
-              fontSize: '20px',
-              fontWeight: '600',
-              marginBottom: '16px',
-              color: '#dc3545'
-            }}>
-              정말 탈퇴하시겠습니까?
-            </h3>
-
-            <p style={{
-              fontSize: '14px',
-              color: '#6c757d',
-              marginBottom: '24px',
-              lineHeight: '1.6'
-            }}>
-              회원 탈퇴를 진행하시려면 아래 입력란에 <strong>"회원탈퇴"</strong>를 입력해주세요.
-              <br />
-              <strong style={{ color: '#dc3545' }}>이 작업은 되돌릴 수 없습니다.</strong>
-            </p>
-
-            <input
-              type="text"
-              value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder="회원탈퇴"
-              disabled={deleting}
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '2px solid #dee2e6',
-                borderRadius: '8px',
-                fontSize: '14px',
-                marginBottom: '20px',
-                outline: 'none',
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#dc3545'}
-              onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
-            />
-
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setDeleteConfirmText('');
-                }}
-                disabled={deleting}
-                style={{
-                  padding: '10px 20px',
-                  background: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: deleting ? 'not-allowed' : 'pointer',
-                  opacity: deleting ? 0.5 : 1,
-                }}
-              >
-                취소
-              </button>
-              <button
-                onClick={handleDeleteAccount}
-                disabled={deleting || deleteConfirmText !== '회원탈퇴'}
-                style={{
-                  padding: '10px 20px',
-                  background: deleteConfirmText === '회원탈퇴' && !deleting ? '#dc3545' : '#ccc',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: deleteConfirmText === '회원탈퇴' && !deleting ? 'pointer' : 'not-allowed',
-                }}
-              >
-                {deleting ? '탈퇴 처리 중...' : '탈퇴하기'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
