@@ -135,7 +135,13 @@
       "Bash(if exist \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\orders\\notify-cancel-approval\" rmdir /s /q \"C:\\Users\\USER\\Desktop\\projects\\dalreamarket.com\\src\\app\\api\\orders\\notify-cancel-approval\")",
       "Bash(node scripts/run-migration-088.js:*)",
       "Bash(node scripts/check-test4-user.js:*)",
-      "Bash(node scripts/check-sub-account.js:*)"
+      "Bash(node scripts/check-sub-account.js:*)",
+      "Bash(node scripts/run-migration-089.js:*)",
+      "Bash(node scripts/update-products-view.js:*)",
+      "Bash(del /f scriptsupdate-products-view.js 2)",
+      "Bash(node scripts/check-option-mapping-permissions.js:*)",
+      "Bash(node scripts/run-migration-092.js:*)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": []
