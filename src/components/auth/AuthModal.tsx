@@ -139,8 +139,8 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         setLoading(false)
         onClose()
 
-        // 서버 상태 강제 갱신 (UserHeader 즉시 업데이트)
-        router.refresh()
+        // 페이지 완전 새로고침으로 모든 상태 즉시 반영
+        window.location.reload()
       }
     } catch (err) {
       console.error('Login error:', err)

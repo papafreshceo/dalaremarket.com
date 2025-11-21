@@ -41,12 +41,24 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
           return;
         }
 
-        // OneSignal 409 Conflict 에러 억제
-        if (errorMsg.includes('409') || errorMsg.includes('Conflict')) {
-          // URL을 확인해서 OneSignal API인지 체크
+        // OneSignal 관련 에러 억제 (409 Conflict, SetAlias, 429 Rate Limit)
+        if (
+          errorMsg.includes('409') ||
+          errorMsg.includes('Conflict') ||
+          errorMsg.includes('SetAlias') ||
+          errorMsg.includes('Recovering from SetAlias') ||
+          errorMsg.includes('429') ||
+          errorMsg.includes('Too Many Requests') ||
+          errorMsg.includes('Player ID 저장')
+        ) {
+          // URL 또는 메시지에서 OneSignal 관련 확인
           if (args.some((arg: any) =>
             arg?.toString().includes('onesignal.com') ||
-            arg?.toString().includes('identity')
+            arg?.toString().includes('OneSignal') ||
+            arg?.toString().includes('identity') ||
+            arg?.toString().includes('SetAlias') ||
+            arg?.toString().includes('externalId') ||
+            arg?.toString().includes('Player ID')
           )) {
             return;
           }
