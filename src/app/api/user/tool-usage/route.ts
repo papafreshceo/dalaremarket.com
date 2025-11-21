@@ -1,12 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import logger from '@/lib/logger';
 
 // GET: 사용자의 도구별 사용 횟수 조회
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    // Authorization 헤더 확인
+    const authHeader = request.headers.get('authorization');
+    let supabase;
+
+    if (authHeader?.startsWith('Bearer ')) {
+      // Authorization 헤더가 있으면 토큰으로 인증
+      const token = authHeader.substring(7);
+      supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          global: {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        }
+      );
+    } else {
+      // 없으면 쿠키로 인증
+      supabase = await createClientForRouteHandler();
+    }
 
     // 현재 로그인한 사용자 정보 가져오기
     const { data: { user }, error: authError } = await supabase.auth.getUser();

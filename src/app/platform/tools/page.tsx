@@ -32,26 +32,22 @@ export default function ToolsPage() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [openModals, setOpenModals] = useState<Array<{ id: string; tool: Tool }>>([]);
   const [usageCounts, setUsageCounts] = useState<Record<string, number>>({});
-  const { creditBalance: userCredits, setCreditBalance } = useUserBalance();
+  const { creditBalance: userCredits, setCreditBalance, refreshBalances } = useUserBalance();
   const [toolsFromDB, setToolsFromDB] = useState<Tool[]>([]);
   const [loadingTools, setLoadingTools] = useState(true);
 
-  // 도구 목록, 즐겨찾기, 사용 횟수 불러오기 (크레딧은 헤더에서 관리)
+  // 크레딧 정보 불러오기
+  useEffect(() => {
+    refreshBalances();
+  }, []);
+
+  // 도구 목록, 즐겨찾기, 사용 횟수 불러오기
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        // 3개 API를 병렬로 호출하여 로딩 시간 단축
-        const [toolsResponse, favResponse, usageResponse] = await Promise.all([
-          fetch('/api/tools'),
-          fetch('/api/user/favorite-tools'),
-          fetch('/api/user/tool-usage')
-        ]);
-
-        const [toolsData, favData, usageData] = await Promise.all([
-          toolsResponse.json(),
-          favResponse.json(),
-          usageResponse.json()
-        ]);
+        // 도구 목록은 항상 로드
+        const toolsResponse = await fetch('/api/tools');
+        const toolsData = await toolsResponse.json();
 
         // 도구 목록
         if (toolsData.success && toolsData.tools) {
@@ -69,14 +65,44 @@ export default function ToolsPage() {
           setToolsFromDB(formattedTools);
         }
 
-        // 즐겨찾기
-        if (favData.success && favData.favoriteTools) {
-          setFavorites(favData.favoriteTools);
-        }
+        // 로그인 여부 확인 후 즐겨찾기 & 사용 횟수 로드
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-        // 사용 횟수
-        if (usageData.success && usageData.usageCounts) {
-          setUsageCounts(usageData.usageCounts);
+        if (user && !authError) {
+          // 로그인한 사용자만 API 호출 (세션 확인)
+          const { data: { session } } = await supabase.auth.getSession();
+
+          if (session?.access_token) {
+            try {
+              // Authorization 헤더에 토큰 포함
+              const headers = {
+                'Authorization': `Bearer ${session.access_token}`
+              };
+
+              const [favResponse, usageResponse] = await Promise.all([
+                fetch('/api/user/favorite-tools', { headers }),
+                fetch('/api/user/tool-usage', { headers })
+              ]);
+
+              if (favResponse.ok) {
+                const favData = await favResponse.json();
+                if (favData.success && favData.favoriteTools) {
+                  setFavorites(favData.favoriteTools);
+                }
+              }
+
+              if (usageResponse.ok) {
+                const usageData = await usageResponse.json();
+                if (usageData.success && usageData.usageCounts) {
+                  setUsageCounts(usageData.usageCounts);
+                }
+              }
+            } catch (error) {
+              console.error('사용자 데이터 로드 중 오류:', error);
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading user data:', error);
@@ -187,11 +213,22 @@ export default function ToolsPage() {
 
       // 크레딧 차감
       try {
+        // 세션 토큰 가져오기
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+
+        const headers: any = {
+          'Content-Type': 'application/json',
+        };
+
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+
         const response = await fetch('/api/user/use-credits', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers,
           body: JSON.stringify({ toolId: tool.id }),
         });
 
@@ -368,7 +405,7 @@ export default function ToolsPage() {
                     color: '#ffffff',
                     fontWeight: '700'
                   }}>
-                    {loadingTools ? '...' : userCredits.toLocaleString()}
+                    {loadingTools ? '...' : (userCredits || 0).toLocaleString()}
                   </div>
                 </div>
               </div>

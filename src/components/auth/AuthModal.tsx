@@ -135,9 +135,12 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
           .update({ last_login_provider: 'email' })
           .eq('id', data.user.id)
 
-        onClose()
         showToast('로그인되었습니다.', 'success')
         setLoading(false)
+        onClose()
+
+        // 서버 상태 강제 갱신 (UserHeader 즉시 업데이트)
+        router.refresh()
       }
     } catch (err) {
       console.error('Login error:', err)
@@ -283,7 +286,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         .single()
 
       if (error || !data) {
-        setError('일치하는 계정을 찾을 수 없습니다.')
+        setError('입력하신 정보로 계정을 찾을 수 없습니다. 이름과 전화번호를 다시 확인해주세요.')
         setLoading(false)
         return
       }
@@ -503,6 +506,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
                 style={{
                   width: '100%',
                   padding: '14px 16px',
@@ -533,6 +537,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
                 style={{
                   width: '100%',
                   padding: '14px 16px',
@@ -564,6 +569,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   required
+                  autoComplete="name"
                   style={{
                     width: '100%',
                     padding: '14px 16px',
@@ -594,6 +600,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                       onChange={(e) => handlePhoneChange(e.target.value)}
                       required
                       disabled={smsVerified}
+                      autoComplete="tel"
                       style={{
                         flex: 1,
                         padding: '14px 16px',

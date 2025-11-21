@@ -9,15 +9,17 @@ export function LogoutButton() {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch('/api/auth/logout', { method: 'POST' })
-      if (response.ok) {
-        // 로그아웃 시 탭 상태 초기화
-        localStorage.removeItem('ordersActiveTab')
-        showToast('로그아웃되었습니다.', 'success')
-        router.push('/')
+      const { logout } = await import('@/lib/logout');
+      const result = await logout(router, '/');
+
+      if (result.success) {
+        showToast('로그아웃되었습니다.', 'success');
+      } else {
+        showToast('로그아웃 중 오류가 발생했습니다.', 'error');
       }
     } catch (error) {
-      console.error('Logout error:', error)
+      console.error('Logout error:', error);
+      showToast('로그아웃 중 오류가 발생했습니다.', 'error');
     }
   }
 

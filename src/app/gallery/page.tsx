@@ -119,7 +119,7 @@ export default function PublicGalleryPage() {
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      a.remove();
 
       // 다운로드 카운트 업데이트
       setImages((prev) =>

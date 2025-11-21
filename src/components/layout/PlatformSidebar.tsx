@@ -29,6 +29,7 @@ export default function PlatformSidebar() {
   const [organizationTier, setOrganizationTier] = useState<'light' | 'standard' | 'advance' | 'elite' | 'legend' | null>(null);
   const [primaryOrgId, setPrimaryOrgId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('');
+  const [toolsMenuItems, setToolsMenuItems] = useState<MenuItem[]>([]);
   const supabase = createClient();
 
   const handleClose = () => {
@@ -66,6 +67,46 @@ export default function PlatformSidebar() {
       }
     };
     fetchUser();
+  }, []);
+
+  // 업무도구 목록 불러오기
+  useEffect(() => {
+    const loadTools = async () => {
+      try {
+        const response = await fetch('/api/tools');
+        const data = await response.json();
+
+        if (data.success && data.tools) {
+          const formattedTools: MenuItem[] = data.tools.map((tool: any) => ({
+            path: '/platform/tools',
+            text: tool.name,
+            icon: icons.tools
+          }));
+
+          // '전체 도구'를 맨 앞에 추가
+          setToolsMenuItems([
+            {
+              path: '/platform/tools',
+              text: '전체 도구',
+              icon: icons.tools
+            },
+            ...formattedTools
+          ]);
+        }
+      } catch (error) {
+        console.error('업무도구 목록 로드 오류:', error);
+        // 에러 발생 시 기본 항목만 표시
+        setToolsMenuItems([
+          {
+            path: '/platform/tools',
+            text: '전체 도구',
+            icon: icons.tools
+          }
+        ]);
+      }
+    };
+
+    loadTools();
   }, []);
 
   // localStorage에서 활성 탭 가져오기
@@ -232,29 +273,6 @@ export default function PlatformSidebar() {
       text: '옵션상품매핑',
       icon: icons.tools,
       tab: '옵션상품매핑'
-    }
-  ];
-
-  const toolsMenuItems: MenuItem[] = [
-    {
-      path: '/platform/tools',
-      text: '전체 도구',
-      icon: icons.tools
-    },
-    {
-      path: '/platform/tools',
-      text: '마진 계산기',
-      icon: icons.pricing
-    },
-    {
-      path: '/platform/tools',
-      text: '가격 시뮬레이터',
-      icon: icons.pricing
-    },
-    {
-      path: '/platform/tools',
-      text: '데이터 분석',
-      icon: icons.products
     }
   ];
 

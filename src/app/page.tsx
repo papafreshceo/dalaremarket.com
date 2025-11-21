@@ -45,10 +45,8 @@ export default function PlatformHome() {
         const existingFavicons = document.querySelectorAll("link[rel*='icon']");
         existingFavicons.forEach(el => {
           try {
-            // isConnected로 DOM에 연결되어 있는지 확인 후 제거
-            if (el && el.isConnected && el.parentNode) {
-              el.parentNode.removeChild(el);
-            }
+            // remove() 메서드 사용 (더 안전)
+            el?.remove();
           } catch (err) {
             // 개별 요소 제거 실패는 무시
           }

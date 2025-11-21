@@ -10,11 +10,14 @@ import { requireCsrfToken } from '@/lib/csrf';
  */
 export async function POST(request: NextRequest) {
   try {
-    // CSRF 토큰 검증
-    const csrfError = requireCsrfToken(request);
-    if (csrfError) {
-      logger.warn('CSRF token validation failed for Player ID POST');
-      return csrfError;
+    // Authorization 헤더가 없는 경우에만 CSRF 토큰 검증
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      const csrfError = requireCsrfToken(request);
+      if (csrfError) {
+        logger.warn('CSRF token validation failed for Player ID POST');
+        return csrfError;
+      }
     }
 
     const supabase = await createClientForRouteHandler();
@@ -235,11 +238,14 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    // CSRF 토큰 검증
-    const csrfError = requireCsrfToken(request);
-    if (csrfError) {
-      logger.warn('CSRF token validation failed for Player ID DELETE');
-      return csrfError;
+    // Authorization 헤더가 없는 경우에만 CSRF 토큰 검증
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      const csrfError = requireCsrfToken(request);
+      if (csrfError) {
+        logger.warn('CSRF token validation failed for Player ID DELETE');
+        return csrfError;
+      }
     }
 
     const supabase = await createClientForRouteHandler();

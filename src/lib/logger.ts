@@ -50,6 +50,10 @@ class Logger {
       'birth',
       'bank_account',
       'bankAccount',
+      'user_id', // 사용자 ID 마스킹
+      'userId',
+      'playerId', // OneSignal Player ID 마스킹
+      'player_id',
     ];
 
     const sanitized = Array.isArray(data) ? [...data] : { ...data };
@@ -71,18 +75,39 @@ class Logger {
   }
 
   /**
+   * 문자열에서 민감한 패턴 마스킹
+   */
+  private maskSensitivePatterns(text: string): string {
+    if (!this.isProduction) {
+      return text; // 개발 환경에서는 마스킹하지 않음
+    }
+
+    // 이메일 패턴 마스킹 (user@example.com → u***@example.com)
+    text = text.replace(/([a-zA-Z0-9])[a-zA-Z0-9._%+-]*@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, '$1***@$2');
+
+    // 전화번호 패턴 마스킹 (010-1234-5678 → 010-****-5678)
+    text = text.replace(/(\d{3})[-.]?(\d{4})[-.]?(\d{4})/g, '$1-****-$3');
+
+    // UUID 패턴 마스킹 (사용자 ID)
+    text = text.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '***UUID***');
+
+    return text;
+  }
+
+  /**
    * 로그 포맷팅
    */
   private format(level: LogLevel, message: string, context?: LogContext): string {
     const timestamp = new Date().toISOString();
     const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
+    const sanitizedMessage = this.maskSensitivePatterns(message);
 
     if (context) {
       const sanitizedContext = this.sanitize(context);
-      return `${prefix} ${message} ${JSON.stringify(sanitizedContext)}`;
+      return `${prefix} ${sanitizedMessage} ${JSON.stringify(sanitizedContext)}`;
     }
 
-    return `${prefix} ${message}`;
+    return `${prefix} ${sanitizedMessage}`;
   }
 
   /**

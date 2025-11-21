@@ -795,7 +795,7 @@ function OrdersPageContent() {
     link.download = '달래마켓_발주서양식.xlsx';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
   };
 
   const handleFiles = async (files: FileList) => {

@@ -222,7 +222,7 @@ export async function downloadMonthlyStatementPDF(
     link.download = `거래명세서_${year}년${month}월.pdf`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     window.URL.revokeObjectURL(url);
 
   } catch (error) {
@@ -326,7 +326,7 @@ export async function downloadPeriodStatementPDF(
     link.download = `거래명세서_${startDate}_${endDate}.pdf`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     window.URL.revokeObjectURL(url);
 
   } catch (error) {

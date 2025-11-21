@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/server';
 import { getUserPrimaryOrganization } from '@/lib/organization-utils';
 import logger from '@/lib/logger';
+import { rateLimit } from '@/lib/rate-limit';
 
 /**
  * POST /api/cash/claim-login
@@ -18,6 +19,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: '인증이 필요합니다.' },
         { status: 401 }
+      );
+    }
+
+    // Rate Limiting: 사용자당 1분에 5번까지 허용 (남용 방지)
+    const rateLimitResult = rateLimit(`claim-login:${user.id}`, {
+      maxRequests: 5,
+      windowMs: 60 * 1000, // 1분
+    });
+
+    if (!rateLimitResult.success) {
+      const retryAfter = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000);
+      return NextResponse.json(
+        { success: false, error: '너무 많은 요청입니다. 잠시 후 다시 시도해주세요.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': retryAfter.toString(),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': new Date(rateLimitResult.resetTime).toISOString(),
+          }
+        }
       );
     }
 
@@ -70,20 +92,42 @@ export async function POST(request: NextRequest) {
 
     const loginReward = settings.login_reward;
 
-    // 오늘 로그인 보상을 이미 받았는지 확인 (organization_id 기준 - 조직별 하루 1회)
-    const { data: dailyReward, error: dailyRewardError } = await supabase
+    // 일일 보상 기록을 먼저 시도 (Race Condition 방지)
+    // INSERT 성공 = 첫 번째 요청, INSERT 실패 = 이미 받았음
+    const { error: insertRewardError } = await supabase
       .from('organization_daily_rewards')
-      .select('*')
-      .eq('organization_id', organization.id)
-      .eq('reward_date', today)
-      .single();
+      .insert({
+        organization_id: organization.id,
+        reward_date: today,
+        login_reward_claimed: true
+      });
 
-    // 이미 받았으면 200 OK로 조용히 반환 (에러가 아님)
-    if (dailyReward && dailyReward.login_reward_claimed) {
-      return NextResponse.json(
-        { success: false, error: '오늘 로그인 보상을 이미 받았습니다.', alreadyClaimed: true },
-        { status: 200 }
-      );
+    // 중복 키 에러 = 이미 받았음 (23505는 PostgreSQL의 unique_violation 에러 코드)
+    if (insertRewardError) {
+      if (insertRewardError.code === '23505') {
+        return NextResponse.json(
+          { success: false, error: '오늘 로그인 보상을 이미 받았습니다.', alreadyClaimed: true },
+          { status: 200 }
+        );
+      }
+
+      // 다른 에러는 로그만 남기고 계속 진행 (기존 레코드가 있을 수 있음)
+      logger.warn('[POST /api/cash/claim-login] 일일 보상 기록 삽입 경고:', insertRewardError);
+
+      // 기존 기록 확인
+      const { data: existingReward } = await supabase
+        .from('organization_daily_rewards')
+        .select('*')
+        .eq('organization_id', organization.id)
+        .eq('reward_date', today)
+        .single();
+
+      if (existingReward?.login_reward_claimed) {
+        return NextResponse.json(
+          { success: false, error: '오늘 로그인 보상을 이미 받았습니다.', alreadyClaimed: true },
+          { status: 200 }
+        );
+      }
     }
 
     // 조직 캐시 잔액 조회 (organization_id 기준)
@@ -167,22 +211,7 @@ export async function POST(request: NextRequest) {
       logger.error('[POST /api/cash/claim-login] 거래 이력 추가 오류:', transactionError);
     }
 
-    // 일일 보상 기록 업데이트
-    if (dailyReward) {
-      await supabase
-        .from('organization_daily_rewards')
-        .update({ login_reward_claimed: true })
-        .eq('organization_id', organization.id)
-        .eq('reward_date', today);
-    } else {
-      await supabase
-        .from('organization_daily_rewards')
-        .insert({
-          organization_id: organization.id,
-          reward_date: today,
-          login_reward_claimed: true
-        });
-    }
+    // 일일 보상 기록은 이미 앞에서 INSERT 완료됨 (73-109번 라인)
 
     return NextResponse.json({
       success: true,

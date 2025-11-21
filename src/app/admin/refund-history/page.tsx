@@ -226,7 +226,7 @@ export default function RefundHistoryPage() {
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
 
     toast.success('CSV 파일이 다운로드되었습니다.');
   };

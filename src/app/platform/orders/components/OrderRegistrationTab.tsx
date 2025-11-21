@@ -2235,7 +2235,7 @@ export default function OrderRegistrationTab({
     link.download = '달래마켓_발주서양식.xlsx';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
   };
 
   // 마켓 목록 추출 (발송완료 주문의 마켓만)

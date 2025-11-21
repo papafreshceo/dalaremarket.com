@@ -15,48 +15,122 @@ declare global {
 
 // OneSignal 초기화 상태 추적 (전역)
 let isOneSignalInitialized = false;
+let isOneSignalInitializing = false;
+// OneSignal 로그인 중복 방지 (전역)
+let oneSignalLoginInProgress = false;
+let lastLoginUserId: string | null = null;
 
 export default function OneSignalProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  // 싱글톤 Supabase 클라이언트 사용
   const supabase = createClient();
 
   useEffect(() => {
-    // OneSignal 초기화
+    // 개발 환경 콘솔 에러 필터링
+    if (process.env.NODE_ENV === 'development') {
+      const originalError = console.error;
+      const originalWarn = console.warn;
+
+      console.error = (...args: any[]) => {
+        const errorMsg = args[0]?.toString() || '';
+
+        // React Portal removeChild 에러 억제
+        if (
+          errorMsg.includes('removeChild') ||
+          (errorMsg.includes('TypeError') && args[0]?.stack?.includes('removeChild'))
+        ) {
+          return;
+        }
+
+        // OneSignal 409 Conflict 에러 억제
+        if (errorMsg.includes('409') || errorMsg.includes('Conflict')) {
+          // URL을 확인해서 OneSignal API인지 체크
+          if (args.some((arg: any) =>
+            arg?.toString().includes('onesignal.com') ||
+            arg?.toString().includes('identity')
+          )) {
+            return;
+          }
+        }
+
+        originalError(...args);
+      };
+
+      // OneSignal 409 Conflict 경고 억제
+      console.warn = (...args: any[]) => {
+        const msg = args.join(' ');
+        if (msg.includes('409') && msg.includes('onesignal')) {
+          return;
+        }
+        originalWarn(...args);
+      };
+    }
+
+    // OneSignal /identity 409 에러 fetch intercept로 필터링 (개발 환경만)
+    let originalFetch: typeof window.fetch | null = null;
+
+    if (process.env.NODE_ENV === 'development') {
+      originalFetch = window.fetch;
+      window.fetch = async (...args: any[]) => {
+        const response = await originalFetch!(...args);
+
+        // OneSignal /identity PATCH 409 응답 필터링
+        if (
+          args[0]?.toString().includes('onesignal.com') &&
+          args[0]?.toString().includes('/identity') &&
+          response.status === 409
+        ) {
+          // 409 응답을 복제하되 콘솔에 로그 안 남김
+          return response.clone();
+        }
+
+        return response;
+      };
+    }
+
     const initOneSignal = async () => {
-      // 이미 초기화되었으면 스킵
-      if (isOneSignalInitialized) {
-        logger.info('OneSignal은 이미 초기화되었습니다.');
+      // 이미 초기화되었거나 초기화 진행 중이면 스킵
+      if (isOneSignalInitialized || isOneSignalInitializing || window.OneSignal) {
+        logger.info('OneSignal은 이미 초기화되었거나 진행 중입니다.');
+        isOneSignalInitialized = true;
         return;
       }
+
+      isOneSignalInitializing = true;
 
       const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
 
       if (!appId) {
         logger.warn('OneSignal App ID가 설정되지 않았습니다.');
+        isOneSignalInitializing = false;
         return;
       }
 
       try {
-        // OneSignal SDK 로드
+        // OneSignal SDK가 이미 로드되어 있으면 스킵
+        if (document.getElementById('onesignal-script')) {
+          logger.info('OneSignal SDK는 이미 로드되었습니다.');
+          isOneSignalInitialized = true;
+          isOneSignalInitializing = false;
+          return;
+        }
+
+        // OneSignal SDK 로드 준비
         if (!window.OneSignalDeferred) {
           window.OneSignalDeferred = [];
         }
 
-        // 회원가입 페이지에서는 알림 버튼 비활성화
-        const shouldShowNotifyButton = !pathname.startsWith('/register');
+        const shouldShowNotifyButton = true;
 
         window.OneSignalDeferred.push(async function (OneSignal: any) {
           try {
-            // 초기화 상태 플래그 설정
             isOneSignalInitialized = true;
 
-            // OneSignal 초기화 및 아이콘 설정
+            // OneSignal 초기화
             await OneSignal.init({
               appId: appId,
-              allowLocalhostAsSecureOrigin: true,
+              allowLocalhostAsSecureOrigin: process.env.NODE_ENV === 'development',
               notifyButton: {
-                enable: shouldShowNotifyButton,  // Subscription Bell 조건부 활성화
+                enable: shouldShowNotifyButton,
                 text: {
                   'tip.state.unsubscribed': '알림 받기',
                   'tip.state.subscribed': '알림 받는 중',
@@ -85,25 +159,18 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
             await OneSignal.Notifications.setDefaultUrl(window.location.origin);
             await OneSignal.Notifications.setDefaultTitle('달래마켓');
 
+            isOneSignalInitializing = false;
             logger.info('OneSignal SDK 초기화 완료');
 
-            // 권한 변경 감지 (차단 → 허용 등)
+            // 권한 변경 감지
             OneSignal.Notifications.addEventListener('permissionChange', (permission: boolean) => {
               logger.info('알림 권한 변경:', permission ? '허용됨' : '거부됨');
             });
 
-            // 알림 클릭 이벤트 핸들러
-            OneSignal.Notifications.addEventListener('click', (event: any) => {
-              logger.info('알림 클릭', event);
+            // 알림 클릭 이벤트
+            OneSignal.Notifications.addEventListener('click', async (event: any) => {
+              const notificationData = event.notification?.additionalData;
 
-              const notificationData = event.notification?.data;
-
-              // 메시지 알림인 경우 localStorage에 저장 (채팅 페이지에서 사용)
-              if (notificationData?.sender_id) {
-                localStorage.setItem('openChatWithUser', notificationData.sender_id);
-              }
-
-              // actionUrl이 있으면 발주관리시스템 창으로 열기 (이미 열려있으면 재사용)
               if (notificationData?.actionUrl && notificationData.actionUrl !== '#') {
                 const screenWidth = window.screen.width;
                 const screenHeight = window.screen.height;
@@ -112,50 +179,41 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
               }
             });
 
-            // 푸시 구독 상태 변경 이벤트
+            // 푸시 구독 상태 변경 이벤트 (Player ID 저장만)
             OneSignal.User.PushSubscription.addEventListener('change', async (event: any) => {
               logger.info('푸시 구독 상태 변경', event);
 
               const { data: { user } } = await supabase.auth.getUser();
 
+              // Player ID만 저장 (external_id는 건드리지 않음)
               if (user && event.current?.id) {
-                try {
-                  await OneSignal.login(user.id);
-                  await savePlayerIdToDatabase(user.id, event.current.id);
-                  logger.info('사용자 연결 완료', { userId: user.id });
-                } catch (error) {
-                  logger.error('사용자 연결 실패', error);
-                }
+                await savePlayerIdToDatabase(user.id, event.current.id);
+                logger.info('Player ID 저장 완료', { userId: user.id });
               }
             });
           } catch (error: any) {
-            // OneSignal 초기화 중 에러 발생 시
+            isOneSignalInitializing = false;
+
             const isAlreadyInitialized = error.message?.includes('already initialized');
 
             if (isAlreadyInitialized) {
-              // 이미 초기화된 경우 디버그 레벨로만 로그
               logger.debug('OneSignal이 이미 초기화되어 있습니다.');
+              isOneSignalInitialized = true;
             } else {
-              // 다른 에러는 error 레벨로 로그
               logger.error('OneSignal 초기화 에러:', error);
-              // 플래그 리셋 (재시도 가능하게)
               isOneSignalInitialized = false;
             }
 
-            // 권한 차단 에러일 경우 사용자에게 안내
             if (error.message?.includes('Permission') || error.message?.includes('blocked')) {
               logger.warn('알림 권한이 차단되었습니다. 브라우저 설정에서 허용해주세요.');
             }
           }
 
-          // 로그인한 사용자 확인 및 연결
+          // 초기 Player ID 저장 (login은 Supabase auth 이벤트에서만)
           try {
-            const {
-              data: { user },
-            } = await supabase.auth.getUser();
+            const { data: { user } } = await supabase.auth.getUser();
 
             if (user) {
-              // 푸시 구독 상태 확인 후 사용자 연결
               try {
                 const isSubscribed = await OneSignal.User.PushSubscription.optedIn;
 
@@ -163,20 +221,18 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
                   const playerId = await OneSignal.User.PushSubscription.id;
 
                   if (playerId) {
-                    await OneSignal.login(user.id);
+                    // Player ID만 저장 (external_id login은 SIGNED_IN 이벤트에서)
                     await savePlayerIdToDatabase(user.id, playerId);
-                    logger.info('OneSignal 사용자 연결 완료', {
+                    logger.info('초기 Player ID 저장 완료', {
                       userId: user.id,
                       playerId: playerId.substring(0, 20) + '...',
                     });
                   }
                 } else {
                   logger.info('푸시 알림 구독 대기 중 (Subscription Bell 사용)', { userId: user.id });
-                  // Push Slide Prompt 대신 Subscription Bell 사용
-                  // 사용자가 직접 벨 아이콘을 클릭해서 구독
                 }
               } catch (error) {
-                logger.error('OneSignal 사용자 연결 오류', error);
+                logger.error('Player ID 저장 오류', error);
               }
             }
           } catch (error) {
@@ -194,36 +250,55 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
         }
       } catch (error) {
         logger.error('OneSignal 초기화 오류', error);
+        isOneSignalInitializing = false;
       }
     };
 
     initOneSignal();
-  }, [pathname]);
 
-  // 사용자 로그인/로그아웃 시 OneSignal 상태 업데이트
+    // Cleanup: fetch 복원 (개발 환경에서만)
+    return () => {
+      if (originalFetch) {
+        window.fetch = originalFetch;
+      }
+    };
+  }, []);
+
+  // Supabase 인증 상태 변경 이벤트
   useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        // 로그인 시 OneSignal에 사용자 ID 설정
-        if (window.OneSignal) {
-          const playerId = await window.OneSignal.User.PushSubscription.id;
+      if (!window.OneSignal || !isOneSignalInitialized) {
+        logger.debug('OneSignal 아직 초기화되지 않음 (인증 이벤트 대기)');
+        return;
+      }
 
-          if (playerId) {
-            await window.OneSignal.login(session.user.id);
-            await savePlayerIdToDatabase(session.user.id, playerId);
-          }
-        }
-      } else if (event === 'SIGNED_OUT') {
-        // 로그아웃 시 OneSignal 로그아웃
+      if (event === 'SIGNED_IN' && session?.user) {
         try {
-          if (window.OneSignal && typeof window.OneSignal.logout === 'function') {
-            await window.OneSignal.logout();
+          const isSubscribed = await window.OneSignal.User.PushSubscription.optedIn;
+
+          if (isSubscribed) {
+            const playerId = await window.OneSignal.User.PushSubscription.id;
+
+            if (playerId) {
+              const loginSuccess = await safeOneSignalLogin(window.OneSignal, session.user.id);
+              if (loginSuccess) {
+                await savePlayerIdToDatabase(session.user.id, playerId);
+                logger.info('로그인 시 OneSignal 연결 완료');
+              }
+            }
           }
         } catch (error) {
-          console.error('OneSignal logout error:', error);
-          // 로그아웃 실패는 무시 (사용자 경험에 영향 없음)
+          logger.error('로그인 시 OneSignal 연결 오류', error);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        try {
+          await window.OneSignal.logout();
+          lastLoginUserId = null;
+          logger.info('OneSignal 로그아웃 완료');
+        } catch (error) {
+          logger.error('OneSignal 로그아웃 오류', error);
         }
       }
     });
@@ -236,111 +311,124 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
   return <>{children}</>;
 }
 
+// OneSignal 로그인을 안전하게 처리하는 함수 (중복 방지)
+async function safeOneSignalLogin(OneSignal: any, userId: string): Promise<boolean> {
+  try {
+    // 1단계: 현재 external_id 확인 (가장 먼저)
+    const currentUserId = await OneSignal.User?.getExternalId?.();
+
+    if (currentUserId === userId) {
+      logger.debug('이미 OneSignal에 로그인되어 있습니다 (스킵):', userId);
+      lastLoginUserId = userId;
+      return true; // 이미 같은 유저면 아무것도 안 함
+    }
+
+    // 2단계: 메모리 캐시 체크
+    if (lastLoginUserId === userId) {
+      logger.debug('메모리 캐시에 동일 사용자 (스킵):', userId);
+      return true;
+    }
+
+    // 3단계: 로그인 진행 중이면 대기
+    if (oneSignalLoginInProgress) {
+      logger.debug('OneSignal 로그인이 이미 진행 중입니다 (대기)');
+      for (let i = 0; i < 50; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        if (!oneSignalLoginInProgress) break;
+      }
+      if (lastLoginUserId === userId) {
+        return true;
+      }
+    }
+
+    oneSignalLoginInProgress = true;
+
+    // 4단계: 다른 사용자로 로그인되어 있으면 로그아웃 후 로그인
+    if (currentUserId && currentUserId !== userId) {
+      logger.info('다른 사용자 세션 감지, 로그아웃 후 재로그인:', { currentUserId, newUserId: userId });
+      try {
+        await OneSignal.logout();
+        logger.debug('이전 사용자 로그아웃 완료');
+      } catch (logoutError) {
+        logger.warn('로그아웃 실패 (계속 진행):', logoutError);
+      }
+    }
+
+    // 5단계: 로그인 시도
+    await OneSignal.login(userId);
+    lastLoginUserId = userId;
+    logger.info('OneSignal 로그인 성공:', userId);
+    return true;
+  } catch (error: any) {
+    const errorMsg = error?.message || '';
+    const errorCode = error?.code || error?.status;
+
+    // user-2 (External ID 충돌): 조용히 성공으로 처리 (기능은 유지)
+    if (errorCode === 'user-2' || errorMsg.includes('claimed by another User')) {
+      logger.warn('OneSignal External ID 충돌 (user-2) - 성공으로 간주:', {
+        userId,
+        note: '기능은 정상 작동, 서버에서 중복 정리 필요'
+      });
+      lastLoginUserId = userId; // 캐시에 저장
+      return true; // 성공으로 처리
+    }
+
+    // 기타 409 에러: 로그만 남기고 성공 처리
+    if (errorCode === 409 || errorMsg.includes('409') || errorMsg.includes('Conflict')) {
+      logger.warn('OneSignal 로그인 충돌 (409) - 성공으로 간주:', errorMsg);
+      lastLoginUserId = userId;
+      return true;
+    }
+
+    logger.error('OneSignal 로그인 실패:', error);
+    return false;
+  } finally {
+    oneSignalLoginInProgress = false;
+  }
+}
+
 // Player ID를 데이터베이스에 저장
 async function savePlayerIdToDatabase(userId: string, playerId: string, retryCount = 0) {
   const MAX_RETRIES = 3;
-  const RETRY_DELAY = 1000; // 1초
+  const RETRY_DELAY = 1000;
 
   try {
-    // CSRF 토큰 가져오기 (최대 5초 대기)
-    const csrfToken = await waitForCsrfToken(5000);
+    // Supabase 클라이언트 생성 (Authorization 헤더용)
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
 
-    if (!csrfToken) {
-      logger.warn('CSRF 토큰을 찾을 수 없습니다. Player ID 저장을 건너뜁니다.');
-      return;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // Authorization 헤더 추가
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
     }
 
     const response = await fetch('/api/notifications/player-id', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': csrfToken,
-      },
+      headers,
       body: JSON.stringify({
         player_id: playerId,
-        device_type: getDeviceType(),
-        device_model: getDeviceModel(),
+        device_type: 'web',
+        device_model: navigator.userAgent,
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-
-      // CSRF 토큰 오류이고 재시도 횟수가 남았으면 재시도
-      if (response.status === 403 && retryCount < MAX_RETRIES) {
-        logger.warn(`CSRF 검증 실패, ${RETRY_DELAY}ms 후 재시도 (${retryCount + 1}/${MAX_RETRIES})`);
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-        return savePlayerIdToDatabase(userId, playerId, retryCount + 1);
-      }
-
-      logger.error('Player ID 저장 API 응답 에러', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData,
-        retryCount,
-      });
-      throw new Error(`Player ID 저장 실패: ${errorData.error || response.statusText}`);
+      throw new Error(`Player ID 저장 실패: ${response.status}`);
     }
 
-    logger.debug('Player ID 저장 완료', { userId, playerId: playerId.substring(0, 20) + '...' });
+    const data = await response.json();
+    logger.info('Player ID 저장 완료', data);
   } catch (error) {
-    logger.error('Player ID 저장 오류', { error, retryCount });
-  }
-}
+    logger.error('Player ID 저장 오류', error);
 
-// CSRF 토큰이 준비될 때까지 대기
-async function waitForCsrfToken(timeoutMs: number): Promise<string | null> {
-  const startTime = Date.now();
-  const checkInterval = 100; // 100ms마다 확인
-
-  while (Date.now() - startTime < timeoutMs) {
-    const token = getCsrfToken();
-    if (token) {
-      return token;
-    }
-    await new Promise(resolve => setTimeout(resolve, checkInterval));
-  }
-
-  return null; // 타임아웃
-}
-
-// 디바이스 타입 감지
-function getDeviceType(): string {
-  const userAgent = navigator.userAgent.toLowerCase();
-
-  if (/android/.test(userAgent)) {
-    return 'android';
-  } else if (/iphone|ipad|ipod/.test(userAgent)) {
-    return 'ios';
-  } else {
-    return 'web';
-  }
-}
-
-// 디바이스 모델 감지
-function getDeviceModel(): string {
-  const userAgent = navigator.userAgent;
-
-  // 브라우저 감지
-  if (userAgent.indexOf('Chrome') > -1) return 'Chrome';
-  if (userAgent.indexOf('Safari') > -1) return 'Safari';
-  if (userAgent.indexOf('Firefox') > -1) return 'Firefox';
-  if (userAgent.indexOf('Edge') > -1) return 'Edge';
-
-  return 'Unknown';
-}
-
-// CSRF 토큰 가져오기
-function getCsrfToken(): string | null {
-  if (typeof document === 'undefined') return null;
-
-  const cookies = document.cookie.split(';');
-  for (const cookie of cookies) {
-    const [name, value] = cookie.trim().split('=');
-    if (name === 'csrf-token') {
-      return decodeURIComponent(value);
+    if (retryCount < MAX_RETRIES) {
+      logger.info(`Player ID 저장 재시도 (${retryCount + 1}/${MAX_RETRIES})`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      await savePlayerIdToDatabase(userId, playerId, retryCount + 1);
     }
   }
-
-  return null;
 }

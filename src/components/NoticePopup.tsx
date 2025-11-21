@@ -19,11 +19,28 @@ export function NoticePopup() {
   const [isOpen, setIsOpen] = useState(false);
   const [dontShowToday, setDontShowToday] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
+    // 기존 포탈 컨테이너 재사용 또는 새로 생성
+    let container = document.getElementById('notice-popup-portal');
+
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'notice-popup-portal';
+      document.body.appendChild(container);
+    }
+
+    setPortalContainer(container);
     setMounted(true);
-    return () => setMounted(false);
+
+    return () => {
+      // 상태만 초기화, 컨테이너는 제거하지 않음
+      // (React가 알아서 portal children 정리, HMR 안전)
+      setMounted(false);
+      setPortalContainer(null);
+    };
   }, []);
 
   useEffect(() => {
@@ -100,7 +117,7 @@ export function NoticePopup() {
     }
   };
 
-  if (!isOpen || notices.length === 0 || !mounted) return null;
+  if (!isOpen || notices.length === 0 || !mounted || !portalContainer) return null;
 
   const currentNotice = notices[currentIndex];
 
@@ -319,6 +336,6 @@ export function NoticePopup() {
         </div>
       </div>
     </>,
-    document.body
+    portalContainer
   );
 }

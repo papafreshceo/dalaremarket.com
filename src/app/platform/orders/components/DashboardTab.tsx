@@ -1764,8 +1764,8 @@ export default function DashboardTab({ isMobile, orders, statusConfig, isSampleM
         {/* 첫 번째 열: 날짜 필터 & 통계 카드 - Sticky */}
         <div
           style={{
-            minWidth: '400px',
-            width: '22.4%',
+            minWidth: '280px',
+            width: '16%',
             flexShrink: 1,
             position: 'sticky',
             top: '80px',

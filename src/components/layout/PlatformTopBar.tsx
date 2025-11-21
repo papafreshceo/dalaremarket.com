@@ -110,8 +110,8 @@ export default function PlatformTopBar() {
   }, [user]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
+    const { logout } = await import('@/lib/logout');
+    await logout(router, '/');
   };
 
   const openOrders = (status?: string) => {
