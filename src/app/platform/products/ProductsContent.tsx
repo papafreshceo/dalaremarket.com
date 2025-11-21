@@ -396,67 +396,89 @@ function ProductsPageInner() {
       }}>
         {/* 칼럼 1 - 메인 콘텐츠 */}
         <div>
-          <div onClick={() => setExpandedComponent('stats')} style={{ cursor: 'pointer' }}>
-            <StatsCards stats={stats} isMobile={isMobile} />
+          <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('stats'); }} style={{ cursor: 'default' }}>
+            <div style={{ cursor: 'pointer' }}>
+              <StatsCards stats={stats} isMobile={isMobile} />
+            </div>
           </div>
-          <div onClick={() => setExpandedComponent('products')} style={{ cursor: 'pointer' }}>
-            <SupplyProductsTable products={products} loading={loading} isMobile={isMobile} />
+          <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('products'); }} style={{ cursor: 'default' }}>
+            <div style={{ cursor: 'pointer' }}>
+              <SupplyProductsTable products={products} loading={loading} isMobile={isMobile} />
+            </div>
           </div>
         </div>
 
         {/* 칼럼 2 - 시세정보 */}
-        <div onClick={() => setExpandedComponent('market')} style={{ cursor: 'pointer' }}>
-          <MarketPrices prices={marketPrices} isMobile={isMobile} />
+        <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('market'); }} style={{ cursor: 'default' }}>
+          <div style={{ cursor: 'pointer' }}>
+            <MarketPrices prices={marketPrices} isMobile={isMobile} />
+          </div>
         </div>
 
         {/* 칼럼 3 - 캘린더 */}
         <div>
-          <div onClick={() => setExpandedComponent('shipping-calendar')} style={{ cursor: 'pointer' }}>
-            <ProductCalendar
-              title="발송캘린더"
-              year={shippingMonth.getFullYear()}
-              month={shippingMonth.getMonth()}
-              days={generateCalendarDays(shippingMonth)}
-              onPrevMonth={() => changeMonth('shipping', 'prev')}
-              onNextMonth={() => changeMonth('shipping', 'next')}
-              isMobile={isMobile}
-            />
+          <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('shipping-calendar'); }} style={{ cursor: 'default' }}>
+            <div style={{ cursor: 'pointer' }}>
+              <ProductCalendar
+                title="발송캘린더"
+                year={shippingMonth.getFullYear()}
+                month={shippingMonth.getMonth()}
+                days={generateCalendarDays(shippingMonth)}
+                onPrevMonth={() => changeMonth('shipping', 'prev')}
+                onNextMonth={() => changeMonth('shipping', 'next')}
+                isMobile={isMobile}
+              />
+            </div>
           </div>
-          <div onClick={() => setExpandedComponent('product-calendar')} style={{ cursor: 'pointer' }}>
-            <ProductCalendar
-              title="상품캘린더"
-              year={productMonth.getFullYear()}
-              month={productMonth.getMonth()}
-              days={generateCalendarDays(productMonth)}
-              onPrevMonth={() => changeMonth('product', 'prev')}
-              onNextMonth={() => changeMonth('product', 'next')}
-              isMobile={isMobile}
-            />
+          <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('product-calendar'); }} style={{ cursor: 'default' }}>
+            <div style={{ cursor: 'pointer' }}>
+              <ProductCalendar
+                title="상품캘린더"
+                year={productMonth.getFullYear()}
+                month={productMonth.getMonth()}
+                days={generateCalendarDays(productMonth)}
+                onPrevMonth={() => changeMonth('product', 'prev')}
+                onNextMonth={() => changeMonth('product', 'next')}
+                isMobile={isMobile}
+              />
+            </div>
           </div>
         </div>
 
         {/* 칼럼 4 - 셀러계정, 발주시스템, Win-Win, 발주 그래프 */}
         <div>
-          <div onClick={() => setExpandedComponent('seller-account')} style={{ cursor: 'pointer' }}>
-            <SellerAccountInfo organizationInfo={organizationInfo} isMobile={isMobile} />
+          <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('seller-account'); }} style={{ cursor: 'default' }}>
+            <div style={{ cursor: 'pointer' }}>
+              <SellerAccountInfo organizationInfo={organizationInfo} isMobile={isMobile} />
+            </div>
           </div>
-          <div onClick={() => setExpandedComponent('order-system')} style={{ cursor: 'pointer' }}>
-            <OrderSystemSection items={orderSystemItems} isMobile={isMobile} />
+          <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('order-system'); }} style={{ cursor: 'default' }}>
+            <div style={{ cursor: 'pointer' }}>
+              <OrderSystemSection items={orderSystemItems} isMobile={isMobile} />
+            </div>
           </div>
-          <div onClick={() => setExpandedComponent('winwin')} style={{ cursor: 'pointer' }}>
-            <WinWinProgram isMobile={isMobile} />
+          <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('winwin'); }} style={{ cursor: 'default' }}>
+            <div style={{ cursor: 'pointer' }}>
+              <WinWinProgram isMobile={isMobile} />
+            </div>
           </div>
-          <div onClick={() => setExpandedComponent('weekly-chart')} style={{ marginBottom: '16px', cursor: 'pointer' }}>
-            <WeeklyOrderChart orders={orders} isMobile={isMobile} />
+          <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('weekly-chart'); }} style={{ marginBottom: '16px', cursor: 'default' }}>
+            <div style={{ cursor: 'pointer' }}>
+              <WeeklyOrderChart orders={orders} isMobile={isMobile} />
+            </div>
           </div>
-          <div onClick={() => setExpandedComponent('monthly-chart')} style={{ cursor: 'pointer' }}>
-            <MonthlyOrderChart orders={orders} isMobile={isMobile} />
+          <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('monthly-chart'); }} style={{ cursor: 'default' }}>
+            <div style={{ cursor: 'pointer' }}>
+              <MonthlyOrderChart orders={orders} isMobile={isMobile} />
+            </div>
           </div>
         </div>
 
         {/* 칼럼 5 - 발주 TOP 10 */}
-        <div onClick={() => setExpandedComponent('top10')} style={{ cursor: 'pointer' }}>
-          <ProductTop10Chart orders={orders} isMobile={isMobile} />
+        <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('top10'); }} style={{ cursor: 'default' }}>
+          <div style={{ cursor: 'pointer' }}>
+            <ProductTop10Chart orders={orders} isMobile={isMobile} />
+          </div>
         </div>
 
         {/* 병합 행 1 - 빈 행 */}
