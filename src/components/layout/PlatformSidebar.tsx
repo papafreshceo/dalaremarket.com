@@ -173,7 +173,7 @@ export default function PlatformSidebar() {
   // 알림 메뉴 아이템
   const notificationMenuItems: MenuItem[] = [
     {
-      path: '/platform/notifications/orders',
+      path: '/platform/notifications',
       text: '발주/주문',
       icon: icons.orders
     },
