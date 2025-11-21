@@ -76,6 +76,7 @@ function ProductsPageInner() {
   const [expandedComponent, setExpandedComponent] = useState<string | null>(null);
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [tools, setTools] = useState<any[]>([]);
+  const [designSettings, setDesignSettings] = useState<any>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -90,6 +91,30 @@ function ProductsPageInner() {
       window.addEventListener('resize', checkMobile);
       return () => window.removeEventListener('resize', checkMobile);
     }
+  }, []);
+
+  // 디자인 프리셋 로드
+  useEffect(() => {
+    const loadDesignSettings = async () => {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('platform_design_presets')
+          .select('settings')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (data && !error) {
+          setDesignSettings(data.settings);
+        }
+      } catch (error) {
+        console.error('디자인 설정 로드 실패:', error);
+      }
+    };
+
+    loadDesignSettings();
   }, []);
 
   // URL 파라미터로 로그인 모달 열기 (로그인되어 있지 않을 때만)
@@ -141,12 +166,16 @@ function ProductsPageInner() {
           }
         });
 
+        // 디자인 설정에서 색상 가져오기
+        const primaryColor = designSettings?.colors?.primary?.base || '#2563eb';
+        const primaryLight = designSettings?.colors?.primary?.tones?.light || '#60a5fa';
+
         // 전체 품목 수
         newStats.push({
           label: '전체 상품',
           value: String(uniqueCategories.size),
-          color: '#2563eb',
-          bgGradient: 'linear-gradient(135deg, #2563eb 0%, #60a5fa 100%)'
+          color: primaryColor,
+          bgGradient: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryLight} 100%)`
         });
 
         // 상태별 통계 추가
@@ -169,7 +198,7 @@ function ProductsPageInner() {
     };
 
     fetchStats();
-  }, []);
+  }, [designSettings]);
 
   // 도구 목록 가져오기
   useEffect(() => {
@@ -342,6 +371,18 @@ function ProductsPageInner() {
 
   if (!isMounted) return null;
 
+  // 디자인 설정에서 배경 생성
+  const mainBackground = designSettings?.background?.light?.gradient?.enabled
+    ? `linear-gradient(${designSettings.background.light.gradient.direction}, ${
+        designSettings.background.light.gradient.colors?.map((c: any, i: number) =>
+          `${c.color} ${c.position || (i * 100 / (designSettings.background.light.gradient.colors.length - 1))}%`
+        ).join(', ') || '#ffffff 0%, #f0f4ff 100%'
+      })`
+    : designSettings?.background?.light?.solid?.color || 'linear-gradient(180deg, #ffffff 0%, #fefefe 50px, #fafaff 100px, #f5f7ff 150px, #f0f4ff 200px, #e8f0ff 250px, #dce7fe 300px, #d0dffe 350px, #c0d4fd 400px, #b0c9fc 450px, #9ebcfb 500px, #8aaffa 550px, #75a2f9 600px, #5f94f8 650px, #4787f6 700px, #3b82f6 750px, #60a5fa 1050px, #93c5fd 1350px, #bfdbfe 1650px, #dbeafe 1950px, #f0f9ff 2250px, #ffffff 2550px, #ffffff 100%)';
+
+  const accentColor1 = designSettings?.colors?.secondary?.base || 'rgba(187, 247, 208, 0.4)';
+  const accentColor2 = designSettings?.colors?.info?.base || 'rgba(139, 92, 246, 0.3)';
+
   return (
     <div style={{
       position: 'relative',
@@ -353,36 +394,36 @@ function ProductsPageInner() {
       minHeight: '100vh',
       overflow: 'hidden'
     }}>
-      {/* 메인 파란색 그라데이션 */}
+      {/* 메인 배경 */}
       <div style={{
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'linear-gradient(180deg, #ffffff 0%, #fefefe 50px, #fafaff 100px, #f5f7ff 150px, #f0f4ff 200px, #e8f0ff 250px, #dce7fe 300px, #d0dffe 350px, #c0d4fd 400px, #b0c9fc 450px, #9ebcfb 500px, #8aaffa 550px, #75a2f9 600px, #5f94f8 650px, #4787f6 700px, #3b82f6 750px, #60a5fa 1050px, #93c5fd 1350px, #bfdbfe 1650px, #dbeafe 1950px, #f0f9ff 2250px, #ffffff 2550px, #ffffff 100%)',
+        background: mainBackground,
         zIndex: -3
       }} />
 
-      {/* 왼쪽 연두색 */}
+      {/* 왼쪽 액센트 */}
       <div style={{
         position: 'absolute',
         top: '600px',
         left: 0,
         width: '600px',
         height: '400px',
-        background: 'radial-gradient(ellipse at 0% 50%, rgba(187, 247, 208, 0.4) 0%, transparent 60%)',
+        background: `radial-gradient(ellipse at 0% 50%, ${accentColor1} 0%, transparent 60%)`,
         zIndex: -2
       }} />
 
-      {/* 우측 상단 보라색 */}
+      {/* 우측 상단 액센트 */}
       <div style={{
         position: 'absolute',
         top: '400px',
         right: 0,
         width: '1600px',
         height: '1200px',
-        background: 'radial-gradient(ellipse at 100% 50%, rgba(139, 92, 246, 0.3) 0%, transparent 60%)',
+        background: `radial-gradient(ellipse at 100% 50%, ${accentColor2} 0%, transparent 60%)`,
         zIndex: -1
       }} />
 
@@ -398,7 +439,7 @@ function ProductsPageInner() {
         <div>
           <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('stats'); }} style={{ cursor: 'default' }}>
             <div style={{ cursor: 'pointer' }}>
-              <StatsCards stats={stats} isMobile={isMobile} />
+              <StatsCards stats={stats} isMobile={isMobile} designSettings={designSettings} />
             </div>
           </div>
           <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('products'); }} style={{ cursor: 'default' }}>
@@ -411,7 +452,7 @@ function ProductsPageInner() {
         {/* 칼럼 2 - 시세정보 */}
         <div onClick={(e) => { if (e.target !== e.currentTarget) setExpandedComponent('market'); }} style={{ cursor: 'default' }}>
           <div style={{ cursor: 'pointer' }}>
-            <MarketPrices prices={marketPrices} isMobile={isMobile} />
+            <MarketPrices prices={marketPrices} isMobile={isMobile} designSettings={designSettings} />
           </div>
         </div>
 
@@ -427,6 +468,7 @@ function ProductsPageInner() {
                 onPrevMonth={() => changeMonth('shipping', 'prev')}
                 onNextMonth={() => changeMonth('shipping', 'next')}
                 isMobile={isMobile}
+                designSettings={designSettings}
               />
             </div>
           </div>
@@ -440,6 +482,7 @@ function ProductsPageInner() {
                 onPrevMonth={() => changeMonth('product', 'prev')}
                 onNextMonth={() => changeMonth('product', 'next')}
                 isMobile={isMobile}
+                designSettings={designSettings}
               />
             </div>
           </div>
@@ -512,33 +555,33 @@ function ProductsPageInner() {
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'linear-gradient(180deg, #ffffff 0%, #fefefe 50px, #fafaff 100px, #f5f7ff 150px, #f0f4ff 200px, #e8f0ff 250px, #dce7fe 300px, #d0dffe 350px, #c0d4fd 400px, #b0c9fc 450px, #9ebcfb 500px, #8aaffa 550px, #75a2f9 600px, #5f94f8 650px, #4787f6 700px, #3b82f6 750px, #60a5fa 1050px, #93c5fd 1350px, #bfdbfe 1650px, #dbeafe 1950px, #f0f9ff 2250px, #ffffff 2550px, #ffffff 100%)',
+            background: mainBackground,
             zIndex: -3,
             opacity: 0,
             animation: 'fadeInBackground 0.5s ease-out forwards'
           }} />
 
-          {/* 왼쪽 연두색 */}
+          {/* 왼쪽 액센트 */}
           <div style={{
             position: 'absolute',
             top: '600px',
             left: 0,
             width: '600px',
             height: '400px',
-            background: 'radial-gradient(ellipse at 0% 50%, rgba(187, 247, 208, 0.4) 0%, transparent 60%)',
+            background: `radial-gradient(ellipse at 0% 50%, ${accentColor1} 0%, transparent 60%)`,
             zIndex: -2,
             opacity: 0,
             animation: 'fadeInBackground 0.5s ease-out 0.1s forwards'
           }} />
 
-          {/* 우측 상단 보라색 */}
+          {/* 우측 상단 액센트 */}
           <div style={{
             position: 'absolute',
             top: '400px',
             right: 0,
             width: '1600px',
             height: '1200px',
-            background: 'radial-gradient(ellipse at 100% 50%, rgba(139, 92, 246, 0.3) 0%, transparent 60%)',
+            background: `radial-gradient(ellipse at 100% 50%, ${accentColor2} 0%, transparent 60%)`,
             zIndex: -1,
             opacity: 0,
             animation: 'fadeInBackground 0.5s ease-out 0.2s forwards'
@@ -567,9 +610,9 @@ function ProductsPageInner() {
               overflow: 'auto'
             }}
           >
-            {expandedComponent === 'stats' && <StatsCards stats={stats} isMobile={isMobile} />}
+            {expandedComponent === 'stats' && <StatsCards stats={stats} isMobile={isMobile} designSettings={designSettings} />}
             {expandedComponent === 'products' && <SupplyProductsTable products={products} loading={loading} isMobile={isMobile} />}
-            {expandedComponent === 'market' && <MarketPrices prices={marketPrices} isMobile={isMobile} />}
+            {expandedComponent === 'market' && <MarketPrices prices={marketPrices} isMobile={isMobile} designSettings={designSettings} />}
             {expandedComponent === 'shipping-calendar' && (
               <ProductCalendar
                 title="발송캘린더"
@@ -579,6 +622,7 @@ function ProductsPageInner() {
                 onPrevMonth={() => changeMonth('shipping', 'prev')}
                 onNextMonth={() => changeMonth('shipping', 'next')}
                 isMobile={isMobile}
+                designSettings={designSettings}
               />
             )}
             {expandedComponent === 'product-calendar' && (
@@ -590,6 +634,7 @@ function ProductsPageInner() {
                 onPrevMonth={() => changeMonth('product', 'prev')}
                 onNextMonth={() => changeMonth('product', 'next')}
                 isMobile={isMobile}
+                designSettings={designSettings}
               />
             )}
             {expandedComponent === 'seller-account' && <SellerAccountInfo organizationInfo={organizationInfo} isMobile={isMobile} />}

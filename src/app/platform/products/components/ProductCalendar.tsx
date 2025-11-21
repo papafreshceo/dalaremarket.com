@@ -20,10 +20,21 @@ interface ProductCalendarProps {
   onPrevMonth?: () => void;
   onNextMonth?: () => void;
   isMobile?: boolean;
+  designSettings?: any;
 }
 
 export default function ProductCalendar(props: ProductCalendarProps) {
   const weekDays = ['일', '월', '화', '수', '목', '금', '토'];
+
+  // 디자인 설정에서 값 가져오기
+  const cardBackground = props.designSettings?.components?.card?.background || 'rgba(255, 255, 255, 0.1)';
+  const borderColor = props.designSettings?.border?.light?.color || 'rgba(222, 226, 230, 0.1)';
+  const borderRadiusLarge = props.designSettings?.border?.radius?.large || '12px';
+  const borderRadiusSmall = props.designSettings?.border?.radius?.small || '6px';
+  const textPrimary = props.designSettings?.colors?.neutral?.base || '#212529';
+  const textSecondary = props.designSettings?.colors?.neutral?.tones?.dark || '#6c757d';
+  const primaryColor = props.designSettings?.colors?.primary?.base || '#2563eb';
+  const errorColor = props.designSettings?.colors?.error?.base || '#ef4444';
 
   // 옛날 방식인지 새 방식인지 확인
   const isOldStyle = props.title !== undefined || props.year !== undefined;
@@ -34,9 +45,9 @@ export default function ProductCalendar(props: ProductCalendarProps) {
 
     return (
       <div style={{
-        background: 'rgba(255, 255, 255, 0.1)',
-        border: '1px solid rgba(222, 226, 230, 0.1)',
-        borderRadius: '12px',
+        background: cardBackground,
+        border: `1px solid ${borderColor}`,
+        borderRadius: borderRadiusLarge,
         padding: isMobile ? '16px' : '24px',
         marginBottom: '16px'
       }}>
@@ -50,7 +61,8 @@ export default function ProductCalendar(props: ProductCalendarProps) {
           <h2 style={{
             fontSize: '18px',
             fontWeight: '600',
-            margin: 0
+            margin: 0,
+            color: textPrimary
           }}>{title}</h2>
 
           <div style={{
@@ -65,14 +77,14 @@ export default function ProductCalendar(props: ProductCalendarProps) {
                 border: 'none',
                 cursor: 'pointer',
                 fontSize: '16px',
-                color: '#495057',
+                color: textSecondary,
                 padding: '4px 8px'
               }}
             >‹</button>
             <span style={{
               fontSize: '14px',
               fontWeight: '500',
-              color: '#212529'
+              color: textPrimary
             }}>
               {year}년 {month + 1}월
             </span>
@@ -83,7 +95,7 @@ export default function ProductCalendar(props: ProductCalendarProps) {
                 border: 'none',
                 cursor: 'pointer',
                 fontSize: '16px',
-                color: '#495057',
+                color: textSecondary,
                 padding: '4px 8px'
               }}
             >›</button>
@@ -104,7 +116,7 @@ export default function ProductCalendar(props: ProductCalendarProps) {
                 textAlign: 'center',
                 fontSize: '11px',
                 fontWeight: '500',
-                color: idx === 0 ? '#ef4444' : idx === 6 ? '#2563eb' : '#6c757d',
+                color: idx === 0 ? errorColor : idx === 6 ? primaryColor : textSecondary,
                 padding: '6px 0'
               }}
             >
@@ -123,18 +135,18 @@ export default function ProductCalendar(props: ProductCalendarProps) {
             <div
               key={idx}
               style={{
-                border: '1px solid rgba(241, 243, 245, 0.1)',
-                borderRadius: '6px',
+                border: `1px solid ${borderColor}`,
+                borderRadius: borderRadiusSmall,
                 padding: '6px',
                 minHeight: '40px',
-                background: dayInfo.day ? 'rgba(255, 255, 255, 0.1)' : 'transparent'
+                background: dayInfo.day ? cardBackground : 'transparent'
               }}
             >
               {dayInfo.day && (
                 <div style={{
                   fontSize: '12px',
                   fontWeight: dayInfo.isToday ? '600' : '400',
-                  color: dayInfo.isToday ? '#2563eb' : '#212529'
+                  color: dayInfo.isToday ? primaryColor : textPrimary
                 }}>
                   {dayInfo.day}
                 </div>
@@ -194,9 +206,9 @@ export default function ProductCalendar(props: ProductCalendarProps) {
 
   return (
     <div style={{
-      background: 'rgba(255, 255, 255, 0.1)',
-      border: '1px solid rgba(222, 226, 230, 0.1)',
-      borderRadius: '12px',
+      background: cardBackground,
+      border: `1px solid ${borderColor}`,
+      borderRadius: borderRadiusLarge,
       padding: isMobile ? '16px' : '24px',
       marginBottom: '16px'
     }}>
@@ -210,7 +222,8 @@ export default function ProductCalendar(props: ProductCalendarProps) {
         <h2 style={{
           fontSize: '18px',
           fontWeight: '600',
-          margin: 0
+          margin: 0,
+          color: textPrimary
         }}>상품 캘린더</h2>
 
         <div style={{
@@ -225,14 +238,14 @@ export default function ProductCalendar(props: ProductCalendarProps) {
               border: 'none',
               cursor: 'pointer',
               fontSize: '16px',
-              color: '#495057',
+              color: textSecondary,
               padding: '4px 8px'
             }}
           >‹</button>
           <span style={{
             fontSize: '14px',
             fontWeight: '500',
-            color: '#212529'
+            color: textPrimary
           }}>
             {year}년 {month + 1}월
           </span>
@@ -243,7 +256,7 @@ export default function ProductCalendar(props: ProductCalendarProps) {
               border: 'none',
               cursor: 'pointer',
               fontSize: '16px',
-              color: '#495057',
+              color: textSecondary,
               padding: '4px 8px'
             }}
           >›</button>
@@ -264,7 +277,7 @@ export default function ProductCalendar(props: ProductCalendarProps) {
               textAlign: 'center',
               fontSize: '11px',
               fontWeight: '500',
-              color: idx === 0 ? '#ef4444' : idx === 6 ? '#2563eb' : '#6c757d',
+              color: idx === 0 ? errorColor : idx === 6 ? primaryColor : textSecondary,
               padding: '6px 0'
             }}
           >
@@ -283,18 +296,18 @@ export default function ProductCalendar(props: ProductCalendarProps) {
           <div
             key={idx}
             style={{
-              border: '1px solid rgba(241, 243, 245, 0.1)',
-              borderRadius: '6px',
+              border: `1px solid ${borderColor}`,
+              borderRadius: borderRadiusSmall,
               padding: '6px',
               minHeight: '40px',
-              background: dayInfo.day ? 'rgba(255, 255, 255, 0.1)' : 'transparent'
+              background: dayInfo.day ? cardBackground : 'transparent'
             }}
           >
             {dayInfo.day && (
               <div style={{
                 fontSize: '12px',
                 fontWeight: dayInfo.isToday ? '600' : '400',
-                color: dayInfo.isToday ? '#2563eb' : '#212529'
+                color: dayInfo.isToday ? primaryColor : textPrimary
               }}>
                 {dayInfo.day}
               </div>
