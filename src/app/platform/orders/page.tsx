@@ -1858,7 +1858,10 @@ function OrdersPageContent() {
           </div>
         )}
         {activeTab === '지갑' && (
-          <CashHistoryTab />
+          <CashHistoryTab
+            cashBalance={cashBalance}
+            creditBalance={creditBalance}
+          />
         )}
 
         {/* 모달들 */}

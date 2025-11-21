@@ -21,66 +21,73 @@ const transactionTypeConfig: Record<Transaction['type'], { label: string; color:
   daily_refill: { label: '일일 리필', color: '#7c3aed', icon: '🔄' }
 };
 
-export default function CashHistoryTab() {
+interface CashHistoryTabProps {
+  cashBalance: number;
+  creditBalance: number;
+}
+
+export default function CashHistoryTab({ cashBalance, creditBalance }: CashHistoryTabProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [cashBalance, setCashBalance] = useState<number>(0);
-  const [creditBalance, setCreditBalance] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [total, setTotal] = useState<number>(0);
   const [limit] = useState<number>(50);
   const [offset, setOffset] = useState<number>(0);
   const [selectedType, setSelectedType] = useState<'cash' | 'credit'>('cash');
 
-  // 캐시 & 크레딧 잔액 조회
-  useEffect(() => {
-    const fetchBalances = async () => {
-      try {
-        // 캐시 조회
-        const cashResponse = await fetch('/api/cash');
-        const cashData = await cashResponse.json();
-        if (cashData.success) {
-          setCashBalance(cashData.balance);
-        }
-
-        // 크레딧 조회
-        const creditResponse = await fetch('/api/credits/daily-refill', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        const creditData = await creditResponse.json();
-        if (creditData.success) {
-          setCreditBalance(creditData.balance);
-        }
-      } catch (error) {
-        console.error('잔액 조회 실패:', error);
-      }
-    };
-
-    fetchBalances();
-  }, []);
-
   // 거래 이력 조회
   useEffect(() => {
     const fetchTransactions = async () => {
+      console.log('[CashHistoryTab] 거래 이력 조회 시작');
       setLoading(true);
       try {
         const endpoint = selectedType === 'cash'
           ? `/api/cash/transactions?limit=${limit}&offset=${offset}`
           : `/api/credits/transactions?limit=${limit}&offset=${offset}`;
 
-        const response = await fetch(endpoint);
+        console.log('[CashHistoryTab] API 호출:', endpoint);
+
+        // 타임아웃 추가 (10초)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          console.log('[CashHistoryTab] 타임아웃 발생');
+          controller.abort();
+        }, 10000);
+
+        const response = await fetch(endpoint, {
+          signal: controller.signal,
+          cache: 'no-store'
+        });
+
+        clearTimeout(timeoutId);
+        console.log('[CashHistoryTab] API 응답 상태:', response.status);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
         const data = await response.json();
+        console.log('[CashHistoryTab] API 응답 데이터:', data);
 
         if (data.success) {
           setTransactions(data.transactions);
           setTotal(data.total);
+          console.log('[CashHistoryTab] 거래 이력 설정 완료:', data.transactions.length, '건');
         } else {
-          toast.error('거래 이력 조회에 실패했습니다.');
+          console.log('[CashHistoryTab] API 실패:', data.error);
+          toast.error(data.error || '거래 이력 조회에 실패했습니다.');
         }
-      } catch (error) {
-        console.error('거래 이력 조회 실패:', error);
-        toast.error('거래 이력 조회 중 오류가 발생했습니다.');
+      } catch (error: any) {
+        console.error('[CashHistoryTab] 거래 이력 조회 실패:', error);
+        if (error.name === 'AbortError') {
+          toast.error('요청 시간이 초과되었습니다. 다시 시도해주세요.');
+        } else {
+          toast.error('거래 이력 조회 중 오류가 발생했습니다.');
+        }
+        // 에러 시 빈 배열로 설정
+        setTransactions([]);
+        setTotal(0);
       } finally {
+        console.log('[CashHistoryTab] 로딩 종료');
         setLoading(false);
       }
     };
