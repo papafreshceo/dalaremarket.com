@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { createClient } from '@/lib/supabase/client';
@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 export default function IconSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const { activeIconMenu, setActiveIconMenu, isSidebarVisible, setIsSidebarVisible } = useSidebar();
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
@@ -171,6 +172,10 @@ export default function IconSidebar() {
     } else if (pathname === '/platform/settings') {
       setActiveIconMenu('settings');
       setIsSidebarVisible(true);
+    } else if (pathname === '/platform/orders' && searchParams.get('tab') === '옵션상품매핑') {
+      // 옵션상품매핑 탭: 설정 메뉴 활성화
+      setActiveIconMenu('settings');
+      setIsSidebarVisible(true);
     } else if (pathname === '/platform' || pathname.startsWith('/platform/products') || pathname === '/platform/calendar' || pathname === '/gallery' || pathname === '/platform/orders') {
       // 홈 및 기본 메뉴: activeIconMenu는 null
       setActiveIconMenu(null);
@@ -178,7 +183,7 @@ export default function IconSidebar() {
       const savedVisible = localStorage.getItem('platformSidebarVisible');
       setIsSidebarVisible(savedVisible === 'true');
     }
-  }, [pathname]);
+  }, [pathname, searchParams]);
 
   // 컴포넌트 언마운트 시 정리
   useEffect(() => {
