@@ -49,7 +49,8 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
           errorMsg.includes('Recovering from SetAlias') ||
           errorMsg.includes('429') ||
           errorMsg.includes('Too Many Requests') ||
-          errorMsg.includes('Player ID 저장')
+          errorMsg.includes('Player ID 저장') ||
+          errorMsg.includes('Can only be used on')
         ) {
           // URL 또는 메시지에서 OneSignal 관련 확인
           if (args.some((arg: any) =>
@@ -83,6 +84,7 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
     if (process.env.NODE_ENV === 'development') {
       originalFetch = window.fetch;
       window.fetch = async (...args: any[]) => {
+        // @ts-ignore
         const response = await originalFetch!(...args);
 
         // OneSignal /identity PATCH 409 응답 필터링
@@ -176,7 +178,7 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
 
             // 권한 변경 감지
             OneSignal.Notifications.addEventListener('permissionChange', (permission: boolean) => {
-              logger.info('알림 권한 변경:', permission ? '허용됨' : '거부됨');
+              logger.info('알림 권한 변경:', { status: permission ? '허용됨' : '거부됨' });
             });
 
             // 알림 클릭 이벤트
@@ -218,6 +220,10 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
 
             if (error.message?.includes('Permission') || error.message?.includes('blocked')) {
               logger.warn('알림 권한이 차단되었습니다. 브라우저 설정에서 허용해주세요.');
+            } else if (error.message?.includes('Can only be used on')) {
+              logger.warn('OneSignal 도메인 불일치 (포트 확인 필요):', { message: error.message });
+            } else {
+              logger.error('OneSignal 초기화 에러:', error);
             }
           }
 
@@ -330,14 +336,14 @@ async function safeOneSignalLogin(OneSignal: any, userId: string): Promise<boole
     const currentUserId = await OneSignal.User?.getExternalId?.();
 
     if (currentUserId === userId) {
-      logger.debug('이미 OneSignal에 로그인되어 있습니다 (스킵):', userId);
+      logger.debug('이미 OneSignal에 로그인되어 있습니다 (스킵):', { userId });
       lastLoginUserId = userId;
       return true; // 이미 같은 유저면 아무것도 안 함
     }
 
     // 2단계: 메모리 캐시 체크
     if (lastLoginUserId === userId) {
-      logger.debug('메모리 캐시에 동일 사용자 (스킵):', userId);
+      logger.debug('메모리 캐시에 동일 사용자 (스킵):', { userId });
       return true;
     }
 
@@ -362,14 +368,14 @@ async function safeOneSignalLogin(OneSignal: any, userId: string): Promise<boole
         await OneSignal.logout();
         logger.debug('이전 사용자 로그아웃 완료');
       } catch (logoutError) {
-        logger.warn('로그아웃 실패 (계속 진행):', logoutError);
+        logger.warn('로그아웃 실패 (계속 진행):', { error: logoutError });
       }
     }
 
     // 5단계: 로그인 시도
     await OneSignal.login(userId);
     lastLoginUserId = userId;
-    logger.info('OneSignal 로그인 성공:', userId);
+    logger.info('OneSignal 로그인 성공:', { userId });
     return true;
   } catch (error: any) {
     const errorMsg = error?.message || '';
@@ -387,7 +393,7 @@ async function safeOneSignalLogin(OneSignal: any, userId: string): Promise<boole
 
     // 기타 409 에러: 로그만 남기고 성공 처리
     if (errorCode === 409 || errorMsg.includes('409') || errorMsg.includes('Conflict')) {
-      logger.warn('OneSignal 로그인 충돌 (409) - 성공으로 간주:', errorMsg);
+      logger.warn('OneSignal 로그인 충돌 (409) - 성공으로 간주:', { errorMsg });
       lastLoginUserId = userId;
       return true;
     }

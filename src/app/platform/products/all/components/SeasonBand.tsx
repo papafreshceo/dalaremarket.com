@@ -15,11 +15,11 @@ export default function SeasonBand({ seasonStart, seasonEnd, className = '' }: S
   // 시즌 날짜가 없으면 플레이스홀더 표시 (디버그용)
   if (!seasonStart || !seasonEnd) {
     return (
-      <div className={`${className}`}>
-        <div className="h-2 w-full rounded-full bg-gray-100" />
-        <div className="mt-1 flex justify-between text-[9px] sm:text-[10px] text-gray-400 select-none px-0.5">
+      <div className={`min-w-0 w-full ${className}`}>
+        <div className="h-[10px] w-full rounded-full bg-gray-100" />
+        <div className="mt-1.5 flex justify-between text-[9px] sm:text-[10px] text-gray-400 select-none">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map((month) => (
-            <span key={month}>{month}</span>
+            <span key={month} className="flex-1 text-center">{month}</span>
           ))}
         </div>
       </div>
@@ -80,7 +80,7 @@ export default function SeasonBand({ seasonStart, seasonEnd, className = '' }: S
   const months = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative min-w-0 w-full ${className}`}>
       {/* 시즌 밴드 */}
       <div
         className="relative"
@@ -88,12 +88,12 @@ export default function SeasonBand({ seasonStart, seasonEnd, className = '' }: S
         onMouseLeave={() => setShowTooltip(false)}
       >
         {/* 배경 바 */}
-        <div className="h-2 w-full rounded-full bg-gray-100 relative">
+        <div className="h-[10px] w-full rounded-full bg-gray-100 relative">
           {/* 활성 시즌 구간 (한 개 또는 두 개) */}
           {seasonBands.map((band, index) => (
             <div
               key={index}
-              className="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-200 hover:shadow-md absolute top-0"
+              className="h-[10px] rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-200 hover:shadow-md absolute top-0"
               style={{
                 width: `${Math.max(band.width, 2)}%`, // 최소 2%
                 left: `${band.start}%`
@@ -115,9 +115,9 @@ export default function SeasonBand({ seasonStart, seasonEnd, className = '' }: S
       </div>
 
       {/* 월 레이블 */}
-      <div className="mt-1 flex justify-between text-[9px] sm:text-[10px] text-gray-400 select-none px-0.5">
+      <div className="mt-1.5 flex justify-between text-[9px] sm:text-[10px] text-gray-400 select-none">
         {months.map((month) => (
-          <span key={month}>{month}</span>
+          <span key={month} className="flex-1 text-center">{month}</span>
         ))}
       </div>
     </div>

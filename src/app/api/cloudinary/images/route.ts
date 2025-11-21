@@ -18,7 +18,25 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
 
     const supabase = await createClientForRouteHandler();
-    let query = supabase.from('cloudinary_images').select('*', { count: 'exact' });
+
+    // products_master와 option_products 조인하여 카테고리 정보 가져오기
+    let query = supabase
+      .from('cloudinary_images')
+      .select(`
+        *,
+        products_master:category_4_id (
+          id,
+          category_1,
+          category_2,
+          category_3,
+          category_4
+        ),
+        option_products:option_product_id (
+          id,
+          option_name,
+          product_master_id
+        )
+      `, { count: 'exact' });
 
     // 필터 적용
     if (category && category !== 'all') {
@@ -49,9 +67,48 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // 데이터 평탄화 (category_3, category_4 정보 추가)
+    // option_products의 product_master_id로 products_master 조회
+    const optionCategoryIds = data
+      ?.filter(img => img.option_products?.product_master_id)
+      .map(img => img.option_products.product_master_id) || [];
+
+    let optionCategoriesMap = new Map();
+    if (optionCategoryIds.length > 0) {
+      const { data: optionCategories } = await supabase
+        .from('products_master')
+        .select('id, category_1, category_2, category_3, category_4')
+        .in('id', optionCategoryIds);
+
+      optionCategories?.forEach(cat => {
+        optionCategoriesMap.set(cat.id, cat);
+      });
+    }
+
+    const flattenedData = data?.map(img => {
+      // category_4_id로 직접 연결된 품목 정보 (품목이미지용)
+      const directCategory = img.products_master;
+
+      // option_product_id로 연결된 옵션상품의 품목 정보
+      const optionCategoryId = img.option_products?.product_master_id;
+      const optionCategory = optionCategoryId ? optionCategoriesMap.get(optionCategoryId) : null;
+
+      // 우선순위: option_product의 카테고리 > 직접 연결된 카테고리
+      const category = optionCategory || directCategory;
+
+      return {
+        ...img,
+        category_1: category?.category_1 || null,
+        category_2: category?.category_2 || null,
+        category_3: category?.category_3 || null,
+        category_4: category?.category_4 || null,
+        option_name: img.option_products?.option_name || null,
+      };
+    });
+
     return NextResponse.json({
       success: true,
-      data,
+      data: flattenedData,
       pagination: {
         page,
         limit,

@@ -43,6 +43,7 @@ export default function AllProductsPage() {
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [selectedImageCategory, setSelectedImageCategory] = useState<{category4: string; category4Id?: number} | null>(null);
   const [categoryImageMap, setCategoryImageMap] = useState<Map<string, string>>(new Map());
+  const [cardOffsetTop, setCardOffsetTop] = useState(0);
 
   const supabase = createClient();
 
@@ -124,8 +125,65 @@ export default function AllProductsPage() {
     // 같은 카드를 다시 클릭하면 닫기, 다른 카드 클릭하면 그 카드만 열기
     if (expandedGroups.has(itemName)) {
       setExpandedGroups(new Set());
+      setCardOffsetTop(0);
     } else {
+      // 현재 스크롤 위치 저장
+      const currentScrollY = window.scrollY;
+
       setExpandedGroups(new Set([itemName]));
+
+      // 클릭한 카드의 위치 계산
+      setTimeout(() => {
+        const cardElement = document.getElementById(`product-card-${itemName}`);
+        if (cardElement) {
+          const cardHeight = cardElement.offsetHeight;
+          const cardTop = cardElement.offsetTop;
+          const containerElement = cardElement.parentElement;
+
+          let offset = 0;
+
+          if (containerElement) {
+            // 옵션상품 개수 파악
+            const groupedData = Object.entries(
+              filteredProducts.reduce((groups, product) => {
+                const itemName = product.category_4 || '기타';
+                if (!groups[itemName]) groups[itemName] = [];
+                groups[itemName].push(product);
+                return groups;
+              }, {} as Record<string, OptionProduct[]>)
+            );
+
+            const selectedGroup = groupedData.find(([name]) => name === itemName);
+            const optionCount = selectedGroup ? selectedGroup[1].length : 0;
+
+            // 옵션상품 전체 높이 계산
+            const estimatedOptionHeight = 60 + (optionCount * 35) + 32;
+
+            // 조건3: 선택한 품목카드 위치에서 카드 2개 높이만큼 위로
+            let desiredOffset = cardTop - (cardHeight * 2);
+
+            // 조건2: 갈색 컨테이너가 아래로 확장되지 않도록 최대 하단 위치 설정
+            const viewportHeight = window.innerHeight;
+            const headerHeight = window.innerWidth >= 768 ? 140 : 105;
+            const maxBottomPosition = viewportHeight - headerHeight;
+
+            // 조건1: 모든 옵션상품이 스크롤 없이 보이려면
+            // (offset + 옵션상품높이) <= 최대하단위치
+            // offset <= 최대하단위치 - 옵션상품높이
+            const maxAllowedOffset = maxBottomPosition - estimatedOptionHeight;
+
+            // 최종 offset: 품목카드 위치를 원하지만, 컨테이너가 아래로 확장되지 않도록 제한
+            offset = Math.min(desiredOffset, maxAllowedOffset);
+          }
+
+          setCardOffsetTop(Math.max(0, offset));
+
+          // 스크롤 위치 복원 (레이아웃 시프트 방지)
+          requestAnimationFrame(() => {
+            window.scrollTo(0, currentScrollY);
+          });
+        }
+      }, 10);
     }
   };
 
@@ -177,84 +235,104 @@ export default function AllProductsPage() {
         zIndex: -1
       }} />
 
-      {/* 헤더 */}
-      <div className="bg-white border-b border-gray-200 sticky top-[35px] md:top-[70px] z-50 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          {/* 카테고리2 필터 */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setSelectedCategory2('all')}
-              className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                selectedCategory2 === 'all'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              전체
-            </button>
-            {category2List.map((category2) => (
-              <button
-                key={category2}
-                onClick={() => setSelectedCategory2(category2)}
-                className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                  selectedCategory2 === category2
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {category2}
-              </button>
-            ))}
-
-            {/* 상태별 통계 배지 */}
-            <div className="ml-4 flex items-center gap-2">
-              {(() => {
-                // 품목별로 중복 제거 후 상태별 개수 계산
-                const uniqueCategories = new Map<string, string>();
-                filteredProducts.forEach(p => {
-                  const category4 = (p as any).category_4;
-                  const status = (p as any).category_supply_status;
-                  if (category4 && !uniqueCategories.has(category4)) {
-                    uniqueCategories.set(category4, status);
-                  }
-                });
-
-                const statusCounts = new Map<string, number>();
-                uniqueCategories.forEach(status => {
-                  if (status) {
-                    statusCounts.set(status, (statusCounts.get(status) || 0) + 1);
-                  }
-                });
-
-                return supplyStatuses
-                  .filter(status => statusCounts.has(status.name))
-                  .map(status => (
-                    <span
-                      key={status.code}
-                      className="px-3 py-1 text-sm font-medium rounded border inline-flex items-center justify-center"
-                      style={{
-                        borderColor: status.color,
-                        color: status.color,
-                        minWidth: '40px'
-                      }}
-                    >
-                      {statusCounts.get(status.name)}
-                    </span>
-                  ));
-              })()}
+      {/* Flex 컨테이너: 사이드바 + 메인 */}
+      <div className="flex" style={{ border: '3px solid red' }}>
+        {/* 왼쪽 사이드바 */}
+        <div className="w-56 bg-gray-50 border-r border-gray-200 sticky top-0 h-screen overflow-y-auto flex-shrink-0" style={{ border: '3px solid blue' }}>
+          <div className="p-3 space-y-6">
+            {/* 카테고리2 필터 */}
+            <div>
+              <h3 className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-2 px-2">카테고리</h3>
+              <div className="space-y-0.5">
+                <button
+                  onClick={() => setSelectedCategory2('all')}
+                  className={`w-full text-left px-2 py-1.5 text-xs transition-all ${
+                    selectedCategory2 === 'all'
+                      ? 'text-gray-900 font-medium bg-white border-l-2 border-gray-900'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-white/50 border-l-2 border-transparent'
+                  }`}
+                >
+                  전체
+                </button>
+                {category2List.map((category2) => (
+                  <button
+                    key={category2}
+                    onClick={() => setSelectedCategory2(category2)}
+                    className={`w-full text-left px-2 py-1.5 text-xs transition-all ${
+                      selectedCategory2 === category2
+                        ? 'text-gray-900 font-medium bg-white border-l-2 border-gray-900'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50 border-l-2 border-transparent'
+                    }`}
+                  >
+                    {category2}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* 검색 및 보기 전환 */}
-            <div className="ml-auto flex items-center gap-3">
+            {/* 상태별 통계 */}
+            <div>
+              <h3 className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-2 px-2">상태별 품목</h3>
+              <div className="space-y-0.5">
+                {(() => {
+                  // 품목별로 중복 제거 후 상태별 개수 계산
+                  const uniqueCategories = new Map<string, string>();
+                  filteredProducts.forEach(p => {
+                    const category4 = (p as any).category_4;
+                    const status = (p as any).category_supply_status;
+                    if (category4 && !uniqueCategories.has(category4)) {
+                      uniqueCategories.set(category4, status);
+                    }
+                  });
+
+                  const statusCounts = new Map<string, number>();
+                  uniqueCategories.forEach(status => {
+                    if (status) {
+                      statusCounts.set(status, (statusCounts.get(status) || 0) + 1);
+                    }
+                  });
+
+                  return supplyStatuses
+                    .filter(status => statusCounts.has(status.name))
+                    .map(status => (
+                      <div
+                        key={status.code}
+                        className="flex items-center justify-between px-2 py-1.5 hover:bg-white/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <div
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ backgroundColor: status.color }}
+                          />
+                          <span className="text-xs text-gray-700">
+                            {status.name}
+                          </span>
+                        </div>
+                        <span className="text-xs font-semibold text-gray-900">
+                          {statusCounts.get(status.name)}
+                        </span>
+                      </div>
+                    ));
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 오른쪽 메인 영역 */}
+        <div className="flex-1 min-w-0" style={{ border: '3px solid green' }}>
+          {/* 헤더 */}
+          <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm" style={{ border: '3px solid orange' }}>
+            <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
               {/* 검색 */}
-              <div className="relative">
+              <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   placeholder="상품명 검색.."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm w-64"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
               </div>
 
@@ -285,11 +363,9 @@ export default function AllProductsPage() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* 컨텐츠 */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {/* 컨텐츠 */}
+          <div className="px-4 sm:px-6 lg:px-8 py-6" style={{ border: '3px solid purple' }}>
         {loading ? (
           <div className="space-y-4">
             {/* 스켈레톤 카드 */}
@@ -433,24 +509,10 @@ export default function AllProductsPage() {
                               return (
                                 <div key={itemName} className="col-span-1 flex">
                               <div
-                                className={`rounded-lg transition-all duration-300 ease-out p-3 flex flex-col gap-2 cursor-pointer hover:shadow-lg w-full ${
-                                  isExpanded ? 'scale-105' : ''
-                                }`}
-                                style={isShipping ? {
-                                  background: '#ffffff',
-                                  border: isExpanded ? '2px solid #ffc0cb' : '1px solid #ffc0cb',
-                                  boxShadow: isExpanded
-                                    ? '0 10px 25px rgba(255, 192, 203, 0.5), 8px 8px 0 rgba(16, 185, 129, 0.3)'
-                                    : '0 1px 3px rgba(0, 0, 0, 0.1), 8px 8px 0 rgba(16, 185, 129, 0.3)',
-                                  transform: isExpanded ? 'translateY(-4px)' : undefined
-                                } : {
-                                  background: isExpanded ? '#ffffff' : '#f3f4f6',
-                                  border: isExpanded ? '2px solid #d1d5db' : '1px solid #d1d5db',
-                                  boxShadow: isExpanded
-                                    ? '0 10px 25px rgba(209, 213, 219, 0.5)'
-                                    : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                  opacity: 1,
-                                  transform: isExpanded ? 'translateY(-4px)' : undefined
+                                className="rounded-lg transition-all duration-300 ease-out p-3 flex flex-col gap-2 cursor-pointer w-full"
+                                style={{
+                                  background: isExpanded ? '#ffffff' : (isShipping ? '#ffffff' : '#f3f4f6'),
+                                  border: `1px solid ${isShipping ? '#ffc0cb' : '#d1d5db'}`
                                 }}
                                 onClick={() => toggleGroup(itemName)}
                               >
@@ -581,7 +643,7 @@ export default function AllProductsPage() {
                                     {groupProducts.map((product) => (
                                       <div
                                         key={product.id}
-                                        className="bg-gray-50 rounded-lg border border-gray-200 p-3 hover:shadow-md transition-all cursor-pointer flex flex-col gap-2"
+                                        className="bg-gray-50 rounded-lg border border-gray-200 p-3 transition-all cursor-pointer flex flex-col gap-2"
                                         onClick={() => handleProductClick(product)}
                                       >
                                         {/* 옵션상품 썸네일 */}
@@ -628,7 +690,9 @@ export default function AllProductsPage() {
           </div>
         ) : (
           // 품목별 그룹화 리스트 뷰 (카드보기와 동일한 형식)
-          <div className="space-y-4">
+          <div className="flex gap-6">
+            {/* 칼럼1: 품목 카드 */}
+            <div className="flex-[8] space-y-0" style={{ border: '3px solid magenta' }}>
             {(() => {
               const groupedData = Object.entries(
                 filteredProducts.reduce((groups, product) => {
@@ -696,96 +760,70 @@ export default function AllProductsPage() {
                     return (
                       <div
                         key={itemName}
-                        className="rounded-lg transition-all duration-300 ease-out"
-                        style={isShipping ? {
-                          background: '#ffffff',
-                          border: '1px solid #ffc0cb',
-                          borderRadius: '0.5rem',
-                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1), 8px 8px 0 rgba(16, 185, 129, 0.3)',
-                          position: 'relative' as const,
-                          transform: 'scale(1)'
-                        } : {
-                          background: '#f3f4f6',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '0.5rem',
-                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                          transform: 'scale(0.9)',
-                          opacity: 0.85
-                        }}
-                        onMouseEnter={(e) => {
-                          if (isShipping) {
-                            e.currentTarget.style.transform = 'scale(1.02) translateY(-4px)';
-                          } else {
-                            e.currentTarget.style.transform = 'scale(0.92) translateY(-4px)';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (isShipping) {
-                            e.currentTarget.style.transform = 'scale(1) translateY(0)';
-                          } else {
-                            e.currentTarget.style.transform = 'scale(0.9) translateY(0)';
-                          }
+                        id={`product-card-${itemName}`}
+                        className="transition-all duration-300 ease-out scroll-mt-[110px] md:scroll-mt-[145px]"
+                        style={{
+                          background: isShipping ? '#ffffff' : '#f3f4f6',
+                          border: `1px solid ${isShipping ? '#ffc0cb' : '#d1d5db'}`
                         }}
                       >
                         {/* 그룹 헤더 */}
                         <div
-                          className={`px-6 py-2 transition-colors cursor-pointer overflow-visible relative ${
+                          className={`px-3 py-1.5 transition-colors cursor-pointer overflow-hidden relative ${
                             !isShipping ? 'hover:bg-gray-50' : ''
                           }`}
                           onClick={() => toggleGroup(itemName)}
                         >
-                          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
-                            {/* 왼쪽: 썸네일 + 품목정보 */}
-                            <div className="flex items-center gap-3">
-                              {/* 품목 대표이미지 썸네일 */}
-                              {(() => {
-                                const categoryThumbnail = categoryImageMap.get(itemName);
-                                if (categoryThumbnail) {
-                                  return (
-                                    <img src={categoryThumbnail} alt={itemName} className="w-16 h-16 aspect-square rounded-lg object-cover flex-shrink-0" />
-                                  );
-                                }
+                          <div className="grid items-center gap-1.5 min-w-0" style={{ gridTemplateColumns: 'minmax(40px, 48px) minmax(60px, 80px) minmax(80px, 120px) minmax(60px, 90px) minmax(100px, 220px) 1fr' }}>
+                            {/* 썸네일 */}
+                            {(() => {
+                              const categoryThumbnail = categoryImageMap.get(itemName);
+                              if (categoryThumbnail) {
                                 return (
-                                  <div className="w-16 h-16 aspect-square rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                    <Package className="w-8 h-8 text-gray-400" />
-                                  </div>
+                                  <img src={categoryThumbnail} alt={itemName} className="w-full aspect-square rounded-lg object-cover" style={{ maxWidth: '48px' }} />
                                 );
-                              })()}
-                              <div className="text-left">
-                                <div className="flex items-baseline gap-2">
-                                  <h3 className="font-semibold text-gray-900">
-                                    {category3 && (
-                                      <span style={{ fontSize: '13px', fontWeight: 'normal' }}>{category3}/ </span>
-                                    )}
-                                    <span style={{ fontSize: '18px' }}>{category4}</span>
-                                  </h3>
-                                  <p className="text-gray-500" style={{ fontSize: '13px' }}>{groupProducts.length}개 옵션상품</p>
+                              }
+                              return (
+                                <div className="w-full aspect-square rounded-lg bg-gray-100 flex items-center justify-center" style={{ maxWidth: '48px' }}>
+                                  <Package className="w-5 h-5 text-gray-400" />
                                 </div>
-                              </div>
+                              );
+                            })()}
+
+                            {/* 카테고리3 */}
+                            <div className="text-[10px] text-gray-600 truncate min-w-0">
+                              {category3 || '-'}
                             </div>
 
-                            {/* 중앙: 시즌밴드 */}
-                            <div className="text-left flex items-center gap-6">
-                              {/* 시즌밴드 */}
-                              <div className="flex-1 max-w-xs">
-                                <SeasonBand
-                                  seasonStart={(groupProducts[0] as any).season_start_date}
-                                  seasonEnd={(groupProducts[0] as any).season_end_date}
-                                />
-                              </div>
+                            {/* 카테고리4 (품목) */}
+                            <h3 className="font-semibold text-gray-900 text-xs truncate min-w-0">
+                              {category4}
+                            </h3>
+
+                            {/* 옵션상품 개수 */}
+                            <p className="text-[10px] text-gray-500 whitespace-nowrap">
+                              {groupProducts.length}개 옵션
+                            </p>
+
+                            {/* 시즌밴드 */}
+                            <div className="min-w-0 overflow-hidden w-full">
+                              <SeasonBand
+                                seasonStart={(groupProducts[0] as any).season_start_date}
+                                seasonEnd={(groupProducts[0] as any).season_end_date}
+                              />
                             </div>
 
-                            {/* 오른쪽: 배지 + 펼치기 버튼 */}
-                            <div className="flex items-center gap-1.5">
+                            {/* 배지 + 펼치기 버튼 */}
+                            <div className="flex items-center gap-1 justify-end overflow-hidden min-w-0">
                             {/* 배지 */}
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1 flex-shrink-0">
                               {(groupProducts[0] as any).is_best && (
-                                <span className="px-1.5 py-0.5 text-[11px] font-normal border border-gray-400 text-gray-600 rounded">
+                                <span className="px-1.5 py-0.5 text-[9px] font-normal border border-gray-400 text-gray-600 rounded whitespace-nowrap">
                                   BEST
                                 </span>
                               )}
                               {(groupProducts[0] as any).is_recommended && (
-                                <span className="px-1.5 py-0.5 text-[11px] font-normal border border-gray-400 text-gray-600 rounded">
+                                <span className="px-1.5 py-0.5 text-[9px] font-normal border border-gray-400 text-gray-600 rounded whitespace-nowrap">
                                   추천
                                 </span>
                               )}
@@ -801,7 +839,7 @@ export default function AllProductsPage() {
 
                               return (
                                 <span
-                                  className="px-1.5 py-0.5 text-[11px] font-normal border rounded"
+                                  className="px-1.5 py-0.5 text-[9px] font-normal border rounded whitespace-nowrap flex-shrink-0"
                                   style={{
                                     borderColor: statusInfo.color,
                                     color: statusInfo.color
@@ -863,118 +901,181 @@ export default function AllProductsPage() {
                             </div>
                           </div>
                         </div>
-
-                        {/* 그룹 컨텐츠 - 테이블 형태 */}
-                        {isExpanded && (
-                          <div className="border-t border-gray-200 bg-gray-50">
-                            <div className="divide-y divide-gray-200">
-                              {groupProducts.map((product) => (
-                                <div
-                                  key={product.id}
-                                  className="pl-20 pr-6 py-3 hover:bg-gray-100 transition-colors cursor-pointer flex items-center gap-4"
-                                  onClick={() => handleProductClick(product)}
-                                >
-                                  {/* 썸네일 */}
-                                  {product.thumbnail_url ? (
-                                    <img
-                                      src={product.thumbnail_url}
-                                      alt={product.option_name}
-                                      className="w-14 h-14 aspect-square rounded object-cover flex-shrink-0"
-                                    />
-                                  ) : (
-                                    <div className="w-14 h-14 aspect-square rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                      <Package className="w-7 h-7 text-gray-400" />
-                                    </div>
-                                  )}
-
-                                  {/* 옵션상품 */}
-                                  <div className="w-48 flex-shrink-0">
-                                    <h4 className="text-sm font-medium text-gray-900 truncate">
-                                      {product.option_name}
-                                    </h4>
-                                  </div>
-
-                                  {/* 규격1 */}
-                                  <div className="w-24 flex-shrink-0 text-center">
-                                    <p className="text-sm text-gray-700">
-                                      {(product as any).spec_1 || '-'}
-                                    </p>
-                                  </div>
-
-                                  {/* 규격2 */}
-                                  <div className="w-24 flex-shrink-0 text-center">
-                                    <p className="text-sm text-gray-700">
-                                      {(product as any).spec_2 || '-'}
-                                    </p>
-                                  </div>
-
-                                  {/* 규격3 */}
-                                  <div className="w-24 flex-shrink-0 text-center">
-                                    <p className="text-sm text-gray-700">
-                                      {(product as any).spec_3 || '-'}
-                                    </p>
-                                  </div>
-
-                                  {/* 셀러공급가 */}
-                                  <div className="w-28 flex-shrink-0 text-right">
-                                    <p className="text-sm font-semibold text-gray-900">
-                                      {product.seller_supply_price?.toLocaleString() || '-'}원
-                                    </p>
-                                  </div>
-
-                                  {/* 배송비 */}
-                                  <div className="w-24 flex-shrink-0 text-right">
-                                    <p className="text-sm text-gray-700">
-                                      {product.shipping_cost != null ? `${product.shipping_cost.toLocaleString()}원` : '-'}
-                                    </p>
-                                  </div>
-
-                                  {/* 가격차트 버튼 */}
-                                  <div className="w-10 flex-shrink-0 flex justify-center">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleShowPriceChart(product);
-                                      }}
-                                      className="p-1.5 hover:bg-gray-200 rounded transition-colors"
-                                      title="가격 차트"
-                                    >
-                                      <TrendingUp className="w-4 h-4 text-blue-600" />
-                                    </button>
-                                  </div>
-
-                                  {/* 상태 */}
-                                  <div className="w-20 flex-shrink-0 flex justify-center">
-                                    {(() => {
-                                      const status = (product as any).status;
-                                      if (!status) return <span className="text-xs text-gray-400">-</span>;
-
-                                      const statusInfo = supplyStatuses.find(s => s.code === status);
-                                      if (!statusInfo) return <span className="text-xs text-gray-400">-</span>;
-
-                                      return (
-                                        <span
-                                          className="px-2 py-0.5 text-[10px] font-normal rounded-full text-white whitespace-nowrap"
-                                          style={{ backgroundColor: statusInfo.color }}
-                                        >
-                                          {statusInfo.name}
-                                        </span>
-                                      );
-                                    })()}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
                 </>
               );
             })()}
+            </div>
+
+            {/* 칼럼2: 선택된 품목의 옵션상품 표시 */}
+            <div
+              className="flex-[7] self-start"
+              style={{
+                border: '3px solid yellow',
+                backgroundColor: 'rgba(255, 255, 0, 0.05)',
+                paddingTop: `${cardOffsetTop}px`
+              }}
+            >
+              <div
+                key={Array.from(expandedGroups)[0] || 'empty'}
+                className="overflow-visible"
+                style={{
+                  animation: 'slideInFromLeft 0.4s ease-out'
+                }}
+              >
+                <style jsx>{`
+                  @keyframes slideInFromLeft {
+                    from {
+                      opacity: 0;
+                      transform: translateX(-30px);
+                    }
+                    to {
+                      opacity: 1;
+                      transform: translateX(0);
+                    }
+                  }
+                `}</style>
+              {(() => {
+                // 선택된 품목 찾기
+                const expandedItem = Array.from(expandedGroups)[0];
+                if (!expandedItem) {
+                  return (
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                      <div className="text-center">
+                        <Package className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                        <p className="text-sm">품목 카드를 클릭하여 옵션상품을 확인하세요</p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // groupedData에서 해당 품목의 옵션상품 찾기
+                const groupedData = Object.entries(
+                  filteredProducts.reduce((groups, product) => {
+                    const itemName = product.category_4 || '기타';
+                    if (!groups[itemName]) {
+                      groups[itemName] = [];
+                    }
+                    groups[itemName].push(product);
+                    return groups;
+                  }, {} as Record<string, OptionProduct[]>)
+                );
+
+                const selectedGroup = groupedData.find(([itemName]) => itemName === expandedItem);
+                if (!selectedGroup) return null;
+
+                const [itemName, groupProducts] = selectedGroup;
+
+                return (
+                  <div className="p-4">
+                    {/* 헤더 */}
+                    <div className="mb-3 pb-2 border-b border-gray-200 flex items-center gap-2">
+                      <h3 className="text-base font-semibold text-gray-900 truncate">{itemName}</h3>
+                      <span className="text-xs text-gray-500 whitespace-nowrap">{groupProducts.length}개 옵션상품</span>
+                    </div>
+
+                    {/* 옵션상품 그리드 테이블 */}
+                    <div className="space-y-0">
+                      {groupProducts.map((product) => (
+                        <div
+                          key={product.id}
+                          className="bg-white border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer overflow-hidden"
+                          onClick={() => handleProductClick(product)}
+                        >
+                          <div className="grid items-center gap-1.5 px-2 py-1" style={{ gridTemplateColumns: 'minmax(35px, 40px) minmax(100px, 1fr) minmax(45px, 60px) minmax(45px, 60px) minmax(45px, 60px) minmax(60px, 80px) minmax(45px, 60px) minmax(70px, 90px)' }}>
+                            {/* 썸네일 */}
+                            {product.thumbnail_url ? (
+                              <img
+                                src={product.thumbnail_url}
+                                alt={product.option_name}
+                                className="w-full aspect-square rounded object-cover"
+                                style={{ maxWidth: '40px' }}
+                              />
+                            ) : (
+                              <div className="w-full aspect-square rounded bg-gray-100 flex items-center justify-center" style={{ maxWidth: '40px' }}>
+                                <Package className="w-4 h-4 text-gray-400" />
+                              </div>
+                            )}
+
+                            {/* 옵션명 */}
+                            <div className="text-xs font-medium text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
+                              {product.option_name}
+                            </div>
+
+                            {/* 규격1 */}
+                            <div className="text-[10px] text-gray-600 text-center truncate min-w-0">
+                              {(product as any).spec_1 || '-'}
+                            </div>
+
+                            {/* 규격2 */}
+                            <div className="text-[10px] text-gray-600 text-center truncate min-w-0">
+                              {(product as any).spec_2 || '-'}
+                            </div>
+
+                            {/* 규격3 */}
+                            <div className="text-[10px] text-gray-600 text-center truncate min-w-0">
+                              {(product as any).spec_3 || '-'}
+                            </div>
+
+                            {/* 공급가 */}
+                            <div className="text-xs font-semibold text-gray-900 text-right truncate min-w-0">
+                              {product.seller_supply_price?.toLocaleString() || '-'}원
+                            </div>
+
+                            {/* 배송비 */}
+                            <div className="text-[10px] text-gray-600 text-right truncate min-w-0">
+                              {product.shipping_cost != null ? `${product.shipping_cost.toLocaleString()}원` : '-'}
+                            </div>
+
+                            {/* 상태 & 버튼 */}
+                            <div className="flex items-center justify-end gap-1 flex-shrink-0">
+                              {(() => {
+                                const status = (product as any).status;
+                                const statusInfo = supplyStatuses.find(s => s.code === status);
+                                return statusInfo ? (
+                                  <span
+                                    className="px-1.5 py-0.5 text-[9px] font-medium rounded-full text-white whitespace-nowrap"
+                                    style={{ backgroundColor: statusInfo.color }}
+                                  >
+                                    {statusInfo.name}
+                                  </span>
+                                ) : null;
+                              })()}
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleShowPriceChart(product);
+                                }}
+                                className="p-0.5 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
+                                title="가격 차트"
+                              >
+                                <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+              </div>
+            </div>
+
+            {/* 칼럼3: 새로운 칼럼 */}
+            <div className="flex-[5] sticky top-[70px] h-[calc(100vh-70px)] overflow-y-auto self-start" style={{ border: '3px solid lime', backgroundColor: 'rgba(0, 255, 0, 0.05)' }}>
+              <div className="p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">칼럼 3</h3>
+                <p className="text-sm text-gray-500">여기에 원하는 컨텐츠를 추가하세요</p>
+              </div>
+            </div>
           </div>
         )}
+          </div>
+        </div>
       </div>
 
       {/* 상세보기 모달 */}

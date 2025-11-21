@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import MessagesPanel from '@/components/MessagesPanel'
 
 // OneSignal 알림 타입 정의
 interface Notification {
@@ -128,7 +127,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string
 }
 
 // 알림 탭 타입 정의
-type NotificationTab = 'all' | 'orders' | 'announcements' | 'payments' | 'products' | 'messages' | 'chat' | 'others'
+type NotificationTab = 'all' | 'orders' | 'announcements' | 'payments' | 'products' | 'messages' | 'others'
 
 // 알림 탭별 포함되는 타입들
 const TAB_TYPE_MAPPING: Record<NotificationTab, string[]> = {
@@ -138,7 +137,6 @@ const TAB_TYPE_MAPPING: Record<NotificationTab, string[]> = {
   payments: ['deposit_confirm'],
   products: ['harvest_news', 'price_change', 'out_of_stock'],
   messages: ['new_message', 'comment_reply'],
-  chat: [], // 메시지 탭 (알림 없음, 메시징 패널만 표시)
   others: ['admin_support_post', 'admin_new_member', 'organization_invitation', 'system_notice'],
 }
 
@@ -158,7 +156,6 @@ function NotificationsPageContent() {
     payments: 0,
     products: 0,
     messages: 0,
-    chat: 0,
     others: 0,
   })
 
@@ -191,7 +188,6 @@ function NotificationsPageContent() {
           payments: 0,
           products: 0,
           messages: 0,
-          chat: 0,
           others: 0,
         }
 
@@ -225,7 +221,7 @@ function NotificationsPageContent() {
   // URL 쿼리 파라미터에서 탭 설정
   useEffect(() => {
     const tab = searchParams.get('tab')
-    if (tab && ['all', 'orders', 'announcements', 'payments', 'products', 'messages', 'chat', 'others'].includes(tab)) {
+    if (tab && ['all', 'orders', 'announcements', 'payments', 'products', 'messages', 'others'].includes(tab)) {
       setActiveTab(tab as NotificationTab)
     }
   }, [searchParams])
@@ -334,7 +330,6 @@ function NotificationsPageContent() {
         payments: 0,
         products: 0,
         messages: 0,
-        chat: 0,
         others: 0,
       })
 
@@ -615,16 +610,6 @@ function NotificationsPageContent() {
             )}
           </button>
           <button
-            onClick={() => setActiveTab('chat')}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-              activeTab === 'chat'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-            }`}
-          >
-            메시지
-          </button>
-          <button
             onClick={() => setActiveTab('others')}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
               activeTab === 'others'
@@ -642,9 +627,8 @@ function NotificationsPageContent() {
         </div>
       </div>
 
-      {/* 읽음 필터 및 액션 (메시지 탭에서는 숨김) */}
-      {activeTab !== 'chat' && (
-        <div className="flex items-center justify-between mb-6">
+      {/* 읽음 필터 및 액션 */}
+      <div className="flex items-center justify-between mb-6">
           <div className="flex gap-2">
             <button
               onClick={() => setReadFilter('all')}
@@ -687,13 +671,9 @@ function NotificationsPageContent() {
             )}
           </div>
         </div>
-      )}
 
-      {/* 메시지 패널 또는 알림 목록 */}
-      {activeTab === 'chat' ? (
-        <MessagesPanel />
-      ) : (
-        <div className="space-y-2">
+      {/* 알림 목록 */}
+      <div className="space-y-2">
           {loading ? (
             <div className="text-center py-12 text-gray-500">
               로딩 중...
@@ -849,8 +829,7 @@ function NotificationsPageContent() {
             )
           })
         )}
-        </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -184,30 +184,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      // 중복 키 에러인 경우 UPDATE로 재시도 (race condition 처리)
+      // 중복 키 에러인 경우 성공으로 처리 (이미 등록됨)
       if (error.code === '23505' || error.message?.includes('duplicate key')) {
-        logger.info('Player ID 중복 감지 (Race Condition), UPDATE로 재시도', { playerId: player_id });
-
-        const { data: updateData, error: updateError } = await adminSupabase
-          .from('onesignal_player_ids')
-          .update({
-            user_id: user.id,
-            last_active_at: new Date().toISOString(),
-            is_active: true,
-          })
-          .eq('player_id', player_id)
-          .select()
-          .single();
-
-        if (updateError) {
-          logger.error('Player ID UPDATE 실패', updateError);
-          return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
-        }
+        logger.info('Player ID 중복 감지 - 성공으로 처리', { playerId: player_id });
 
         return NextResponse.json({
           success: true,
-          message: 'Player ID가 업데이트되었습니다.',
-          data: updateData,
+          message: 'Player ID가 이미 등록되어 있습니다.',
+          data: { player_id, user_id: user.id }, // 가짜 데이터 반환
         });
       }
 

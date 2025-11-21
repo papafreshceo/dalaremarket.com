@@ -144,7 +144,7 @@ export default function PlatformSidebar() {
       submenu: [
         { path: '/platform/products/all', text: '전체상품' },
         { path: '/platform/calendar', text: '상품캘린더' },
-        { path: '/gallery', text: '이미지다운로드' }
+        { path: '/platform/gallery', text: '이미지다운로드' }
       ]
     },
     {
@@ -174,33 +174,13 @@ export default function PlatformSidebar() {
   const notificationMenuItems: MenuItem[] = [
     {
       path: '/platform/notifications',
-      text: '발주/주문',
-      icon: icons.orders
-    },
-    {
-      path: '/platform/notifications/payment',
-      text: '입금/정산',
-      icon: icons.won
-    },
-    {
-      path: '/platform/notifications/products',
-      text: '상품정보',
-      icon: icons.products
-    },
-    {
-      path: '/platform/notifications/announcements',
-      text: '공지알림',
+      text: '사이트알림',
       icon: icons.notice
     },
     {
       path: '/platform/notifications/messages',
       text: '메세지',
       icon: icons.message
-    },
-    {
-      path: '/platform/notifications/etc',
-      text: '기타',
-      icon: icons.fileText
     }
   ];
 
@@ -288,7 +268,7 @@ export default function PlatformSidebar() {
     if (path === '/platform') {
       return pathname?.startsWith('/platform/products/') ||
              pathname === '/platform/calendar' ||
-             pathname === '/gallery';
+             pathname === '/platform/gallery';
     }
 
     // 다른 경로는 하위 경로 매칭

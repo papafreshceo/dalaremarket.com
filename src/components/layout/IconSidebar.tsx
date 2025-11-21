@@ -148,6 +148,38 @@ export default function IconSidebar() {
     };
   }, [currentUserId]);
 
+  // 페이지 로드 시 현재 경로에 맞는 메뉴 상태 설정
+  useEffect(() => {
+    if (pathname.startsWith('/platform/notifications')) {
+      setActiveIconMenu('notifications');
+      setIsSidebarVisible(true);
+    } else if (pathname.startsWith('/platform/deposit') || pathname === '/platform/wallet') {
+      setActiveIconMenu('deposit');
+      setIsSidebarVisible(true);
+    } else if (pathname.startsWith('/platform/community') || pathname === '/platform/ranking' || pathname === '/platform/seller-feed') {
+      setActiveIconMenu('community');
+      setIsSidebarVisible(true);
+    } else if (pathname.startsWith('/platform/subscription') || pathname === '/platform/pricing' || pathname === '/platform/winwin') {
+      setActiveIconMenu('subscription');
+      setIsSidebarVisible(true);
+    } else if (pathname.startsWith('/platform/announcements') || pathname === '/platform/notice') {
+      setActiveIconMenu('announcements');
+      setIsSidebarVisible(true);
+    } else if (pathname === '/platform/tools') {
+      setActiveIconMenu('tools');
+      setIsSidebarVisible(true);
+    } else if (pathname === '/platform/settings') {
+      setActiveIconMenu('settings');
+      setIsSidebarVisible(true);
+    } else if (pathname === '/platform' || pathname.startsWith('/platform/products') || pathname === '/platform/calendar' || pathname === '/gallery' || pathname === '/platform/orders') {
+      // 홈 및 기본 메뉴: activeIconMenu는 null
+      setActiveIconMenu(null);
+      // localStorage에서 사이드바 표시 상태 가져오기
+      const savedVisible = localStorage.getItem('platformSidebarVisible');
+      setIsSidebarVisible(savedVisible === 'true');
+    }
+  }, [pathname]);
+
   // 컴포넌트 언마운트 시 정리
   useEffect(() => {
     return () => {

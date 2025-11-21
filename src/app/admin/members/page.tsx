@@ -569,7 +569,7 @@ export default function MembersPage() {
   };
 
   return (
-    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
+    <div style={{ maxWidth: '100%', margin: '0 auto', padding: '24px' }}>
       {/* 헤더 */}
       <div style={{
         display: 'flex',
@@ -800,202 +800,202 @@ export default function MembersPage() {
                 ) : (
                   paginatedMembers.map((member, index) => {
                     return (
-                    <tr key={member.member_id} style={{ borderBottom: '1px solid #dee2e6' }}>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px', fontWeight: '500' }}>
-                          {(currentPage - 1) * itemsPerPage + index + 1}
-                        </div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <button
-                          onClick={() => handleImpersonate(member.id, member.email)}
-                          style={{
-                            padding: '4px 8px',
-                            background: '#3b82f6',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                            transition: 'all 0.2s',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#2563eb';
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#3b82f6';
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
-                        >
-                          전환
-                        </button>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px', fontWeight: '500' }}>{member.seller_code || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px', fontWeight: '500' }}>{member.business_name || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '14px', fontWeight: '500' }}>{member.email}</span>
-                          {(() => {
-                            const createdDate = new Date(member.created_at);
-                            const now = new Date();
-                            const diffDays = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-                            return diffDays <= 7 ? (
-                              <span style={{
-                                fontSize: '10px',
-                                fontWeight: '700',
-                                color: '#ef4444',
-                                background: '#fee2e2',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                border: '1px solid #fecaca'
-                              }}>
-                                NEW
-                              </span>
-                            ) : null;
-                          })()}
-                        </div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.name || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.profile_name || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.business_number || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.phone || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '12px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={member.business_address || '-'}>
-                          {member.business_address || '-'}
-                        </div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        {getOrgRoleBadge(member.org_role)}
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                          {/* 현재 등급 아이콘 */}
-                          {member.tier && (
-                            <div style={{
-                              width: '24px',
-                              height: '24px',
-                              color: (() => {
-                                const tierColors: Record<string, string> = {
-                                  'light': '#7BE9FF',
-                                  'standard': '#4BB3FF',
-                                  'advance': '#B05CFF',
-                                  'elite': '#24E3A8',
-                                  'legend': '#FFD447'
-                                };
-                                return tierColors[member.tier.toLowerCase()] || '#6b7280';
-                              })()
-                            }}>
-                              {(() => {
-                                const tier = member.tier.toLowerCase();
-                                if (tier === 'light') return (
-                                  <svg viewBox="0 0 24 24" style={{ width: '100%', height: '100%' }}>
-                                    <path d="M12 2 C9 6 6 9 6 13 C6 16.5 8.5 20 12 20 C15.5 20 18 16.5 18 13 C18 9 15 6 12 2 Z" fill="currentColor" opacity="0.9"/>
-                                    <ellipse cx="10" cy="10" rx="2" ry="3" fill="currentColor" opacity="0.3"/>
-                                  </svg>
-                                );
-                                if (tier === 'standard') return (
-                                  <svg viewBox="0 0 24 24" style={{ width: '100%', height: '100%' }}>
-                                    <path d="M12 2 L5 6 L5 12 C5 16.5 8 20 12 22 C16 20 19 16.5 19 12 L19 6 Z" fill="currentColor" opacity="0.9"/>
-                                    <path d="M12 4 L7 7 L7 12 C7 15.5 9.5 18.5 12 20 C14.5 18.5 17 15.5 17 12 L17 7 Z" fill="currentColor" opacity="0.4"/>
-                                  </svg>
-                                );
-                                if (tier === 'advance') return (
-                                  <svg viewBox="0 0 24 24" style={{ width: '100%', height: '100%' }}>
-                                    <path d="M12 2C12 2 9 6 9 10v7l3 3 3-3v-7C15 6 12 2 12 2z" fill="currentColor"/>
-                                    <path d="M9 12L6 14v4l3-2v-4z" fill="currentColor" opacity="0.7"/>
-                                    <path d="M15 12l3 2v4l-3-2v-4z" fill="currentColor" opacity="0.7"/>
-                                    <circle cx="12" cy="8" r="1.5" fill="currentColor" opacity="0.3"/>
-                                    <path d="M10 20l-1 2 1-1.5z" fill="currentColor" opacity="0.5"/>
-                                    <path d="M12 20v3l0-2z" fill="currentColor" opacity="0.6"/>
-                                    <path d="M14 20l1 2-1-1.5z" fill="currentColor" opacity="0.5"/>
-                                  </svg>
-                                );
-                                if (tier === 'elite') return (
-                                  <svg viewBox="0 0 24 24" style={{ width: '100%', height: '100%' }}>
-                                    <path d="M12 2l2.5 5.5 6 .9-4.3 4.2 1 6-5.2-3-5.2 3 1-6-4.3-4.2 6-.9L12 2Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
-                                  </svg>
-                                );
-                                if (tier === 'legend') return (
-                                  <svg viewBox="0 0 24 24" style={{ width: '100%', height: '100%' }}>
-                                    <path d="M4 16h16v2H4v-2z" fill="currentColor" opacity="0.9"/>
-                                    <path d="M5 8l2.5 3 2-4.5 2.5 4.5 2.5-4.5 2 4.5 2.5-3v8H5v-8z" fill="currentColor"/>
-                                    <circle cx="12" cy="6.5" r="1.5" fill="currentColor" opacity="0.4"/>
-                                    <circle cx="8" cy="9" r="1" fill="currentColor" opacity="0.4"/>
-                                    <circle cx="16" cy="9" r="1" fill="currentColor" opacity="0.4"/>
-                                    <path d="M7 7l.5-1.5L8 7z" fill="currentColor" opacity="0.8"/>
-                                    <path d="M11.5 4l.5-2 .5 2z" fill="currentColor" opacity="0.8"/>
-                                    <path d="M16 7l.5-1.5L17 7z" fill="currentColor" opacity="0.8"/>
-                                  </svg>
-                                );
-                                return null;
-                              })()}
-                            </div>
-                          )}
-
-                          {/* 등급 설정 드롭다운 */}
-                          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '6px' }}>
-                            <select
-                              value={member.tier?.toLowerCase() || ''}
-                              onChange={(e) => handleSetTier(member.id, e.target.value || null)}
-                              style={{
-                                padding: '6px 8px',
-                                border: member.manual_tier ? '2px solid #f59e0b' : '1px solid #dee2e6',
-                                borderRadius: '6px',
-                                fontSize: '13px',
-                                fontWeight: member.manual_tier ? '700' : '500',
-                                background: member.manual_tier ? '#fffbeb' : 'white',
-                                cursor: 'pointer',
-                                color: member.manual_tier ? '#f59e0b' : '#111827',
-                              }}
-                            >
-                              <option value="">자동</option>
-                              <option value="light">LIGHT</option>
-                              <option value="standard">STANDARD</option>
-                              <option value="advance">ADVANCE</option>
-                              <option value="elite">ELITE</option>
-                              <option value="legend">LEGEND</option>
-                            </select>
-                            {member.manual_tier && (
-                              <span style={{
-                                fontSize: '10px',
-                                color: '#f59e0b',
-                                fontWeight: '600',
-                                background: '#fef3c7',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                whiteSpace: 'nowrap',
-                              }}>
-                                수동
-                              </span>
-                            )}
+                      <tr key={member.member_id} style={{ borderBottom: '1px solid #dee2e6' }}>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px', fontWeight: '500' }}>
+                            {(currentPage - 1) * itemsPerPage + index + 1}
                           </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        {getUserRoleBadge(member.user_role)}
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        {getProviderBadge(member.last_login_provider)}
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#10b981' }}>{member.cash_balance?.toLocaleString() || '0'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <button
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleImpersonate(member.id, member.email)}
+                            style={{
+                              padding: '4px 8px',
+                              background: '#3b82f6',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#2563eb';
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#3b82f6';
+                              e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                          >
+                            전환
+                          </button>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px', fontWeight: '500' }}>{member.seller_code || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px', fontWeight: '500' }}>{member.business_name || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: '500' }}>{member.email}</span>
+                            {(() => {
+                              const createdDate = new Date(member.created_at);
+                              const now = new Date();
+                              const diffDays = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+                              return diffDays <= 7 ? (
+                                <span style={{
+                                  fontSize: '10px',
+                                  fontWeight: '700',
+                                  color: '#ef4444',
+                                  background: '#fee2e2',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #fecaca'
+                                }}>
+                                  NEW
+                                </span>
+                              ) : null;
+                            })()}
+                          </div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px' }}>{member.name || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px' }}>{member.profile_name || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px' }}>{member.business_number || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px' }}>{member.phone || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '12px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={member.business_address || '-'}>
+                            {member.business_address || '-'}
+                          </div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          {getOrgRoleBadge(member.org_role)}
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                            {/* 현재 등급 아이콘 */}
+                            {member.tier && (
+                              <div style={{
+                                width: '24px',
+                                height: '24px',
+                                color: (() => {
+                                  const tierColors: Record<string, string> = {
+                                    'light': '#7BE9FF',
+                                    'standard': '#4BB3FF',
+                                    'advance': '#B05CFF',
+                                    'elite': '#24E3A8',
+                                    'legend': '#FFD447'
+                                  };
+                                  return tierColors[member.tier.toLowerCase()] || '#6b7280';
+                                })()
+                              }}>
+                                {(() => {
+                                  const tier = member.tier.toLowerCase();
+                                  if (tier === 'light') return (
+                                    <svg viewBox="0 0 24 24" style={{ width: '100%', height: '100%' }}>
+                                      <path d="M12 2 C9 6 6 9 6 13 C6 16.5 8.5 20 12 20 C15.5 20 18 16.5 18 13 C18 9 15 6 12 2 Z" fill="currentColor" opacity="0.9" />
+                                      <ellipse cx="10" cy="10" rx="2" ry="3" fill="currentColor" opacity="0.3" />
+                                    </svg>
+                                  );
+                                  if (tier === 'standard') return (
+                                    <svg viewBox="0 0 24 24" style={{ width: '100%', height: '100%' }}>
+                                      <path d="M12 2 L5 6 L5 12 C5 16.5 8 20 12 22 C16 20 19 16.5 19 12 L19 6 Z" fill="currentColor" opacity="0.9" />
+                                      <path d="M12 4 L7 7 L7 12 C7 15.5 9.5 18.5 12 20 C14.5 18.5 17 15.5 17 12 L17 7 Z" fill="currentColor" opacity="0.4" />
+                                    </svg>
+                                  );
+                                  if (tier === 'advance') return (
+                                    <svg viewBox="0 0 24 24" style={{ width: '100%', height: '100%' }}>
+                                      <path d="M12 2C12 2 9 6 9 10v7l3 3 3-3v-7C15 6 12 2 12 2z" fill="currentColor" />
+                                      <path d="M9 12L6 14v4l3-2v-4z" fill="currentColor" opacity="0.7" />
+                                      <path d="M15 12l3 2v4l-3-2v-4z" fill="currentColor" opacity="0.7" />
+                                      <circle cx="12" cy="8" r="1.5" fill="currentColor" opacity="0.3" />
+                                      <path d="M10 20l-1 2 1-1.5z" fill="currentColor" opacity="0.5" />
+                                      <path d="M12 20v3l0-2z" fill="currentColor" opacity="0.6" />
+                                      <path d="M14 20l1 2-1-1.5z" fill="currentColor" opacity="0.5" />
+                                    </svg>
+                                  );
+                                  if (tier === 'elite') return (
+                                    <svg viewBox="0 0 24 24" style={{ width: '100%', height: '100%' }}>
+                                      <path d="M12 2l2.5 5.5 6 .9-4.3 4.2 1 6-5.2-3-5.2 3 1-6-4.3-4.2 6-.9L12 2Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                    </svg>
+                                  );
+                                  if (tier === 'legend') return (
+                                    <svg viewBox="0 0 24 24" style={{ width: '100%', height: '100%' }}>
+                                      <path d="M4 16h16v2H4v-2z" fill="currentColor" opacity="0.9" />
+                                      <path d="M5 8l2.5 3 2-4.5 2.5 4.5 2.5-4.5 2 4.5 2.5-3v8H5v-8z" fill="currentColor" />
+                                      <circle cx="12" cy="6.5" r="1.5" fill="currentColor" opacity="0.4" />
+                                      <circle cx="8" cy="9" r="1" fill="currentColor" opacity="0.4" />
+                                      <circle cx="16" cy="9" r="1" fill="currentColor" opacity="0.4" />
+                                      <path d="M7 7l.5-1.5L8 7z" fill="currentColor" opacity="0.8" />
+                                      <path d="M11.5 4l.5-2 .5 2z" fill="currentColor" opacity="0.8" />
+                                      <path d="M16 7l.5-1.5L17 7z" fill="currentColor" opacity="0.8" />
+                                    </svg>
+                                  );
+                                  return null;
+                                })()}
+                              </div>
+                            )}
+
+                            {/* 등급 설정 드롭다운 */}
+                            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '6px' }}>
+                              <select
+                                value={member.tier?.toLowerCase() || ''}
+                                onChange={(e) => handleSetTier(member.id, e.target.value || null)}
+                                style={{
+                                  padding: '6px 8px',
+                                  border: member.manual_tier ? '2px solid #f59e0b' : '1px solid #dee2e6',
+                                  borderRadius: '6px',
+                                  fontSize: '13px',
+                                  fontWeight: member.manual_tier ? '700' : '500',
+                                  background: member.manual_tier ? '#fffbeb' : 'white',
+                                  cursor: 'pointer',
+                                  color: member.manual_tier ? '#f59e0b' : '#111827',
+                                }}
+                              >
+                                <option value="">자동</option>
+                                <option value="light">LIGHT</option>
+                                <option value="standard">STANDARD</option>
+                                <option value="advance">ADVANCE</option>
+                                <option value="elite">ELITE</option>
+                                <option value="legend">LEGEND</option>
+                              </select>
+                              {member.manual_tier && (
+                                <span style={{
+                                  fontSize: '10px',
+                                  color: '#f59e0b',
+                                  fontWeight: '600',
+                                  background: '#fef3c7',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  whiteSpace: 'nowrap',
+                                }}>
+                                  수동
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          {getUserRoleBadge(member.user_role)}
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          {getProviderBadge(member.last_login_provider)}
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px', fontWeight: '600', color: '#10b981' }}>{member.cash_balance?.toLocaleString() || '0'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <button
                             onClick={() => openCashModal(member)}
                             style={{
                               padding: '4px 8px',
@@ -1017,12 +1017,12 @@ export default function MembersPage() {
                           >
                             지급
                           </button>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#8b5cf6' }}>{member.credit_balance?.toLocaleString() || '0'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <button
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px', fontWeight: '600', color: '#8b5cf6' }}>{member.credit_balance?.toLocaleString() || '0'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <button
                             onClick={() => openCreditModal(member)}
                             style={{
                               padding: '4px 8px',
@@ -1044,43 +1044,43 @@ export default function MembersPage() {
                           >
                             지급
                           </button>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.bank_name || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.account_number || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.account_holder || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '12px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={member.business_email || '-'}>
-                          {member.business_email || '-'}
-                        </div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.representative_name || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.representative_phone || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.manager_name || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.manager_phone || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.store_name || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px' }}>{member.store_phone || '-'}</div>
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'center', fontSize: '14px' }}>
-                        {formatDate(member.created_at)}
-                      </td>
-                    </tr>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px' }}>{member.bank_name || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px' }}>{member.account_number || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px' }}>{member.account_holder || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '12px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={member.business_email || '-'}>
+                            {member.business_email || '-'}
+                          </div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px' }}>{member.representative_name || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px' }}>{member.representative_phone || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px' }}>{member.manager_name || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px' }}>{member.manager_phone || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px' }}>{member.store_name || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '14px' }}>{member.store_phone || '-'}</div>
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'center', fontSize: '14px' }}>
+                          {formatDate(member.created_at)}
+                        </td>
+                      </tr>
                     );
                   })
                 )}
@@ -1289,84 +1289,84 @@ export default function MembersPage() {
             {!showCreditHistory ? (
               <>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>
-                지급할 크레딧 *
-              </label>
-              <input
-                type="number"
-                value={creditAmount}
-                onChange={(e) => setCreditAmount(e.target.value)}
-                placeholder="지급할 크레딧 금액"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '8px',
-                  fontSize: '14px'
-                }}
-              />
-            </div>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>
+                    지급할 크레딧 *
+                  </label>
+                  <input
+                    type="number"
+                    value={creditAmount}
+                    onChange={(e) => setCreditAmount(e.target.value)}
+                    placeholder="지급할 크레딧 금액"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
 
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>
-                지급 사유 *
-              </label>
-              <textarea
-                value={creditDescription}
-                onChange={(e) => setCreditDescription(e.target.value)}
-                placeholder="지급 사유를 입력하세요 (필수)"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  minHeight: '80px',
-                  resize: 'vertical'
-                }}
-              />
-            </div>
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>
+                    지급 사유 *
+                  </label>
+                  <textarea
+                    value={creditDescription}
+                    onChange={(e) => setCreditDescription(e.target.value)}
+                    placeholder="지급 사유를 입력하세요 (필수)"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      minHeight: '80px',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
 
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => {
-                  setShowCreditModal(false);
-                  setCreditAmount('');
-                  setCreditDescription('');
-                  setSelectedMember(null);
-                }}
-                disabled={creditLoading}
-                style={{
-                  padding: '10px 20px',
-                  background: '#f1f5f9',
-                  color: '#64748b',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: creditLoading ? 'not-allowed' : 'pointer'
-                }}
-              >
-                취소
-              </button>
-              <button
-                onClick={handleGrantCredit}
-                disabled={creditLoading || !creditAmount || !creditDescription.trim()}
-                style={{
-                  padding: '10px 20px',
-                  background: creditLoading || !creditAmount || !creditDescription.trim() ? '#cbd5e1' : 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: creditLoading || !creditAmount || !creditDescription.trim() ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {creditLoading ? '처리 중...' : '지급하기'}
-              </button>
-            </div>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => {
+                      setShowCreditModal(false);
+                      setCreditAmount('');
+                      setCreditDescription('');
+                      setSelectedMember(null);
+                    }}
+                    disabled={creditLoading}
+                    style={{
+                      padding: '10px 20px',
+                      background: '#f1f5f9',
+                      color: '#64748b',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: creditLoading ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleGrantCredit}
+                    disabled={creditLoading || !creditAmount || !creditDescription.trim()}
+                    style={{
+                      padding: '10px 20px',
+                      background: creditLoading || !creditAmount || !creditDescription.trim() ? '#cbd5e1' : 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: creditLoading || !creditAmount || !creditDescription.trim() ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {creditLoading ? '처리 중...' : '지급하기'}
+                  </button>
+                </div>
               </>
             ) : (
               <div>

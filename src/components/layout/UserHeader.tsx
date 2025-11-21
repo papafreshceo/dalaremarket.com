@@ -357,7 +357,7 @@ export default function UserHeader() {
       submenu: [
         { path: '/platform/products/all', text: '전체상품' },
         { path: '/platform/calendar', text: '상품캘린더' },
-        { path: '/gallery', text: '이미지다운로드' }
+        { path: '/platform/gallery', text: '이미지다운로드' }
       ]
     },
     { path: '/platform/tools', text: '업무도구' },
