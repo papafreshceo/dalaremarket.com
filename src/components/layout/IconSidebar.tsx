@@ -172,6 +172,10 @@ export default function IconSidebar() {
     } else if (pathname === '/platform/settings') {
       setActiveIconMenu('settings');
       setIsSidebarVisible(true);
+    } else if (pathname === '/platform/orders' && searchParams.get('tab') === '지갑') {
+      // 지갑 탭: 예치금 메뉴 활성화
+      setActiveIconMenu('deposit');
+      setIsSidebarVisible(true);
     } else if (pathname === '/platform/orders' && searchParams.get('tab') === '옵션상품매핑') {
       // 옵션상품매핑 탭: 설정 메뉴 활성화
       setActiveIconMenu('settings');
