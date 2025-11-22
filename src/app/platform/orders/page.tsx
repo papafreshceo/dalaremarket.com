@@ -25,6 +25,7 @@ import { getCurrentTimeUTC } from '@/lib/date';
 import { applyOptionMapping } from './utils/applyOptionMapping';
 import { showStatusToast } from './utils/statusToast';
 import PasswordModal from './modals/PasswordModal';
+import { useSidebar } from '@/contexts/SidebarContext';
 
 function OrdersPageContent() {
   const searchParams = useSearchParams();
@@ -33,6 +34,7 @@ function OrdersPageContent() {
 
   const [activeTab, setActiveTab] = useState<Tab>(statusParam ? '발주서등록' : '대시보드');
   const router = useRouter();
+  const { isSidebarVisible } = useSidebar();
   const [userId, setUserId] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
   const [organizationTier, setOrganizationTier] = useState<'light' | 'standard' | 'advance' | 'elite' | 'legend' | null>(null);
@@ -1680,13 +1682,13 @@ function OrdersPageContent() {
         </div>
       )}
 
-      {/* 본문 영역 로딩 스크린 */}
+      {/* 본문 영역 로딩 스크린 - 사이드바 제외, 본문영역 중앙 */}
       {isInitialLoading && (
         <div
           style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
+            top: '50px',
+            left: isMobile ? 0 : (isSidebarVisible ? '242px' : '50px'),
             right: 0,
             bottom: 0,
             background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 248, 255, 0.98) 100%)',
@@ -1695,8 +1697,8 @@ function OrdersPageContent() {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
-            transition: 'opacity 0.5s ease-out',
+            zIndex: 999,
+            transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease-out',
           }}
           className="loading-screen-bg"
         >

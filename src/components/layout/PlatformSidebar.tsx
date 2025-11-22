@@ -530,6 +530,8 @@ export default function PlatformSidebar() {
                   <button
                     key={item.path + '-' + subItemTab}
                     onClick={() => {
+                      // 예치금 메뉴 활성화 유지
+                      setActiveIconMenu('deposit');
                       if (pathname === item.path) {
                         localStorage.setItem('ordersActiveTab', subItemTab);
                         setActiveTab(subItemTab);
@@ -627,6 +629,8 @@ export default function PlatformSidebar() {
                   <button
                     key={item.path + '-' + subItemTab}
                     onClick={() => {
+                      // 설정 메뉴 활성화 유지
+                      setActiveIconMenu('settings');
                       if (pathname === item.path) {
                         localStorage.setItem('ordersActiveTab', subItemTab);
                         setActiveTab(subItemTab);
