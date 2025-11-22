@@ -9,7 +9,6 @@ export default function Footer() {
     { path: '/platform/calendar', text: '상품캘린더' },
     { path: '/platform/delivery', text: '배송캘린더' },
     { path: '/platform/orders', text: '주문관리' },
-    { path: '/platform/services', text: '서비스&프로그램' },
     { path: '/platform/notice', text: '공지사항' },
   ];
 

@@ -543,14 +543,14 @@ export default function SellerFeedPage() {
             <h1 style={{
               fontSize: isMobile ? '32px' : '48px',
               fontWeight: '700',
-              color: '#ffffff',
+              color: '#1f2937',
               marginBottom: '16px'
             }}>
               Seller Feed
             </h1>
             <p style={{
               fontSize: isMobile ? '16px' : '18px',
-              color: 'rgba(255, 255, 255, 0.9)'
+              color: '#4b5563'
             }}>
               셀러들의 소통 공간, 함께 배우고 성장해요
             </p>
