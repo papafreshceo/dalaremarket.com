@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import UserHeader from '@/components/layout/UserHeader'
 import PlatformSidebar from '@/components/layout/PlatformSidebar'
@@ -106,11 +106,7 @@ function LayoutContent({ children, pathname }: { children: React.ReactNode; path
       )}
 
       {/* 최상위 아이콘 사이드바 */}
-      {showLayout && (
-        <Suspense fallback={null}>
-          <IconSidebar />
-        </Suspense>
-      )}
+      {showLayout && <IconSidebar />}
 
       {/* 왼쪽 사이드바 */}
       {showLayout && <PlatformSidebar />}

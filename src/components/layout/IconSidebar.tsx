@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { createClient } from '@/lib/supabase/client';
@@ -8,7 +8,6 @@ import { createClient } from '@/lib/supabase/client';
 export default function IconSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const supabase = createClient();
   const { activeIconMenu, setActiveIconMenu, isSidebarVisible, setIsSidebarVisible } = useSidebar();
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
@@ -151,6 +150,10 @@ export default function IconSidebar() {
 
   // 페이지 로드 시 현재 경로에 맞는 메뉴 상태 설정
   useEffect(() => {
+    // 클라이언트에서만 URL 파라미터 파싱
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const tab = urlParams?.get('tab') || null;
+
     if (pathname.startsWith('/platform/notifications')) {
       setActiveIconMenu('notifications');
       setIsSidebarVisible(true);
@@ -172,11 +175,11 @@ export default function IconSidebar() {
     } else if (pathname === '/platform/settings') {
       setActiveIconMenu('settings');
       setIsSidebarVisible(true);
-    } else if (pathname === '/platform/orders' && searchParams.get('tab') === '지갑') {
+    } else if (pathname === '/platform/orders' && tab === '지갑') {
       // 지갑 탭: 예치금 메뉴 활성화
       setActiveIconMenu('deposit');
       setIsSidebarVisible(true);
-    } else if (pathname === '/platform/orders' && searchParams.get('tab') === '옵션상품매핑') {
+    } else if (pathname === '/platform/orders' && tab === '옵션상품매핑') {
       // 옵션상품매핑 탭: 설정 메뉴 활성화
       setActiveIconMenu('settings');
       setIsSidebarVisible(true);
@@ -187,7 +190,7 @@ export default function IconSidebar() {
       const savedVisible = localStorage.getItem('platformSidebarVisible');
       setIsSidebarVisible(savedVisible === 'true');
     }
-  }, [pathname, searchParams]);
+  }, [pathname]);
 
   // 컴포넌트 언마운트 시 정리
   useEffect(() => {
