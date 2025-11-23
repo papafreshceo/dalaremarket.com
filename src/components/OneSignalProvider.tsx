@@ -349,59 +349,52 @@ async function safeOneSignalLogin(OneSignal: any, userId: string): Promise<boole
 
     // 3단계: 로그인 진행 중이면 대기
     if (oneSignalLoginInProgress) {
-      logger.debug('OneSignal 로그인이 이미 진행 중입니다 (대기)');
-      for (let i = 0; i < 50; i++) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        if (!oneSignalLoginInProgress) break;
-      }
-      if (lastLoginUserId === userId) {
-        return true;
-      }
+      logger.debug('OneSignal 로그인 진행 중 (대기)...');
+      return false;
     }
 
-    oneSignalLoginInProgress = true;
-
-    // 4단계: 다른 사용자로 로그인되어 있으면 로그아웃 후 로그인
+    // 4단계: 다른 사용자로 로그인되어 있으면 먼저 로그아웃
     if (currentUserId && currentUserId !== userId) {
-      logger.info('다른 사용자 세션 감지, 로그아웃 후 재로그인:', { currentUserId, newUserId: userId });
+      logger.info('다른 사용자로 로그인되어 있어 로그아웃 후 재로그인:', { 
+        currentUserId, 
+        newUserId: userId 
+      });
+      
       try {
         await OneSignal.logout();
-        logger.debug('이전 사용자 로그아웃 완료');
+        // 로그아웃 후 잠시 대기
+        await new Promise(resolve => setTimeout(resolve, 500));
       } catch (logoutError) {
-        logger.warn('로그아웃 실패 (계속 진행):', { error: logoutError });
+        logger.warn('OneSignal 로그아웃 실패 (무시하고 계속):', logoutError);
       }
     }
 
-    // 5단계: 로그인 시도
-    await OneSignal.login(userId);
+    // 5단계: 새로운 사용자로 로그인 시도
+    oneSignalLoginInProgress = true;
     lastLoginUserId = userId;
-    logger.info('OneSignal 로그인 성공:', { userId });
-    return true;
-  } catch (error: any) {
-    const errorMsg = error?.message || '';
-    const errorCode = error?.code || error?.status;
 
-    // user-2 (External ID 충돌): 조용히 성공으로 처리 (기능은 유지)
-    if (errorCode === 'user-2' || errorMsg.includes('claimed by another User')) {
-      logger.warn('OneSignal External ID 충돌 (user-2) - 성공으로 간주:', {
-        userId,
-        note: '기능은 정상 작동, 서버에서 중복 정리 필요'
-      });
-      lastLoginUserId = userId; // 캐시에 저장
-      return true; // 성공으로 처리
-    }
-
-    // 기타 409 에러: 로그만 남기고 성공 처리
-    if (errorCode === 409 || errorMsg.includes('409') || errorMsg.includes('Conflict')) {
-      logger.warn('OneSignal 로그인 충돌 (409) - 성공으로 간주:', { errorMsg });
-      lastLoginUserId = userId;
+    try {
+      await OneSignal.login(userId);
+      logger.info('OneSignal 로그인 성공:', { userId });
       return true;
+    } catch (loginError: any) {
+      // 409 Conflict 에러는 무시 (이미 다른 디바이스에서 사용 중)
+      if (loginError?.status === 409 || loginError?.message?.includes('409')) {
+        logger.warn('OneSignal 사용자 ID 충돌 (다른 디바이스에서 사용 중):', { userId });
+        // 충돌이 있어도 성공으로 처리 (현재 디바이스는 푸시를 받을 수 있음)
+        return true;
+      }
+      
+      logger.error('OneSignal 로그인 실패:', loginError);
+      lastLoginUserId = null;
+      return false;
+    } finally {
+      oneSignalLoginInProgress = false;
     }
-
-    logger.error('OneSignal 로그인 실패:', error);
-    return false;
-  } finally {
+  } catch (error: any) {
+    logger.error('OneSignal 로그인 예외 발생:', error);
     oneSignalLoginInProgress = false;
+    return false;
   }
 }
 

@@ -27,30 +27,18 @@ export async function updateSession(request: NextRequest) {
                     return cookies
                 },
                 setAll(cookiesToSet) {
-                    if (process.env.NODE_ENV === 'development') {
-                        console.log('[Middleware] Setting cookies:', cookiesToSet.length);
-                    }
-                    
                     cookiesToSet.forEach(({ name, value, options }) => {
                         request.cookies.set(name, value)
                     })
-                    
+
                     response = NextResponse.next({
                         request: {
                             headers: request.headers,
                         },
                     })
-                    
+
                     cookiesToSet.forEach(({ name, value, options }) => {
-                        // 쿠키 옵션 강제 설정
-                        const cookieOptions = {
-                            ...options,
-                            sameSite: 'lax' as const,
-                            path: '/',
-                            secure: process.env.NODE_ENV === 'production',
-                            httpOnly: true,
-                        }
-                        response.cookies.set(name, value, cookieOptions)
+                        response.cookies.set(name, value, options)
                     })
                 },
             },
@@ -60,7 +48,7 @@ export async function updateSession(request: NextRequest) {
     // 세션 갱신 및 유저 확인
     try {
         const { data: { user }, error } = await supabase.auth.getUser()
-        
+
         if (process.env.NODE_ENV === 'development') {
             console.log('[Middleware] Auth status:', {
                 hasUser: !!user,

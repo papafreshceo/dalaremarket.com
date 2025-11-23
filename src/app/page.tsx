@@ -181,12 +181,8 @@ export default function PlatformHome() {
                 달래마켓은 농가와 소비자를 직접 연결하여<br />
                 더 신선하고 더 저렴한 농산물을 제공합니다
               </p>
-              <button
-                onClick={() => {
-                  console.log('[HomePage] 지금 시작하기 버튼 클릭됨')
-                  // 플랫폼으로 이동 (로그인 체크는 플랫폼 페이지에서)
-                  router.push('/platform')
-                }}
+              <Link
+                href="/platform"
                 style={{
                   display: 'inline-block',
                   padding: '18px 56px',
@@ -200,7 +196,9 @@ export default function PlatformHome() {
                   boxShadow: '0 8px 24px rgba(59, 130, 246, 0.3)',
                   transition: 'all 0.3s',
                   position: 'relative',
-                  zIndex: 10
+                  zIndex: 10,
+                  textDecoration: 'none',
+                  textAlign: 'center'
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'translateY(-4px)'
@@ -211,7 +209,7 @@ export default function PlatformHome() {
                   e.currentTarget.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.3)'
                 }}>
                 지금 시작하기
-              </button>
+              </Link>
             </div>
           </div>
 

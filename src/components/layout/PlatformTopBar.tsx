@@ -38,19 +38,40 @@ export default function PlatformTopBar() {
     return () => clearInterval(interval);
   }, [user, refreshBalances]);
 
-  const fetchUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      // 로그인 안 되어 있어도 플랫폼 페이지는 볼 수 있음
-      return;
-    }
-    setUser(user);
+  const fetchUser = async (session?: any) => {
+    let currentUser = session?.user;
 
-    const { data: userData } = await supabase
+    if (!currentUser) {
+      // 1. getUser() 시도 (보안상 권장)
+      const { data: { user }, error } = await supabase.auth.getUser();
+
+      if (user) {
+        currentUser = user;
+      } else {
+        // 2. 실패 시 getSession() 시도 (로컬 세션 확인)
+        // 새로고침 직후에는 getUser가 실패할 수 있으므로 getSession으로 보완
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (session?.user) {
+          currentUser = session.user;
+        } else {
+          console.log('[PlatformTopBar] No user found');
+          return;
+        }
+      }
+    }
+
+    setUser(currentUser);
+
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .select('role, primary_organization_id')
-      .eq('id', user.id)
+      .eq('id', currentUser.id)
       .single();
+
+    if (userError) {
+      console.error('[PlatformTopBar] Error fetching user data:', userError);
+      return;
+    }
 
     setUserRole(userData?.role || null);
 
@@ -71,7 +92,34 @@ export default function PlatformTopBar() {
   };
 
   useEffect(() => {
+    // 초기 사용자 정보 로드
     fetchUser();
+
+    // 인증 상태 변경 리스너 등록
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[PlatformTopBar] Auth state changed:', event, session?.user?.id);
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // 로그인 시 사용자 정보 갱신 및 모달 닫기
+        // 세션 정보를 직접 전달하여 즉시 갱신
+        fetchUser(session);
+        setShowLoginModal(false);
+      } else if (event === 'SIGNED_OUT') {
+        // 로그아웃 시 상태 초기화
+        setUser(null);
+        setUserRole(null);
+        setOrganizationTier(null);
+        setOrganizationName('');
+        setSellerCode('');
+        setOrders([]);
+      } else if (event === 'USER_UPDATED') {
+        fetchUser(session);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // 주문 데이터 가져오기
@@ -468,15 +516,14 @@ export default function PlatformTopBar() {
           </button>
         )}
       </div>
-      
+
       {/* 로그인 모달 */}
       {showLoginModal && (
         <AuthModal
           isOpen={showLoginModal}
           onClose={() => {
             setShowLoginModal(false);
-            // 로그인 성공 후 사용자 정보 다시 가져오기
-            fetchUser();
+            // onAuthStateChange에서 처리하므로 여기서는 제거
           }}
           initialMode="login"
         />
