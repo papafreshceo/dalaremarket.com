@@ -14,6 +14,8 @@ export async function GET(request: NextRequest) {
     const isPublic = searchParams.get('is_public');
     const search = searchParams.get('search');
     const folderPath = searchParams.get('folder_path'); // 폴더 경로 필터 추가
+    const category4Id = searchParams.get('category_4_id'); // 품목 ID 필터 추가
+    const category2Filter = searchParams.get('category_2'); // 카테고리2 필터 추가
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
 
@@ -51,6 +53,10 @@ export async function GET(request: NextRequest) {
     // 폴더 경로로 필터링 (cloudinary_id가 해당 경로로 시작하는 것만)
     if (folderPath) {
       query = query.ilike('cloudinary_id', `${folderPath}/%`);
+    }
+    // 품목 ID로 필터링
+    if (category4Id) {
+      query = query.eq('category_4_id', category4Id);
     }
 
     // 페이지네이션

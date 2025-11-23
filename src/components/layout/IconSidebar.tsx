@@ -229,8 +229,8 @@ export default function IconSidebar() {
       path: '/platform/profile',
       label: '프로필',
       submenu: [
-        { path: '/platform/profile', label: '프로필' },
-        { path: '/platform/seller-info', label: '셀러정보' }
+        { path: '/platform/profileinfo', label: '프로필' },
+        { path: '/platform/profile', label: '셀러계정' }
       ]
     },
     {
@@ -625,7 +625,7 @@ export default function IconSidebar() {
         const profileItem = menuItems.find(item => item.path === '/platform/profile');
         if (!profileItem) return null;
 
-        const isProfileActive = pathname === '/platform/profile' || pathname === '/platform/seller-info';
+        const isProfileActive = pathname === '/platform/profile' || pathname === '/platform/profileinfo';
 
         return (
           <div

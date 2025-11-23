@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Download, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Download, X, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import Image from 'next/image';
+import { createClient } from '@/lib/supabase/client';
 
 interface CloudinaryImage {
   id: string;
@@ -35,14 +36,25 @@ interface Category {
   icon: string;
 }
 
+// 품목마스터 카테고리 트리 구조
+interface CategoryTree {
+  [category1: string]: string[]; // category1 -> category2[]
+}
+
 export default function PublicGalleryPage() {
+  const supabase = createClient();
   const [images, setImages] = useState<CloudinaryImage[]>([]);
   const [allProductImages, setAllProductImages] = useState<CloudinaryImage[]>([]); // 품목이미지 전체
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 품목마스터 카테고리 트리
+  const [categoryTree, setCategoryTree] = useState<CategoryTree>({});
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [selectedCategory2, setSelectedCategory2] = useState<string | null>(null);
+
   // 필터
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('품목이미지'); // 기본값을 품목이미지로 변경
   const [selectedProduct, setSelectedProduct] = useState<string>('all'); // 품목 필터
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,7 +67,8 @@ export default function PublicGalleryPage() {
   useEffect(() => {
     fetchImages();
     fetchCategories();
-  }, [selectedCategory, searchQuery, currentPage]);
+    fetchCategoryTree();
+  }, [selectedCategory, searchQuery, currentPage, selectedProduct, selectedCategory2, allProductImages.length]);
 
   // 품목이미지 카테고리 선택 시 전체 품목 리스트 가져오기
   useEffect(() => {
@@ -63,6 +76,47 @@ export default function PublicGalleryPage() {
       fetchAllProductImages();
     }
   }, [selectedCategory]);
+
+  // 품목마스터에서 카테고리 트리 구조 가져오기
+  const fetchCategoryTree = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products_master')
+        .select('category_1, category_2')
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('카테고리 트리 로드 오류:', error);
+        return;
+      }
+
+      // 트리 구조 생성
+      const tree: CategoryTree = {};
+      const expandedSet = new Set<string>();
+
+      data?.forEach((item) => {
+        if (item.category_1 && item.category_2) {
+          if (!tree[item.category_1]) {
+            tree[item.category_1] = [];
+            expandedSet.add(item.category_1); // 기본으로 펼침
+          }
+          if (!tree[item.category_1].includes(item.category_2)) {
+            tree[item.category_1].push(item.category_2);
+          }
+        }
+      });
+
+      // category_2 정렬
+      Object.keys(tree).forEach((cat1) => {
+        tree[cat1].sort();
+      });
+
+      setCategoryTree(tree);
+      setExpandedCategories(expandedSet);
+    } catch (error) {
+      console.error('카테고리 트리 로드 오류:', error);
+    }
+  };
 
   const fetchAllProductImages = async () => {
     try {
@@ -97,6 +151,18 @@ export default function PublicGalleryPage() {
       }
       if (searchQuery) {
         params.append('search', searchQuery);
+      }
+
+      // 품목이미지 카테고리에서 특정 품목 선택 시 category_4_id로 필터링
+      if (selectedCategory === '품목이미지' && selectedProduct !== 'all' && allProductImages.length > 0) {
+        // selectedProduct는 "category_3 / category_4" 형태
+        // allProductImages에서 해당 품목의 category_4_id 찾기
+        const matchingImage = allProductImages.find(img =>
+          `${img.category_3 || ''} / ${img.category_4 || ''}` === selectedProduct
+        );
+        if (matchingImage?.category_4_id) {
+          params.append('category_4_id', matchingImage.category_4_id);
+        }
       }
 
       const response = await fetch(`/api/cloudinary/images?${params}`);
@@ -166,21 +232,7 @@ export default function PublicGalleryPage() {
   };
 
   const navigateLightbox = (direction: 'prev' | 'next') => {
-    // 필터링된 이미지 사용
-    const filteredImages = images.filter(img => {
-      const categoryMatch = selectedCategory === 'all' || img.category === selectedCategory;
-
-      // 품목 선택 시: 해당 품목의 이미지만 (품목이미지, option_product 제외)
-      if (selectedProduct !== 'all' && selectedCategory === '품목이미지') {
-        // category_4_id가 있고 option_product_id가 없으며, category_3/category_4가 일치
-        return img.category_4_id &&
-               !img.option_product_id &&
-               `${img.category_3 || ''} / ${img.category_4 || ''}` === selectedProduct;
-      }
-
-      return categoryMatch;
-    });
-
+    // 필터링된 이미지 사용 (filteredImages와 동일한 로직)
     const newIndex = direction === 'prev'
       ? (lightboxIndex - 1 + filteredImages.length) % filteredImages.length
       : (lightboxIndex + 1) % filteredImages.length;
@@ -195,34 +247,41 @@ export default function PublicGalleryPage() {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
-  // 카테고리별 이미지 개수 계산
-  const categoryCounts = categories.reduce((acc, cat) => {
-    acc[cat.name] = images.filter(img => img.category === cat.name).length;
-    return acc;
-  }, {} as Record<string, number>);
-
-  // 품목이미지 카테고리의 품목 리스트 추출 (전체 품목이미지 사용)
-  const productList = selectedCategory === '품목이미지'
-    ? Array.from(new Set(
+  // 품목이미지 카테고리의 품목 리스트 추출 (선택된 category_2 기준 필터링)
+  // { label: "카테고리3 / 카테고리4", category_4_id: "uuid" } 형태로 저장
+  const productListWithId = selectedCategory === '품목이미지'
+    ? (() => {
+        const uniqueMap = new Map<string, string>(); // label -> category_4_id
         allProductImages
-          .filter(img => img.category_4)
-          .map(img => `${img.category_3 || ''} / ${img.category_4 || ''}`)
-      )).sort()
+          .filter(img => {
+            if (!img.category_4 || !img.category_4_id) return false;
+            if (selectedCategory2 && img.category_2 !== selectedCategory2) return false;
+            return true;
+          })
+          .forEach(img => {
+            const label = `${img.category_3 || ''} / ${img.category_4 || ''}`;
+            if (!uniqueMap.has(label)) {
+              uniqueMap.set(label, img.category_4_id!);
+            }
+          });
+        return Array.from(uniqueMap.entries())
+          .map(([label, category_4_id]) => ({ label, category_4_id }))
+          .sort((a, b) => a.label.localeCompare(b.label));
+      })()
     : [];
 
-  // 필터링된 이미지
+  // 기존 호환성을 위한 productList (label만 추출)
+  const productList = productListWithId.map(p => p.label);
+
+  // 필터링된 이미지 (서버에서 이미 필터링했으므로 추가 클라이언트 필터링은 최소화)
   const filteredImages = images.filter(img => {
-    const categoryMatch = selectedCategory === 'all' || img.category === selectedCategory;
-
-    // 품목 선택 시: 해당 품목의 이미지만 (품목이미지, option_product 제외)
-    if (selectedProduct !== 'all' && selectedCategory === '품목이미지') {
-      // category_4_id가 있고 option_product_id가 없으며, category_3/category_4가 일치
-      return img.category_4_id &&
-             !img.option_product_id &&
-             `${img.category_3 || ''} / ${img.category_4 || ''}` === selectedProduct;
+    // 품목이미지 카테고리에서 category_2 필터링 (서버에서 처리 안 되므로 클라이언트에서 필터링)
+    if (selectedCategory === '품목이미지' && selectedCategory2) {
+      if (img.category_2 !== selectedCategory2) {
+        return false;
+      }
     }
-
-    return categoryMatch;
+    return true;
   });
 
   return (
@@ -267,68 +326,76 @@ export default function PublicGalleryPage() {
 
       {/* Flex 컨테이너: 사이드바 + 품목 사이드바 + 메인 */}
       <div className="flex">
-        {/* 왼쪽 사이드바 - 카테고리 */}
-        <div className="w-56 bg-gray-50 border-r border-gray-200 sticky top-0 h-screen overflow-y-auto flex-shrink-0">
-          <div className="p-3 space-y-6">
-            {/* 카테고리 필터 */}
+        {/* 왼쪽 사이드바 - 카테고리 트리 (품목마스터 기준) */}
+        <div className="w-40 bg-gray-50 border-r border-gray-200 sticky top-0 h-screen overflow-y-auto flex-shrink-0">
+          <div className="p-3 space-y-4">
+            {/* 카테고리 트리 */}
             <div>
               <h3 className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-2 px-2">카테고리</h3>
               <div className="space-y-0.5">
+                {/* 전체 버튼 */}
                 <button
                   onClick={() => {
-                    setSelectedCategory('all');
+                    setSelectedCategory2(null);
                     setSelectedProduct('all');
                     setCurrentPage(1);
                   }}
                   className={`w-full text-left px-2 py-1.5 text-xs transition-all ${
-                    selectedCategory === 'all'
-                      ? 'text-gray-900 font-medium bg-white border-l-2 border-gray-900'
+                    selectedCategory2 === null
+                      ? 'text-gray-900 font-medium bg-white border-l-2 border-blue-600'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-white/50 border-l-2 border-transparent'
                   }`}
                 >
                   전체
                 </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => {
-                      setSelectedCategory(cat.name);
-                      setSelectedProduct('all');
-                      setCurrentPage(1);
-                    }}
-                    className={`w-full text-left px-2 py-1.5 text-xs transition-all ${
-                      selectedCategory === cat.name
-                        ? 'text-gray-900 font-medium bg-white border-l-2 border-gray-900'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50 border-l-2 border-transparent'
-                    }`}
-                  >
-                    {cat.icon} {cat.name}
-                  </button>
-                ))}
-              </div>
-            </div>
 
-            {/* 카테고리별 통계 */}
-            <div>
-              <h3 className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-2 px-2">이미지 통계</h3>
-              <div className="space-y-0.5">
-                <div className="flex items-center justify-between px-2 py-1.5 hover:bg-white/50 transition-colors">
-                  <span className="text-xs text-gray-700">전체</span>
-                  <span className="text-xs font-semibold text-gray-900">{images.length}</span>
-                </div>
-                {categories.map((cat) => {
-                  const count = categoryCounts[cat.name] || 0;
-                  if (count === 0) return null;
-                  return (
-                    <div
-                      key={cat.id}
-                      className="flex items-center justify-between px-2 py-1.5 hover:bg-white/50 transition-colors"
+                {/* 카테고리1 > 카테고리2 트리 */}
+                {Object.keys(categoryTree).sort().map((cat1) => (
+                  <div key={cat1}>
+                    {/* 카테고리1 (펼침/접힘 버튼) */}
+                    <button
+                      onClick={() => {
+                        const newExpanded = new Set(expandedCategories);
+                        if (newExpanded.has(cat1)) {
+                          newExpanded.delete(cat1);
+                        } else {
+                          newExpanded.add(cat1);
+                        }
+                        setExpandedCategories(newExpanded);
+                      }}
+                      className="w-full text-left px-2 py-1.5 text-xs font-medium text-gray-800 hover:bg-white/50 flex items-center gap-1 transition-all"
                     >
-                      <span className="text-xs text-gray-700">{cat.name}</span>
-                      <span className="text-xs font-semibold text-gray-900">{count}</span>
-                    </div>
-                  );
-                })}
+                      <ChevronDown
+                        size={12}
+                        className={`transition-transform ${expandedCategories.has(cat1) ? '' : '-rotate-90'}`}
+                      />
+                      {cat1}
+                    </button>
+
+                    {/* 카테고리2 리스트 */}
+                    {expandedCategories.has(cat1) && (
+                      <div className="ml-3 space-y-0.5">
+                        {categoryTree[cat1].map((cat2) => (
+                          <button
+                            key={`${cat1}-${cat2}`}
+                            onClick={() => {
+                              setSelectedCategory2(cat2);
+                              setSelectedProduct('all');
+                              setCurrentPage(1);
+                            }}
+                            className={`w-full text-left px-2 py-1 text-xs transition-all ${
+                              selectedCategory2 === cat2
+                                ? 'text-blue-600 font-medium bg-blue-50 border-l-2 border-blue-600'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-white/50 border-l-2 border-transparent'
+                            }`}
+                          >
+                            {cat2}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -336,7 +403,7 @@ export default function PublicGalleryPage() {
 
         {/* 중간 사이드바 - 품목명 (품목이미지 선택 시만 표시) */}
         {selectedCategory === '품목이미지' && (
-          <div className="w-64 bg-white border-r border-gray-200 sticky top-0 h-screen overflow-y-auto flex-shrink-0">
+          <div className="w-52 bg-white border-r border-gray-200 sticky top-0 h-screen overflow-y-auto flex-shrink-0">
             <div className="p-3">
               <h3 className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-2 px-2">품목명</h3>
               <div className="space-y-0.5">
@@ -383,7 +450,6 @@ export default function PublicGalleryPage() {
               {/* 제목 */}
               <div>
                 <h1 className="text-xl font-bold text-gray-900">이미지 갤러리</h1>
-                <p className="text-sm text-gray-600 mt-0.5">무료로 다운로드하여 사용하실 수 있습니다.</p>
               </div>
 
               {/* 검색 */}
@@ -523,69 +589,85 @@ export default function PublicGalleryPage() {
         </div>
       </div>
 
-      {/* 라이트박스 모달 */}
+      {/* 이미지 상세 모달 */}
       {selectedImage && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
-          <button
-            onClick={() => setSelectedImage(null)}
-            className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
+        <div
+          className="fixed inset-0 bg-black/10 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
           >
-            <X size={32} />
-          </button>
+            {/* 모달 헤더 */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900 truncate">{selectedImage.title}</h2>
+              <button
+                onClick={() => setSelectedImage(null)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
 
-          <button
-            onClick={() => navigateLightbox('prev')}
-            className="absolute left-4 text-white hover:text-gray-300 z-10"
-          >
-            <ChevronLeft size={48} />
-          </button>
+            {/* 이미지 영역 */}
+            <div className="relative flex-1 bg-gray-100 flex items-center justify-center min-h-[300px] overflow-hidden">
+              {/* 이전 버튼 */}
+              <button
+                onClick={() => navigateLightbox('prev')}
+                className="absolute left-2 z-10 p-2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full shadow-md transition-all"
+              >
+                <ChevronLeft size={24} className="text-gray-700" />
+              </button>
 
-          <button
-            onClick={() => navigateLightbox('next')}
-            className="absolute right-4 text-white hover:text-gray-300 z-10"
-          >
-            <ChevronRight size={48} />
-          </button>
-
-          <div className="max-w-5xl max-h-[90vh] w-full flex flex-col">
-            <div className="relative flex-1 flex items-center justify-center">
+              {/* 이미지 */}
               <Image
                 src={selectedImage.secure_url}
                 alt={selectedImage.title}
                 width={selectedImage.width}
                 height={selectedImage.height}
                 unoptimized
-                className="max-w-full max-h-[70vh] object-contain"
+                className="max-w-full max-h-[50vh] object-contain"
                 style={{ width: 'auto', height: 'auto' }}
               />
+
+              {/* 다음 버튼 */}
+              <button
+                onClick={() => navigateLightbox('next')}
+                className="absolute right-2 z-10 p-2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full shadow-md transition-all"
+              >
+                <ChevronRight size={24} className="text-gray-700" />
+              </button>
             </div>
 
-            <div className="bg-white rounded-lg mt-4 p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h2 className="text-xl font-bold text-gray-900">{selectedImage.title}</h2>
-                  {selectedImage.description && (
-                    <p className="text-gray-600 mt-2">{selectedImage.description}</p>
-                  )}
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {selectedImage.tags?.map((tag, i) => (
-                      <span key={i} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-6 mt-4 text-sm text-gray-500">
-                    <span>{selectedImage.width} × {selectedImage.height}</span>
-                    <span>{formatFileSize(selectedImage.file_size)}</span>
-                    <span>⬇ {selectedImage.download_count} 다운로드</span>
-                  </div>
+            {/* 이미지 정보 */}
+            <div className="px-6 py-4 border-t border-gray-200">
+              {selectedImage.description && (
+                <p className="text-gray-600 text-sm mb-3">{selectedImage.description}</p>
+              )}
+
+              {selectedImage.tags && selectedImage.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {selectedImage.tags.map((tag, i) => (
+                    <span key={i} className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4 text-xs text-gray-500">
+                  <span>{selectedImage.width} × {selectedImage.height}</span>
+                  <span>{formatFileSize(selectedImage.file_size)}</span>
+                  <span>다운로드 {selectedImage.download_count}회</span>
                 </div>
                 <button
                   onClick={() => handleDownload(selectedImage)}
                   disabled={!selectedImage.is_downloadable}
-                  className="ml-4 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
                 >
-                  <Download size={20} />
+                  <Download size={16} />
                   다운로드
                 </button>
               </div>

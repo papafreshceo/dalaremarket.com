@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { ChevronLeft, ChevronRight, Calendar, Package, Leaf, Sun, Snowflake } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Package, Leaf, Sun, Snowflake, ChevronDown } from 'lucide-react';
 
 interface ProductItem {
   id: number;
+  category_1: string;
+  category_2: string;
   category_3: string;
   category_4: string;
   category_4_id?: number;
@@ -23,8 +25,25 @@ export default function ProductCalendarPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [supplyStatuses, setSupplyStatuses] = useState<Array<{code: string; name: string; color: string}>>([]);
+  const [yearSortByShipping, setYearSortByShipping] = useState(false); // 년간보기 출하순 정렬
+  const [selectedCategory1, setSelectedCategory1] = useState<string>(''); // 카테고리1 필터
+  const [selectedCategory2, setSelectedCategory2] = useState<string>(''); // 카테고리2 필터
+  const [cat1Open, setCat1Open] = useState(false);
+  const [cat2Open, setCat2Open] = useState(false);
+  const cat1Ref = useRef<HTMLDivElement>(null);
+  const cat2Ref = useRef<HTMLDivElement>(null);
 
   const supabase = createClient();
+
+  // 드롭다운 외부 클릭 감지
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (cat1Ref.current && !cat1Ref.current.contains(e.target as Node)) setCat1Open(false);
+      if (cat2Ref.current && !cat2Ref.current.contains(e.target as Node)) setCat2Open(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     fetchProducts();
@@ -37,7 +56,7 @@ export default function ProductCalendarPage() {
       // products_master에서 품목 정보 가져오기
       const { data: productsData, error: productsError } = await supabase
         .from('products_master')
-        .select('id, category_3, category_4, supply_status, season_start_date, season_end_date, thumbnail_url')
+        .select('id, category_1, category_2, category_3, category_4, supply_status, season_start_date, season_end_date')
         .order('category_3')
         .order('category_4');
 
@@ -369,63 +388,247 @@ export default function ProductCalendarPage() {
     );
   };
 
-  // 년간 캘린더 렌더링
+  // 년간 캘린더 렌더링 - 테이블 형태 시즌밴드
   const renderYearCalendar = () => {
-    const months = Array.from({ length: 12 }, (_, i) => i);
+    const months = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+
+    // 각 월의 일수 (윤년 고려 - 2024년 기준)
+    const daysInMonths = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const totalDays = 366; // 윤년 기준
+
+    // 월별 시작 위치 (%) 계산
+    const monthStartPercent: number[] = [];
+    let cumulative = 0;
+    for (let i = 0; i < 12; i++) {
+      monthStartPercent.push((cumulative / totalDays) * 100);
+      cumulative += daysInMonths[i];
+    }
+
+    // MM-DD를 연간 위치(%)로 변환
+    const getYearPercent = (mmdd: string): number => {
+      const [month, day] = mmdd.split('-').map(Number);
+      let dayOfYear = 0;
+      for (let i = 0; i < month - 1; i++) {
+        dayOfYear += daysInMonths[i];
+      }
+      dayOfYear += day;
+      return (dayOfYear / totalDays) * 100;
+    };
+
+    // 시즌밴드 구간 계산
+    const getSeasonBands = (startDate: string, endDate: string): Array<{ left: number; width: number }> => {
+      const startPercent = getYearPercent(startDate);
+      const endPercent = getYearPercent(endDate);
+
+      // 종료일이 시작일보다 앞이면 연도를 넘어가는 경우
+      if (endPercent < startPercent) {
+        return [
+          { left: startPercent, width: 100 - startPercent }, // 시작 ~ 12월 말
+          { left: 0, width: endPercent } // 1월 초 ~ 종료
+        ];
+      }
+
+      return [{ left: startPercent, width: endPercent - startPercent }];
+    };
+
+    // 현재 날짜 위치 (%)
+    const todayPercent = (() => {
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const day = now.getDate();
+      return getYearPercent(`${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+    })();
+
+    // 시즌 데이터가 있는 품목만 필터링하고 정렬
+    const productsWithSeason = products
+      .filter(p => p.season_start_date && p.season_end_date)
+      .filter(p => !selectedCategory1 || p.category_1 === selectedCategory1)
+      .filter(p => !selectedCategory2 || p.category_2 === selectedCategory2)
+      .sort((a, b) => {
+        if (yearSortByShipping) {
+          // 출하순: 시작일이 빠른 순서대로 정렬
+          const aStart = a.season_start_date || '12-31';
+          const bStart = b.season_start_date || '12-31';
+          return aStart.localeCompare(bStart);
+        }
+        // 카테고리3 오름차순
+        const cat3Compare = (a.category_3 || '').localeCompare(b.category_3 || '', 'ko');
+        if (cat3Compare !== 0) return cat3Compare;
+        // 카테고리3이 같으면 카테고리4로 정렬
+        return (a.category_4 || '').localeCompare(b.category_4 || '', 'ko');
+      });
 
     return (
-      <div className="grid grid-cols-3 md:grid-cols-4 gap-4">
-        {months.map(month => {
-          const monthProducts = products.filter(p => {
-            if (!p.season_start_date && !p.season_end_date) return false;
-            const monthStr = String(month + 1).padStart(2, '0');
-            const startMonth = p.season_start_date?.split('-')[0];
-            const endMonth = p.season_end_date?.split('-')[0];
-            return startMonth === monthStr || endMonth === monthStr;
-          });
-
-          const shippingInMonth = products.filter(p => {
-            if (p.supply_status !== '출하중') return false;
-            const monthStr = String(month + 1).padStart(2, '0');
-            if (!p.season_start_date || !p.season_end_date) return false;
-
-            const start = p.season_start_date;
-            const end = p.season_end_date;
-            const monthStart = `${monthStr}-01`;
-            const monthEnd = `${monthStr}-31`;
-
-            if (end < start) {
-              return monthStart <= end || monthEnd >= start;
-            }
-            return !(monthEnd < start || monthStart > end);
-          });
-
-          return (
-            <div
-              key={month}
-              className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => {
-                setCurrentDate(new Date(currentYear, month, 1));
-                setViewMode('month');
-              }}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-gray-900">{month + 1}월</span>
-                {shippingInMonth.length > 0 && (
-                  <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
-                    출하중 {shippingInMonth.length}
-                  </span>
-                )}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {/* 헤더 - 월 표시 */}
+        <div className="flex border-b border-gray-200 bg-gray-50">
+          {/* 품목명 컬럼 헤더 */}
+          <div className="w-52 flex-shrink-0 px-3 py-2 font-medium text-sm text-gray-700 border-r border-gray-200">
+            품목명
+          </div>
+          {/* 월 헤더 */}
+          <div className="flex-1 flex">
+            {months.map((month, index) => (
+              <div
+                key={month}
+                className="flex-1 text-center py-2 text-xs font-medium text-gray-600 border-r border-gray-100 last:border-r-0"
+                style={{ width: `${(daysInMonths[index] / totalDays) * 100}%` }}
+              >
+                {month}
               </div>
-              <div className="text-xs text-gray-500">
-                시작: {products.filter(p => p.season_start_date?.startsWith(String(month + 1).padStart(2, '0'))).length}개
-              </div>
-              <div className="text-xs text-gray-500">
-                종료: {products.filter(p => p.season_end_date?.startsWith(String(month + 1).padStart(2, '0'))).length}개
-              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 품목별 시즌밴드 */}
+        <div className="max-h-[600px] overflow-y-auto">
+          {productsWithSeason.length === 0 ? (
+            <div className="py-12 text-center text-gray-500">
+              시즌 정보가 등록된 품목이 없습니다.
             </div>
-          );
-        })}
+          ) : (
+            productsWithSeason.map((product, index) => {
+              const bands = getSeasonBands(product.season_start_date!, product.season_end_date!);
+              const isShipping = product.supply_status === '출하중';
+
+              return (
+                <div
+                  key={product.id}
+                  className={`flex border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                    index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
+                  }`}
+                >
+                  {/* 품목명 */}
+                  <div className="w-52 flex-shrink-0 px-3 py-2 border-r border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs text-gray-700 truncate">
+                          <span className="text-gray-400">{product.category_3}</span>
+                          <span className="text-gray-300 mx-1">/</span>
+                          <span className="font-medium text-gray-900">{product.category_4}</span>
+                        </div>
+                      </div>
+                      {isShipping && (
+                        <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" title="출하중" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 시즌밴드 영역 */}
+                  <div className="flex-1 relative py-2 px-1">
+                    {/* 월 구분선 */}
+                    <div className="absolute inset-0 flex pointer-events-none">
+                      {months.map((_, i) => (
+                        <div
+                          key={i}
+                          className="border-r border-gray-100 last:border-r-0"
+                          style={{ width: `${(daysInMonths[i] / totalDays) * 100}%` }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* 오늘 표시선 */}
+                    <div
+                      className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-10"
+                      style={{ left: `${todayPercent}%` }}
+                    />
+
+                    {/* 배경 바 */}
+                    <div className="relative h-4 bg-gray-100 rounded-sm">
+                      {/* 시즌 밴드 */}
+                      {bands.map((band, i) => {
+                        // 시작일이 30일 이내인지 확인
+                        const startPercent = getYearPercent(product.season_start_date!);
+                        const isStartingSoon = Math.abs(startPercent - todayPercent) <= (30 / totalDays) * 100 && startPercent >= todayPercent;
+
+                        // 기본 색상 및 살짝 밝은 색상 결정
+                        const baseColor = isStartingSoon
+                          ? 'rgb(245, 158, 11)' // amber-500
+                          : isShipping
+                            ? 'rgb(16, 185, 129)' // emerald-500
+                            : 'rgb(96, 165, 250)'; // blue-400
+
+                        const endColor = isStartingSoon
+                          ? 'rgb(252, 211, 77)' // amber-300
+                          : isShipping
+                            ? 'rgb(110, 231, 183)' // emerald-300
+                            : 'rgb(191, 219, 254)'; // blue-200
+
+                        // 연도 넘어가는 경우: 첫 번째 밴드(12월 말로 끝남)는 단색, 두 번째 밴드만 그라데이션
+                        // 연도 안 넘어가는 경우: 그라데이션 적용
+                        const isYearCrossing = bands.length === 2;
+                        const isEndBand = !isYearCrossing || i === 1; // 실제 종료일이 있는 밴드
+
+                        return (
+                          <div
+                            key={i}
+                            className="absolute top-0 bottom-0"
+                            style={{
+                              left: `${band.left}%`,
+                              width: `${Math.max(band.width, 0.5)}%`,
+                              background: isEndBand
+                                ? `linear-gradient(to right, ${baseColor} 0%, ${endColor} 100%)`
+                                : baseColor
+                            }}
+                            title={`${product.season_start_date} ~ ${product.season_end_date}`}
+                          />
+                        );
+                      })}
+
+                      {/* 시작일 화살표 마커 (밴드 안쪽, 흰색) */}
+                      <div
+                        className="absolute top-1/2 z-20 flex items-center justify-center"
+                        style={{
+                          left: `calc(${getYearPercent(product.season_start_date!)}% + 2px)`,
+                          transform: 'translateY(-50%)'
+                        }}
+                        title={`시작: ${product.season_start_date}`}
+                      >
+                        <svg width="5" height="8" viewBox="0 0 5 8" className="text-white drop-shadow-sm">
+                          <path d="M0 0L5 4L0 8V0Z" fill="currentColor" />
+                        </svg>
+                      </div>
+                    </div>
+
+                    {/* 시즌 기간 텍스트 */}
+                    <div className="mt-0.5 text-[9px] text-gray-400 text-center">
+                      {product.season_start_date?.replace('-', '/')} ~ {product.season_end_date?.replace('-', '/')}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* 범례 */}
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center gap-4 text-xs text-gray-600 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-3 bg-gradient-to-r from-emerald-500 to-teal-400" />
+            <span>출하중</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-3 bg-gradient-to-r from-blue-400 to-cyan-400" />
+            <span>시즌</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-3 bg-gradient-to-r from-amber-500 to-orange-400" />
+            <span>곧 시작 (30일 이내)</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <svg width="6" height="8" viewBox="0 0 6 8" className="text-gray-500">
+              <path d="M0 0L6 4L0 8V0Z" fill="currentColor" />
+            </svg>
+            <span>시작일</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-0.5 h-4 bg-red-400" />
+            <span>오늘</span>
+          </div>
+          <div className="ml-auto text-gray-400">
+            총 {productsWithSeason.length}개 품목
+          </div>
+        </div>
       </div>
     );
   };
@@ -564,30 +767,113 @@ export default function ProductCalendarPage() {
         </div>
 
         {/* 네비게이션 */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
+        {viewMode !== 'year' ? (
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePrev}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <button
+                onClick={handleNext}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ChevronRight className="w-5 h-5 text-gray-600" />
+              </button>
+              <button
+                onClick={handleToday}
+                className="px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                오늘
+              </button>
+            </div>
+            <h2 className="text-lg font-semibold text-gray-900">{getTitle()}</h2>
+            <div className="w-32" /> {/* 스페이서 */}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 mb-4">
+            {/* 카테고리1 드롭다운 */}
+            <div ref={cat1Ref} className="relative">
+              <button
+                onClick={() => { setCat1Open(!cat1Open); setCat2Open(false); }}
+                className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-gray-900"
+              >
+                <span>{selectedCategory1 || '전체'}</span>
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+              {cat1Open && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 shadow-sm z-50 max-h-40 overflow-y-auto">
+                  <div
+                    onClick={() => { setSelectedCategory1(''); setSelectedCategory2(''); setCat1Open(false); }}
+                    className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 cursor-pointer whitespace-nowrap"
+                  >
+                    전체
+                  </div>
+                  {Array.from(new Set(products.map(p => p.category_1).filter(Boolean))).sort().map(cat => (
+                    <div
+                      key={cat}
+                      onClick={() => { setSelectedCategory1(cat); setSelectedCategory2(''); setCat1Open(false); }}
+                      className={`px-3 py-1.5 text-sm hover:bg-gray-100 cursor-pointer whitespace-nowrap ${selectedCategory1 === cat ? 'text-blue-600 bg-blue-50' : 'text-gray-700'}`}
+                    >
+                      {cat}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <span className="text-gray-300 text-sm">/</span>
+
+            {/* 카테고리2 드롭다운 */}
+            <div ref={cat2Ref} className="relative">
+              <button
+                onClick={() => { setCat2Open(!cat2Open); setCat1Open(false); }}
+                className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-gray-900"
+              >
+                <span>{selectedCategory2 || '전체'}</span>
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+              {cat2Open && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 shadow-sm z-50 max-h-40 overflow-y-auto">
+                  <div
+                    onClick={() => { setSelectedCategory2(''); setCat2Open(false); }}
+                    className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 cursor-pointer whitespace-nowrap"
+                  >
+                    전체
+                  </div>
+                  {Array.from(new Set(
+                    products
+                      .filter(p => !selectedCategory1 || p.category_1 === selectedCategory1)
+                      .map(p => p.category_2)
+                      .filter(Boolean)
+                  )).sort().map(cat => (
+                    <div
+                      key={cat}
+                      onClick={() => { setSelectedCategory2(cat); setCat2Open(false); }}
+                      className={`px-3 py-1.5 text-sm hover:bg-gray-100 cursor-pointer whitespace-nowrap ${selectedCategory2 === cat ? 'text-blue-600 bg-blue-50' : 'text-gray-700'}`}
+                    >
+                      {cat}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 출하순 버튼 */}
             <button
-              onClick={handlePrev}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              onClick={() => setYearSortByShipping(!yearSortByShipping)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                yearSortByShipping
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
             >
-              <ChevronLeft className="w-5 h-5 text-gray-600" />
-            </button>
-            <button
-              onClick={handleNext}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ChevronRight className="w-5 h-5 text-gray-600" />
-            </button>
-            <button
-              onClick={handleToday}
-              className="px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-            >
-              오늘
+              출하순
             </button>
           </div>
-          <h2 className="text-lg font-semibold text-gray-900">{getTitle()}</h2>
-          <div className="w-32" /> {/* 스페이서 */}
-        </div>
+        )}
 
         {/* 캘린더 */}
         <div className="mb-6">

@@ -20,21 +20,30 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClientForRouteHandler();
 
+    // 현재 다운로드 카운트 조회
+    const { data: currentImage, error: fetchError } = await supabase
+      .from('cloudinary_images')
+      .select('download_count')
+      .eq('id', imageId)
+      .single();
+
+    if (fetchError) {
+      logger.error('이미지 조회 실패:', fetchError);
+      return NextResponse.json(
+        { success: false, error: '이미지를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
     // 다운로드 카운트 증가
-    const { error: updateError } = await supabase.rpc('increment_download_count', {
-      image_id: imageId,
-    });
+    const newCount = (currentImage.download_count || 0) + 1;
+    const { error: updateError } = await supabase
+      .from('cloudinary_images')
+      .update({ download_count: newCount })
+      .eq('id', imageId);
 
-    // RPC 함수가 없으면 직접 UPDATE
     if (updateError) {
-      const { error: directUpdateError } = await supabase
-        .from('cloudinary_images')
-        .update({ download_count: supabase.sql`download_count + 1` })
-        .eq('id', imageId);
-
-      if (directUpdateError) {
-        logger.error('다운로드 카운트 증가 실패:', directUpdateError);
-      }
+      logger.error('다운로드 카운트 증가 실패:', updateError);
     }
 
     // 다운로드 로그 기록

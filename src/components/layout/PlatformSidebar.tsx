@@ -1091,7 +1091,7 @@ export default function PlatformSidebar() {
         )}
       </div>
 
-      {/* 하단 사용자 정보 */}
+      {/* 하단 셀러코드 */}
       {sellerCode && user && (
         <div style={{
           padding: '12px 8px',
@@ -1106,23 +1106,13 @@ export default function PlatformSidebar() {
             textAlign: 'center'
           }}>
             <div style={{
-              fontSize: '11px',
+              fontSize: '12px',
               fontWeight: '600',
               color: '#2563eb',
               fontFamily: 'monospace',
-              letterSpacing: '0.5px',
-              marginBottom: '4px'
+              letterSpacing: '0.5px'
             }}>
               {sellerCode}
-            </div>
-            <div style={{
-              fontSize: '10px',
-              color: 'var(--color-text-secondary, #6c757d)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}>
-              {user.email}
             </div>
           </div>
         </div>

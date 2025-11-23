@@ -469,6 +469,18 @@ export default function PlatformTopBar() {
               </button>
             )}
 
+            {/* 사용자 이메일 */}
+            <span style={{
+              fontSize: '12px',
+              color: '#6b7280',
+              maxWidth: '150px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {user?.email}
+            </span>
+
             {/* 로그아웃 버튼 */}
             <button
               onClick={handleLogout}

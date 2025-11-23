@@ -12,7 +12,7 @@ export default async function AdminLayout({
     const supabase = await createClient();
 
     // 쿠키 헤더 확인 (디버깅용)
-    const headersList = headers();
+    const headersList = await headers();
     const cookie = headersList.get('cookie');
     
     if (process.env.NODE_ENV === 'development') {
