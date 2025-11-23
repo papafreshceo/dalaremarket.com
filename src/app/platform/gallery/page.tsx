@@ -77,39 +77,19 @@ export default function PublicGalleryPage() {
     }
   }, [selectedCategory]);
 
-  // 품목마스터에서 카테고리 트리 구조 가져오기
+  // 품목마스터에서 카테고리 트리 구조 가져오기 (API 사용)
   const fetchCategoryTree = async () => {
     try {
-      const { data, error } = await supabase
-        .from('products_master')
-        .select('category_1, category_2')
-        .eq('is_active', true);
+      const response = await fetch('/api/products/categories');
+      const result = await response.json();
 
-      if (error) {
-        console.error('카테고리 트리 로드 오류:', error);
+      if (!result.success) {
+        console.error('카테고리 트리 로드 오류:', result.error);
         return;
       }
 
-      // 트리 구조 생성
-      const tree: CategoryTree = {};
-      const expandedSet = new Set<string>();
-
-      data?.forEach((item) => {
-        if (item.category_1 && item.category_2) {
-          if (!tree[item.category_1]) {
-            tree[item.category_1] = [];
-            expandedSet.add(item.category_1); // 기본으로 펼침
-          }
-          if (!tree[item.category_1].includes(item.category_2)) {
-            tree[item.category_1].push(item.category_2);
-          }
-        }
-      });
-
-      // category_2 정렬
-      Object.keys(tree).forEach((cat1) => {
-        tree[cat1].sort();
-      });
+      const tree: CategoryTree = result.data;
+      const expandedSet = new Set<string>(Object.keys(tree)); // 기본으로 모두 펼침
 
       setCategoryTree(tree);
       setExpandedCategories(expandedSet);

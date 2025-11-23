@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { ChevronLeft, ChevronRight, Calendar, Package, Leaf, Sun, Snowflake, ChevronDown } from 'lucide-react';
 
 interface ProductItem {
@@ -32,8 +31,7 @@ export default function ProductCalendarPage() {
   const [cat2Open, setCat2Open] = useState(false);
   const cat1Ref = useRef<HTMLDivElement>(null);
   const cat2Ref = useRef<HTMLDivElement>(null);
-
-  const supabase = createClient();
+  const [categoryImageMap, setCategoryImageMap] = useState<Map<string, string>>(new Map());
 
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
@@ -47,36 +45,46 @@ export default function ProductCalendarPage() {
 
   useEffect(() => {
     fetchProducts();
+    fetchCategoryImages(); // 썸네일은 별도로 로딩
   }, []);
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
 
-      // products_master에서 품목 정보 가져오기
-      const { data: productsData, error: productsError } = await supabase
-        .from('products_master')
-        .select('id, category_1, category_2, category_3, category_4, supply_status, season_start_date, season_end_date')
-        .order('category_3')
-        .order('category_4');
+      // API를 통해 품목 정보 가져오기 (RLS 우회)
+      const response = await fetch('/api/products/calendar');
+      const result = await response.json();
 
-      if (productsError) {
-        console.error('품목 조회 오류:', productsError);
+      if (!result.success) {
+        console.error('품목 조회 오류:', result.error);
         return;
       }
 
-      // 공급상태 설정 가져오기
-      const { data: statusData } = await supabase
-        .from('supply_status_settings')
-        .select('code, name, color, display_order')
-        .order('display_order');
-
-      setProducts(productsData || []);
-      setSupplyStatuses(statusData || []);
+      setProducts(result.products || []);
+      setSupplyStatuses(result.supplyStatuses || []);
     } catch (error) {
       console.error('데이터 fetch 오류:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 품목별 대표이미지 별도 로딩 (Cloudinary)
+  const fetchCategoryImages = async () => {
+    try {
+      const response = await fetch('/api/products/all');
+      const { success, products: allProducts } = await response.json();
+      if (success && allProducts) {
+        const newCategoryImageMap = new Map<string, string>(
+          allProducts
+            .filter((p: any) => p.category_4 && p.category_thumbnail_url)
+            .map((p: any) => [p.category_4, p.category_thumbnail_url])
+        );
+        setCategoryImageMap(newCategoryImageMap);
+      }
+    } catch (imgError) {
+      console.error('대표이미지 조회 오류:', imgError);
     }
   };
 
@@ -499,7 +507,7 @@ export default function ProductCalendarPage() {
                   }`}
                 >
                   {/* 품목명 */}
-                  <div className="w-52 flex-shrink-0 px-3 py-2 border-r border-gray-200">
+                  <div className="w-52 flex-shrink-0 px-3 py-3 border-r border-gray-200">
                     <div className="flex items-center gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="text-xs text-gray-700 truncate">
@@ -515,18 +523,7 @@ export default function ProductCalendarPage() {
                   </div>
 
                   {/* 시즌밴드 영역 */}
-                  <div className="flex-1 relative py-2 px-1">
-                    {/* 월 구분선 */}
-                    <div className="absolute inset-0 flex pointer-events-none">
-                      {months.map((_, i) => (
-                        <div
-                          key={i}
-                          className="border-r border-gray-100 last:border-r-0"
-                          style={{ width: `${(daysInMonths[i] / totalDays) * 100}%` }}
-                        />
-                      ))}
-                    </div>
-
+                  <div className="flex-1 relative py-3 px-1">
                     {/* 오늘 표시선 */}
                     <div
                       className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-10"
@@ -590,10 +587,6 @@ export default function ProductCalendarPage() {
                       </div>
                     </div>
 
-                    {/* 시즌 기간 텍스트 */}
-                    <div className="mt-0.5 text-[9px] text-gray-400 text-center">
-                      {product.season_start_date?.replace('-', '/')} ~ {product.season_end_date?.replace('-', '/')}
-                    </div>
                   </div>
                 </div>
               );
@@ -683,11 +676,13 @@ export default function ProductCalendarPage() {
         {products.length === 0 ? (
           <div className="text-xs text-gray-400 py-2">해당 품목이 없습니다</div>
         ) : (
-          products.map(p => (
+          products.map(p => {
+            const thumbnailUrl = categoryImageMap.get(p.category_4);
+            return (
             <div key={p.id} className="flex items-center gap-2 bg-white rounded px-2 py-1.5">
-              {p.thumbnail_url ? (
+              {thumbnailUrl ? (
                 <img
-                  src={p.thumbnail_url}
+                  src={thumbnailUrl}
                   alt={p.category_4}
                   className="w-6 h-6 rounded object-cover flex-shrink-0"
                 />
@@ -706,7 +701,8 @@ export default function ProductCalendarPage() {
                 </span>
               )}
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
