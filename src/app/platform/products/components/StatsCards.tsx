@@ -63,7 +63,7 @@ export default function StatsCards({ stats, isMobile = false, designSettings }: 
           <div style={{
             fontSize: isMobile ? '20px' : '24px',
             fontWeight: '700',
-            background: stat.bgGradient,
+            backgroundImage: stat.bgGradient,
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text'

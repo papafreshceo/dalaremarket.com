@@ -2,6 +2,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { SessionProvider } from '@/contexts/SessionProvider';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import AgriChatbot from '@/components/chatbot/AgriChatbot';
 
@@ -67,12 +68,14 @@ export default function RootLayout({
         />
       </head>
       <body className="font-pretendard antialiased" style={{ visibility: 'visible' }}>
-        <ThemeProvider>
-          <ClientProviders>
-            {children}
-            <AgriChatbot />
-          </ClientProviders>
-        </ThemeProvider>
+        <SessionProvider>
+          <ThemeProvider>
+            <ClientProviders>
+              {children}
+              <AgriChatbot />
+            </ClientProviders>
+          </ThemeProvider>
+        </SessionProvider>
       </body>
     </html>
   );

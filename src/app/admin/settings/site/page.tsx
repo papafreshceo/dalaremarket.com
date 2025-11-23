@@ -33,7 +33,7 @@ export default function SiteSettingsPage() {
     site_logo_url: 'https://res.cloudinary.com/dde1hpbrp/image/upload/v1753148563/05_etc/dalraemarket_papafarmers.com/DalraeMarket_loge_trans.png',
     site_description: '신선한 농산물을 직접 공급하는 B2B 플랫폼',
     site_keywords: '농산물, B2B, 도매, 납품, 신선식품',
-    contact_email: 'contact@dalreamarket.com',
+    contact_email: 'contact@dalraemarket.com',
     contact_phone: '1588-0000',
     business_hours: '평일 09:00 - 18:00',
     footer_text: '© 2025 달래마켓. All rights reserved.',
@@ -43,7 +43,7 @@ export default function SiteSettingsPage() {
     e_commerce_license_number: '2024-서울강남-12345',
     address: '서울특별시 강남구 테헤란로 123',
     privacy_officer_name: '김개인',
-    privacy_officer_email: 'privacy@dalreamarket.com'
+    privacy_officer_email: 'privacy@dalraemarket.com'
   })
 
   // DB에서 설정 불러오기

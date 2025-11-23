@@ -1161,6 +1161,7 @@ body {
   color: var(--color-text);
   background: linear-gradient(180deg, #eff6ff, #ffffff 15%);
   margin: 0;
+  overflow-x: hidden;
 
   /* 렌더링 최적화 */
   -webkit-font-smoothing: antialiased;

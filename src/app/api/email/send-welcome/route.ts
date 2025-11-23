@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     // 환영 이메일 발송
     const { data, error } = await resend.emails.send({
-      from: '달래마켓 <noreply@dalreamarket.com>',
+      from: '달래마켓 <noreply@dalraemarket.com>',
       to: [email],
       subject: `${name || ''}님, 달래마켓에 오신 것을 환영합니다! 🎉`,
       html: `

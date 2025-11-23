@@ -85,8 +85,23 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         setLoading(false)
         onClose()
 
-        // 서버 상태 강제 갱신 및 UI 즉시 업데이트를 위해 페이지 새로고침
-        window.location.reload()
+        // URL 파라미터 정리 후 새로고침
+        const url = new URL(window.location.href)
+        const redirect = url.searchParams.get('redirect')
+        
+        // 로그인 관련 파라미터 제거
+        url.searchParams.delete('login')
+        url.searchParams.delete('error')
+        url.searchParams.delete('mode')
+        url.searchParams.delete('redirect')
+        
+        // redirect 파라미터가 있으면 해당 경로로, 없으면 현재 경로로
+        if (redirect) {
+          window.location.href = redirect
+        } else {
+          // 파라미터가 정리된 URL로 이동
+          window.location.href = url.pathname + url.search
+        }
       }
     } catch (err) {
       console.error('Login error:', err)
@@ -329,28 +344,63 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     }
   }
 
+  // isOpen이 false면 아무것도 렌더링하지 않음
+  if (!isOpen) {
+    return null;
+  }
+
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-      {/* Backdrop */}
+    <>
+      {/* Backdrop - 최상위 z-index */}
       <div
-        className="absolute inset-0 bg-black/60"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          zIndex: 99998,
+          cursor: 'pointer'
+        }}
         onClick={onClose}
       />
-
-      {/* Modal */}
-      <div
-        className="relative w-full max-w-md mx-4"
-        onClick={(e) => e.stopPropagation()}
+      
+      {/* Modal Container - Backdrop보다 위 */}
+      <div 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          pointerEvents: 'none'
+        }}
       >
-        <div style={{
-          background: 'white',
-          borderRadius: '24px',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-          padding: '40px',
-          position: 'relative'
-        }}>
-          {/* Close button */}
-          <button
+        {/* Modal */}
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: '448px',
+            margin: '0 16px',
+            pointerEvents: 'auto'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{
+            background: 'white',
+            borderRadius: '24px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            padding: '40px',
+            position: 'relative'
+          }}>
+            {/* Close button */}
+            <button
             onClick={onClose}
             style={{
               position: 'absolute',
@@ -1056,7 +1106,8 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
             </div>
           )}
         </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

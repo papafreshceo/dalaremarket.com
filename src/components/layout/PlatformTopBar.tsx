@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import TierBadge from '@/components/TierBadge';
 import { useUserBalance } from '@/contexts/UserBalanceContext';
+import { AuthModal } from '@/components/auth/AuthModal';
 
 export default function PlatformTopBar() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function PlatformTopBar() {
   const [showCreditTooltip, setShowCreditTooltip] = useState(false);
   const [contributionPoints, setContributionPoints] = useState(0);
   const [showContributionTooltip, setShowContributionTooltip] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const supabase = createClient();
 
   // 잔액 초기 로드 및 주기적 갱신
@@ -36,39 +38,39 @@ export default function PlatformTopBar() {
     return () => clearInterval(interval);
   }, [user, refreshBalances]);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        // 로그인 안 되어 있어도 플랫폼 페이지는 볼 수 있음
-        return;
-      }
-      setUser(user);
+  const fetchUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      // 로그인 안 되어 있어도 플랫폼 페이지는 볼 수 있음
+      return;
+    }
+    setUser(user);
 
-      const { data: userData } = await supabase
-        .from('users')
-        .select('role, primary_organization_id')
-        .eq('id', user.id)
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role, primary_organization_id')
+      .eq('id', user.id)
+      .single();
+
+    setUserRole(userData?.role || null);
+
+    if (userData?.primary_organization_id) {
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('accumulated_points, tier, business_name, seller_code')
+        .eq('id', userData.primary_organization_id)
         .single();
 
-      setUserRole(userData?.role || null);
-
-      if (userData?.primary_organization_id) {
-        const { data: orgData } = await supabase
-          .from('organizations')
-          .select('accumulated_points, tier, business_name, seller_code')
-          .eq('id', userData.primary_organization_id)
-          .single();
-
-        if (orgData) {
-          setOrganizationTier(orgData.tier);
-          setOrganizationName(orgData.business_name || '');
-          setSellerCode(orgData.seller_code || '');
-          setContributionPoints(orgData.accumulated_points || 0);
-        }
+      if (orgData) {
+        setOrganizationTier(orgData.tier);
+        setOrganizationName(orgData.business_name || '');
+        setSellerCode(orgData.seller_code || '');
+        setContributionPoints(orgData.accumulated_points || 0);
       }
-    };
+    }
+  };
 
+  useEffect(() => {
     fetchUser();
   }, []);
 
@@ -440,7 +442,10 @@ export default function PlatformTopBar() {
         {/* 로그인 안 되어 있을 때 로그인 버튼 표시 */}
         {!user && (
           <button
-            onClick={() => router.push('/platform?login=true')}
+            onClick={() => {
+              console.log('[PlatformTopBar] 로그인 버튼 클릭 - 모달 열기');
+              setShowLoginModal(true);
+            }}
             style={{
               padding: '8px 16px',
               background: '#2563eb',
@@ -463,6 +468,19 @@ export default function PlatformTopBar() {
           </button>
         )}
       </div>
+      
+      {/* 로그인 모달 */}
+      {showLoginModal && (
+        <AuthModal
+          isOpen={showLoginModal}
+          onClose={() => {
+            setShowLoginModal(false);
+            // 로그인 성공 후 사용자 정보 다시 가져오기
+            fetchUser();
+          }}
+          initialMode="login"
+        />
+      )}
     </header>
   );
 }

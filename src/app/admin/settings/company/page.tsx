@@ -342,7 +342,7 @@ export default function CompanyPage() {
                 value={formData.email}
                 onChange={(e) => handleChange('email', e.target.value)}
                 className="w-full px-2 py-1.5 text-sm border border-border rounded focus:ring-1 focus:ring-primary bg-background text-text"
-                placeholder="contact@dalreamarket.com"
+                placeholder="contact@dalraemarket.com"
               />
             </div>
           </div>
@@ -415,7 +415,7 @@ export default function CompanyPage() {
                 value={formData.privacy_officer_email}
                 onChange={(e) => handleChange('privacy_officer_email', e.target.value)}
                 className="w-full px-2 py-1.5 text-sm border border-border rounded focus:ring-1 focus:ring-primary bg-background text-text"
-                placeholder="privacy@dalreamarket.com"
+                placeholder="privacy@dalraemarket.com"
               />
             </div>
 
@@ -426,7 +426,7 @@ export default function CompanyPage() {
                 value={formData.tax_invoice_email}
                 onChange={(e) => handleChange('tax_invoice_email', e.target.value)}
                 className="w-full px-2 py-1.5 text-sm border border-border rounded focus:ring-1 focus:ring-primary bg-background text-text"
-                placeholder="tax@dalreamarket.com"
+                placeholder="tax@dalraemarket.com"
               />
             </div>
           </div>

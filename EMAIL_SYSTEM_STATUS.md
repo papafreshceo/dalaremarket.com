@@ -85,7 +85,7 @@
 
 ### 🔴 도메인 인증 지연 중
 
-**문제**: Resend에서 `dalreamarket.com` 도메인 인증이 늦어지고 있음
+**문제**: Resend에서 `dalraemarket.com` 도메인 인증이 늦어지고 있음
 
 **현재 설정** (`.env.local`):
 ```bash
@@ -95,13 +95,13 @@ FROM_NAME=달래마켓
 
 **목표 설정** (도메인 인증 완료 후):
 ```bash
-FROM_EMAIL=noreply@dalreamarket.com  # 커스텀 도메인
+FROM_EMAIL=noreply@dalraemarket.com  # 커스텀 도메인
 FROM_NAME=달래마켓
 ```
 
 **해결 방법**:
 1. Resend 대시보드 (https://resend.com/domains) 접속
-2. `dalreamarket.com` 도메인 추가
+2. `dalraemarket.com` 도메인 추가
 3. DNS 레코드 추가 (Resend에서 제공하는 값):
    - DKIM 레코드
    - SPF 레코드
@@ -289,7 +289,7 @@ POST /api/admin/scheduled-emails/execute
 - **무료 플랜**: 3,000 emails/month
 - **Rate Limit**: 2 requests/second (0.6초 딜레이로 해결)
 - **현재 발신자**: `onboarding@resend.dev`
-- **목표 발신자**: `noreply@dalreamarket.com` (도메인 인증 후)
+- **목표 발신자**: `noreply@dalraemarket.com` (도메인 인증 후)
 
 ---
 

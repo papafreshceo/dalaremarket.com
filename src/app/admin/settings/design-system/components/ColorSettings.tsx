@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 import {
+  RefreshCw,
+  Wand2,
+  Check,
+  Copy,
+  Sliders
+} from 'lucide-react';
+import {
   generateColorTones,
   generateSemanticColors,
   applyToneAdjustments,
@@ -16,8 +23,14 @@ interface ColorSettingsProps {
 
 export default function ColorSettings({ settings, onChange }: ColorSettingsProps) {
   const [selectedColorType, setSelectedColorType] = useState<string>('primary');
+  const [copiedColor, setCopiedColor] = useState<string | null>(null);
 
-  // 100개 팔레트 생성
+  const handleCopy = (color: string) => {
+    navigator.clipboard.writeText(color);
+    setCopiedColor(color);
+    setTimeout(() => setCopiedColor(null), 2000);
+  };
+
   const handleGenerate100Palette = () => {
     const palette = generate100ColorPalette();
     onChange({
@@ -26,7 +39,6 @@ export default function ColorSettings({ settings, onChange }: ColorSettingsProps
     });
   };
 
-  // 시멘틱 색상 자동 생성
   const handleGenerateSemanticColors = () => {
     const semantic = generateSemanticColors(settings.primary.base);
     const newSettings = { ...settings };
@@ -44,7 +56,6 @@ export default function ColorSettings({ settings, onChange }: ColorSettingsProps
     onChange(newSettings);
   };
 
-  // 기본 색상 변경 + 톤 자동 생성
   const handleBaseColorChange = (type: string, color: string) => {
     const tones = generateColorTones(color);
     onChange({
@@ -57,7 +68,6 @@ export default function ColorSettings({ settings, onChange }: ColorSettingsProps
     });
   };
 
-  // 톤 조절 적용
   const handleToneAdjustment = (key: string, value: number) => {
     const newAdjustments = {
       ...settings.tone_adjustments,
@@ -66,7 +76,6 @@ export default function ColorSettings({ settings, onChange }: ColorSettingsProps
 
     const newSettings = { ...settings, tone_adjustments: newAdjustments };
 
-    // 모든 색상에 톤 조절 적용
     ['primary', 'secondary', 'success', 'warning', 'error', 'info', 'neutral'].forEach(colorType => {
       const adjusted = applyToneAdjustments(
         settings[colorType].base,
@@ -84,7 +93,6 @@ export default function ColorSettings({ settings, onChange }: ColorSettingsProps
     onChange(newSettings);
   };
 
-  // 프리셋 톤 적용
   const handlePresetTone = (preset: string) => {
     const newSettings = { ...settings, preset_tone: preset };
 
@@ -101,252 +109,207 @@ export default function ColorSettings({ settings, onChange }: ColorSettingsProps
   };
 
   const colorTypes = [
-    { key: 'primary', label: 'Primary', emoji: '🔵' },
-    { key: 'secondary', label: 'Secondary', emoji: '🟢' },
-    { key: 'success', label: 'Success', emoji: '✅' },
-    { key: 'warning', label: 'Warning', emoji: '⚠️' },
-    { key: 'error', label: 'Error', emoji: '❌' },
-    { key: 'info', label: 'Info', emoji: 'ℹ️' },
-    { key: 'neutral', label: 'Neutral', emoji: '⚪' }
+    { key: 'primary', label: '기본 색상 (Primary)', desc: '브랜드 메인 색상' },
+    { key: 'secondary', label: '보조 색상 (Secondary)', desc: '강조 및 보조 색상' },
+    { key: 'success', label: '성공 (Success)', desc: '긍정적 상태 표시' },
+    { key: 'warning', label: '경고 (Warning)', desc: '주의 필요 상태' },
+    { key: 'error', label: '오류 (Error)', desc: '치명적 상태 표시' },
+    { key: 'info', label: '정보 (Info)', desc: '일반 정보 표시' },
+    { key: 'neutral', label: '중립 (Neutral)', desc: '텍스트 및 테두리' }
   ];
 
   const presetTones = [
-    { key: 'vibrant', label: 'Vibrant', desc: '선명하고 강렬한 색상' },
-    { key: 'pastel', label: 'Pastel', desc: '부드럽고 연한 색상' },
-    { key: 'dark', label: 'Dark', desc: '어둡고 깊은 색상' },
-    { key: 'monochrome', label: 'Monochrome', desc: '흑백 색상' },
-    { key: 'warm', label: 'Warm', desc: '따뜻한 색온도' },
-    { key: 'cool', label: 'Cool', desc: '차가운 색온도' }
+    { key: 'vibrant', label: '생생한' },
+    { key: 'pastel', label: '파스텔' },
+    { key: 'dark', label: '다크' },
+    { key: 'monochrome', label: '모노' },
+    { key: 'warm', label: '따뜻한' },
+    { key: 'cool', label: '차가운' }
   ];
 
   return (
-    <div className="space-y-2">
-
-      {/* 100개 팔레트 */}
-      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-              100개 색상 팔레트
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Tailwind 스타일 100개 색상
-            </p>
-          </div>
-          <button
-            onClick={handleGenerate100Palette}
-            className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-          >
-            자동 생성
-          </button>
-        </div>
-
-        <div className="grid grid-cols-20 gap-1">
-          {(settings.palette_100 || []).map((color: string, idx: number) => (
-            <div
-              key={idx}
-              className="aspect-square rounded cursor-pointer hover:scale-110 transition-transform"
-              style={{ backgroundColor: color }}
-              title={color}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* 시멘틱 색상 */}
-      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-              시멘틱 색상
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Primary 색상 기반 자동 생성
-            </p>
-          </div>
-          <button
-            onClick={handleGenerateSemanticColors}
-            className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700"
-          >
-            자동 생성
-          </button>
-        </div>
-
-        {/* 색상 타입 선택 */}
-        <div className="grid grid-cols-7 gap-1.5 mb-3">
-          {colorTypes.map(({ key, label, emoji }) => (
-            <button
-              key={key}
-              onClick={() => setSelectedColorType(key)}
-              className={`p-3 rounded-lg border-2 transition-all ${
-                selectedColorType === key
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
-            >
-              <div className="text-2xl mb-1">{emoji}</div>
-              <div className="text-xs font-medium text-gray-900 dark:text-white">
-                {label}
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {/* 선택된 색상 편집 */}
-        {selectedColorType && settings[selectedColorType] && (
-          <div className="space-y-4">
-            {/* 기본 색상 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                기본 색상
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={settings[selectedColorType].base}
-                  onChange={(e) => handleBaseColorChange(selectedColorType, e.target.value)}
-                  className="w-20 h-10 rounded cursor-pointer"
+    <div className="space-y-8">
+      {/* Main Color Configuration */}
+      <div className="grid grid-cols-12 gap-8">
+        {/* Left: Color Selection */}
+        <div className="col-span-4 space-y-2">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 px-1">
+            색상 역할
+          </label>
+          <div className="space-y-1">
+            {colorTypes.map(({ key, label, desc }) => (
+              <button
+                key={key}
+                onClick={() => setSelectedColorType(key)}
+                className={`w-full flex items-center gap-3 p-2 rounded-lg transition-all border ${selectedColorType === key
+                    ? 'bg-white dark:bg-gray-800 border-blue-500 ring-1 ring-blue-500 shadow-sm'
+                    : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }`}
+              >
+                <div
+                  className="w-8 h-8 rounded-md shadow-sm border border-gray-200 dark:border-gray-700 shrink-0"
+                  style={{ backgroundColor: settings[key]?.base }}
                 />
-                <input
-                  type="text"
-                  value={settings[selectedColorType].base}
-                  onChange={(e) => handleBaseColorChange(selectedColorType, e.target.value)}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
+                <div className="text-left">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">{label}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">{desc}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Right: Detailed Settings */}
+        <div className="col-span-8 space-y-6">
+          {selectedColorType && settings[selectedColorType] && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white capitalize">
+                    {colorTypes.find(t => t.key === selectedColorType)?.label}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    기본 색상 및 생성된 톤 설정
+                  </p>
+                </div>
                 <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-700 dark:text-gray-300">투명도</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={settings[selectedColorType].opacity}
-                    onChange={(e) => onChange({
-                      ...settings,
-                      [selectedColorType]: {
-                        ...settings[selectedColorType],
-                        opacity: parseInt(e.target.value)
-                      }
-                    })}
-                    className="w-16 px-2 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                  <span className="text-sm text-gray-500">%</span>
+                  <div className="relative">
+                    <input
+                      type="color"
+                      value={settings[selectedColorType].base}
+                      onChange={(e) => handleBaseColorChange(selectedColorType, e.target.value)}
+                      className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                    />
+                    <div
+                      className="w-10 h-10 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm flex items-center justify-center text-white"
+                      style={{ backgroundColor: settings[selectedColorType].base }}
+                    >
+                      <Wand2 size={16} />
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={settings[selectedColorType].base}
+                      onChange={(e) => handleBaseColorChange(selectedColorType, e.target.value)}
+                      className="w-28 px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-transparent font-mono uppercase"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Tones Grid */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    생성된 톤
+                  </label>
+                  <span className="text-xs text-gray-500">클릭하여 복사</span>
+                </div>
+                <div className="grid grid-cols-10 gap-2">
+                  {Object.entries(settings[selectedColorType].tones || {}).map(([tone, data]: [string, any]) => (
+                    <button
+                      key={tone}
+                      onClick={() => handleCopy(data.color)}
+                      className="group relative aspect-square rounded-md transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      style={{ backgroundColor: data.color }}
+                      title={`${tone}: ${data.color}`}
+                    >
+                      {copiedColor === data.color && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-md">
+                          <Check size={12} className="text-white" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex justify-between text-xs text-gray-400 px-1">
+                  <span>50</span>
+                  <span>500</span>
+                  <span>900</span>
                 </div>
               </div>
             </div>
+          )}
 
-            {/* 50-900 톤 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                색상 톤 (50-900)
-              </label>
-              <div className="grid grid-cols-10 gap-2">
-                {Object.entries(settings[selectedColorType].tones || {}).map(([tone, data]: [string, any]) => (
-                  <div key={tone} className="space-y-1">
-                    <div
-                      className="aspect-square rounded-lg border border-gray-300 dark:border-gray-600"
-                      style={{ backgroundColor: data.color }}
-                    />
-                    <div className="text-xs text-center text-gray-600 dark:text-gray-400">
-                      {tone}
-                    </div>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={data.opacity}
-                      onChange={(e) => {
-                        const newTones = { ...settings[selectedColorType].tones };
-                        newTones[tone] = { ...newTones[tone], opacity: parseInt(e.target.value) };
-                        onChange({
-                          ...settings,
-                          [selectedColorType]: {
-                            ...settings[selectedColorType],
-                            tones: newTones
-                          }
-                        });
-                      }}
-                      className="w-full px-1 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
+          {/* Global Adjustments */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+            <div className="flex items-center gap-2 mb-6">
+              <Sliders size={18} className="text-gray-500" />
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                전역 조정
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400">채도 (Saturation)</label>
+                    <span className="text-xs text-gray-500">{settings.tone_adjustments?.saturation || 0}%</span>
                   </div>
-                ))}
+                  <input
+                    type="range"
+                    min="-100"
+                    max="100"
+                    value={settings.tone_adjustments?.saturation || 0}
+                    onChange={(e) => handleToneAdjustment('saturation', parseInt(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400">밝기 (Lightness)</label>
+                    <span className="text-xs text-gray-500">{settings.tone_adjustments?.lightness || 0}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-100"
+                    max="100"
+                    value={settings.tone_adjustments?.lightness || 0}
+                    onChange={(e) => handleToneAdjustment('lightness', parseInt(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">프리셋 무드</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {presetTones.map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => handlePresetTone(key)}
+                      className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${settings.preset_tone === key
+                          ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300'
+                          : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* 톤 조절 */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
-          전체 톤 조절
-        </h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              채도 ({settings.tone_adjustments?.saturation || 0})
-            </label>
-            <input
-              type="range"
-              min="-100"
-              max="100"
-              value={settings.tone_adjustments?.saturation || 0}
-              onChange={(e) => handleToneAdjustment('saturation', parseInt(e.target.value))}
-              className="w-full"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              밝기 ({settings.tone_adjustments?.lightness || 0})
-            </label>
-            <input
-              type="range"
-              min="-100"
-              max="100"
-              value={settings.tone_adjustments?.lightness || 0}
-              onChange={(e) => handleToneAdjustment('lightness', parseInt(e.target.value))}
-              className="w-full"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              색온도 ({settings.tone_adjustments?.temperature || 0})
-            </label>
-            <input
-              type="range"
-              min="-100"
-              max="100"
-              value={settings.tone_adjustments?.temperature || 0}
-              onChange={(e) => handleToneAdjustment('temperature', parseInt(e.target.value))}
-              className="w-full"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* 프리셋 톤 */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
-          프리셋 톤
-        </h3>
-        <div className="grid grid-cols-3 gap-3">
-          {presetTones.map(({ key, label, desc }) => (
+          {/* Actions */}
+          <div className="flex gap-3">
             <button
-              key={key}
-              onClick={() => handlePresetTone(key)}
-              className={`p-4 rounded-lg border-2 text-left transition-all ${
-                settings.preset_tone === key
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
+              onClick={handleGenerateSemanticColors}
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
             >
-              <div className="font-medium text-gray-900 dark:text-white mb-1">
-                {label}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                {desc}
-              </div>
+              <Wand2 size={16} />
+              시멘틱 색상 자동 생성
             </button>
-          ))}
+            <button
+              onClick={handleGenerate100Palette}
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
+            >
+              <RefreshCw size={16} />
+              팔레트 재생성
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -53,7 +53,7 @@ interface UseRequireAuthReturn {
  * const { user, loading, isAuthenticated } = useRequireAuth({
  *   requiredRole: 'admin', // 선택 사항
  *   requireApproved: true,
- *   redirectTo: '/auth/login'
+ *   redirectTo: '/platform?login=true'
  * });
  *
  * if (loading) return <div>로딩 중...</div>;
@@ -120,7 +120,7 @@ export function useRequireAuth(options: UseRequireAuthOptions = {}): UseRequireA
           setLoading(false);
           // 승인 대기 페이지로 이동하거나 로그아웃
           await supabase.auth.signOut();
-          router.push('/auth/login?error=not-approved');
+          router.push('/platform?login=true&error=not-approved');
           return;
         }
 

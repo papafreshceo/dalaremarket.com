@@ -176,7 +176,7 @@ psql -h [SUPABASE_DB_HOST] -U postgres -d postgres -f database/migrations/001_cr
 ## 현재 파일 구조
 
 ```
-dalreamarket.com/
+dalraemarket.com/
 ├── database/
 │   ├── DB_ARCHITECTURE.md              # 데이터베이스 설계 문서
 │   ├── MIGRATION_SUMMARY.md            # 이 파일

@@ -368,7 +368,7 @@ export default function ApiSettingsPage() {
               <div>
                 <h3 className="font-medium text-text mb-2">베이스 URL</h3>
                 <code className="block bg-background px-4 py-2 rounded text-sm text-text">
-                  https://api.dalreamarket.com/v1
+                  https://api.dalraemarket.com/v1
                 </code>
               </div>
 
@@ -411,7 +411,7 @@ export default function ApiSettingsPage() {
 
               <div className="pt-4">
                 <Button
-                  onClick={() => window.open('https://docs.dalreamarket.com/api', '_blank')}
+                  onClick={() => window.open('https://docs.dalraemarket.com/api', '_blank')}
                   className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover"
                 >
                   전체 API 문서 보기

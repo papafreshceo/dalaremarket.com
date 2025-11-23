@@ -41,7 +41,7 @@ export default function PlatformFooter() {
         setSettings({
           site_name: '달래마켓',
           site_logo_url: 'https://res.cloudinary.com/dde1hpbrp/image/upload/v1753148563/05_etc/dalraemarket_papafarmers.com/DalraeMarket_loge_trans.png',
-          contact_email: 'contact@dalreamarket.com',
+          contact_email: 'contact@dalraemarket.com',
           contact_phone: '1588-0000',
           business_hours: '평일 09:00 - 18:00',
           footer_text: '© 2025 달래마켓. All rights reserved.',
@@ -51,7 +51,7 @@ export default function PlatformFooter() {
           e_commerce_license_number: '2024-서울강남-12345',
           address: '서울특별시 강남구 테헤란로 123',
           privacy_officer_name: '김개인',
-          privacy_officer_email: 'privacy@dalreamarket.com'
+          privacy_officer_email: 'privacy@dalraemarket.com'
         })
       }
     }

@@ -93,8 +93,8 @@ node scripts/fix-user-organization.js test@example.com
 # Mac: brew install bfg
 
 # 민감 정보 제거
-git clone --mirror https://github.com/your-username/dalreamarket.com.git
-cd dalreamarket.com.git
+git clone --mirror https://github.com/your-username/dalraemarket.com.git
+cd dalraemarket.com.git
 bfg --delete-files 'run-*.js'
 bfg --delete-files 'fix-test2-*.js'
 git reflog expire --expire=now --all
@@ -153,7 +153,7 @@ cd git-secrets
 ./install.sh
 
 # 프로젝트에 설정
-cd /path/to/dalreamarket.com
+cd /path/to/dalraemarket.com
 git secrets --install
 git secrets --register-aws
 git secrets --add 'eyJ[A-Za-z0-9-_]*\.[A-Za-z0-9-_]*'

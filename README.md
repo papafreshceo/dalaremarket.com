@@ -30,8 +30,8 @@ B2B 통합 비즈니스 플랫폼 - 내부 관리 시스템과 고객용 발주/
 
 ### 1. 프로젝트 클론
 ```bash
-git clone https://github.com/yourusername/dalreamarket.com.git
-cd dalreamarket.com
+git clone https://github.com/yourusername/dalraemarket.com.git
+cd dalraemarket.com
 ```
 
 ### 2. 의존성 설치
@@ -60,7 +60,7 @@ npm run dev
 ## 📁 프로젝트 구조
 
 ```
-dalreamarket.com/
+dalraemarket.com/
 ├── app/
 │   ├── (admin)/          # 관리자 페이지
 │   ├── (platform)/       # 사용자 페이지
@@ -89,7 +89,7 @@ dalreamarket.com/
 ## 📝 테스트 계정
 
 ### 관리자
-- Email: admin@dalreamarket.com
+- Email: admin@dalraemarket.com
 - Password: admin123456
 
 ### 고객
@@ -121,5 +121,5 @@ MIT License
 
 ## 📞 문의
 
-- Email: contact@dalreamarket.com
-- Website: https://dalreamarket.com
+- Email: contact@dalraemarket.com
+- Website: https://dalraemarket.com

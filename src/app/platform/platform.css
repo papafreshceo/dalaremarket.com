@@ -1,34 +1,44 @@
 /* Platform 전용 디자인 시스템 */
+/* 디자인 시스템(--ds-*)에서 값을 가져오고, 없으면 기본값 사용 */
 
 :root {
-  /* Border Radius */
-  --platform-radius-sm: 4px;
-  --platform-radius-md: 8px;
-  --platform-radius-lg: 12px;
-  --platform-radius-xl: 16px;
+  /* Border Radius - 디자인 시스템 연동 */
+  --platform-radius-sm: var(--ds-radius-sm, 4px);
+  --platform-radius-md: var(--ds-radius-md, 8px);
+  --platform-radius-lg: var(--ds-radius-lg, 12px);
+  --platform-radius-xl: var(--ds-radius-xl, 16px);
 
-  /* Shadow */
+  /* Shadow - 디자인 시스템 연동 */
   --platform-shadow-none: none;
-  --platform-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
-  --platform-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-  --platform-shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15);
+  --platform-shadow-sm: var(--ds-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+  --platform-shadow-md: var(--ds-shadow-md, 0 4px 6px rgba(0, 0, 0, 0.1));
+  --platform-shadow-lg: var(--ds-shadow-lg, 0 10px 20px rgba(0, 0, 0, 0.15));
   --platform-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.2);
 
-  /* Colors */
-  --platform-primary: #2563eb;
+  /* Colors - 디자인 시스템 연동 */
+  --platform-primary: var(--ds-color-primary, #2563eb);
   --platform-primary-hover: #1d4ed8;
-  --platform-secondary: #10b981;
+  --platform-secondary: var(--ds-color-secondary, #10b981);
   --platform-border: #e0e0e0;
   --platform-text: #212529;
-  --platform-text-secondary: #6b7280;
+  --platform-text-secondary: var(--ds-color-neutral, #6b7280);
+
+  /* Background - 디자인 시스템 연동 */
+  --platform-bg-light: var(--ds-bg-light, #ffffff);
+  --platform-bg-medium: var(--ds-bg-medium, #f3f4f6);
+  --platform-bg-dark: var(--ds-bg-dark, #1f2937);
+
+  /* Typography - 디자인 시스템 연동 */
+  --platform-font-size: var(--ds-font-size-base, 16px);
+  --platform-font-weight: var(--ds-font-weight-base, 400);
 
   /* Spacing */
   --platform-padding-sm: 8px;
   --platform-padding-md: 12px;
   --platform-padding-lg: 16px;
 
-  /* Border Width */
-  --platform-border-width: 1px;
+  /* Border Width - 디자인 시스템 연동 */
+  --platform-border-width: var(--ds-border-width, 1px);
 }
 
 /* ===== 버튼 스타일 ===== */

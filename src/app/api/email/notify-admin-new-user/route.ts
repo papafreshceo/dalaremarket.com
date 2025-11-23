@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const emailPromises = superAdmins.map(async (admin) => {
       try {
         const { data, error } = await resend.emails.send({
-          from: '달래마켓 <noreply@dalreamarket.com>',
+          from: '달래마켓 <noreply@dalraemarket.com>',
           to: [admin.email],
           subject: `🎉 신규 회원 가입 알림 - ${name}`,
           html: `

@@ -40,7 +40,7 @@ export default function NotificationsSettingsPage() {
     smtp_user: '',
     smtp_password: '',
     sender_name: '달래마켓',
-    sender_email: 'noreply@dalreamarket.com'
+    sender_email: 'noreply@dalraemarket.com'
   })
 
   const [smsSettings, setSMSSettings] = useState<SMSSettings>({
@@ -234,7 +234,7 @@ export default function NotificationsSettingsPage() {
                     value={emailSettings.sender_email}
                     onChange={(e) => handleEmailChange('sender_email', e.target.value)}
                     className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary bg-background text-text"
-                    placeholder="noreply@dalreamarket.com"
+                    placeholder="noreply@dalraemarket.com"
                   />
                 </div>
               </div>

@@ -1,4 +1,4 @@
-// app/admin/layout.tsx
+// app/admin/admin-client-layout.tsx
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -17,6 +17,8 @@ import { getUserAccessiblePages } from '@/lib/permissions'
 import { menuCategories, menuGroups } from '@/config/admin-menu'
 import { AdminAuthProvider, UserData } from '@/contexts/AdminAuthContext'
 import { User } from '@supabase/supabase-js'
+import { useSession } from '@/contexts/SessionProvider'
+import { syncSession } from '@/lib/session-sync'
 
 // React Query 클라이언트 설정 (최적화)
 const queryClient = new QueryClient({
@@ -43,6 +45,7 @@ export default function AdminClientLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { user: sessionUser, loading: sessionLoading, refreshSession } = useSession()
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
   const [showHtmlBuilder, setShowHtmlBuilder] = useState(false)
@@ -53,6 +56,22 @@ export default function AdminClientLayout({
   const [selectedCategory, setSelectedCategory] = useState<string>('operation')
   const [selectedGroup, setSelectedGroup] = useState<string>('dashboard')
   const supabase = createClient()
+
+  // 세션 동기화 체크 (한 번만 실행)
+  useEffect(() => {
+    // 초기 로드시 세션 동기화 (sessionLoading이 false일 때만)
+    if (!sessionLoading && !sessionUser && !initialUser) {
+      syncSession().then(result => {
+        if (!result.success) {
+          console.log('[AdminClientLayout] Session sync failed:', result.error)
+          // Rate limit 에러가 아닐 때만 리다이렉트
+          if (!result.error?.toString().includes('rate limit')) {
+            router.push('/platform?login=true')
+          }
+        }
+      })
+    }
+  }, [sessionLoading]) // sessionUser, router 제거하여 무한 루프 방지
 
   useEffect(() => {
     const checkScreenSize = () => {

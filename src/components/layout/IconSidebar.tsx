@@ -9,7 +9,7 @@ export default function IconSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
-  const { activeIconMenu, setActiveIconMenu, isSidebarVisible, setIsSidebarVisible } = useSidebar();
+  const { activeIconMenu, setActiveIconMenu, isSidebarVisible, setIsSidebarVisible, isHydrated } = useSidebar();
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [showOpenButton, setShowOpenButton] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -149,7 +149,10 @@ export default function IconSidebar() {
   }, [currentUserId]);
 
   // 페이지 로드 시 현재 경로에 맞는 메뉴 상태 설정
+  // Hydration 완료 후에만 실행하여 서버/클라이언트 불일치 방지
   useEffect(() => {
+    // Hydration 완료 전에는 실행하지 않음
+    if (!isHydrated) return;
     // 클라이언트에서만 URL 파라미터 및 localStorage 확인
     if (typeof window === 'undefined') return;
 
@@ -194,7 +197,7 @@ export default function IconSidebar() {
       const savedVisible = localStorage.getItem('platformSidebarVisible');
       setIsSidebarVisible(savedVisible === 'true');
     }
-  }, [pathname]);
+  }, [pathname, isHydrated]);
 
   // 컴포넌트 언마운트 시 정리
   useEffect(() => {
@@ -215,21 +218,6 @@ export default function IconSidebar() {
       ),
       path: '/platform',
       label: '홈'
-    },
-    {
-      icon: (
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-        </svg>
-      ),
-      path: '/platform/notifications',
-      label: '알림',
-      submenu: [
-        { path: '/platform/notice', label: '공지사항' },
-        { path: '/platform/notifications', label: '알림' },
-        { path: '/platform/messages', label: '채팅' }
-      ]
     },
     {
       icon: (
@@ -320,6 +308,21 @@ export default function IconSidebar() {
       label: '업무도구',
       submenu: [
         { path: '/platform/tools', label: '전체 도구' }
+      ]
+    },
+    {
+      icon: (
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+      ),
+      path: '/platform/notifications',
+      label: '알림',
+      submenu: [
+        { path: '/platform/notice', label: '공지사항' },
+        { path: '/platform/notifications', label: '알림' },
+        { path: '/platform/messages', label: '채팅' }
       ]
     },
     {
@@ -492,11 +495,12 @@ export default function IconSidebar() {
       alignItems: 'center',
       paddingTop: '16px',
       gap: '12px',
-      zIndex: 1003
+      zIndex: 999
     }}>
       {menuItems.filter(item => item.path !== '/platform/profile').map((item, index) => {
         // 클릭 상태로만 활성화 여부 결정 (페이지 경로 무시)
-        const isHomeActive = item.path === '/platform' && activeIconMenu === null && isSidebarVisible;
+        // Hydration 전에는 false로 처리하여 서버 렌더링과 일치
+        const isHomeActive = item.path === '/platform' && activeIconMenu === null && isHydrated && isSidebarVisible;
         const isNotificationActive = item.path === '/platform/notifications' && activeIconMenu === 'notifications';
         const isProfileActive = item.path === '/platform/profile' && activeIconMenu === 'profile';
         const isDepositActive = item.path === '/platform/deposit' && activeIconMenu === 'deposit';
@@ -510,6 +514,7 @@ export default function IconSidebar() {
         return (
           <div key={item.path} style={{ position: 'relative' }} ref={expandedMenu === item.path ? dropdownRef : null}>
             <button
+              suppressHydrationWarning
               onClick={() => handleClick(item)}
               title={item.label}
               style={{
@@ -724,7 +729,7 @@ export default function IconSidebar() {
           right: '-12px',
           top: '50%',
           transform: 'translateY(calc(-50% - 120px))',
-          zIndex: 1004
+          zIndex: 997
         }}>
           <button
             onClick={handleOpenSidebar}

@@ -1,22 +1,89 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { usePathname } from 'next/navigation'
-import UserHeader from '@/components/layout/UserHeader'
+import { useEffect, useState, Suspense } from 'react'
+import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 import PlatformSidebar from '@/components/layout/PlatformSidebar'
 import PlatformTopBar from '@/components/layout/PlatformTopBar'
 import IconSidebar from '@/components/layout/IconSidebar'
-import MobileBottomNav from '@/components/layout/MobileBottomNav'
+import MobileHeader from '@/components/layout/MobileHeader'
+import MobileDrawer from '@/components/layout/MobileDrawer'
 import Footer from '@/components/layout/Footer'
 import { UserBalanceProvider } from '@/contexts/UserBalanceContext'
 import { SidebarProvider, useSidebar } from '@/contexts/SidebarContext'
+import { DesignSystemProvider } from '@/contexts/DesignSystemContext'
+import { AuthModal } from '@/components/auth/AuthModal'
+import { useSession } from '@/contexts/SessionProvider'
+import { ToastProvider } from '@/components/ui/Toast'
 import './platform.css'
 
 function LayoutContent({ children, pathname }: { children: React.ReactNode; pathname: string | null }) {
-  const { isSidebarVisible } = useSidebar()
+  const { isSidebarVisible, isHydrated } = useSidebar()
+  const { user, loading: sessionLoading } = useSession()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [isInIframe, setIsInIframe] = useState<boolean | null>(null)
   const [isMounted, setIsMounted] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [loginMode, setLoginMode] = useState<'login' | 'findId' | 'resetPassword'>('login')
+  
+  // URL 파라미터로 로그인 모달 제어 (외부 링크에서 올 때만)
+  useEffect(() => {
+    const shouldShowLogin = searchParams?.get('login') === 'true'
+    const error = searchParams?.get('error')
+    const mode = searchParams?.get('mode')
+    
+    // 세션 로딩 중이면 대기
+    if (sessionLoading) {
+      return
+    }
+    
+    // URL에 login=true가 있고 로그인되지 않은 경우
+    if (shouldShowLogin && !user) {
+      console.log('[PlatformLayout] URL 파라미터로 인한 로그인 모달 표시')
+      setShowLoginModal(true)
+      
+      // 모드 설정
+      if (mode === 'findId') {
+        setLoginMode('findId')
+      } else if (mode === 'resetPassword') {
+        setLoginMode('resetPassword')
+      } else {
+        setLoginMode('login')
+      }
+      
+      // URL 파라미터 즉시 제거 (깔끔한 URL 유지)
+      const url = new URL(window.location.href)
+      url.searchParams.delete('login')
+      url.searchParams.delete('error')
+      url.searchParams.delete('mode')
+      url.searchParams.delete('redirect')
+      window.history.replaceState({}, '', url.pathname + url.search)
+      
+    } else if (shouldShowLogin && user) {
+      // 이미 로그인된 상태면 URL 정리
+      console.log('[PlatformLayout] 이미 로그인됨, URL 정리')
+      const url = new URL(window.location.href)
+      url.searchParams.delete('login')
+      url.searchParams.delete('error')
+      url.searchParams.delete('mode')
+      url.searchParams.delete('redirect')
+      router.replace(url.pathname + url.search)
+      setShowLoginModal(false)
+    }
+  }, [searchParams, user, sessionLoading, router])
+
+  const handleCloseLoginModal = () => {
+    setShowLoginModal(false)
+    // URL에서 login 파라미터 제거
+    const url = new URL(window.location.href)
+    url.searchParams.delete('login')
+    url.searchParams.delete('error')
+    url.searchParams.delete('mode')
+    url.searchParams.delete('redirect')
+    router.replace(url.pathname + url.search)
+  }
 
   useEffect(() => {
     setIsMounted(true)
@@ -37,6 +104,18 @@ function LayoutContent({ children, pathname }: { children: React.ReactNode; path
 
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  // 드로어 열려있을 때 body 스크롤 방지
+  useEffect(() => {
+    if (isDrawerOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isDrawerOpen])
 
   // 플랫폼 화면 파비콘 설정 (더 빠른 타이밍)
   useEffect(() => {
@@ -83,15 +162,30 @@ function LayoutContent({ children, pathname }: { children: React.ReactNode; path
   // /platform/orders 페이지 체크
   const isOrdersPage = pathname?.startsWith('/platform/orders')
 
-  // 모바일: 기존 UserHeader 방식
+  // 모바일: MobileHeader + MobileDrawer 방식
   if (isMobile) {
     return (
-      <div className="flex flex-col min-h-screen">
-        {showLayout && <UserHeader />}
-        <main className="flex-1">{children}</main>
+      <>
+        {showLayout && (
+          <>
+            <MobileHeader onMenuOpen={() => setIsDrawerOpen(true)} />
+            <MobileDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
+          </>
+        )}
+        <main style={{ paddingTop: showLayout ? '56px' : '0', minHeight: '100vh' }}>
+          {children}
+        </main>
         {showLayout && <Footer />}
-        {showLayout && <MobileBottomNav />}
-      </div>
+        
+        {/* 로그인 모달 */}
+        {showLoginModal && (
+          <AuthModal
+            isOpen={showLoginModal}
+            onClose={handleCloseLoginModal}
+            initialMode={loginMode}
+          />
+        )}
+      </>
     )
   }
 
@@ -100,7 +194,7 @@ function LayoutContent({ children, pathname }: { children: React.ReactNode; path
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       {/* 상단바 - 전체 너비 */}
       {showLayout && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1001 }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000 }}>
           <PlatformTopBar />
         </div>
       )}
@@ -112,20 +206,31 @@ function LayoutContent({ children, pathname }: { children: React.ReactNode; path
       {showLayout && <PlatformSidebar />}
 
       {/* 오른쪽 메인 영역 */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        marginLeft: isSidebarVisible ? '242px' : '50px',
-        marginTop: '50px',
-        transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-      }}>
+      <div
+        suppressHydrationWarning
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          marginLeft: isHydrated && isSidebarVisible ? '242px' : '50px',
+          marginTop: '50px',
+          transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}>
         <main style={{ flex: 1, overflowY: 'auto', background: isOrdersPage ? 'white' : '#f8f9fa' }}>
           {children}
           {showLayout && <Footer />}
         </main>
       </div>
+      
+      {/* 로그인 모달 */}
+      {showLoginModal && (
+        <AuthModal
+          isOpen={showLoginModal}
+          onClose={handleCloseLoginModal}
+          initialMode={loginMode}
+        />
+      )}
     </div>
   )
 }
@@ -138,12 +243,18 @@ export default function PlatformLayout({
   const pathname = usePathname()
 
   return (
-    <UserBalanceProvider>
-      <SidebarProvider>
-        <LayoutContent pathname={pathname}>
-          {children}
-        </LayoutContent>
-      </SidebarProvider>
-    </UserBalanceProvider>
+    <DesignSystemProvider>
+      <ToastProvider>
+        <UserBalanceProvider>
+          <SidebarProvider>
+            <Suspense fallback={null}>
+              <LayoutContent pathname={pathname}>
+                {children}
+              </LayoutContent>
+            </Suspense>
+          </SidebarProvider>
+        </UserBalanceProvider>
+      </ToastProvider>
+    </DesignSystemProvider>
   )
 }

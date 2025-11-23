@@ -177,12 +177,12 @@ let query = dbClient
 ### 1. 백업 (필수)
 ```bash
 # integrated_orders 테이블 백업
-psql -U postgres -d dalreamarket -c "\COPY integrated_orders TO 'backup_integrated_orders_$(date +%Y%m%d).csv' CSV HEADER"
+psql -U postgres -d dalraemarket -c "\COPY integrated_orders TO 'backup_integrated_orders_$(date +%Y%m%d).csv' CSV HEADER"
 ```
 
 ### 2. 마이그레이션 실행
 ```bash
-psql -U postgres -d dalreamarket -f database/migrations/cleanup_integrated_orders_columns.sql
+psql -U postgres -d dalraemarket -f database/migrations/cleanup_integrated_orders_columns.sql
 ```
 
 ### 3. 검증

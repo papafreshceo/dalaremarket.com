@@ -103,8 +103,16 @@ export async function GET(request: NextRequest) {
         // 점수 추가 실패해도 로그인은 진행
       }
 
-      // 로그인 성공 - 공급상품 페이지로 리다이렉트
-      return NextResponse.redirect(new URL('/platform', requestUrl.origin))
+      // 로그인 성공 - URL 파라미터 정리 후 리다이렉트
+      const redirectUrl = new URL('/platform', requestUrl.origin)
+      
+      // login 관련 파라미터가 있으면 제거
+      redirectUrl.searchParams.delete('login')
+      redirectUrl.searchParams.delete('error')
+      redirectUrl.searchParams.delete('mode')
+      redirectUrl.searchParams.delete('redirect')
+      
+      return NextResponse.redirect(redirectUrl)
     }
   }
 

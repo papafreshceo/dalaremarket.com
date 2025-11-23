@@ -63,7 +63,7 @@ INSERT INTO site_settings (
   'https://res.cloudinary.com/dde1hpbrp/image/upload/v1753148563/05_etc/dalraemarket_papafarmers.com/DalraeMarket_loge_trans.png',
   '신선한 농산물을 직접 공급하는 B2B 플랫폼',
   '농산물, B2B, 도매, 납품, 신선식품',
-  'contact@dalreamarket.com',
+  'contact@dalraemarket.com',
   '1588-0000',
   '평일 09:00 - 18:00',
   '© 2025 달래마켓. All rights reserved.',
@@ -73,7 +73,7 @@ INSERT INTO site_settings (
   '2024-서울강남-12345',
   '서울특별시 강남구 테헤란로 123',
   '김개인',
-  'privacy@dalreamarket.com'
+  'privacy@dalraemarket.com'
 );
 
 -- 단일 레코드 제약 조건 추가

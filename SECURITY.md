@@ -1,6 +1,6 @@
 # Security Guidelines
 
-이 문서는 dalreamarket.com 프로젝트의 보안 가이드라인을 설명합니다.
+이 문서는 dalraemarket.com 프로젝트의 보안 가이드라인을 설명합니다.
 
 ## 환경변수 관리
 

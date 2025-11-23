@@ -68,7 +68,7 @@ https://abc123.ngrok.io/api/cloudinary/webhook
 - 서버 콘솔에서 다음과 같은 로그 확인:
   ```
   Cloudinary Webhook 수신: { notification_type: 'delete', public_id: '...' }
-  ✅ DB에서 이미지 삭제 완료: filename.jpg (dalreamarket/...)
+  ✅ DB에서 이미지 삭제 완료: filename.jpg (dalraemarket/...)
   ```
 
 ## 5. 프로덕션 배포 시

@@ -15,7 +15,7 @@ function NaverCallbackContent() {
       const state = searchParams.get('state')
 
       if (!code || !state) {
-        router.push('/auth/login?error=missing_code')
+        router.push('/platform?login=true&error=missing_code')
         return
       }
 
@@ -29,7 +29,7 @@ function NaverCallbackContent() {
 
         if (!tokenResponse.ok || !tokenData.access_token) {
           console.error('Token error:', tokenData)
-          router.push('/auth/login?error=token_failed')
+          router.push('/platform?login=true&error=token_failed')
           return
         }
 
@@ -44,7 +44,7 @@ function NaverCallbackContent() {
 
         if (!userResponse.ok || !userData.email) {
           console.error('User info error:', userData)
-          router.push('/auth/login?error=user_info_failed')
+          router.push('/platform?login=true&error=user_info_failed')
           return
         }
 
@@ -63,7 +63,7 @@ function NaverCallbackContent() {
 
         if (!loginResponse.ok || !loginData.success) {
           console.error('Login API error:', loginData)
-          router.push('/auth/login?error=login_failed')
+          router.push('/platform?login=true&error=login_failed')
           return
         }
 
@@ -88,7 +88,7 @@ function NaverCallbackContent() {
 
         if (signInError) {
           console.error('Session creation error:', signInError)
-          router.push('/auth/login?error=session_failed')
+          router.push('/platform?login=true&error=session_failed')
           return
         }
 
@@ -100,11 +100,17 @@ function NaverCallbackContent() {
             .eq('id', signInData.user.id)
         }
 
-        // 리다이렉트
-        router.push(loginData.redirect)
+        // 리다이렉트 - URL 파라미터 정리
+        const redirectUrl = loginData.redirect || '/platform'
+        // login 파라미터가 있으면 제거
+        const cleanUrl = new URL(redirectUrl, window.location.origin)
+        cleanUrl.searchParams.delete('login')
+        cleanUrl.searchParams.delete('error')
+        cleanUrl.searchParams.delete('mode')
+        router.push(cleanUrl.pathname + cleanUrl.search)
       } catch (error) {
         console.error('Naver OAuth error:', error)
-        router.push('/auth/login?error=oauth_failed')
+        router.push('/platform?login=true&error=oauth_failed')
       }
     }
 

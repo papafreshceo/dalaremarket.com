@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClientForRouteHandler } from '@/lib/supabase/server';
 import logger from '@/lib/logger';
 
 // GET: 활성화된 도구 목록 조회
 export async function GET() {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createClientForRouteHandler();
 
     // 활성화된 도구만 조회
     const { data: tools, error } = await supabase

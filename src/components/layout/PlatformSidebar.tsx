@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import TierBadge from '@/components/TierBadge';
 import { useSidebar } from '@/contexts/SidebarContext';
@@ -21,7 +21,7 @@ interface MenuItem {
 export default function PlatformSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { activeIconMenu, isSidebarVisible, setIsSidebarVisible, setActiveIconMenu } = useSidebar();
+  const { activeIconMenu, isSidebarVisible, setIsSidebarVisible, setActiveIconMenu, isHydrated } = useSidebar();
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [organizationName, setOrganizationName] = useState<string>('');
@@ -30,6 +30,10 @@ export default function PlatformSidebar() {
   const [primaryOrgId, setPrimaryOrgId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('');
   const [toolsMenuItems, setToolsMenuItems] = useState<MenuItem[]>([]);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const messageChannelRef = useRef<any>(null);
+  const notificationChannelRef = useRef<any>(null);
   const supabase = createClient();
 
   const handleClose = () => {
@@ -116,6 +120,109 @@ export default function PlatformSidebar() {
       setActiveTab(savedTab);
     }
   }, [pathname]);
+
+  // 읽지 않은 메시지 개수 조회
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchUnreadMessageCount = async () => {
+      try {
+        const response = await fetch('/api/messages');
+        const data = await response.json();
+        if (data.success && data.threads) {
+          // 모든 대화방의 unread_count 합산
+          const totalUnread = data.threads.reduce((sum: number, thread: any) => sum + (thread.unread_count || 0), 0);
+          setUnreadMessageCount(totalUnread);
+        }
+      } catch (error) {
+        console.error('읽지 않은 메시지 개수 조회 실패:', error);
+      }
+    };
+
+    fetchUnreadMessageCount();
+
+    // Realtime 구독: 메시지 테이블 변경 감지
+    if (messageChannelRef.current) {
+      supabase.removeChannel(messageChannelRef.current);
+    }
+
+    const channel = supabase
+      .channel('messages-sidebar')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages'
+        },
+        () => {
+          // 메시지 변경 시 카운트 다시 조회
+          fetchUnreadMessageCount();
+        }
+      )
+      .subscribe();
+
+    messageChannelRef.current = channel;
+
+    return () => {
+      if (messageChannelRef.current) {
+        supabase.removeChannel(messageChannelRef.current);
+      }
+    };
+  }, [user]);
+
+  // 읽지 않은 사이트 알림 개수 조회 (메시지 알림 제외)
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchUnreadNotificationCount = async () => {
+      try {
+        const response = await fetch('/api/notifications');
+        const data = await response.json();
+        if (data.success) {
+          // 메시지 알림(new_message)을 제외한 읽지 않은 알림 개수
+          const nonMessageUnread = (data.notifications || []).filter(
+            (n: any) => !n.is_read && n.type !== 'new_message'
+          ).length;
+          setUnreadNotificationCount(nonMessageUnread);
+        }
+      } catch (error) {
+        console.error('읽지 않은 알림 개수 조회 실패:', error);
+      }
+    };
+
+    fetchUnreadNotificationCount();
+
+    // Realtime 구독: 알림 테이블 변경 감지
+    if (notificationChannelRef.current) {
+      supabase.removeChannel(notificationChannelRef.current);
+    }
+
+    const channel = supabase
+      .channel('notifications-platform-sidebar')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          // 알림 변경 시 카운트 다시 조회
+          fetchUnreadNotificationCount();
+        }
+      )
+      .subscribe();
+
+    notificationChannelRef.current = channel;
+
+    return () => {
+      if (notificationChannelRef.current) {
+        supabase.removeChannel(notificationChannelRef.current);
+      }
+    };
+  }, [user]);
 
   // 메뉴 아이콘
   const icons = {
@@ -291,23 +398,30 @@ export default function PlatformSidebar() {
     });
   };
 
+  // Hydration 전에는 숨김 상태로 시작 (서버 렌더링과 일치)
+  const sidebarTransform = isHydrated
+    ? (isSidebarVisible ? 'translateX(0)' : 'translateX(-242px)')
+    : 'translateX(-242px)';
+
   return (
-    <div style={{
-      position: 'fixed',
-      top: '50px',
-      left: '50px',
-      width: '192px',
-      height: 'calc(100vh - 50px)',
-      background: 'var(--color-background-secondary, #f8f9fa)',
-      borderRight: '1px solid var(--color-border, #e0e0e0)',
-      display: 'flex',
-      flexDirection: 'column',
-      zIndex: 1002,
-      transform: isSidebarVisible ? 'translateX(0)' : 'translateX(-242px)',
-      transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-    }}>
+    <div
+      suppressHydrationWarning
+      style={{
+        position: 'fixed',
+        top: '50px',
+        left: '50px',
+        width: '192px',
+        height: 'calc(100vh - 50px)',
+        background: 'var(--color-background-secondary, #f8f9fa)',
+        borderRight: '1px solid var(--color-border, #e0e0e0)',
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 998,
+        transform: sidebarTransform,
+        transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+      }}>
       {/* 닫기 버튼 */}
-      {isSidebarVisible && (
+      {isHydrated && isSidebarVisible && (
       <div style={{
         position: 'absolute',
         right: '-12px',
@@ -359,7 +473,15 @@ export default function PlatformSidebar() {
           <div key="notifications" style={{
             animation: 'fadeIn 0.2s ease-in-out'
           }}>
-            {notificationMenuItems.map((item) => (
+            {notificationMenuItems.map((item, index) => {
+              // 알림 메뉴는 정확한 경로 매칭 사용 (하위 경로 매칭 X)
+              const isExactMatch = pathname === item.path;
+              // 알림 메뉴 중 정확히 활성화된 항목이 있는지 확인
+              const anyNotificationActive = notificationMenuItems.some(menuItem => pathname === menuItem.path);
+              // 현재 항목이 정확히 활성화되어 있거나, 아무것도 활성화되지 않았으면 첫 번째 항목(사이트알림) 활성화
+              const isItemActive = isExactMatch || (!anyNotificationActive && index === 0);
+
+              return (
               <Link
                 key={item.path}
                 href={item.path}
@@ -370,7 +492,7 @@ export default function PlatformSidebar() {
                   gap: '12px',
                   padding: '8px 12px 8px 8px',
                   margin: '1px 8px',
-                  background: isActive(item.path) ? '#e9ecef' : 'transparent',
+                  background: isItemActive ? '#e9ecef' : 'transparent',
                   borderRadius: '8px',
                   fontSize: '14px',
                   fontWeight: '400',
@@ -380,20 +502,56 @@ export default function PlatformSidebar() {
                   transition: 'background 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActive(item.path)) {
+                  if (!isItemActive) {
                     e.currentTarget.style.background = '#f1f3f5';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActive(item.path)) {
+                  if (!isItemActive) {
                     e.currentTarget.style.background = 'transparent';
                   }
                 }}
               >
                 {item.icon}
-                <span>{item.text}</span>
+                <span style={{ flex: 1 }}>{item.text}</span>
+                {/* 사이트알림 메뉴에 읽지 않은 알림 뱃지 표시 */}
+                {item.text === '사이트알림' && unreadNotificationCount > 0 && (
+                  <span style={{
+                    background: '#ef4444',
+                    color: 'white',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    borderRadius: '999px',
+                    minWidth: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 6px'
+                  }}>
+                    {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                  </span>
+                )}
+                {/* 메세지 메뉴에 읽지 않은 메시지 뱃지 표시 */}
+                {item.text === '메세지' && unreadMessageCount > 0 && (
+                  <span style={{
+                    background: '#ef4444',
+                    color: 'white',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    borderRadius: '999px',
+                    minWidth: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 6px'
+                  }}>
+                    {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                  </span>
+                )}
               </Link>
-            ))}
+            )})}
           </div>
         ) : activeIconMenu === 'community' ? (
           <div key="community" style={{

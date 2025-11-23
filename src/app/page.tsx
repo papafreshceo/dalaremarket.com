@@ -182,19 +182,13 @@ export default function PlatformHome() {
                 더 신선하고 더 저렴한 농산물을 제공합니다
               </p>
               <button
-                onClick={async () => {
-                  // 로그인 상태 확인
-                  const { data: { user } } = await supabase.auth.getUser()
-
-                  if (user) {
-                    // 로그인되어 있으면 바로 /platform으로 이동
-                    router.push('/platform')
-                  } else {
-                    // 로그인되어 있지 않으면 로그인 모달과 함께 /platform으로 이동
-                    router.push('/platform?login=true')
-                  }
+                onClick={() => {
+                  console.log('[HomePage] 지금 시작하기 버튼 클릭됨')
+                  // 플랫폼으로 이동 (로그인 체크는 플랫폼 페이지에서)
+                  router.push('/platform')
                 }}
                 style={{
+                  display: 'inline-block',
                   padding: '18px 56px',
                   background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
                   color: '#ffffff',
@@ -204,7 +198,9 @@ export default function PlatformHome() {
                   fontWeight: '700',
                   cursor: 'pointer',
                   boxShadow: '0 8px 24px rgba(59, 130, 246, 0.3)',
-                  transition: 'all 0.3s'
+                  transition: 'all 0.3s',
+                  position: 'relative',
+                  zIndex: 10
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'translateY(-4px)'

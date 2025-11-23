@@ -530,7 +530,7 @@ export async function notifyAdminNewOrder(params: {
   batchId?: string;
 }) {
   // 기본 URL (환경변수에서 가져오거나 기본값 사용)
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dalreamarket.com';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dalraemarket.com';
 
   // 배치 ID가 있으면 배치 전용 페이지로, 없으면 일반 주문 페이지로
   const actionUrl = params.batchId

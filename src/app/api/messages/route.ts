@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 상대방 정보 조회
+    // 상대방 정보 및 읽지 않은 메시지 개수 조회
     const threadsWithPartner = await Promise.all(
       (threads || []).map(async (thread: any) => {
         const partnerId = thread.participant_1 === user.id
@@ -56,10 +56,18 @@ export async function GET(request: NextRequest) {
           .eq('id', partnerId)
           .single();
 
+        // 읽지 않은 메시지 개수 조회 (상대방이 보낸 메시지 중 is_read=false인 것)
+        const { count: unreadCount } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('thread_id', thread.id)
+          .neq('sender_id', user.id)
+          .eq('is_read', false);
+
         return {
           ...thread,
           partner,
-          unread_count: 0, // TODO: 별도 쿼리로 계산
+          unread_count: unreadCount || 0,
         };
       })
     );
